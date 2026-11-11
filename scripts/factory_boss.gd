@@ -59,9 +59,12 @@ func check_supplies(current: float, maximum: float) -> void:
 func drop_supply(index: int) -> void:
 	if not active or health <= 0.0:
 		return
+	var platform_name: String = ["ArenaCatwalkWest", "ArenaCatwalkCenter", "ArenaCatwalkEast"][index]
+	var deck := get_parent().get_parent().get_node_or_null("TERRAIN/" + platform_name) as Node3D
+	if not deck:
+		return
 	var carrier := CARRIER.new()
-	var room_x := [arena_left + 9.35, arena_right - 9.3, arena_left + 10.4]
-	carrier.position = get_parent_node_3d().to_local(Vector3(room_x[index], floor_height + 2.67, 0))
+	carrier.position = get_parent_node_3d().to_local(deck.global_position + Vector3.UP * 1.25)
 	carrier.adaptive_supply = true
 	carrier.supply_target = target
 	carrier.add_to_group(&"boss_supply")
@@ -228,7 +231,7 @@ func floor_cascade(phase: int) -> void:
 	var center := clampf(target.global_position.x, arena_left, arena_right)
 	for i in range(3 + phase):
 		var x := clampf(center + facing * (i - 1) * 2.25, arena_left, arena_right)
-		var marker := make_effect_box(Vector3(x, base + 0.06, 0), Vector3(1.5, 0.07, 1.35))
+		var marker := make_spike_warning(Vector3(x, base + 0.043, 0), 1.52)
 		var warning := create_tween()
 		warning.tween_interval(0.57 + i * 0.13)
 		warning.tween_callback(raise_spike.bind(x, base, marker))
@@ -268,7 +271,7 @@ func launch_drill(direction: float, height: float) -> void:
 func ground_punch() -> void:
 	var locked_x := target.global_position.x
 	var base := floor_height
-	var marker := make_effect_box(Vector3(locked_x, base + 0.035, 0), Vector3(1.4, 0.07, 1.2))
+	var marker := make_spike_warning(Vector3(locked_x, base + 0.043, 0), 1.48)
 	var resting := fist.position
 	var windup := create_tween()
 	windup.tween_method(pose_punch.bind(resting), 0.0, 1.0, 0.52)
@@ -290,7 +293,7 @@ func followup_spike(base: float) -> void:
 	if not is_instance_valid(target) or health <= 0.0:
 		return
 	var locked_x := target.global_position.x
-	var marker := make_effect_box(Vector3(locked_x, base + 0.035, 0), Vector3(1.4, 0.07, 1.2))
+	var marker := make_spike_warning(Vector3(locked_x, base + 0.043, 0), 1.48)
 	var warning := create_tween()
 	warning.tween_interval(0.34)
 	warning.tween_callback(raise_spike.bind(locked_x, base, marker))
@@ -317,6 +320,20 @@ func raise_spike(locked_x: float, base: float, marker: MeshInstance3D) -> void:
 	impact.tween_interval(0.27)
 	impact.tween_property(spike, "scale:y", 0.02, 0.2)
 	impact.tween_callback(spike.queue_free)
+
+func make_spike_warning(at: Vector3, width: float) -> MeshInstance3D:
+	var marker := MeshInstance3D.new()
+	var decal := QuadMesh.new()
+	decal.size = Vector2(width, 1.4)
+	marker.mesh = decal
+	var paint := ShaderMaterial.new()
+	paint.shader = preload("res://assets/neon_factory/spike_warning.gdshader")
+	marker.material_override = paint
+	marker.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(marker)
+	marker.global_position = at
+	marker.rotation.x = -PI * 0.5
+	return marker
 
 func make_effect_box(at: Vector3, size: Vector3) -> MeshInstance3D:
 	var effect := MeshInstance3D.new()

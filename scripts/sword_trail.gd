@@ -4,6 +4,7 @@ var blade: Node3D
 var age := 0.0
 var swing_time := 0.18
 var intensity := 1.0
+var hot := false
 var samples: Array[PackedVector3Array] = []
 var ribbon := ImmediateMesh.new()
 var tint := StandardMaterial3D.new()
@@ -34,8 +35,8 @@ func _process(delta: float) -> void:
 	var fade := clampf((swing_time + 0.10 - age) / 0.10, 0.0, 1.0)
 	for index in range(samples.size()):
 		var alpha := fade * float(index) / float(samples.size() - 1)
-		ribbon.surface_set_color(Color(0.03, 0.48, 1.0, alpha * 0.31 * intensity))
+		ribbon.surface_set_color(Color(1.0, 0.13, 0.02, alpha * 0.35 * intensity) if hot else Color(0.03, 0.48, 1.0, alpha * 0.31 * intensity))
 		ribbon.surface_add_vertex(samples[index][0])
-		ribbon.surface_set_color(Color(0.48, 0.96, 1.0, minf(1.0, alpha * 0.95 * intensity)))
+		ribbon.surface_set_color(Color(1.0, 0.63, 0.18, minf(1.0, alpha * intensity)) if hot else Color(0.48, 0.96, 1.0, minf(1.0, alpha * 0.95 * intensity)))
 		ribbon.surface_add_vertex(samples[index][1])
 	ribbon.surface_end()

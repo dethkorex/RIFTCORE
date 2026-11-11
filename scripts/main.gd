@@ -311,6 +311,7 @@ func build_level() -> void:
 	bind_boss_signals()
 
 func apply_permanent_upgrades() -> void:
+	player.magma_unlocked = profile.weapons.has("magma_breaker")
 	if profile.owned.has("armor"):
 		player.max_health += 12.0
 		player.health = player.max_health
@@ -331,8 +332,12 @@ func bind_boss_signals() -> void:
 	boss.died.connect(func():
 		boss_defeated = true
 		open_factory_gate()
+		var first_unlock := not profile.weapons.has("magma_breaker")
 		player.unlock_magma()
-		factory_hud.announce("MAGMA BREAKER UNLOCKED", Color("ff9c45"))
+		var saved := profile.unlock_weapon("magma_breaker")
+		if saved != OK:
+			push_warning("Could not save the Magma Breaker unlock: %s" % error_string(saved))
+		factory_hud.announce("MAGMA BREAKER UNLOCKED" if first_unlock else "FORGE TITAN DEFEATED", Color("ff9c45"))
 		var barrier := game_root.get_node("ExitBarrier") as StaticBody3D
 		barrier.get_node("CollisionShape3D").set_deferred("disabled", true)
 		var release := barrier.create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
@@ -350,6 +355,8 @@ func build_hud() -> void:
 	factory_hud.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	factory_hud.remaining = remaining_enemies
 	factory_hud.lives = player.lives
+	if player.magma_unlocked:
+		factory_hud.weapon = "BUSTER CANNON"
 	factory_hud.health_capacity = player.max_health
 	factory_hud.energy_capacity = player.max_energy
 	player.energy_changed.connect(func(current: float, maximum: float):

@@ -16,7 +16,9 @@ const LARGE_DROPS := [
 @export_range(0.0, 1.0) var drop_chance := 0.03
 enum Variant { SCOUT, QUAD, HEAVY, TURRET, FLYER }
 @export var variant: Variant
+@export var model_override: PackedScene
 @export var patrol_right_limit := 100000.0
+@export var planted_override := false
 const MODELS := [
 	preload("res://assets/enemies/factory_scout.tscn"),
 	preload("res://assets/enemies/factory_quad.tscn"),
@@ -39,6 +41,8 @@ var attack_time := 0.0
 var stagger_left := 0.0
 var recoil := 0.0
 var gait_phase := 0.0
+var last_support: StaticBody3D
+var last_ground_local := Vector3.ZERO
 var gait_joints: Array[Node3D] = []
 
 func _ready() -> void:
@@ -75,7 +79,8 @@ func build_visuals() -> void:
 	add_child(mesh)
 
 func install_model() -> void:
-	robot = MODELS[variant].instantiate() as Node3D
+	var visual := model_override if model_override else MODELS[variant] as PackedScene
+	robot = visual.instantiate() as Node3D
 	add_child(robot)
 	robot.scale = Vector3.ONE * 1.16
 	for index in range(4):
@@ -122,7 +127,7 @@ func _physics_process(delta: float) -> void:
 			fire_at_player()
 	if not tracking and absf(global_position.x - patrol_center) > 4.0:
 		direction = -signf(global_position.x - patrol_center)
-	velocity.x = direction * move_speed
+	velocity.x = 0.0 if planted_override else direction * move_speed
 	if is_on_floor() and variant != Variant.TURRET:
 		var ledge := global_position + Vector3(direction * 0.75, 0.0, 0.0)
 		var probe := PhysicsRayQueryParameters3D.create(ledge, ledge + Vector3.DOWN * 1.1)
@@ -162,6 +167,11 @@ func _physics_process(delta: float) -> void:
 		var body := get_slide_collision(index).get_collider() as RiftPlayer
 		if body:
 			damage_on_contact(body)
+		var contact := get_slide_collision(index)
+		var support := contact.get_collider() as StaticBody3D
+		if support and contact.get_normal().y > 0.62:
+			last_support = support
+			last_ground_local = support.to_local(contact.get_position() + Vector3.UP * 0.42)
 
 func take_damage(amount: float, source_position := Vector3.ZERO) -> void:
 	var previous := health
@@ -171,7 +181,7 @@ func take_damage(amount: float, source_position := Vector3.ZERO) -> void:
 		if is_zero_approx(side):
 			side = -direction
 		stagger_left = 0.18
-		recoil = side * (3.2 if variant == Variant.HEAVY or variant == Variant.TURRET else 5.0)
+		recoil = 0.0 if variant == Variant.TURRET or planted_override else side * (3.2 if variant == Variant.HEAVY else 5.0)
 
 func damage_on_contact(body: RiftPlayer) -> void:
 	if contact_lock > 0.0 or health <= 0.0:
@@ -201,14 +211,17 @@ func fire_at_player() -> void:
 	shot.damage = 15.0 if variant == Variant.HEAVY else 9.0
 	shot.setup(aim, faction, Color("ff5d71"))
 
-func spawn_pickup(scene: PackedScene, at: Vector3, temporary: bool, experience := 0) -> void:
+func spawn_pickup(scene: PackedScene, at: Vector3, temporary: bool, experience := 0, anchor: StaticBody3D = null) -> void:
 	var pickup := scene.instantiate() as Area3D
 	pickup.expires = temporary
 	pickup.xp_amount = experience
-	pickup.position = get_parent_node_3d().to_local(at)
-	get_parent().add_child.call_deferred(pickup)
+	var host := anchor if is_instance_valid(anchor) else get_parent_node_3d()
+	pickup.position = host.to_local(at)
+	host.add_child.call_deferred(pickup)
 
-func find_drop_anchor() -> Vector3:
+func find_drop_anchor() -> Dictionary:
+	if global_position.y < -2.8 and is_instance_valid(last_support):
+		return {"position": last_support.to_global(last_ground_local), "body": last_support}
 	var origin := global_position
 	var casts: Array[Vector3] = []
 	for distance in [0.0, -1.15, 1.15, -2.30, 2.30, -3.45, 3.45]:
@@ -222,17 +235,24 @@ func find_drop_anchor() -> Vector3:
 		ray.exclude = exclusions
 		var hit := get_world_3d().direct_space_state.intersect_ray(ray)
 		if not hit.is_empty() and hit.collider is StaticBody3D and hit.normal.y >= 0.55:
-			return hit.position + Vector3.UP * 0.42
+			return {"position": hit.position + Vector3.UP * 0.42, "body": hit.collider}
+	if is_instance_valid(last_support):
+		return {"position": last_support.to_global(last_ground_local), "body": last_support}
 	if is_instance_valid(target):
-		return target.global_position
-	return Vector3(patrol_center, home_height - 0.18, 0)
+		var fallback := PhysicsRayQueryParameters3D.create(target.global_position, target.global_position + Vector3.DOWN * 15.0)
+		fallback.exclude = exclusions
+		var floor_hit := get_world_3d().direct_space_state.intersect_ray(fallback)
+		if not floor_hit.is_empty() and floor_hit.collider is StaticBody3D:
+			return {"position": floor_hit.position + Vector3.UP * 0.42, "body": floor_hit.collider}
+	return {"position": Vector3(patrol_center, home_height - 0.18, 0), "body": null}
 
 func _on_died() -> void:
-	var drop_position := find_drop_anchor()
-	spawn_pickup(XP_ORB, drop_position, false, XP_REWARDS[variant])
+	var anchor := find_drop_anchor()
+	var drop_position: Vector3 = anchor.position
+	spawn_pickup(XP_ORB, drop_position, false, XP_REWARDS[variant], anchor.body)
 	if global_position.y > -3.0 and randf() < drop_chance:
 		var pool := LARGE_DROPS if randf() < 0.2 else SMALL_DROPS
-		spawn_pickup(pool.pick_random(), drop_position + Vector3.FORWARD * 0.25, true)
+		spawn_pickup(pool.pick_random(), drop_position + Vector3.FORWARD * 0.25, true, 0, anchor.body)
 	set_physics_process(false)
 	set_deferred("collision_layer", 0)
 	if global_position.y <= -3.0:

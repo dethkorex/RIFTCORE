@@ -273,7 +273,7 @@ phase_offset = 0.12
 transform = Transform3D(1.32, 0, 0, 0, 1, 0, 0, 0, 1, -16.55, -0.25, 0)
 
 [node name="Deck8" parent="TERRAIN" unique_id=1866882289 instance=ExtResource("large_floor_platform")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 42.93082, -1.7812634, 0)
+position = Vector3(42.0, 0.1, 0)
 
 [node name="AssemblyBelt" parent="TERRAIN" unique_id=1931346509 instance=ExtResource("large_floor_platform")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5.0019636, 1.82, 0)
@@ -318,23 +318,28 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 409, 0, 0)
 transform = Transform3D(0.7, 0, 0, 0, 1, 0, 0, 0, 1, 415.8, 0, 0)
 
 [node name="ArenaCatwalkCenter" parent="TERRAIN" unique_id=270177190 instance=ExtResource("jump_through_catwalk")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 398, 3.42, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 398, 4.72, 0)
 
 [node name="ArenaCatwalkWest" parent="TERRAIN" unique_id=1969503556 instance=ExtResource("jump_through_catwalk")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 388, 3.23, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 388, 3.67, 0)
 
 [node name="ArenaCatwalkEast" parent="TERRAIN" unique_id=156071763 instance=ExtResource("jump_through_catwalk")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 408, 3.26, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 408, 3.69, 0)
 
 [node name="ArenaLadderWest" type="Node3D" parent="TERRAIN" groups=["factory_ladder"]]
 position = Vector3(387.6, 0, 0)
 script = ExtResource("factory_ladder")
-rise = 3.23
+rise = 3.67
 
 [node name="ArenaLadderEast" type="Node3D" parent="TERRAIN" groups=["factory_ladder"]]
 position = Vector3(408.45, 0, 0)
 script = ExtResource("factory_ladder")
-rise = 3.26
+rise = 3.69
+
+[node name="ArenaLadderCenter" type="Node3D" parent="TERRAIN" groups=["factory_ladder"]]
+position = Vector3(397.72, 0, 0)
+script = ExtResource("factory_ladder")
+rise = 4.72
 
 [node name="ArenaVentWest" type="Area3D" parent="TERRAIN" unique_id=903328977]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 384.5, 0, 0)
@@ -365,13 +370,15 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 382, 0.38, 0)
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 58, 0.1, 0)
 
 [node name="SortingFloor66" parent="TERRAIN" unique_id=116633522 instance=ExtResource("large_floor_platform")]
-transform = Transform3D(0.96696323, -0.25491583, 0, 0.25491583, 0.96696323, 0, 0, 0, 1, 66, 1.2310604, 0)
+position = Vector3(66.0, 0.5, 0)
+rotation = Vector3(0, 0, 0.1)
+scale = Vector3(0.99, 1, 1)
 
 [node name="SortingFloor74" parent="TERRAIN" unique_id=824477177 instance=ExtResource("large_floor_platform")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 74, 2.265544, 0)
+position = Vector3(74.0, 0.9, 0)
 
 [node name="SortingFloor82" parent="TERRAIN" unique_id=1966269466 instance=ExtResource("large_floor_platform")]
-transform = Transform3D(0.96534246, -0.26098657, 0, 0.26098657, 0.96534246, 0, 0, 0, 1, 82, 3.4051108, 0)
+position = Vector3(82.0, 0.9, 0)
 
 [node name="SortingRungExit" parent="TERRAIN" unique_id=1487264732 instance=ExtResource("jump_through_catwalk")]
 transform = Transform3D(1.14, 0, 0, 0, 1, 0, 0, 0, 1, 56.2, 2.65, 0)
@@ -382,13 +389,15 @@ script = ExtResource("factory_ladder")
 rise = 2.55
 
 [node name="SortingUpperOne" parent="TERRAIN" unique_id=255829068 instance=ExtResource("jump_through_catwalk")]
-transform = Transform3D(0.97884566, -0.20459992, 0, 0.20459992, 0.97884566, 0, 0, 0, 1, 63.988106, 4.3522615, 0)
+position = Vector3(62.1, 4.08, 0)
+rotation = Vector3(0, 0, 0.071)
 
 [node name="SortingCacheShelf" parent="TERRAIN" unique_id=1072882651 instance=ExtResource("jump_through_catwalk")]
-transform = Transform3D(1.25, 0, 0, 0, 1, 0, 0, 0, 1, 72.2, 5.64, 0)
+position = Vector3(68.4, 5.23, 0)
+scale = Vector3(1.25, 1, 1)
 
 [node name="SortingCache" parent="TERRAIN" unique_id=1155920647 instance=ExtResource("credits_large")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 72.9, 6.03, 0)
+position = Vector3(68.75, 5.62, 0)
 
 [node name="SortingUpperEnergy" parent="TERRAIN" unique_id=196243372 instance=ExtResource("energy_small")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 56.26245, 3.5052385, 0)
@@ -445,9 +454,6 @@ rise = 3.1
 [node name="InspectionShelf1" parent="TERRAIN" unique_id=1510223963 instance=ExtResource("jump_through_catwalk")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 216.2, 4.55, 0)
 
-[node name="InspectionShelf2" parent="TERRAIN" unique_id=888494454 instance=ExtResource("jump_through_catwalk")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 222.3, 5.75, 0)
-
 [node name="InspectionShelf3" parent="TERRAIN" unique_id=1752463192 instance=ExtResource("jump_through_catwalk")]
 transform = Transform3D(1.29, 0, 0, 0, 1, 0, 0, 0, 1, 228.3, 6, 0)
 
@@ -455,7 +461,7 @@ transform = Transform3D(1.29, 0, 0, 0, 1, 0, 0, 0, 1, 228.3, 6, 0)
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 229, 6.36, 0)
 
 [node name="InspectionCell" parent="TERRAIN" unique_id=1052707828 instance=ExtResource("energy_large")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 222.2, 6.12, 0)
+position = Vector3(216.2, 4.94, 0)
 
 [node name="InspectionExitStep" parent="TERRAIN" unique_id=2113978280 instance=ExtResource("jump_through_catwalk")]
 transform = Transform3D(1.04, 0, 0, 0, 1, 0, 0, 0, 1, 241, 1.18, 0)
@@ -492,11 +498,9 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 312.1, 7.03, 0)
 [node name="FoundryRecovery" parent="TERRAIN" unique_id=1924244062 instance=ExtResource("large_floor_platform")]
 transform = Transform3D(0.78, 0, 0, 0, 1, 0, 0, 0, 1, 307, -0.85, 0)
 
-[node name="FoundryStepBackUp" parent="TERRAIN" unique_id=1058130380 instance=ExtResource("jump_through_catwalk")]
-transform = Transform3D(0.87, 0, 0, 0, 1, 0, 0, 0, 1, 311.3, 1.4, 0)
-
 [node name="FoundryRecoveryEnd" parent="TERRAIN" unique_id=1488034913 instance=ExtResource("jump_through_catwalk")]
-transform = Transform3D(0.86, 0, 0, 0, 1, 0, 0, 0, 1, 316.1, 1.63, 0)
+position = Vector3(312.68, 1.49, 0)
+scale = Vector3(1.1, 1, 1)
 
 [node name="FoundryStaging" parent="TERRAIN" unique_id=1686962409 instance=ExtResource("large_floor_platform")]
 position = Vector3(321.5, 2.1, 0)
@@ -513,13 +517,8 @@ scale = Vector3(0.73, 1, 1)
 [node name="ReactorServiceStep" parent="TERRAIN" instance=ExtResource("small_floor_platform")]
 position = Vector3(17.1, 2.28, 0)
 
-[node name="SortingApproachCatch" parent="TERRAIN" instance=ExtResource("jump_through_catwalk")]
-position = Vector3(38.7, 0.87, 0)
-scale = Vector3(0.78, 1, 1)
-
-[node name="SortingExitCatch" parent="TERRAIN" instance=ExtResource("jump_through_catwalk")]
-position = Vector3(89.10, 2.05, 0)
-scale = Vector3(0.88, 1, 1)
+[node name="SortingExitCatch" parent="TERRAIN" instance=ExtResource("medium_floor_platform")]
+position = Vector3(88.25, 0.9, 0)
 
 [node name="ForgeHallRepair" parent="TERRAIN" instance=ExtResource("health_large")]
 position = Vector3(375.45, 0.45, 0)
@@ -560,6 +559,12 @@ position = Vector3(142.0, 4.62, 0)
 [node name="SwitchyardCrown" parent="TERRAIN" instance=ExtResource("small_floor_platform")]
 position = Vector3(142.91, 6.21, 0)
 scale = Vector3(0.66, 1, 1)
+
+[node name="ReactorDashCell" parent="TERRAIN" instance=ExtResource("energy_small")]
+position = Vector3(20.68, 4.88, 0)
+
+[node name="FoundryDashCell" parent="TERRAIN" instance=ExtResource("energy_small")]
+position = Vector3(337.63, 0.79, 0)
 
 [node name="DECOR" type="Node3D" parent="." unique_id=759099904]
 
@@ -767,7 +772,7 @@ metadata/max_x = 416.0
 [node name="Actors" type="Node3D" parent="." unique_id=145851359]
 
 [node name="Bay1Patrol" type="CharacterBody3D" parent="Actors" unique_id=1435628334 groups=["damageable_enemies", "level_enemies"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 66.6, 0.81, 0)
+position = Vector3(66.6, 1.27, 0)
 script = ExtResource("2_enemy")
 variant = 1
 
@@ -837,7 +842,7 @@ shape = SubResource("Shape_enemy")
 mesh = SubResource("Mesh_enemy")
 
 [node name="WalkerBot_02" type="CharacterBody3D" parent="Actors" unique_id=294900165 groups=["damageable_enemies", "level_enemies"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 35.9, 1.05, 0)
+position = Vector3(51.4, 0.87, 0)
 script = ExtResource("2_enemy")
 variant = 3
 
@@ -847,7 +852,7 @@ script = ExtResource("2_enemy")
 variant = 4
 
 [node name="WalkerBot_04" type="CharacterBody3D" parent="Actors" unique_id=469688216 groups=["damageable_enemies", "level_enemies"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 43.7, -1.05, 0)
+position = Vector3(43.7, 0.86, 0)
 script = ExtResource("2_enemy")
 variant = 1
 
@@ -858,7 +863,7 @@ shape = SubResource("Shape_enemy")
 mesh = SubResource("Mesh_enemy")
 
 [node name="WalkerBot_05" type="CharacterBody3D" parent="Actors" unique_id=143739127 groups=["damageable_enemies", "level_enemies"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 101.9, 1.42, 0)
+position = Vector3(97.7, 1.36, 0)
 script = ExtResource("2_enemy")
 variant = 2
 

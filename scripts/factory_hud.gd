@@ -160,6 +160,8 @@ func _draw() -> void:
 		plate(Rect2(size.x * 0.5 - 168, size.y * 0.72, 336, 44), 10, Color("ff536c"))
 		caption(Vector2(size.x * 0.5 - 151, size.y * 0.72 + 28), "RUN OVER   /   BANKING CREDITS" if lives <= 0 else "SYSTEM FAILURE   /   RESPAWNING", 17)
 
+	plate(Rect2(18, 157, 119, 29))
+	caption(Vector2(28, 178), "DEF  %.1f%%" % (RiftPlayer.defense_for_experience(experience) * 100.0), 15, Color("a8e5ff"))
 	if not weapon.is_empty():
-		plate(Rect2(18, 157, 287, 29))
-		caption(Vector2(28, 178), weapon + "   /   Q · LB", 15, Color("ffaf60") if weapon == "MAGMA BREAKER" else CYAN)
+		plate(Rect2(18, 192, 287, 29))
+		caption(Vector2(28, 213), weapon + "   /   Q · LB", 15, Color("ffaf60") if weapon == "MAGMA BREAKER" else CYAN)

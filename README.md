@@ -20,7 +20,7 @@ The installed launcher checks GitHub Releases. When an update is available, sele
 | Swap weapon | Q | LB |
 | Pause | Escape | Start |
 
-Resolution, fullscreen, Master/Music/SFX levels, and keyboard/controller bindings are saved in Settings. Three lives per stage, optional extra lives, checkpoint saves, and a persistent credit bank support repeat runs. Collect dropped XP orbs to level up. Beating Forge Titan awards Magma Breaker for the run.
+Resolution, fullscreen, Master/Music/SFX levels, and keyboard/controller bindings are saved in Settings. Three lives per stage, optional extra lives, checkpoint saves, and a persistent credit bank support repeat runs. Collect dropped XP orbs to level up. Defense rises with each level. Beating Forge Titan permanently unlocks Magma Breaker; fresh deployments still begin at level 1.
 
 ## Develop
 

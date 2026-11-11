@@ -38,9 +38,8 @@ var forge_armor: Dictionary = {}
 @export var dash_duration := 0.18
 @export var dash_cooldown := 0.35
 @export var dash_energy_cost := 12.0
-@export var energy_recharge_rate := 8.0
 @export_group("Combat")
-@export var fire_interval := 0.16
+@export var fire_interval := 0.115
 @export var charge_time := 0.7
 @export var charge_energy_cost := 30.0
 @export var base_buster_damage := 18.0
@@ -52,7 +51,6 @@ var forge_armor: Dictionary = {}
 var faction := "player"
 var facing := 1.0
 var energy := START_ENERGY
-var energy_regen_lock := 0.0
 var max_energy := START_ENERGY
 var credits := 0
 var experience := 0
@@ -61,6 +59,10 @@ var jump_buffer := 0.0
 var dash_left := 0.0
 var dash_lock := 0.0
 var fire_lock := 0.0
+var shot_buffer_left := 0.0
+var queued_charged := false
+var queued_pose := false
+var combo_hot := false
 var melee_lock := 0.0
 var combo_step := 0
 var combo_queued := 0
@@ -245,9 +247,6 @@ func _physics_process(delta: float) -> void:
 		jump_buffer = jump_buffer_duration
 	else:
 		jump_buffer = maxf(0.0, jump_buffer - delta)
-	energy_regen_lock = maxf(0.0, energy_regen_lock - delta)
-	if dash_lock <= 0.0 and energy_regen_lock <= 0.0 and energy < max_energy:
-		restore_energy(energy_recharge_rate * delta)
 	if resume_input_guard <= 0.0 and contact_recoil <= 0.0 and Input.is_action_just_pressed("dash") and dash_lock <= 0.0 and energy >= dash_energy_cost and (is_on_floor() or air_dash_available):
 		restore_energy(-dash_energy_cost)
 		dash_left = dash_duration
@@ -261,7 +260,7 @@ func _physics_process(delta: float) -> void:
 	var stick_crouch := Input.is_action_pressed("crouch_stick") and absf(axis) < 0.35
 	var wants_crouch := Input.is_action_pressed("crouch") or stick_crouch
 	set_crouch(wants_crouch and is_on_floor() and dash_left <= 0.0 and jump_buffer <= 0.0)
-	if magma_unlocked and Input.is_action_just_pressed("swap_weapon"):
+	if magma_unlocked and melee_lock <= 0.0 and Input.is_action_just_pressed("swap_weapon"):
 		set_magma_active(not magma_active)
 	update_charge(delta)
 	update_melee(delta)
@@ -380,7 +379,7 @@ func update_ladder(delta: float, axis: float) -> bool:
 		return false
 	var bottom: float = ladder.global_position.y + standing_capsule.height * 0.5
 	var top: float = bottom + ladder.rise
-	var proposed := global_position.y + vertical * 3.25 * delta
+	var proposed := global_position.y + vertical * 2.85 * delta
 	if (vertical > 0.0 and proposed >= top) or (vertical < 0.0 and proposed <= bottom):
 		global_position.y = top + 0.025 if vertical > 0.0 else bottom + 0.02
 		velocity = Vector3.ZERO
@@ -390,17 +389,17 @@ func update_ladder(delta: float, axis: float) -> bool:
 	for deck in get_tree().get_nodes_in_group(&"factory_one_way"):
 		add_collision_exception_with(deck)
 	set_crouch(false)
-	velocity = Vector3((ladder.global_position.x - global_position.x) * 14.0, vertical * 3.25, -global_position.z * 18.0)
+	velocity = Vector3((ladder.global_position.x - global_position.x) * 14.0, vertical * 2.85, -global_position.z * 18.0)
 	move_and_slide()
 	play_character_animation("idle")
 	if model_root:
-		model_root.rotation.y = lerp_angle(model_root.rotation.y, 2.68, 0.37)
+		model_root.rotation.y = lerp_angle(model_root.rotation.y, 2.40, 0.37)
 		model_root.rotation.x = lerpf(model_root.rotation.x, 0.0, 0.4)
 	if buster_pose:
 		buster_pose.influence = 0.0
 	if climb_pose:
 		climb_pose.influence = move_toward(climb_pose.influence, 1.0, 0.27)
-		climb_pose.cycle = fposmod(climb_pose.cycle + vertical * delta * 10.0, TAU)
+		climb_pose.cycle = fposmod(climb_pose.cycle + vertical * delta * 16.4, TAU)
 	return true
 
 static func experience_threshold(level: int) -> int:
@@ -419,7 +418,7 @@ func gain_experience(amount: int) -> void:
 		max_energy += gained_levels * 5.0
 		health = minf(max_health, health + gained_levels * 20.0)
 		health_changed.emit(health, max_health)
-		restore_energy(gained_levels * 10.0)
+		energy_changed.emit(energy, max_energy)
 	experience_changed.emit(experience)
 
 func add_life() -> void:
@@ -463,6 +462,11 @@ func cancel_charge() -> void:
 		charge_orb = null
 
 func update_charge(delta: float) -> void:
+	if shot_buffer_left > 0.0:
+		shot_buffer_left = maxf(0.0, shot_buffer_left - delta)
+		if fire_lock <= 0.0 and melee_lock <= 0.0:
+			shot_buffer_left = 0.0
+			shoot(queued_charged, queued_pose)
 	if Input.is_action_just_pressed("shoot"):
 		charge_held = true
 		charge_elapsed = 0.0
@@ -472,8 +476,13 @@ func update_charge(delta: float) -> void:
 		var full := charge_elapsed >= charge_time and energy >= (36.0 if magma_active else charge_energy_cost)
 		var pose_held := is_instance_valid(charge_orb)
 		cancel_charge()
-		if fire_lock <= 0.0 and melee_lock <= 0.0:
-			shoot(full, pose_held)
+		if melee_lock <= 0.0:
+			if fire_lock <= 0.0:
+				shoot(full, pose_held)
+			else:
+				shot_buffer_left = 0.12
+				queued_charged = full
+				queued_pose = pose_held
 		return
 	charge_elapsed += delta
 	if charge_elapsed < 0.18:
@@ -512,13 +521,10 @@ func shoot(charged := false, pose_held := false) -> void:
 	fire_lock = fire_interval
 	if cost > 0.0:
 		restore_energy(-cost)
-		energy_regen_lock = 0.85 if charged else 0.4
 	var aim := facing
 	if buster_pose:
 		buster_pose.crouched = low_profile
 		buster_pose.influence = 1.0 if pose_held else 0.7
-	if not pose_held:
-		await get_tree().create_timer(0.045, false, true).timeout
 	if health <= 0.0:
 		return
 	if buster_pose:
@@ -526,25 +532,31 @@ func shoot(charged := false, pose_held := false) -> void:
 		await buster_pose.modification_processed
 		if health <= 0.0:
 			return
+	var muzzle := cannon_muzzle(aim)
+	if magma and charged:
+		for spread in [-0.51, 0.0, 0.51]:
+			var direction := Vector3(aim * cos(spread), sin(spread), 0.0)
+			launch_buster(muzzle, direction, true, true, (62.0 if is_zero_approx(spread) else 45.0) * level_damage_scale())
+	else:
+		var power := (34.0 * level_damage_scale()) if magma else (buster_power() * (4.0 if charged else 1.0))
+		launch_buster(muzzle, Vector3(aim, 0, 0), charged, magma, power)
+	RiftAudio.play_effect(&"buster_charged" if charged else &"buster")
+
+func launch_buster(muzzle: Vector3, direction: Vector3, charged: bool, magma: bool, power: float) -> void:
 	var projectile := RiftProjectile.new()
 	get_tree().current_scene.add_child(projectile)
-	projectile.global_position = cannon_muzzle(aim)
+	projectile.global_position = muzzle
+	projectile.damage = power
 	if charged:
-		projectile.damage = 72.0
 		projectile.speed = 29.0
 	if magma:
-		projectile.damage = 108.0 if charged else 34.0
-		projectile.speed = 25.0
+		projectile.speed = 24.0 if charged else 25.0
 		projectile.lifetime = 2.35
 		projectile.burn_power = (8.0 if charged else 4.5) * level_damage_scale()
-	if not magma:
-		projectile.damage = buster_power() * (4.0 if charged else 1.0)
-	else:
-		projectile.damage *= level_damage_scale()
 	var shot_color := (Color("ffae35") if charged else Color("ff681c")) if magma else (Color("73f4ff") if charged else Color.CYAN)
-	projectile.setup(Vector3(aim, 0.0, 0.0), faction, shot_color, false, charged, magma)
-	RiftAudio.play_effect(&"buster_charged" if charged else &"buster")
+	projectile.setup(direction, faction, shot_color, false, charged, magma)
 	shot_fired.emit(projectile)
+
 
 func unlock_magma() -> void:
 	magma_unlocked = true
@@ -575,6 +587,9 @@ func set_magma_active(enabled: bool) -> void:
 						material.set_shader_parameter("use_normal", true)
 					forge_armor[key] = material
 				piece.set_surface_override_material(surface, forge_armor[key] if enabled else original_armor[key])
+	var blade_mesh := find_child("EnergyBlade", true, false) as MeshInstance3D
+	if blade_mesh:
+		blade_mesh.material_override = RiftProjectile.light_paint(Color("ff4e19"), 2.4) if enabled else null
 	var light := get_node_or_null("CoreLight") as OmniLight3D
 	if light:
 		light.light_color = Color("ff8e42") if enabled else Color("3ddcff")
@@ -632,6 +647,7 @@ func perform_melee(step := 1) -> void:
 	combo_hit_at = [0.075, 0.077, 0.115][step - 1]
 	combo_hit = false
 	combo_facing = facing
+	combo_hot = magma_active
 	melee_lock = combo_duration
 	cancel_charge()
 	if animation_player and animation_player.has_animation(&"slash"):
@@ -649,6 +665,7 @@ func perform_melee(step := 1) -> void:
 			trail.blade = sword
 			trail.swing_time = combo_duration
 			trail.intensity = 1.25 if step == 3 else 1.0
+			trail.hot = combo_hot
 			get_parent().add_child(trail)
 		else:
 			sword.rotation_degrees.z = -72.0 * facing if step != 2 else 65.0 * facing
@@ -664,7 +681,13 @@ func strike_melee() -> void:
 			continue
 		var offset: Vector3 = candidate.global_position - global_position
 		if absf(offset.z) < 1.4 and absf(offset.y) < 1.7 and absf(offset.x) <= reach and offset.x * combo_facing > -0.05:
-			candidate.take_damage(power, global_position)
+			var before: float = candidate.health
+			if combo_hot and candidate.has_method("take_fire_damage"):
+				candidate.take_fire_damage(power, global_position)
+			else:
+				candidate.take_damage(power, global_position)
+			if combo_hot and candidate.health < before and candidate.has_method("ignite"):
+				candidate.ignite(3.8 * level_damage_scale(), 2.5)
 	melee_performed.emit()
 
 func update_character_visuals() -> void:
@@ -677,7 +700,7 @@ func update_character_visuals() -> void:
 	var swinging := melee_lock > 0.0
 	if buster_pose:
 		buster_pose.crouched = low_profile
-		var aiming := not swinging and (is_instance_valid(charge_orb) or fire_lock > 0.0)
+		var aiming := not swinging and (charge_held or is_instance_valid(charge_orb) or fire_lock > 0.0)
 		buster_pose.influence = move_toward(buster_pose.influence, 1.0 if aiming else 0.0, 0.30)
 	if is_instance_valid(charge_orb):
 		charge_orb.global_position = cannon_muzzle(facing)
@@ -726,9 +749,15 @@ func play_character_animation(animation_name: String, force := false) -> void:
 		"slash": speed_scale = duration / 0.30
 	animation_player.play(animation_name, 0.035 if force or animation_name == "dash" else 0.10, speed_scale)
 
+static func defense_for_experience(total: int) -> float:
+	return minf(0.35, (level_for_experience(total) - 1) * 0.025)
+
+func mitigate_damage(amount: float) -> float:
+	return amount * (1.0 - defense_for_experience(experience))
+
 func take_damage(amount: float, source_position := Vector3.ZERO) -> void:
 	var before := health
-	super.take_damage(amount, source_position)
+	super.take_damage(mitigate_damage(amount), source_position)
 	if health < before:
 		RiftAudio.play_effect(&"armor_hit")
 	if health < before and health > 0.0:
@@ -743,7 +772,7 @@ func take_damage(amount: float, source_position := Vector3.ZERO) -> void:
 
 func take_projectile_damage(amount: float) -> void:
 	var before := health
-	super.take_damage(amount)
+	super.take_damage(mitigate_damage(amount))
 	if health < before:
 		RiftAudio.play_effect(&"armor_hit")
 	if health < before and health > 0.0:

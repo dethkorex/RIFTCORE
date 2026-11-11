@@ -202,6 +202,8 @@ func build_loadout(columns: HBoxContainer) -> void:
 		var row := PanelContainer.new()
 		gear.add_child(row)
 		UI.label(row, line)
+	if profile and profile.weapons.has("magma_breaker"):
+		UI.label(gear, "Magma Breaker unlocked · Q / LB during a run", 16, Color("ffad66"))
 	var model := card(columns, 1.7)
 	portrait(model)
 	UI.label(model, "RX-07   /   STANDARD FRAME", 18, UI.VIOLET)

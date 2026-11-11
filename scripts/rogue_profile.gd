@@ -10,12 +10,15 @@ const UPGRADES := [
 var path := "user://riftcore_profile.cfg"
 var credits := 0
 var owned: Dictionary = {}
+var weapons: Dictionary = {}
 
 func restore() -> void:
 	var data := ConfigFile.new()
 	if data.load(path) != OK:
 		return
 	credits = maxi(0, int(data.get_value("profile", "credits", 0)))
+	if bool(data.get_value("weapons", "magma_breaker", false)):
+		weapons["magma_breaker"] = true
 	for upgrade in UPGRADES:
 		var id: String = upgrade.id
 		if bool(data.get_value("upgrades", id, false)):
@@ -26,6 +29,8 @@ func save() -> Error:
 	data.set_value("profile", "credits", credits)
 	for id in owned:
 		data.set_value("upgrades", id, true)
+	for id in weapons:
+		data.set_value("weapons", id, true)
 	return data.save(path)
 
 func deposit(amount: int) -> Error:
@@ -37,6 +42,15 @@ func deposit(amount: int) -> Error:
 	if result != OK:
 		credits -= amount
 	return result
+
+func unlock_weapon(id: String) -> Error:
+	if weapons.has(id):
+		return OK
+	weapons[id] = true
+	var error := save()
+	if error != OK:
+		weapons.erase(id)
+	return error
 
 func buy(id: String) -> String:
 	for item in UPGRADES:

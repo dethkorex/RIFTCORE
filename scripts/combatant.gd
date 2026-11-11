@@ -7,6 +7,8 @@ signal died
 const DAMAGE_NUMBER := preload("res://scripts/damage_number.gd")
 
 @export var max_health: float = 100.0
+@export_range(1.0, 3.0, 0.1) var fire_weakness := 1.0
+var incoming_critical := false
 var health: float
 var invulnerable_time := 0.0
 var burn_left := 0.0
@@ -21,12 +23,17 @@ func take_damage(amount: float, source_position := Vector3.ZERO) -> void:
 	if invulnerable_time > 0.0 or health <= 0.0:
 		return
 	health = maxf(0.0, health - amount)
-	show_damage.call_deferred(amount)
+	show_damage.call_deferred(amount, false, incoming_critical)
 	health_changed.emit(health, max_health)
 	if health <= 0.0:
 		died.emit()
 
-func show_damage(amount: float, burning := false) -> void:
+func take_fire_damage(amount: float, source_position := Vector3.ZERO) -> void:
+	incoming_critical = fire_weakness > 1.0
+	take_damage(amount * fire_weakness, source_position)
+	incoming_critical = false
+
+func show_damage(amount: float, burning := false, critical := false) -> void:
 	var scene := get_tree().current_scene
 	if not scene or amount <= 0.0:
 		return
@@ -35,7 +42,7 @@ func show_damage(amount: float, burning := false) -> void:
 	var hurt_player: bool = get("faction") == "player"
 	var offset := 1.1 if hurt_player else (1.7 if max_health >= 1000 else 1.03)
 	counter.global_position = global_position + Vector3(randf_range(-0.08, 0.08), offset, 0.27)
-	counter.animate(amount, hurt_player, burning)
+	counter.animate(amount, hurt_player, burning, critical)
 
 func ignite(power: float, seconds: float) -> void:
 	if health <= 0.0 or seconds <= 0.0:

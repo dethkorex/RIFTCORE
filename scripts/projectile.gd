@@ -84,7 +84,10 @@ func _on_body_entered(body: Node) -> void:
 			body.take_projectile_damage(damage)
 		else:
 			var prior: float = body.health if "health" in body else 0.0
-			body.take_damage(damage, global_position)
+			if is_magma and body.has_method("take_fire_damage"):
+				body.take_fire_damage(damage, global_position)
+			else:
+				body.take_damage(damage, global_position)
 			if is_magma and burn_power > 0.0 and body.has_method("ignite") and body.health < prior:
 				body.ignite(burn_power, 3.0)
 		impact()
