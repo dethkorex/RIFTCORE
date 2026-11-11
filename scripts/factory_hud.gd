@@ -19,8 +19,11 @@ var xp_tween: Tween
 var notice: Label
 var notice_tween: Tween
 var remaining := 0
+var act := 1
+var reserve_lives := 0
 var reached_exit := false
-var weapon := ""
+var weapon := "STANDARD FRAME"
+var suit_tint := Color("55e7ff")
 var lives := 3
 var failed := false
 var boss_visible := false
@@ -142,7 +145,7 @@ func _draw() -> void:
 	var next_threshold := RiftPlayer.experience_threshold(shown_level + 1)
 	gauge(139, "XP", (animated_xp - threshold) / (next_threshold - threshold), Color("ab72ff"), 150.0)
 	plate(Rect2(334, 20, 255, 31), 10)
-	caption(Vector2(352, 43), "RIFTCORE   ///", 23)
+	caption(Vector2(352, 43), "RIFTCORE   /   ACT %d" % act, 20)
 	var right := hud_size.x - 20.0
 	var x := right - 348.0
 	plate(Rect2(x, 21, 348, 105), 14)
@@ -153,9 +156,12 @@ func _draw() -> void:
 	task(Vector2(x + 20, 80), exit_task, reached_exit)
 	task(Vector2(x + 20, 106), "OPTIONAL: SECURITY   %d LEFT" % remaining, remaining == 0)
 	plate(Rect2(right - 222, 139, 222, 36), 11)
-	caption(Vector2(right - 207, 164), "⬡   CREDITS  %04d" % credits, 19)
+	caption(Vector2(right - 207, 164), "⬡   BOLTS  %04d" % credits, 19)
 	plate(Rect2(right - 222, 181, 222, 33), 9)
-	caption(Vector2(right - 207, 204), "RX   LIVES   %02d" % lives, 17)
+	var life_text := "RX   LIVES   %02d" % lives
+	if reserve_lives > 0:
+		life_text += "  +%d" % reserve_lives
+	caption(Vector2(right - 207, 204), life_text, 17)
 	if boss_visible:
 		var center := hud_size.x * 0.5
 		plate(Rect2(center - 180, 14, 360, 47), 11, boss_tint)
@@ -168,6 +174,13 @@ func _draw() -> void:
 
 	plate(Rect2(18, 157, 119, 29))
 	caption(Vector2(28, 178), "DEF  %.1f%%" % (RiftPlayer.defense_for_experience(experience) * 100.0), 15, Color("a8e5ff"))
-	if not weapon.is_empty():
-		plate(Rect2(18, 192, 287, 29))
-		caption(Vector2(28, 213), weapon + "   /   Q · RB", 15, Color("ffaf60") if weapon == "MAGMA BREAKER" else CYAN)
+	plate(Rect2(18, 192, 280, 43), 9, suit_tint)
+	var visor := PackedVector2Array([Vector2(33, 202), Vector2(40, 199), Vector2(48, 199),
+		Vector2(55, 202), Vector2(54, 217), Vector2(44, 228), Vector2(34, 217), Vector2(33, 202)])
+	draw_polyline(visor, suit_tint, 2.0, true)
+	draw_line(Vector2(36, 210), Vector2(52, 210), suit_tint, 2.0, true)
+	caption(Vector2(64, 210), weapon, 16, suit_tint)
+	var device := "pad" if not Input.get_connected_joypads().is_empty() else "key"
+	var previous := RiftSettings.binding_label("previous_suit", device)
+	var next := RiftSettings.binding_label("swap_weapon", device)
+	caption(Vector2(64, 227), "%s  ‹  PREV     NEXT  ›  %s" % [previous, next], 12, Color("a8c6db"))

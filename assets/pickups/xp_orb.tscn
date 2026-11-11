@@ -1,22 +1,7 @@
 [gd_scene format=3]
 
 [ext_resource type="Script" path="res://scripts/enemy_pickup.gd" id="pickup"]
-
-[sub_resource type="StandardMaterial3D" id="Glow"]
-albedo_color = Color(0.68, 0.33, 1, 1)
-emission_enabled = true
-emission = Color(0.68, 0.33, 1, 1)
-emission_energy_multiplier = 1.7
-
-[sub_resource type="SphereMesh" id="Orb"]
-radius = 0.18
-height = 0.36
-material = SubResource("Glow")
-
-[sub_resource type="SphereMesh" id="Core"]
-radius = 0.075
-height = 0.15
-material = SubResource("Glow")
+[ext_resource type="Script" path="res://scripts/pickup_orb_visual.gd" id="visual"]
 
 [node name="xp_orb" type="Area3D"]
 script = ExtResource("pickup")
@@ -24,12 +9,6 @@ kind = 3
 large = false
 
 [node name="Visual" type="Node3D" parent="."]
-scale = Vector3(1, 1, 1)
-
-[node name="Orb" type="MeshInstance3D" parent="Visual"]
-position = Vector3(0, 0, 0)
-mesh = SubResource("Orb")
-
-[node name="Core" type="MeshInstance3D" parent="Visual"]
-position = Vector3(0, 0.055, 0.156)
-mesh = SubResource("Core")
+script = ExtResource("visual")
+tint = Color(0.76, 0.39, 1, 1)
+mark = 2

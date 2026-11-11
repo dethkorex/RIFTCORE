@@ -18,7 +18,7 @@ func _ready() -> void:
 	add_service_details.call_deferred(platform)
 
 func add_service_details(platform: Node3D) -> void:
-	if platform.has_node("ServiceDetails"):
+	if not is_instance_valid(platform) or not platform.is_inside_tree() or platform.has_node("ServiceDetails"):
 		return
 	for collider in platform.find_children("*", "CollisionShape3D", true, false):
 		if not collider.shape is BoxShape3D:

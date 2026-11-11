@@ -1,6 +1,7 @@
 """Build the editable sectors 03-10 from authored routes and modular biome kits."""
 from pathlib import Path
 import json,math,re,sys
+import act_two_routes
 ROOT=Path(sys.argv[-1])
 CAM=ROOT/'assets/campaign'
 catalog=json.loads((CAM/'sector_plan.json').read_text())
@@ -156,11 +157,25 @@ position = Vector3(0, -1.55, 0)
 rotation = Vector3(0, -1.04, 0)
 [node name="Model" parent="Armor" instance=ExtResource("model")]
 ''')
-def make_level(info):
+def make_level(info, act_two=False):
     n=info['number'];id=info['id'];prefix=f'assets/campaign/{id}';c=tint(info['color'])
     route=[]
-    for row in ROUTES[n].split():
+    for row in (act_two_routes.ROUTES if act_two else ROUTES)[n].split():
         x,y,w,*kind=row.split(':'); route.append((float(x),float(y),float(w),{'p':'phase','m':'lift','c':'perch'}.get(kind[0],'deck') if kind else 'deck'))
+    if act_two:
+        for index in act_two_routes.CHOKEPOINTS[n]:
+            x, y, width, kind = route[index]
+            phased = index in act_two_routes.PHASE_DECKS.get(n, ())
+            route[index] = (x, y + 0.38, min(width, 5.0), 'phase' if phased else kind)
+    zones = ZONES.get(n, [])
+    arena_layout = ARENAS.get(n, [])
+    if act_two:
+        arena_layout = act_two_routes.ARENAS[n]
+        zones = []
+        for kind, index in act_two_routes.HAZARDS[n]:
+            x, y, width, _ = route[index]
+            broad = kind in [1, 2, 3]
+            zones.append((kind, x, y - 1.2 if broad else y, 20 if broad else min(2.5, width - 2), 7.0 if broad else 2.1, -1 if index % 2 else 1))
     x0,y0,w0,_=route[-1]
     hall=x0+w0/2; fy=y0; gate=hall+8.2; arena=46.0 if n<8 else 50.0; end=gate+arena
     refs={}
@@ -171,6 +186,22 @@ def make_level(info):
     for key in ['checkpoint_beacon','deployment_pad','extraction_pad']:ext(key,'assets/neon_factory/'+key+'.tscn')
     for key in ['camera_rig','jungle_backdrop','factory_checkpoint','factory_ladder','forge_safe_hall','biome_zone']:ext(key,'scripts/'+key+'.gd','Script')
     ext('panorama',prefix+'/panorama.png','Texture2D')
+    if n <= 2:
+        terrain = 'assets/neon_factory' if n == 1 else 'assets/machine_jungle/terrain'
+        pieces = (['large_floor_platform','jump_through_catwalk','wall_hike_panel','moving_lift_platform','jump_through_catwalk','reactor_core','boss_gate_door','door_frame'] if n == 1 else
+                  ['root_rib_floor','root_perch','vine_wall','vine_hoist','root_perch','spore_reservoir',None,'root_arch'])
+        for key, piece in zip(['deck','perch','wall','lift','phase','relay','gate','arch'], pieces):
+            ext(key, f'{terrain}/{piece}.tscn' if piece else 'assets/neon_factory/boss_gate_door.tscn')
+        ext('panorama', 'assets/neon_factory/factory_panorama.png' if n == 1 else 'assets/machine_jungle/jungle_panorama.png', 'Texture2D')
+        if n == 1:
+            ext('factory_enemy','scripts/enemy.gd','Script')
+            for key in ['scout','quad','heavy','turret','flyer']:
+                refs.pop(key)
+        else:
+            ext('factory_ladder','scripts/climb_vine.gd','Script')
+            ext('vine','assets/machine_jungle/terrain/burnable_vine.tscn')
+            for key, piece in zip(['scout','quad','heavy','turret','flyer'], ['rootrunner','thorn_weaver','bark_bulwark','spore_sentry','canopy_wasp']):
+                ext(key, f'assets/machine_jungle/enemies/{piece}.tscn')
     ext('player','scenes/actors/riftcore_player.tscn')
     ext('boss',f"scenes/levels/{info['boss_slug']}.tscn")
     out=['[gd_scene format=3]']
@@ -212,11 +243,22 @@ tonemap_mode = 2
         instance(f'RouteDeck{i:02}',kind,(x,y,0),props=props)
         if i%3==1:instance(f'MidgroundRelay{i}','relay',(x+1,y,-2.95),'DECOR',props='scale = '+v(1.05,1.4+(i%4)*.28,1.05))
         if i%6==2:instance(f'MidgroundFrame{i}','arch',(x,y,-4.4),'DECOR',props='scale = '+v(1.43,1.55,1.4))
-    checkpoint_index=min(range(2,len(route)-3), key=lambda i:abs(route[i][0]-hall*.51)+(25 if route[i][3]!='deck' or any(abs(route[i][0]-z[1])<3 and z[0]>=4 for z in ZONES[n]) else 0))
+    checkpoint_index=min(range(2,len(route)-3), key=lambda i:abs(route[i][0]-hall*.51)+(25 if route[i][3]!='deck' or any(abs(route[i][0]-z[1])<3 and z[0]>=4 for z in zones) else 0))
     mid=route[checkpoint_index];checkpoint('MidpointCheckpoint',mid[0],mid[1])
     checkpoint('ForgeHallCheckpoint',hall+6.1,fy)
     instance('HallFullHeal','health_large',(hall+3.8,fy+.45,0),props='full_heal = true')
-    for i,(kind,x,y,w,h,direction) in enumerate(ZONES[n]):zone(f'BiomeGimmick{i:02}',kind,x,y,w,h,direction)
+    for i,(kind,x,y,w,h,direction) in enumerate(zones):zone(f'BiomeGimmick{i:02}',kind,x,y,w,h,direction)
+    if act_two:
+        for index in act_two_routes.CHOKEPOINTS[n]:
+            x, y, w, kind = route[index]
+            prior_x, prior_y, prior_width, _ = route[index - 1]
+            gap_center = (prior_x + prior_width * 0.5 + x - w * 0.5) * 0.5
+            zone(f'CrossingPulse{index}', 8 if n in [1, 4, 8, 9, 10] else 4, gap_center,
+                 min(y, prior_y) + 0.25, 1.12, 3.65, 0)
+    if act_two and n == 2:
+        for i in [5, 11]:
+            x, y, _, _ = route[i]
+            instance(f'BurnVine{i}','vine',(x+2.1,y,0))
     for i in [2,7,checkpoint_index+2,len(route)-3]:
         x,y,w,k=route[i]
         if k in ['phase','lift']:continue
@@ -228,16 +270,19 @@ tonemap_mode = 2
     if n in [5,10]:
         for i,(x,y,w,k) in enumerate(route):
             if k=='phase':instance(f'PhaseSafetyShelf{i}','perch',(x,y-2.1,0),props='scale = '+v(1.16,1,1))
-    if n==4:
+    if n==4 and not act_two:
         for i in [6,7,8,9]:
             x,y,w,k=route[i]
             instance(f'AirPocket{i}','perch',(x+1.4,1.8+(i%3)*.37,0))
-    if n==6:
+    if n==6 and not act_two:
         for i in [5,8,15]:
             x,y,w,k=route[i]
             instance(f'WindRest{i}','perch',(x+2.5,y-1.65,0))
-    for i,(px,py,pw) in enumerate(ARENAS[n]):
-        instance(f'ArenaPerch{i}','perch',(gate+px,fy+py,0),props='scale = '+v(pw/4,1,1))
+    for i,(px,py,pw) in enumerate(arena_layout):
+        supply_names = {1: ['ArenaCatwalkWest','ArenaCatwalkCenter','ArenaCatwalkEast'], 2: ['Canopy6','RootPerchWestUpper']}
+        names = supply_names.get(n, [])
+        perch_name = names[i] if i < len(names) else f'ArenaPerch{i}'
+        instance(perch_name,'perch',(gate+px,fy+py,0),props='scale = '+v(pw/4,1,1))
         if i in [0,1,2]:
             node(f'ArenaClimb{i}','Node3D','TERRAIN',f'position = {v(gate+px,fy,0)}\nscript = ExtResource("factory_ladder")\nrise = {py}','factory_ladder')
     p=hall
@@ -262,8 +307,10 @@ tonemap_mode = 2
     instance('Seal','gate',(0,0,0),'ExitBarrier',props='rotation = Vector3(0, -1.5707963, 0)\nscale = Vector3(0.82, 1, 1)')
     node('CollisionShape3D','CollisionShape3D','ExitBarrier','position = Vector3(0, 3.2, 0)\nshape = SubResource("GateBlocker")')
     for j in range(3):instance(f'ArenaMachine{j}','relay',(gate+7+j*15,fy,-3.0),'DECOR',props='scale = '+v(1.6,2.15+j*.16,1.4))
-    label('SectorSign',f'{n:02d}  /  {info["title"].upper()}',3,2.65)
-    label('GimmickHint',info['gimmick'].upper(),17,3.9)
+    sign = ('ACT 2  /  ' + act_two_routes.TITLES[n].upper()) if act_two else f'{n:02d}  /  {info["title"].upper()}'
+    label('SectorSign',sign,3,2.65)
+    hint = {1: 'WATCH THE STAMPING PRESSES', 2: 'USE FIRE TO CUT THROUGH VINES'}.get(n, info['gimmick'].upper())
+    label('GimmickHint',hint,17,3.9)
     label('RepairBay','REPAIR BAY  /  CHECKPOINT',hall+5,fy+3.05)
     label('ArenaName',info['boss'].upper(),gate+arena*.50,fy+7.85)
     node('MARKERS','Node3D')
@@ -274,16 +321,37 @@ tonemap_mode = 2
     instance('ExtractionPad','extraction_pad',(0,-.85,0),'MARKERS/RoomExit')
     node('Actors','Node3D')
     instance('RiftcoreMecha','player',(0,route[0][1]+.905,0),'Actors')
-    instance(info['boss_node'],'boss',(gate+arena*.53,fy+1.55,0),'Actors')
+    instance(info['boss_node'],'boss',(gate+arena*.53,fy+(1.45 if n == 1 else 1.55),0),'Actors')
     roster=['scout','quad','heavy','turret','flyer'];placed=0
     for i,(x,y,w,k) in enumerate(route):
-        if i<2 or i==checkpoint_index or i>=len(route)-1 or k!='deck' or w<6.0 or i%5==4:continue
+        if i<2 or i==checkpoint_index or i>=len(route)-1 or k!='deck' or w<6.0 or (not act_two and i%5==4):continue
         role=placed%5
-        instance(f'{info["enemies"][role].replace(" ","")}{placed:02}',roster[role],(x+.7,y+(1.05 if role==4 else .71),0),'Actors',group='level_enemies')
+        name = (info['enemies'][role].replace(' ', '') if info['enemies'] else roster[role].capitalize()) + f'{placed:02}'
+        at = (x+.7,y+(1.05 if role==4 else .71),0)
+        if n == 1:
+            node(name, 'CharacterBody3D', 'Actors', f'position = {v(*at)}\nscript = ExtResource("factory_enemy")\nvariant = {role}', 'level_enemies", "damageable_enemies')
+        else:
+            instance(name,roster[role],at,'Actors',group='level_enemies')
         placed+=1
+    if act_two:
+        for index in [3, len(route) - 4]:
+            x, y, width, _ = route[index]
+            role = 4
+            at = (x - 0.30, y + 2.85, 0)
+            if n == 1:
+                node(f'Escort{index}', 'CharacterBody3D', 'Actors', f'position = {v(*at)}\nscript = ExtResource("factory_enemy")\nvariant = 4', 'level_enemies", "damageable_enemies')
+            else:
+                instance(f'Escort{index}', roster[role], at, 'Actors', group='level_enemies')
+            placed += 1
     node('CameraRig','Node3D',props='position = Vector3(0, 1.35, 0)\nscript = ExtResource("camera_rig")')
-    (ROOT/'scenes/levels'/f'{id}.tscn').write_text('\n\n'.join(out).rstrip()+'\n')
-    print(n,info['title'],f'{end+6.3:.0f}m',placed,'enemies',len(ZONES[n]),'hazard zones')
-for info in catalog[2:]:
-    make_kit(info)
-    make_level(info)
+    filename = f'{id}_act_2.tscn' if act_two else f'{id}.tscn'
+    (ROOT/'scenes/levels'/filename).write_text('\n\n'.join(out).rstrip()+'\n')
+    print(n,info['title'],f'{end+6.3:.0f}m',placed,'enemies',len(zones),'hazard zones')
+if __name__ == '__main__':
+    if '--act-two' in sys.argv:
+        for info in catalog:
+            make_level(info, act_two=True)
+    else:
+        for info in catalog[2:]:
+            make_kit(info)
+            make_level(info)

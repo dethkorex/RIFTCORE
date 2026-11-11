@@ -9,7 +9,7 @@ var active := false
 var target: RiftPlayer
 var facing := -1.0
 var clock := 0.0
-var phase_time := 1.0
+var phase_time := 0.8
 var attack := -1
 var pattern := 0
 var summons := 0
@@ -30,6 +30,7 @@ var reactor_light: OmniLight3D
 @onready var right := armor.find_child("LegRight", true, false) as Node3D
 
 func _ready() -> void:
+	max_health *= 1.22
 	super._ready()
 	body_floor = global_position.y - 1.55
 	var level := get_parent().get_parent()
@@ -106,7 +107,7 @@ func _physics_process(delta: float) -> void:
 	if attack >= 0:
 		_release()
 		attack = -1
-		phase_time = 2.1 if exposed_left > 0.0 else lerpf(0.86, 0.39, anger)
+		phase_time = 1.5 if exposed_left > 0.0 else lerpf(0.69, 0.30, anger)
 		return
 	if summons < 3 and anger > 0.25 + 0.25 * summons:
 		_summon()
@@ -150,8 +151,8 @@ func _release() -> void:
 			shot.collision_layer = 0
 			shot.collision_mask = 1
 			shot.speed = 12.0 + i * 2.5
-			shot.damage = 18.0
-			shot.setup(Vector3(strike_dir, (i - (count - 1) * 0.5) * 0.24, 0), "enemy", TOXIN, false, i == count / 2)
+			shot.damage = 22.0
+			shot.setup(Vector3(strike_dir, (i - (count - 1) * 0.5) * 0.24, 0), "enemy", TOXIN, false, i == count / 2, false, 2, 4)
 			scene.add_child(shot)
 			shot.global_position = global_position + Vector3(strike_dir * 1.43, 0.52, 0)
 		var cloud := Node3D.new()
@@ -179,7 +180,7 @@ func _release() -> void:
 	var reach := 4.15 if attack == 0 else 1.30
 	tween.tween_callback(func():
 		if is_instance_valid(target) and absf(target.global_position.x - impact.global_position.x) < reach and target.global_position.y < body_floor + 2.02:
-			target.take_damage(27.0, impact.global_position)
+			target.take_damage(33.0, impact.global_position)
 	)
 	tween.tween_interval(0.38)
 	tween.tween_property(impact, "scale:y", 0.05, 0.18)

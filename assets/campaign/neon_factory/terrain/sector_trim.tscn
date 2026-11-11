@@ -1,0 +1,45 @@
+[gd_scene format=3]
+
+[sub_resource type="StandardMaterial3D" id="Hull"]
+albedo_color = Color(0.2050, 0.1377, 0.0910, 1)
+metallic = 0.61
+roughness = 0.34
+
+[sub_resource type="StandardMaterial3D" id="Signal"]
+albedo_color = Color(1.0000, 0.5451, 0.2118, 1)
+emission_enabled = true
+emission = Color(1.0000, 0.5451, 0.2118, 1)
+emission_energy_multiplier = 0.63
+
+[sub_resource type="BoxMesh" id="Plate"]
+material = SubResource("Hull")
+size = Vector3(1.26, 0.40, 0.082)
+
+[sub_resource type="BoxMesh" id="Motif"]
+material = SubResource("Signal")
+size = Vector3(0.17, 0.30, 0.061)
+
+[node name="PressHousing" type="Node3D"]
+
+[node name="ArmorPlate" type="MeshInstance3D" parent="."]
+mesh = SubResource("Plate")
+
+[node name="Inlay0" type="MeshInstance3D" parent="."]
+position = Vector3(-0.420, 0, 0.058)
+rotation = Vector3(0, 0, 0.36)
+mesh = SubResource("Motif")
+
+[node name="Inlay1" type="MeshInstance3D" parent="."]
+position = Vector3(-0.140, 0, 0.058)
+rotation = Vector3(0, 0, 0.36)
+mesh = SubResource("Motif")
+
+[node name="Inlay2" type="MeshInstance3D" parent="."]
+position = Vector3(0.140, 0, 0.058)
+rotation = Vector3(0, 0, 0.36)
+mesh = SubResource("Motif")
+
+[node name="Inlay3" type="MeshInstance3D" parent="."]
+position = Vector3(0.420, 0, 0.058)
+rotation = Vector3(0, 0, 0.36)
+mesh = SubResource("Motif")

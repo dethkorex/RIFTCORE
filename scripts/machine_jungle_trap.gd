@@ -1,6 +1,9 @@
 @tool
 extends Area3D
 
+const CHAMFER := preload("res://scripts/factory_chamfer.gd")
+const SporePod := preload("res://scripts/spore_pod_target.gd")
+
 enum Kind { THORN_BED, SPORE_POD, SNAP_VINE }
 @export var kind: Kind
 @export var cycle_seconds := 4.3
@@ -14,6 +17,7 @@ var delay := 0.0
 var live := false
 var device: Node3D
 var warning: MeshInstance3D
+var pod: SporePod
 
 func _ready() -> void:
 	collision_layer = 0
@@ -28,7 +32,7 @@ func _ready() -> void:
 			build_pod()
 		Kind.SNAP_VINE:
 			build_vine()
-	warning = RiftProjectile.add_glow(self, POISON if kind == Kind.SPORE_POD else LEAF, 1.09)
+	warning = RiftProjectile.add_glow(self, LEAF, 1.20)
 	warning.position = Vector3(0, 0.22, 0.25)
 	if Engine.is_editor_hint():
 		return
@@ -43,7 +47,9 @@ func _ready() -> void:
 	warning.hide()
 
 func build_thorns() -> void:
-	block(self, Vector3(0, -0.06, 0), Vector3(2.55, 0.13, 1.47), BARK, 0)
+	for i in range(5):
+		var root := RiftProjectile.part(self, RiftProjectile.cached_mesh("Orb"), RiftProjectile.light_paint(BARK, 0.0), Vector3((i - 2) * 0.45, 0.025, 0.09), Vector3(0.38, 0.093, 0.54))
+		root.rotation.y = 0.21 * (i - 2)
 	for i in range(5):
 		var x := (i - 2) * 0.45
 		var spike := CylinderMesh.new()
@@ -57,15 +63,13 @@ func build_thorns() -> void:
 		block(self, Vector3(x, -0.008, 0.54), Vector3(0.12, 0.024, 0.23), LEAF, 0.28)
 
 func build_pod() -> void:
-	block(self, Vector3(0, -0.07, 0), Vector3(1.58, 0.17, 1.37), BARK, 0)
-	RiftProjectile.part(self, RiftProjectile.cached_mesh("Orb"), RiftProjectile.light_paint(BARK, 0.05), Vector3(0, 0.22, 0), Vector3(0.42, 0.35, 0.42))
-	RiftProjectile.part(self, RiftProjectile.cached_mesh("Orb"), RiftProjectile.light_paint(POISON, 1.02), Vector3(0, 0.30, 0.365), Vector3(0.23, 0.17, 0.10))
-	for i in range(5):
-		var puff := RiftProjectile.add_glow(device, POISON, 1.14)
-		puff.position = Vector3((i - 2) * 0.38, 0.45 + (i % 3) * 0.24, 0.18)
+	pod = SporePod.new()
+	add_child(pod)
+	pod.build(SporePod.GREEN)
+	pod.burned.connect(func(): set_physics_process(false); warning.hide())
 
 func build_vine() -> void:
-	block(self, Vector3(0, -0.055, 0), Vector3(1.80, 0.14, 1.35), BARK, 0)
+	RiftProjectile.part(self, RiftProjectile.cached_mesh("Orb"), RiftProjectile.light_paint(BARK, 0.0), Vector3(-0.35, 0.04, 0), Vector3(0.71, 0.11, 0.44))
 	var pivot := Node3D.new()
 	device.add_child(pivot)
 	pivot.position = Vector3(-0.67, 0.09, 0.07)
@@ -84,7 +88,7 @@ func build_vine() -> void:
 func block(host: Node3D, at: Vector3, dimensions: Vector3, tint: Color, emission: float) -> MeshInstance3D:
 	var geometry := BoxMesh.new()
 	geometry.size = dimensions
-	return RiftProjectile.part(host, geometry, RiftProjectile.light_paint(tint, emission), at, Vector3.ONE)
+	return RiftProjectile.part(host, CHAMFER.from_box(geometry, 0.036), RiftProjectile.light_paint(tint, emission), at, Vector3.ONE)
 
 func _physics_process(delta: float) -> void:
 	if Engine.is_editor_hint():
@@ -92,7 +96,11 @@ func _physics_process(delta: float) -> void:
 	clock = fposmod(clock + delta, maxf(cycle_seconds, 2.8))
 	var p := clock / maxf(cycle_seconds, 2.8)
 	var active := p >= 0.63 and p < (0.96 if kind == Kind.SPORE_POD else 0.82)
-	warning.visible = p >= 0.48 and p < 0.96
+	warning.visible = p >= 0.48 and p < 0.96 and kind != Kind.SPORE_POD
+	if pod:
+		var camera := get_viewport().get_camera_3d()
+		var nearby := camera != null and absf(camera.global_position.x - global_position.x) < 32.0
+		pod.update_pressure(smoothstep(0.43, 0.63, p) * (1.0 - smoothstep(0.93, 1.0, p)), nearby and active)
 	device.visible = active
 	if active and not live:
 		device.scale.y = 0.08

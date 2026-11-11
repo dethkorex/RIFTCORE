@@ -7,7 +7,7 @@ const CROSS_REACH := [0.247, 0.230, 0.419, 0.547, 0.547, 0.545, 0.515, 0.448, 0.
 var faction := "enemy"
 var target: RiftPlayer
 var active := false
-var cooldown := 1.4
+var cooldown := 1.05
 var attack_number := 0
 var contact_lock := 0.0
 var facing := -1.0
@@ -33,6 +33,7 @@ var cargo_index := 0
 @onready var fist := find_child("FistModule", true, false) as Node3D
 
 func _ready() -> void:
+	max_health *= 1.23
 	super._ready()
 	died.connect(die)
 	health_changed.connect(check_supplies)
@@ -116,7 +117,7 @@ func _physics_process(delta: float) -> void:
 	if cooldown > 0.0 or motion_lock > 0.0:
 		return
 	attack_number += 1
-	cooldown = [1.95, 1.64, 1.46][phase]
+	cooldown = [1.46, 1.20, 0.98][phase]
 	match attack_number % 5:
 		1:
 			motion_lock = 0.98
@@ -265,7 +266,7 @@ func launch_drill(direction: float, height: float) -> void:
 	get_parent().add_child(projectile)
 	projectile.global_position = global_position + Vector3(direction * 1.55, height, 0.0)
 	projectile.speed = 21.0
-	projectile.damage = 20.0
+	projectile.damage = 25.0 + phase_index() * 3.0
 	projectile.setup(Vector3(direction, 0.0, 0.0), faction, ORANGE, true)
 
 func ground_punch() -> void:
@@ -315,7 +316,7 @@ func raise_spike(locked_x: float, base: float, marker: MeshInstance3D) -> void:
 		spin.tween_method(drill_piece.rotate_z, 0.13, 0.24, 0.38)
 	impact.tween_callback(func():
 		if is_instance_valid(target) and absf(target.global_position.x - locked_x) < 0.79 and target.global_position.y < base + 2.05:
-			target.take_damage(25.0, spike.global_position)
+			target.take_damage(29.0 + phase_index() * 3.0, spike.global_position)
 	)
 	impact.tween_interval(0.27)
 	impact.tween_property(spike, "scale:y", 0.02, 0.2)

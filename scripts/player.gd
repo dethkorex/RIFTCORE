@@ -17,6 +17,11 @@ signal life_picked_up
 
 var lives := 3
 var buster_damage_multiplier := 1.0
+var armor_resistance := 0.0
+var charge_cost_multiplier := 1.0
+var salvage_multiplier := 1.0
+var xp_pickup_multiplier := 1.0
+var healing_pickup_multiplier := 1.0
 var magma_unlocked := false
 var thorn_unlocked := false
 var thorn_active := false
@@ -65,6 +70,9 @@ var experience := 0
 var coyote := 0.0
 var jump_buffer := 0.0
 var dash_left := 0.0
+var dash_elapsed := 0.0
+var dash_facing := 1.0
+var ground_dash := false
 var dash_lock := 0.0
 var fire_lock := 0.0
 var shot_buffer_left := 0.0
@@ -285,6 +293,9 @@ func _physics_process(delta: float) -> void:
 		jump_buffer = maxf(0.0, jump_buffer - delta)
 	if resume_input_guard <= 0.0 and contact_recoil <= 0.0 and Input.is_action_just_pressed("dash") and dash_lock <= 0.0 and (is_on_floor() or air_dash_available):
 		dash_left = dash_duration
+		dash_elapsed = 0.0
+		dash_facing = facing
+		ground_dash = is_on_floor()
 		dash_lock = dash_cooldown
 		RiftAudio.play_effect(&"dash")
 		var flash := preload("res://scripts/dash_flash.gd").new()
@@ -295,17 +306,21 @@ func _physics_process(delta: float) -> void:
 	var stick_crouch := Input.is_action_pressed("crouch_stick") and absf(axis) < 0.35
 	var wants_crouch := Input.is_action_pressed("crouch") or stick_crouch
 	set_crouch(wants_crouch and is_on_floor() and dash_left <= 0.0 and jump_buffer <= 0.0)
-	if melee_lock <= 0.0 and Input.is_action_just_pressed("swap_weapon"):
-		cycle_weapon()
+	if melee_lock <= 0.0:
+		if Input.is_action_just_pressed("swap_weapon"):
+			cycle_weapon()
+		elif Input.is_action_just_pressed("previous_suit"):
+			cycle_weapon(-1)
 	update_charge(delta)
 	update_melee(delta)
 	if dash_left > 0.0:
-		dash_left -= delta
-		velocity = Vector3(facing * dash_speed, 0.0, 0.0)
-	else:
+		update_dash(delta, axis)
+	if dash_left <= 0.0:
 		var accel := acceleration * terrain.x if is_on_floor() else air_acceleration
 		if axis * velocity.x < 0.0:
-			accel = acceleration * 1.7 * terrain.x if is_on_floor() else air_reverse_acceleration
+			accel = acceleration * 1.8 * terrain.x if is_on_floor() else air_reverse_acceleration
+		elif is_on_floor() and absf(axis) < 0.08:
+			accel *= 1.20
 		elif not is_on_floor() and absf(axis) < 0.08:
 			accel = air_braking
 		if contact_recoil <= 0.0 and wall_launch_lock <= 0.0:
@@ -372,6 +387,30 @@ func _physics_process(delta: float) -> void:
 		collision_layer = 0
 		hide()
 		fell_into_pit.emit()
+
+func update_dash(delta: float, axis: float) -> void:
+	dash_elapsed += delta
+	var reversing := axis * dash_facing < -0.27
+	var released := not Input.is_action_pressed("dash") and dash_elapsed >= 0.065
+	var at_edge := ground_dash and is_on_floor() and absf(axis) < 0.17 and not has_dash_floor(delta)
+	if reversing or released or at_edge:
+		dash_left = 0.0
+		velocity.x = 0.0 if at_edge or reversing else clampf(velocity.x * 0.45, -move_speed, move_speed)
+		if reversing:
+			facing = signf(axis)
+		return
+	var steering := lerpf(0.78, 1.0, absf(axis)) if absf(axis) >= 0.17 else 1.0
+	var speed := lerpf(move_speed, dash_speed, clampf(dash_left / 0.045, 0.0, 1.0))
+	velocity = Vector3(dash_facing * speed * steering, 0.0, 0.0)
+	dash_left = maxf(0.0, dash_left - delta)
+	if dash_left == 0.0:
+		velocity.x = clampf(velocity.x, -move_speed, move_speed)
+
+func has_dash_floor(delta: float) -> bool:
+	var ahead := global_position + Vector3(dash_facing * (standing_capsule.radius * 0.50 + dash_speed * delta), -standing_capsule.height * 0.5 + 0.30, 0)
+	var ray := PhysicsRayQueryParameters3D.create(ahead, ahead + Vector3.DOWN * 0.74, 1, [get_rid()])
+	var hit := get_world_3d().direct_space_state.intersect_ray(ray)
+	return not hit.is_empty() and hit.normal.y > 0.5
 
 func environment_control() -> Vector4:
 	# Ground grip, gravity, lateral flow, and buoyant jump.
@@ -532,7 +571,7 @@ func update_charge(delta: float) -> void:
 	if not charge_held:
 		return
 	if not Input.is_action_pressed("shoot"):
-		var full := charge_elapsed >= charge_time and energy >= (36.0 if magma_active else charge_energy_cost)
+		var full := charge_elapsed >= charge_time and energy >= charged_shot_cost()
 		var pose_held := is_instance_valid(charge_orb)
 		cancel_charge()
 		if melee_lock <= 0.0:
@@ -572,11 +611,15 @@ func level_damage_scale() -> float:
 func buster_power() -> float:
 	return base_buster_damage * level_damage_scale() * buster_damage_multiplier
 
+func charged_shot_cost() -> float:
+	var base := 36.0 if magma_active else (30.0 if thorn_active or not special_weapon.is_empty() else charge_energy_cost)
+	return base * charge_cost_multiplier
+
 func shoot(charged := false, pose_held := false) -> void:
 	var magma := magma_active
 	var thorn := thorn_active
 	var special := special_weapon
-	var cost := (36.0 if charged else 8.0) if magma else ((30.0 if charged else 7.0) if thorn or not special.is_empty() else (charge_energy_cost if charged else 0.0))
+	var cost := charged_shot_cost() if charged else (8.0 if magma else (7.0 if thorn or not special.is_empty() else 0.0))
 	if energy < cost:
 		return
 	fire_lock = fire_interval
@@ -612,10 +655,10 @@ func shoot(charged := false, pose_held := false) -> void:
 
 func launch_buster(muzzle: Vector3, direction: Vector3, charged: bool, magma: bool, power: float, tint := Color.TRANSPARENT, weapon_id := "") -> void:
 	var projectile := RiftProjectile.new()
-	projectile.collision_mask = 3
+	projectile.collision_mask = 3 | 8 if magma else 3
 	get_tree().current_scene.add_child(projectile)
 	projectile.global_position = muzzle
-	projectile.damage = power
+	projectile.damage = power * (buster_damage_multiplier if magma or not weapon_id.is_empty() else 1.0)
 	projectile.weapon_id = weapon_id
 	if charged:
 		projectile.speed = 29.0
@@ -664,15 +707,18 @@ func launch_reward_weapon(muzzle: Vector3, aim: float, charged: bool, id: String
 		var spread := (i - (count - 1) * 0.5) * (0.18 if charged else 0.13)
 		launch_buster(muzzle, Vector3(aim * cos(spread), sin(spread), 0), charged, false, power * level_damage_scale(), Color(info.color), id)
 
-func cycle_weapon() -> void:
-	var equipped := "magma_breaker" if magma_active else ("thorn_swarm" if thorn_active else special_weapon)
+func equipped_suit() -> String:
+	return "magma_breaker" if magma_active else ("thorn_swarm" if thorn_active else special_weapon)
+
+func cycle_weapon(step := 1) -> void:
+	var equipped := equipped_suit()
 	var choices: Array[String] = [""]
 	for entry in Catalog.SECTORS:
 		var id: String = entry.reward
 		if id in run_weapon_ids or (id == "magma_breaker" and magma_unlocked) or (id == "thorn_swarm" and thorn_unlocked):
 			choices.append(id)
 	if choices.size() > 1:
-		equip_sector_weapon(choices[posmod(choices.find(equipped) + 1, choices.size())])
+		equip_sector_weapon(choices[posmod(choices.find(equipped) + step, choices.size())])
 
 func unlock_sector_weapon(id: String) -> void:
 	if id not in run_weapon_ids:
@@ -694,6 +740,11 @@ func equip_sector_weapon(id: String) -> void:
 			if not id.is_empty() and id in run_weapon_ids:
 				var info := Catalog.weapon(id)
 				special_weapon = id
+				var armor := ShaderMaterial.new()
+				armor.shader = preload("res://assets/ui/reward_armor.gdshader")
+				armor.set_shader_parameter("suit_color", Color(info.color))
+				for mesh in base_suit_meshes:
+					mesh.material_overlay = armor
 				var light := get_node_or_null("CoreLight") as OmniLight3D
 				if light:
 					light.light_color = Color(info.color)
@@ -726,6 +777,7 @@ func set_magma_active(enabled: bool) -> void:
 	magma_active = enabled
 	for mesh in base_suit_meshes:
 		mesh.visible = not enabled
+		mesh.material_overlay = null
 	if is_instance_valid(fire_suit_mesh):
 		fire_suit_mesh.visible = enabled
 	if is_instance_valid(nature_suit_mesh):
@@ -896,7 +948,7 @@ static func defense_for_experience(total: int) -> float:
 	return minf(0.25, (level_for_experience(total) - 1) * 0.02)
 
 func mitigate_damage(amount: float) -> float:
-	return amount * (1.0 - defense_for_experience(experience))
+	return amount * (1.0 - defense_for_experience(experience)) * (1.0 - armor_resistance)
 
 func take_damage(amount: float, source_position := Vector3.ZERO) -> void:
 	var before := health

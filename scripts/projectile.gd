@@ -2,6 +2,8 @@ class_name RiftProjectile
 extends Area3D
 
 const HALO := preload("res://assets/pickups/pickup_halo.gdshader")
+const COMBAT_VFX := preload("res://scripts/combat_vfx.gd")
+const ATTACK_FX := preload("res://scripts/attack_fx.gd")
 static var paint_cache: Dictionary = {}
 static var mesh_cache: Dictionary = {}
 var direction := Vector3.RIGHT
@@ -21,7 +23,7 @@ var weapon_id := ""
 var pierces := 0
 var struck: Dictionary = {}
 
-func setup(dir: Vector3, faction: String, tint: Color = Color.CYAN, drill := false, charged := false, magma := false) -> void:
+func setup(dir: Vector3, faction: String, tint: Color = Color.CYAN, drill := false, charged := false, magma := false, sector := 0, role := 0) -> void:
 	direction = dir.normalized()
 	owner_faction = faction
 	add_to_group(&"rift_projectile")
@@ -37,6 +39,8 @@ func setup(dir: Vector3, faction: String, tint: Color = Color.CYAN, drill := fal
 		spinner = drill_visual(skin, tint, 1.0)
 		var jet := part(skin, cached_mesh("Orb"), light_paint(hot, 2.0), Vector3(0, 0, -0.47), Vector3(0.12, 0.12, 0.23))
 		jet.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	elif sector > 0:
+		ATTACK_FX.projectile(skin, sector, role, charged)
 	elif magma:
 		var width := 0.56 if charged else 0.31
 		part(skin, cached_mesh("Orb"), light_paint(Color("e84612"), 1.8), Vector3.ZERO, Vector3(width, width, width * 1.12))
@@ -142,6 +146,7 @@ static func finish_impact(burst: Node3D, at: Vector3, tint: Color, charged: bool
 		return
 	burst.position = at
 	var scale_factor := 1.65 if charged else 1.0
+	COMBAT_VFX.hit(burst, tint, scale_factor)
 	var flash := add_glow(burst, tint, 1.28 * scale_factor)
 	var tween := burst.create_tween().set_parallel()
 	tween.tween_property(flash, "scale", Vector3.ONE * 0.02, 0.17)

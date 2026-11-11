@@ -1,5 +1,7 @@
 extends Combatant
 
+const ATTACK_FX := preload("res://scripts/attack_fx.gd")
+
 @export_range(3, 10) var sector_number := 3
 @export var accent := Color.CYAN
 @export var minion_scene: PackedScene
@@ -22,7 +24,7 @@ var active := false
 var facing := -1.0
 var attack := ""
 var attack_index := 0
-var cooldown := 1.2
+var cooldown := 0.94
 var clock := 0.0
 var strike_x := 0.0
 var strike_dir := -1.0
@@ -41,6 +43,7 @@ var lamp: OmniLight3D
 @onready var armor: Node3D = $Armor
 
 func _ready() -> void:
+	max_health *= 1.24
 	super._ready()
 	floor_y = global_position.y - 1.55
 	var level := get_parent().get_parent()
@@ -71,7 +74,7 @@ func damage_on_contact(player: RiftPlayer) -> void:
 	if not active or contact_left > 0.0:
 		return
 	contact_left = 0.65
-	player.take_damage(19.0 + sector_number * 1.6, global_position)
+	player.take_damage(22.0 + sector_number * 1.9, global_position)
 
 func phase() -> int:
 	return 2 if health < max_health * 0.30 else (1 if health < max_health * 0.66 else 0)
@@ -122,11 +125,13 @@ func _physics_process(delta: float) -> void:
 			warning.queue_free()
 		execute(attack)
 		attack = ""
-		cooldown = (1.12 if stage == 0 else (0.80 if stage == 1 else 0.57)) + recovery
+		cooldown = (0.82 if stage == 0 else (0.61 if stage == 1 else 0.44)) + recovery
 
 func windup() -> void:
 	var pattern: Array = PATTERNS[sector_number]
 	attack = pattern[attack_index % pattern.size()]
+	if phase() > 0 and attack_index % (4 if phase() == 1 else 3) == 2:
+		attack = "crossfire"
 	attack_index += 1
 	strike_x = clampf(target.global_position.x, left - 0.8, right + 0.8)
 	strike_dir = signf(strike_x - global_position.x) if absf(strike_x - global_position.x) > 0.25 else facing
@@ -135,18 +140,28 @@ func windup() -> void:
 	warning = Node3D.new()
 	add_child(warning)
 	warning.top_level = true
-	var broad := attack in ["flood", "gravity", "sweep", "beam", "fracture", "gust"]
+	var broad := attack in ["flood", "gravity", "sweep", "beam", "fracture", "gust", "crossfire"]
 	var dash := attack in ["charge", "lunge", "dive", "tentacles"]
 	var width := (right - left) * 0.51 if broad else (6.0 if dash else 1.7)
 	var x := (left + right) * 0.5 if broad else (global_position.x + strike_dir * 5.5 if dash else strike_x)
 	warning.global_position = Vector3(x, floor_y + 0.075, 0)
-	var marker := RiftProjectile.part(warning, RiftProjectile.cached_mesh("Orb"), RiftProjectile.light_paint(accent, 1.5), Vector3.ZERO, Vector3(width, 0.026, 0.76))
-	marker.create_tween().tween_property(marker, "scale:z", 1.22, cooldown)
+	ATTACK_FX.telegraph(warning, width * 2.0, accent, cooldown)
+	if attack == "crossfire":
+		var signal_light := Label3D.new()
+		signal_light.text = "CROSSFIRE"
+		signal_light.pixel_size = 0.0054
+		signal_light.modulate = accent.lerp(Color.WHITE, 0.35)
+		signal_light.position = Vector3(0.0, 2.1, 0.22)
+		warning.add_child(signal_light)
 	RiftAudio.play_effect(&"titan_windup")
 
 func execute(move: String) -> void:
-	var power := 16.0 + sector_number * 1.8 + phase() * 4.0
+	var power := 19.0 + sector_number * 2.05 + phase() * 5.0
 	match move:
+		"crossfire":
+			fan(4 + phase(), 0.22, power * 0.84, 18.5)
+			var wall := right if strike_dir > 0.0 else left
+			fire(Vector3(wall, floor_y + 0.57, 0), Vector3(-strike_dir, 0, 0), power * 0.86, 21.0, true)
 		"ice_wall":
 			ice_wall(clampf(strike_x - strike_dir * 2.3, left, right))
 			fan(3, 0.18, power, 14.0)
@@ -217,9 +232,11 @@ func fire(at: Vector3, aim: Vector3, power: float, speed: float, heavy := false)
 	shot.damage = power
 	shot.speed = speed
 	shot.lifetime = 3.2
-	shot.setup(aim, faction, accent, false, heavy)
+	shot.setup(aim, faction, ATTACK_FX.tint_for(sector_number), false, heavy, false, sector_number, 4)
 	get_parent().add_child(shot)
 	shot.global_position = at
+	if heavy:
+		ATTACK_FX.muzzle(get_parent(), at, accent, 0.78)
 
 func fan(count: int, spread: float, power: float, speed: float) -> void:
 	for i in count:
@@ -235,13 +252,7 @@ func field(x: float, y: float, radius: float, height: float, lifetime: float, po
 	add_child(fx)
 	fx.top_level = true
 	fx.global_position = Vector3(x, y, 0)
-	var mesh := BoxMesh.new()
-	mesh.size = Vector3(radius * 2.0, minf(height * 0.48, 0.51), 0.16)
-	RiftProjectile.part(fx, mesh, RiftProjectile.light_paint(accent, 1.72), Vector3.ZERO, Vector3.ONE)
-	for i in range(clampi(roundi(radius * 1.8), 2, 16)):
-		var v := float(i) / maxf(float(roundi(radius * 1.8) - 1), 1.0)
-		var haze := RiftProjectile.add_glow(fx, accent, 1.35)
-		haze.position.x = lerpf(-radius * 0.85, radius * 0.85, v)
+	ATTACK_FX.field(fx, sector_number, radius, height, lifetime, attack)
 	hazards.append({"fx": fx, "left": lifetime, "tick": 0.14, "radius": radius, "height": height, "damage": power, "drift": drift, "crouchable": crouchable, "pull": pull})
 
 func update_fields(delta: float) -> void:

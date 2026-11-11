@@ -4,7 +4,7 @@ const MODES := [Vector2i(1280, 720), Vector2i(1600, 900), Vector2i(1920, 1080), 
 const ACTIONS := {
 	"move_left": "Move left", "move_right": "Move right", "jump": "Jump",
 	"crouch": "Crouch", "climb_up": "Climb up", "climb_down": "Climb down",
-	"dash": "Dash", "shoot": "Buster", "melee": "Sword", "swap_weapon": "Swap weapon", "pause": "Pause",
+	"dash": "Dash", "shoot": "Buster", "melee": "Sword", "swap_weapon": "Next suit", "previous_suit": "Previous suit", "pause": "Pause",
 }
 const AXES := ["move_left", "move_right", "climb_up", "climb_down", "crouch"]
 var path := "user://riftcore_settings.cfg"

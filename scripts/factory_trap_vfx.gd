@@ -18,10 +18,14 @@ static func make_spikes(factor := 1.0) -> Node3D:
 
 static func make_laser() -> Node3D:
 	var root := Node3D.new()
-	for config in [[0.17, PINK, 0.75], [0.07, HOT, 2.35]]:
-		var beam := BoxMesh.new()
-		beam.size = Vector3(config[0], 2.40, config[0] * 1.22)
+	for config in [[0.11, PINK, 0.75], [0.036, HOT, 2.35]]:
+		var beam := CylinderMesh.new()
+		beam.top_radius = config[0]
+		beam.bottom_radius = config[0]
+		beam.height = 2.40
+		beam.radial_segments = 12
 		RiftProjectile.part(root, beam, RiftProjectile.light_paint(config[1], config[2]), Vector3(0, 1.2, 0), Vector3.ONE)
+
 	for y in [0.12, 1.2, 2.28]:
 		var rim := RiftProjectile.add_glow(root, PINK, 1.04)
 		rim.position = Vector3(0.0, y, 0.16)

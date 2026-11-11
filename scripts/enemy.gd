@@ -3,6 +3,7 @@ extends Combatant
 
 const XP_REWARDS := [12, 16, 26, 18, 16]
 const XP_ORB := preload("res://assets/pickups/xp_orb.tscn")
+const ATTACK_FX := preload("res://scripts/attack_fx.gd")
 const SMALL_DROPS := [
 	preload("res://assets/pickups/health_small.tscn"),
 	preload("res://assets/pickups/energy_small.tscn"),
@@ -46,12 +47,18 @@ var last_ground_local := Vector3.ZERO
 var gait_joints: Array[Node3D] = []
 var sector_damage_scale := 1.0
 var sector_experience_scale := 1.0
+var sector_number := 1
+var second_act := false
+var shot_windup := 0.0
+var locked_aim := Vector3.ZERO
 
-func scale_for_sector(sector: int) -> void:
+func scale_for_sector(sector: int, act := 1) -> void:
+	sector_number = sector
+	second_act = act == 2
 	var steps := maxi(0, sector - 1)
-	max_health = [40.0, 55.0, 95.0, 60.0, 35.0][variant] * (1.0 + 0.30 * steps)
+	max_health = [40.0, 55.0, 95.0, 60.0, 35.0][variant] * (1.0 + 0.30 * steps) * (1.32 if second_act else 1.0)
 	health = max_health
-	sector_damage_scale = 1.0 + 0.20 * steps
+	sector_damage_scale = (1.0 + 0.20 * steps) * (1.20 if second_act else 1.0)
 	sector_experience_scale = 1.0 + 0.10 * steps
 	health_changed.emit(health, max_health)
 
@@ -130,14 +137,18 @@ func _physics_process(delta: float) -> void:
 	var tracking := false
 	if is_instance_valid(target) and target.health > 0.0:
 		var distance := target.global_position.x - global_position.x
-		tracking = absf(distance) < 8.0 and absf(target.global_position.y - global_position.y) < (4.0 if variant == Variant.FLYER else 1.8)
-		if tracking and absf(distance) > 0.05:
+		tracking = absf(distance) < (12.0 if second_act else 8.6) and absf(target.global_position.y - global_position.y) < (5.0 if variant == Variant.FLYER else 2.2)
+		if tracking and shot_windup <= 0.0 and absf(distance) > 0.05:
 			direction = signf(distance)
-		if stagger_left <= 0.0 and tracking and shot_clock <= 0.0 and absf(distance) > 1.5:
-			fire_at_player()
+		if shot_windup > 0.0:
+			shot_windup = maxf(shot_windup - delta, 0.0)
+			if shot_windup == 0.0 and stagger_left <= 0.0:
+				fire_at_player()
+		elif stagger_left <= 0.0 and tracking and shot_clock <= 0.0 and absf(distance) > 1.45:
+			prepare_shot()
 	if not tracking and absf(global_position.x - patrol_center) > 4.0:
 		direction = -signf(global_position.x - patrol_center)
-	velocity.x = 0.0 if planted_override else direction * move_speed
+	velocity.x = 0.0 if planted_override or shot_windup > 0.0 else direction * move_speed
 	if is_on_floor() and variant != Variant.TURRET:
 		var ledge := global_position + Vector3(direction * 0.75, 0.0, 0.0)
 		var probe := PhysicsRayQueryParameters3D.create(ledge, ledge + Vector3.DOWN * 1.1)
@@ -199,27 +210,33 @@ func damage_on_contact(body: RiftPlayer) -> void:
 	contact_lock = 0.8
 	body.take_damage(14.0 * sector_damage_scale, global_position)
 
-func fire_at_player() -> void:
-	var side := signf(target.global_position.x - global_position.x)
-	if side != 0.0:
-		direction = side
-	if robot:
-		robot.rotation.y = direction * PI * 0.5
+func prepare_shot() -> void:
 	var origin := global_position + Vector3(direction * 0.66, 0.13, 0.0)
-	var aim := target.global_position - origin
 	var sight := PhysicsRayQueryParameters3D.create(origin, target.global_position)
 	sight.exclude = [get_rid(), target.get_rid()]
 	if not get_world_3d().direct_space_state.intersect_ray(sight).is_empty():
 		shot_clock = 0.23
 		return
-	shot_clock = randf_range(0.85, 1.35) if variant == Variant.TURRET else randf_range(1.7, 2.6)
+	locked_aim = (target.global_position - origin).normalized()
+	shot_windup = 0.46 if variant in [Variant.HEAVY, Variant.TURRET] else 0.30
+	shot_clock = (randf_range(1.2, 1.65) if variant == Variant.TURRET else randf_range(1.75, 2.6)) * (0.81 if second_act else 1.0)
+	ATTACK_FX.charge(get_parent(), origin, ATTACK_FX.tint_for(sector_number), shot_windup)
+
+func fire_at_player() -> void:
 	attack_time = 0.4
-	var shot := RiftProjectile.new()
-	get_parent().add_child(shot)
-	shot.global_position = origin
-	shot.speed = 15.0 if variant == Variant.TURRET else 11.5
-	shot.damage = (15.0 if variant == Variant.HEAVY else 9.0) * sector_damage_scale
-	shot.setup(aim, faction, Color("ff5d71"))
+	var origin := global_position + Vector3(direction * 0.76, 0.13, 0.0)
+	var tint := ATTACK_FX.tint_for(sector_number)
+	ATTACK_FX.muzzle(get_parent(), origin, tint)
+	var spread: Array[float] = [0.0]
+	if second_act and variant in [Variant.TURRET, Variant.FLYER]:
+		spread.assign([-0.16, 0.16] if variant == Variant.FLYER else [-0.21, 0.0, 0.21])
+	for angle in spread:
+		var shot := RiftProjectile.new()
+		get_parent().add_child(shot)
+		shot.global_position = origin
+		shot.speed = (17.0 if variant == Variant.TURRET else 13.2) * (1.10 if second_act else 1.0)
+		shot.damage = (15.0 if variant == Variant.HEAVY else 9.0) * sector_damage_scale
+		shot.setup(locked_aim.rotated(Vector3.BACK, angle), faction, tint, false, variant == Variant.HEAVY, false, sector_number, variant)
 
 func spawn_pickup(scene: PackedScene, at: Vector3, temporary: bool, experience := 0, anchor: StaticBody3D = null) -> void:
 	var pickup := scene.instantiate() as Area3D

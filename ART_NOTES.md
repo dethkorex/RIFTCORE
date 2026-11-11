@@ -97,3 +97,10 @@ Stylized concept, panoramic seamless horizontal parallax background for RIFTCORE
 Reference-image generation using the earlier in-game lineup. The resulting silhouettes informed five independent Blender models and the in-game showroom. Forge Titan keeps its existing model.
 
 For sectors 03–10, `assets/campaign/art-prompts.json` records the boss concept, trim sheet, and backdrop prompts. The gameplay meshes are original Blender builds from `assets/campaign/build_models.py`: five enemy variants and a boss mesh per sector. The editable kit scenes and sector layouts come from `assets/campaign/build_levels.py`, using `sector_plan.json` for the theme and palette.
+
+
+## Trap effects and third-party VFX
+
+The campaign hazards use Godot shaders, meshes, and particles with CC0 textures from [Kenney Particle Pack](https://kenney.nl/assets/particle-pack). The jungle pods use the same particle textures for the green discharge and the burn effect. [Kenney Smoke Particles](https://kenney.nl/assets/smoke-particles) offers additional CC0 smoke and explosion sprites.
+
+[Magic Effects FREE by HS Hovl Studio](https://assetstore.unity.com/packages/vfx/particles/spells/magic-effects-free-247933) is a Unity Extension Asset. Its source package is distributed by the Asset Store. Its [Unity Asset Store EULA, section 2.2](https://unity.com/legal/as-terms) limits distribution to assets embedded in the finished game. The public RIFTCORE repository uses CC0 textures.
