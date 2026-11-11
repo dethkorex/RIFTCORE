@@ -58,15 +58,16 @@ func run():
 	p.velocity = Vector3.ZERO
 	await frames(6)
 	ok(game.sector_complete, "Factory extraction records a clear")
+	var extracted_xp: int = p.experience
 	paused = false
 	game.queue_free()
 	await frames(3)
 	var next = make_game(a,b)
 	ok(next.menu.saved_sector == 2 and next.menu.at_sector_start, "Command Deck offers the Machine Jungle deployment")
 	next.load_game()
-	await frames(175)
 	p = next.player
-	ok(next.sector == 2 and p.lives == 3 and p.experience == 230 and p.magma_unlocked, "Machine Jungle loads with three lives, carried XP, and Magma Breaker carried in the saved run")
+	ok(next.sector == 2 and p.lives == 3 and extracted_xp >= 230 and p.experience == extracted_xp and p.magma_unlocked, "Machine Jungle loads with three lives, carried XP, and Magma Breaker carried in the saved run")
+	await frames(175)
 	ok(p.is_on_floor() and next.remaining_enemies == 22, "Jungle spawn stands on the floor with 22 configured enemies")
 	var jungle_enemy = next.game_root.get_node("Actors/JungleUnit04")
 	var hp: float = jungle_enemy.health
@@ -115,4 +116,14 @@ func run():
 	p.shoot(false)
 	await frames(5)
 	ok(absf(ammo - p.energy - 7.0) < .01, "Thorn Swarm fires a burst and costs energy")
+	p.energy = 0.0
+	p.dash_left = 0.0
+	p.dash_lock = 0.0
+	p.air_dash_available = true
+	p.global_position += Vector3.UP * 4.0
+	await frames(4)
+	Input.action_press("dash")
+	await frames(2)
+	Input.action_release("dash")
+	ok(p.dash_left > 0.0 and not p.air_dash_available and p.energy == 0.0, "air dash works at zero energy and spends none")
 	quit(failed)
