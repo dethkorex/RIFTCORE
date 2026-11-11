@@ -1,0 +1,18 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/factory_boss.gd" id="boss"]
+[ext_resource type="PackedScene" path="res://assets/enemies/forge_titan_armored.glb" id="rig"]
+
+[sub_resource type="BoxShape3D" id="hitbox"]
+size = Vector3(2.65, 2.85, 1.28)
+
+[node name="ForgeTitan" type="CharacterBody3D" groups=["damageable_enemies"]]
+script = ExtResource("boss")
+max_health = 1040.0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("hitbox")
+
+[node name="Armor" type="Node3D" parent="."]
+
+[node name="Rig" parent="Armor" instance=ExtResource("rig")]

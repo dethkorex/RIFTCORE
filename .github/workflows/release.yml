@@ -1,0 +1,58 @@
+name: Standalone playtest releases
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch Godot and installer compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y nsis
+          mkdir -p release-tools/templates
+          touch release-tools/.gdignore
+          curl -fsSL --retry 3 -o release-tools/godot.zip https://github.com/godotengine/godot-builds/releases/download/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64.zip
+          unzip -q release-tools/godot.zip -d release-tools
+          chmod +x release-tools/Godot_v4.7.2-stable_linux.x86_64
+          python3 distribution/fetch_templates.py release-tools/templates
+          curl -fsSL --retry 3 -o release-tools/GODOT_LICENSE.txt https://raw.githubusercontent.com/godotengine/godot/4.7.2-stable/LICENSE.txt
+          curl -fsSL --retry 3 -o release-tools/GODOT_COPYRIGHT.txt https://raw.githubusercontent.com/godotengine/godot/4.7.2-stable/COPYRIGHT.txt
+      - name: Build installers and release manifest
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+          RELEASE_REPO: ${{ github.repository }}
+        run: |
+          tag=v0.1.0
+          if [ "$REF_TYPE" = tag ]; then tag="$REF_NAME"; fi
+          python3 distribution/build_release.py --engine release-tools/Godot_v4.7.2-stable_linux.x86_64             --templates release-tools/templates --licenses release-tools --nsis /usr/bin/makensis             --work release-tools/build --out release-tools/artifacts --tag "$tag" --repo "$RELEASE_REPO"
+      - name: Install and smoke-test Linux build
+        run: |
+          export XDG_DATA_HOME="$(mktemp -d)"
+          ./release-tools/artifacts/RIFTCORE-Linux-x64-Setup.run
+          build="$(find "$XDG_DATA_HOME/riftcore/versions" -name RIFTCORE -type f | head -1)"
+          test -x "$build"
+          "$build" --headless --quit-after 100 --log-file "$RUNNER_TEMP/riftcore-smoke.log"
+          ! grep -E 'SCRIPT ERROR:|Failed to load' "$RUNNER_TEMP/riftcore-smoke.log"
+          test -s release-tools/artifacts/RIFTCORE-Windows-x64-Setup.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: riftcore-playtest
+          path: release-tools/artifacts/*
+      - name: Publish tagged release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: gh release create "$RELEASE_TAG" release-tools/artifacts/* --verify-tag --generate-notes --latest

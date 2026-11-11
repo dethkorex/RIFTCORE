@@ -1,0 +1,71 @@
+[gd_scene format=3]
+
+[ext_resource type="Material" path="res://assets/neon_factory/edge.tres" id="edge"]
+[ext_resource type="Material" path="res://assets/neon_factory/dark.tres" id="dark"]
+[ext_resource type="Material" path="res://assets/neon_factory/steel.tres" id="steel"]
+
+[sub_resource type="BoxMesh" id="M0"]
+material = ExtResource("edge")
+size = Vector3(1, 1, 0.19)
+
+[sub_resource type="BoxMesh" id="M1"]
+material = ExtResource("dark")
+size = Vector3(0.83, 0.78, 0.07)
+
+[sub_resource type="BoxMesh" id="M2"]
+material = ExtResource("steel")
+size = Vector3(0.76, 0.045, 0.1)
+
+[sub_resource type="BoxMesh" id="M3"]
+material = ExtResource("steel")
+size = Vector3(0.76, 0.045, 0.1)
+
+[sub_resource type="BoxMesh" id="M4"]
+material = ExtResource("steel")
+size = Vector3(0.76, 0.045, 0.1)
+
+[sub_resource type="BoxMesh" id="M5"]
+material = ExtResource("steel")
+size = Vector3(0.76, 0.045, 0.1)
+
+[sub_resource type="BoxMesh" id="M6"]
+material = ExtResource("steel")
+size = Vector3(0.76, 0.045, 0.1)
+
+[node name="VentUnit" type="Node3D"]
+
+
+[node name="Detail0" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.6, 0.34)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M0")
+
+[node name="Detail1" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.6, 0.45)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M1")
+
+[node name="Detail2" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.33, 0.51)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M2")
+
+[node name="Detail3" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.465, 0.51)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M3")
+
+[node name="Detail4" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.6, 0.51)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M4")
+
+[node name="Detail5" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.735, 0.51)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M5")
+
+[node name="Detail6" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.87, 0.51)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M6")

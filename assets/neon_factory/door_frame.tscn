@@ -1,0 +1,70 @@
+[gd_scene format=3]
+
+[ext_resource type="Material" path="res://assets/neon_factory/edge.tres" id="edge"]
+[ext_resource type="Material" path="res://assets/neon_factory/cyan.tres" id="cyan"]
+[ext_resource type="Material" path="res://assets/neon_factory/dark.tres" id="dark"]
+
+[sub_resource type="BoxMesh" id="M0"]
+material = ExtResource("edge")
+size = Vector3(0.3, 3, 0.42)
+
+[sub_resource type="BoxMesh" id="M1"]
+material = ExtResource("edge")
+size = Vector3(0.3, 3, 0.42)
+
+[sub_resource type="BoxMesh" id="M2"]
+material = ExtResource("edge")
+size = Vector3(3, 0.28, 0.42)
+
+[sub_resource type="BoxMesh" id="M3"]
+material = ExtResource("cyan")
+size = Vector3(1.26, 0.065, 0.05)
+
+[sub_resource type="CylinderMesh" id="M4"]
+material = ExtResource("dark")
+top_radius = 0.045
+bottom_radius = 0.045
+height = 0.055
+radial_segments = 12
+rings = 1
+
+[sub_resource type="CylinderMesh" id="M5"]
+material = ExtResource("dark")
+top_radius = 0.045
+bottom_radius = 0.045
+height = 0.055
+radial_segments = 12
+rings = 1
+
+[node name="DoorFrame" type="Node3D"]
+
+
+[node name="Detail0" type="MeshInstance3D" parent="."]
+position = Vector3(-1.35, 1.5, 0.1)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M0")
+
+[node name="Detail1" type="MeshInstance3D" parent="."]
+position = Vector3(1.35, 1.5, 0.1)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M1")
+
+[node name="Detail2" type="MeshInstance3D" parent="."]
+position = Vector3(0, 2.86, 0.1)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M2")
+
+[node name="Detail3" type="MeshInstance3D" parent="."]
+position = Vector3(0, 2.87, 0.33)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M3")
+
+[node name="Detail4" type="MeshInstance3D" parent="."]
+position = Vector3(-1.34, 2.84, 0.32)
+rotation = Vector3(1.5708, 0, 0)
+mesh = SubResource("M4")
+
+[node name="Detail5" type="MeshInstance3D" parent="."]
+position = Vector3(1.34, 2.84, 0.32)
+rotation = Vector3(1.5708, 0, 0)
+mesh = SubResource("M5")

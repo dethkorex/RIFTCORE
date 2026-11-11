@@ -1,0 +1,87 @@
+[gd_scene format=3]
+
+[ext_resource type="Material" path="res://assets/neon_factory/platform_tread.tres" id="dark"]
+[ext_resource type="Material" path="res://assets/neon_factory/platform_deck.tres" id="steel"]
+[ext_resource type="Material" path="res://assets/neon_factory/cyan.tres" id="cyan"]
+[ext_resource type="Material" path="res://assets/neon_factory/platform_rail.tres" id="edge"]
+
+[ext_resource type="Script" path="res://scripts/platform_finish.gd" id="platform_finish"]
+
+[sub_resource type="BoxMesh" id="M0"]
+material = ExtResource("dark")
+size = Vector3(1.96, 0.32, 1.96)
+
+[sub_resource type="BoxMesh" id="M1"]
+material = ExtResource("steel")
+size = Vector3(1.955, 0.07, 1.78)
+
+[sub_resource type="BoxMesh" id="M2"]
+material = ExtResource("cyan")
+size = Vector3(0.94, 0.055, 0.035)
+
+[sub_resource type="BoxMesh" id="M3"]
+material = ExtResource("edge")
+size = Vector3(0.24, 0.27, 2)
+
+[sub_resource type="BoxMesh" id="M4"]
+material = ExtResource("edge")
+size = Vector3(2, 0.14, 0.1)
+
+[sub_resource type="BoxMesh" id="M5"]
+material = ExtResource("edge")
+size = Vector3(0.24, 0.27, 2)
+
+[sub_resource type="BoxMesh" id="M6"]
+material = ExtResource("edge")
+size = Vector3(2, 0.14, 0.1)
+
+[sub_resource type="BoxShape3D" id="S0"]
+size = Vector3(2, 0.36, 2)
+
+[node name="FloorPanelA" type="Node3D"]
+
+[node name="Body0" type="StaticBody3D" parent="."]
+
+[node name="Collider" type="CollisionShape3D" parent="Body0"]
+position = Vector3(0, -0.18, 0)
+rotation = Vector3(0, 0, 0)
+shape = SubResource("S0")
+
+
+[node name="Detail0" type="MeshInstance3D" parent="."]
+position = Vector3(0, -0.18, 0)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M0")
+
+[node name="Detail1" type="MeshInstance3D" parent="."]
+position = Vector3(0, -0.035, 0)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M1")
+
+[node name="Detail2" type="MeshInstance3D" parent="."]
+position = Vector3(0, -0.2, 1.01)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M2")
+
+[node name="Detail3" type="MeshInstance3D" parent="."]
+position = Vector3(-0.88, -0.12, 0)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M3")
+
+[node name="Detail4" type="MeshInstance3D" parent="."]
+position = Vector3(0, -0.08, -0.95)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M4")
+
+[node name="Detail5" type="MeshInstance3D" parent="."]
+position = Vector3(0.88, -0.12, 0)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M5")
+
+[node name="Detail6" type="MeshInstance3D" parent="."]
+position = Vector3(0, -0.08, 0.95)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M6")
+
+[node name="SurfaceFinish" type="Node3D" parent="."]
+script = ExtResource("platform_finish")

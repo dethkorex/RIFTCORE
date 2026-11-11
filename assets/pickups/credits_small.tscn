@@ -1,0 +1,28 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/enemy_pickup.gd" id="pickup"]
+
+[sub_resource type="StandardMaterial3D" id="Glow"]
+albedo_color = Color(1, 0.65, 0.12, 1)
+emission_enabled = true
+emission = Color(1, 0.65, 0.12, 1)
+emission_energy_multiplier = 1.7
+
+[sub_resource type="CylinderMesh" id="Credit0"]
+top_radius = 0.23
+bottom_radius = 0.23
+height = 0.095
+radial_segments = 8
+material = SubResource("Glow")
+
+[node name="credits_small" type="Area3D"]
+script = ExtResource("pickup")
+kind = 2
+large = false
+
+[node name="Visual" type="Node3D" parent="."]
+scale = Vector3(1, 1, 1)
+
+[node name="Credit0" type="MeshInstance3D" parent="Visual"]
+position = Vector3(0, -0.055, 0)
+mesh = SubResource("Credit0")

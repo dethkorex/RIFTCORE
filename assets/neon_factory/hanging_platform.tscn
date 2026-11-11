@@ -1,0 +1,297 @@
+[gd_scene format=3]
+
+[ext_resource type="Material" path="res://assets/neon_factory/platform_tread.tres" id="dark"]
+[ext_resource type="Material" path="res://assets/neon_factory/platform_deck.tres" id="steel"]
+[ext_resource type="Material" path="res://assets/neon_factory/cyan.tres" id="cyan"]
+[ext_resource type="Material" path="res://assets/neon_factory/platform_rail.tres" id="edge"]
+[ext_resource type="Material" path="res://assets/neon_factory/violet.tres" id="violet"]
+
+[ext_resource type="Script" path="res://scripts/platform_finish.gd" id="platform_finish"]
+
+[sub_resource type="BoxMesh" id="M0"]
+material = ExtResource("dark")
+size = Vector3(3.96, 0.32, 1.96)
+
+[sub_resource type="BoxMesh" id="M1"]
+material = ExtResource("steel")
+size = Vector3(1.955, 0.07, 1.78)
+
+[sub_resource type="BoxMesh" id="M2"]
+material = ExtResource("cyan")
+size = Vector3(0.94, 0.055, 0.035)
+
+[sub_resource type="BoxMesh" id="M3"]
+material = ExtResource("steel")
+size = Vector3(1.955, 0.07, 1.78)
+
+[sub_resource type="BoxMesh" id="M4"]
+material = ExtResource("cyan")
+size = Vector3(0.94, 0.055, 0.035)
+
+[sub_resource type="BoxMesh" id="M5"]
+material = ExtResource("edge")
+size = Vector3(0.24, 0.27, 2)
+
+[sub_resource type="BoxMesh" id="M6"]
+material = ExtResource("edge")
+size = Vector3(4, 0.14, 0.1)
+
+[sub_resource type="BoxMesh" id="M7"]
+material = ExtResource("edge")
+size = Vector3(0.24, 0.27, 2)
+
+[sub_resource type="BoxMesh" id="M8"]
+material = ExtResource("edge")
+size = Vector3(4, 0.14, 0.1)
+
+[sub_resource type="BoxMesh" id="M9"]
+material = ExtResource("edge")
+size = Vector3(4, 0.25, 0.45)
+
+[sub_resource type="CylinderMesh" id="M10"]
+material = ExtResource("steel")
+top_radius = 0.052
+bottom_radius = 0.052
+height = 2.3
+radial_segments = 12
+rings = 1
+
+[sub_resource type="CylinderMesh" id="M11"]
+material = ExtResource("steel")
+top_radius = 0.052
+bottom_radius = 0.052
+height = 2.3
+radial_segments = 12
+rings = 1
+
+[sub_resource type="CylinderMesh" id="M12"]
+material = ExtResource("violet")
+top_radius = 0.034
+bottom_radius = 0.034
+height = 0.4661793917674204
+radial_segments = 12
+rings = 1
+
+[sub_resource type="CylinderMesh" id="M13"]
+material = ExtResource("violet")
+top_radius = 0.034
+bottom_radius = 0.034
+height = 0.4093193876560347
+radial_segments = 12
+rings = 1
+
+[sub_resource type="CylinderMesh" id="M14"]
+material = ExtResource("violet")
+top_radius = 0.034
+bottom_radius = 0.034
+height = 0.3573760900691126
+radial_segments = 12
+rings = 1
+
+[sub_resource type="CylinderMesh" id="M15"]
+material = ExtResource("violet")
+top_radius = 0.034
+bottom_radius = 0.034
+height = 0.3128084897098669
+radial_segments = 12
+rings = 1
+
+[sub_resource type="CylinderMesh" id="M16"]
+material = ExtResource("violet")
+top_radius = 0.034
+bottom_radius = 0.034
+height = 0.27917164174671383
+radial_segments = 12
+rings = 1
+
+[sub_resource type="CylinderMesh" id="M17"]
+material = ExtResource("violet")
+top_radius = 0.034
+bottom_radius = 0.034
+height = 0.26073095849179356
+radial_segments = 12
+rings = 1
+
+[sub_resource type="CylinderMesh" id="M18"]
+material = ExtResource("violet")
+top_radius = 0.034
+bottom_radius = 0.034
+height = 0.26073095849179373
+radial_segments = 12
+rings = 1
+
+[sub_resource type="CylinderMesh" id="M19"]
+material = ExtResource("violet")
+top_radius = 0.034
+bottom_radius = 0.034
+height = 0.2791716417467136
+radial_segments = 12
+rings = 1
+
+[sub_resource type="CylinderMesh" id="M20"]
+material = ExtResource("violet")
+top_radius = 0.034
+bottom_radius = 0.034
+height = 0.31280848970986697
+radial_segments = 12
+rings = 1
+
+[sub_resource type="CylinderMesh" id="M21"]
+material = ExtResource("violet")
+top_radius = 0.034
+bottom_radius = 0.034
+height = 0.35737609006911286
+radial_segments = 12
+rings = 1
+
+[sub_resource type="CylinderMesh" id="M22"]
+material = ExtResource("violet")
+top_radius = 0.034
+bottom_radius = 0.034
+height = 0.409319387656034
+radial_segments = 12
+rings = 1
+
+[sub_resource type="CylinderMesh" id="M23"]
+material = ExtResource("violet")
+top_radius = 0.034
+bottom_radius = 0.034
+height = 0.4661793917674206
+radial_segments = 12
+rings = 1
+
+[sub_resource type="BoxShape3D" id="S0"]
+size = Vector3(4, 0.36, 2)
+
+[node name="HangingPlatform" type="Node3D"]
+
+[node name="Body0" type="StaticBody3D" parent="."]
+
+[node name="Collider" type="CollisionShape3D" parent="Body0"]
+position = Vector3(0, -0.18, 0)
+rotation = Vector3(0, 0, 0)
+shape = SubResource("S0")
+
+
+[node name="Detail0" type="MeshInstance3D" parent="."]
+position = Vector3(0, -0.18, 0)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M0")
+
+[node name="Detail1" type="MeshInstance3D" parent="."]
+position = Vector3(-1, -0.035, 0)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M1")
+
+[node name="Detail2" type="MeshInstance3D" parent="."]
+position = Vector3(-1, -0.2, 1.01)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M2")
+
+[node name="Detail3" type="MeshInstance3D" parent="."]
+position = Vector3(1, -0.035, 0)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M3")
+
+[node name="Detail4" type="MeshInstance3D" parent="."]
+position = Vector3(1, -0.2, 1.01)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M4")
+
+[node name="Detail5" type="MeshInstance3D" parent="."]
+position = Vector3(-1.88, -0.12, 0)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M5")
+
+[node name="Detail6" type="MeshInstance3D" parent="."]
+position = Vector3(0, -0.08, -0.95)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M6")
+
+[node name="Detail7" type="MeshInstance3D" parent="."]
+position = Vector3(1.88, -0.12, 0)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M7")
+
+[node name="Detail8" type="MeshInstance3D" parent="."]
+position = Vector3(0, -0.08, 0.95)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M8")
+
+[node name="Detail9" type="MeshInstance3D" parent="."]
+position = Vector3(0, 2.3, -0.4)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M9")
+
+[node name="Detail10" type="MeshInstance3D" parent="."]
+position = Vector3(-1.7, 1.15, -0.4)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M10")
+
+[node name="Detail11" type="MeshInstance3D" parent="."]
+position = Vector3(1.7, 1.15, -0.4)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M11")
+
+[node name="Detail12" type="MeshInstance3D" parent="."]
+position = Vector3(-1.42083, 1.98597, -0.31)
+rotation = Vector3(0, 0, -2.55425)
+mesh = SubResource("M12")
+
+[node name="Detail13" type="MeshInstance3D" parent="."]
+position = Vector3(-1.1625, 1.63319, -0.31)
+rotation = Vector3(0, 0, -2.45858)
+mesh = SubResource("M13")
+
+[node name="Detail14" type="MeshInstance3D" parent="."]
+position = Vector3(-0.90417, 1.35097, -0.31)
+rotation = Vector3(0, 0, -2.33366)
+mesh = SubResource("M14")
+
+[node name="Detail15" type="MeshInstance3D" parent="."]
+position = Vector3(-0.64583, 1.13931, -0.31)
+rotation = Vector3(0, 0, -2.16988)
+mesh = SubResource("M15")
+
+[node name="Detail16" type="MeshInstance3D" parent="."]
+position = Vector3(-0.3875, 0.99819, -0.31)
+rotation = Vector3(0, 0, -1.95962)
+mesh = SubResource("M16")
+
+[node name="Detail17" type="MeshInstance3D" parent="."]
+position = Vector3(-0.12917, 0.92764, -0.31)
+rotation = Vector3(0, 0, -1.70652)
+mesh = SubResource("M17")
+
+[node name="Detail18" type="MeshInstance3D" parent="."]
+position = Vector3(0.12917, 0.92764, -0.31)
+rotation = Vector3(0, 0, -1.43508)
+mesh = SubResource("M18")
+
+[node name="Detail19" type="MeshInstance3D" parent="."]
+position = Vector3(0.3875, 0.99819, -0.31)
+rotation = Vector3(0, 0, -1.18198)
+mesh = SubResource("M19")
+
+[node name="Detail20" type="MeshInstance3D" parent="."]
+position = Vector3(0.64583, 1.13931, -0.31)
+rotation = Vector3(0, 0, -0.97171)
+mesh = SubResource("M20")
+
+[node name="Detail21" type="MeshInstance3D" parent="."]
+position = Vector3(0.90417, 1.35097, -0.31)
+rotation = Vector3(0, 0, -0.80793)
+mesh = SubResource("M21")
+
+[node name="Detail22" type="MeshInstance3D" parent="."]
+position = Vector3(1.1625, 1.63319, -0.31)
+rotation = Vector3(0, 0, -0.68301)
+mesh = SubResource("M22")
+
+[node name="Detail23" type="MeshInstance3D" parent="."]
+position = Vector3(1.42083, 1.98597, -0.31)
+rotation = Vector3(0, 0, -0.58734)
+mesh = SubResource("M23")
+
+[node name="SurfaceFinish" type="Node3D" parent="."]
+script = ExtResource("platform_finish")

@@ -1,0 +1,170 @@
+[gd_scene format=3]
+
+[ext_resource type="Material" path="res://assets/neon_factory/steel.tres" id="steel"]
+[ext_resource type="Material" path="res://assets/neon_factory/violet.tres" id="violet"]
+[ext_resource type="Material" path="res://assets/neon_factory/dark.tres" id="dark"]
+
+[sub_resource type="BoxMesh" id="M0"]
+material = ExtResource("steel")
+size = Vector3(0.55, 1.5, 0.65)
+
+[sub_resource type="BoxMesh" id="M1"]
+material = ExtResource("violet")
+size = Vector3(0.065, 1.2, 0.03)
+
+[sub_resource type="CylinderMesh" id="M2"]
+material = ExtResource("dark")
+top_radius = 0.12
+bottom_radius = 0.12
+height = 0.69
+radial_segments = 12
+rings = 1
+
+[sub_resource type="BoxMesh" id="M3"]
+material = ExtResource("steel")
+size = Vector3(0.55, 2.56, 0.65)
+
+[sub_resource type="BoxMesh" id="M4"]
+material = ExtResource("violet")
+size = Vector3(0.065, 2.048, 0.03)
+
+[sub_resource type="CylinderMesh" id="M5"]
+material = ExtResource("dark")
+top_radius = 0.12
+bottom_radius = 0.12
+height = 0.69
+radial_segments = 12
+rings = 1
+
+[sub_resource type="BoxMesh" id="M6"]
+material = ExtResource("steel")
+size = Vector3(0.55, 3.62, 0.65)
+
+[sub_resource type="BoxMesh" id="M7"]
+material = ExtResource("violet")
+size = Vector3(0.065, 2.896, 0.03)
+
+[sub_resource type="CylinderMesh" id="M8"]
+material = ExtResource("dark")
+top_radius = 0.12
+bottom_radius = 0.12
+height = 0.69
+radial_segments = 12
+rings = 1
+
+[sub_resource type="BoxMesh" id="M9"]
+material = ExtResource("steel")
+size = Vector3(0.55, 2.03, 0.65)
+
+[sub_resource type="BoxMesh" id="M10"]
+material = ExtResource("violet")
+size = Vector3(0.065, 1.624, 0.03)
+
+[sub_resource type="CylinderMesh" id="M11"]
+material = ExtResource("dark")
+top_radius = 0.12
+bottom_radius = 0.12
+height = 0.69
+radial_segments = 12
+rings = 1
+
+[sub_resource type="BoxMesh" id="M12"]
+material = ExtResource("steel")
+size = Vector3(0.55, 3.09, 0.65)
+
+[sub_resource type="BoxMesh" id="M13"]
+material = ExtResource("violet")
+size = Vector3(0.065, 2.472, 0.03)
+
+[sub_resource type="CylinderMesh" id="M14"]
+material = ExtResource("dark")
+top_radius = 0.12
+bottom_radius = 0.12
+height = 0.69
+radial_segments = 12
+rings = 1
+
+[node name="BackgroundTower" type="Node3D"]
+
+
+[node name="Detail0" type="MeshInstance3D" parent="."]
+position = Vector3(-1.28, 0.75, 0)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M0")
+
+[node name="Detail1" type="MeshInstance3D" parent="."]
+position = Vector3(-1.28, 0.75, 0.34)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M1")
+
+[node name="Detail2" type="MeshInstance3D" parent="."]
+position = Vector3(-1.28, 1.82, 0)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M2")
+
+[node name="Detail3" type="MeshInstance3D" parent="."]
+position = Vector3(-0.64, 1.28, 0)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M3")
+
+[node name="Detail4" type="MeshInstance3D" parent="."]
+position = Vector3(-0.64, 1.28, 0.34)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M4")
+
+[node name="Detail5" type="MeshInstance3D" parent="."]
+position = Vector3(-0.64, 2.88, 0)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M5")
+
+[node name="Detail6" type="MeshInstance3D" parent="."]
+position = Vector3(0, 1.81, 0)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M6")
+
+[node name="Detail7" type="MeshInstance3D" parent="."]
+position = Vector3(0, 1.81, 0.34)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M7")
+
+[node name="Detail8" type="MeshInstance3D" parent="."]
+position = Vector3(0, 3.94, 0)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M8")
+
+[node name="Detail9" type="MeshInstance3D" parent="."]
+position = Vector3(0.64, 1.015, 0)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M9")
+
+[node name="Detail10" type="MeshInstance3D" parent="."]
+position = Vector3(0.64, 1.015, 0.34)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M10")
+
+[node name="Detail11" type="MeshInstance3D" parent="."]
+position = Vector3(0.64, 2.35, 0)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M11")
+
+[node name="Detail12" type="MeshInstance3D" parent="."]
+position = Vector3(1.28, 1.545, 0)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M12")
+
+[node name="Detail13" type="MeshInstance3D" parent="."]
+position = Vector3(1.28, 1.545, 0.34)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M13")
+
+[node name="Detail14" type="MeshInstance3D" parent="."]
+position = Vector3(1.28, 3.41, 0)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M14")
+
+[node name="Mark15" type="Label3D" parent="."]
+position = Vector3(0, 1, 0.39)
+text = "F-02"
+font_size = 48
+pixel_size = 0.006666666666666667
+outline_size = 0

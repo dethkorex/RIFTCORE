@@ -1,0 +1,64 @@
+# Neon Factory kit
+
+58 Godot scenes based on the two Level 1 reference sheets. Open showroom.tscn to browse them. Drag individual scenes into your level. Use 0.5 m translation snapping; floor platform origins are at the top surface. Walls and tall props use bottom-center origins. The six main finish materials are shared, with a separate molten material.
+
+Static platform colliders are editable. The lift animates vertically and straight conveyors apply a surface velocity. The ramp variants have sloped collision. The jump-through catwalk lets the player jump up from below and land from above. The yellow edges are markings. Laser, checkpoint, collectible, security camera, ladder, molten damage, and boss doors are art prefabs for gameplay hookup. The showroom does not replace the current level.
+
+- wall_panel_a
+- wall_panel_b
+- wall_panel_c
+- floor_panel_a
+- floor_panel_b
+- floor_panel_c
+- pipe_straight
+- pipe_elbow
+- pipe_t_joint
+- pipe_vertical
+- support_column
+- support_truss
+- catwalk_rail_section
+- hanging_cables
+- reactor_core
+- neon_machinery
+- conveyor_straight
+- conveyor_inclined
+- conveyor_transfer
+- hazard_barrel
+- industrial_crate
+- sci_fi_terminal
+- security_camera
+- laser_gate_emitter
+- warning_sign
+- energy_canister
+- vent_unit
+- fan_unit
+- door_frame
+- checkpoint_beacon
+- lift_elevator_unit
+- factory_light_fixture
+- molten_vent
+- background_tower
+- boss_gate_door
+- small_floor_platform
+- medium_floor_platform
+- large_floor_platform
+- thin_catwalk_platform
+- grated_platform
+- hazard_edge_platform
+- corner_platform
+- angled_ramp_30
+- angled_ramp_45
+- conveyor_platform
+- moving_lift_platform
+- suspended_platform
+- platform_with_railings
+- support_pillar
+- truss_bridge
+- hanging_platform
+- wall_ledge
+- platform_end_cap
+- platform_connector
+- ladder_platform
+- jump_through_catwalk
+- molten_hazard_platform
+- boss_arena_floor

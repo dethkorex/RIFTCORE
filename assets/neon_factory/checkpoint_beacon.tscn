@@ -1,0 +1,53 @@
+[gd_scene format=3]
+
+[ext_resource type="Material" path="res://assets/neon_factory/steel.tres" id="steel"]
+[ext_resource type="Material" path="res://assets/neon_factory/cyan.tres" id="cyan"]
+
+[sub_resource type="CylinderMesh" id="M0"]
+material = ExtResource("steel")
+top_radius = 0.7
+bottom_radius = 0.7
+height = 0.3
+radial_segments = 12
+rings = 1
+
+[sub_resource type="CylinderMesh" id="M1"]
+material = ExtResource("cyan")
+top_radius = 0.41
+bottom_radius = 0.41
+height = 0.12
+radial_segments = 12
+rings = 1
+
+[sub_resource type="CylinderMesh" id="M2"]
+material = ExtResource("cyan")
+top_radius = 0.36
+bottom_radius = 0.36
+height = 0.07
+radial_segments = 12
+rings = 1
+
+[node name="CheckpointBeacon" type="Node3D"]
+
+
+[node name="Detail0" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.15, 0)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M0")
+
+[node name="Detail1" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.37, 0)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M1")
+
+[node name="Detail2" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.82, 0)
+rotation = Vector3(1.5708, 0, 0)
+mesh = SubResource("M2")
+
+[node name="Mark3" type="Label3D" parent="."]
+position = Vector3(0, 0.82, 0.05)
+text = "∆"
+font_size = 48
+pixel_size = 0.0077083333333333335
+outline_size = 0

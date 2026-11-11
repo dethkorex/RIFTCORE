@@ -1,0 +1,43 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/enemy_pickup.gd" id="pickup"]
+[ext_resource type="Material" path="res://assets/neon_factory/dark.tres" id="dark"]
+[ext_resource type="Material" path="res://assets/neon_factory/cyan.tres" id="cyan"]
+
+[sub_resource type="CylinderMesh" id="Core"]
+material = ExtResource("dark")
+top_radius = 0.31
+bottom_radius = 0.31
+height = 0.15
+radial_segments = 8
+
+[sub_resource type="TorusMesh" id="Rim"]
+material = ExtResource("cyan")
+inner_radius = 0.252
+outer_radius = 0.304
+rings = 16
+ring_segments = 8
+
+[node name="ExtraLife" type="Area3D"]
+script = ExtResource("pickup")
+kind = 4
+large = true
+
+[node name="Visual" type="Node3D" parent="."]
+
+[node name="Core" type="MeshInstance3D" parent="Visual"]
+rotation = Vector3(1.5707963, 0, 0)
+mesh = SubResource("Core")
+
+[node name="Rim" type="MeshInstance3D" parent="Visual"]
+position = Vector3(0, 0, 0.09)
+rotation = Vector3(1.5707963, 0, 0)
+mesh = SubResource("Rim")
+
+[node name="Mark" type="Label3D" parent="Visual"]
+position = Vector3(0, 0, 0.119)
+pixel_size = 0.0034
+font_size = 75
+outline_size = 12
+modulate = Color(0.65, 1, 0.89, 1)
+text = "1UP"

@@ -1,0 +1,79 @@
+[gd_scene format=3]
+
+[ext_resource type="Material" path="res://assets/neon_factory/amber.tres" id="amber"]
+[ext_resource type="Material" path="res://assets/neon_factory/dark.tres" id="dark"]
+
+[sub_resource type="CylinderMesh" id="M0"]
+material = ExtResource("amber")
+top_radius = 0.45
+bottom_radius = 0.45
+height = 1.06
+radial_segments = 12
+rings = 1
+
+[sub_resource type="CylinderMesh" id="M1"]
+material = ExtResource("dark")
+top_radius = 0.47
+bottom_radius = 0.47
+height = 0.075
+radial_segments = 12
+rings = 1
+
+[sub_resource type="CylinderMesh" id="M2"]
+material = ExtResource("dark")
+top_radius = 0.47
+bottom_radius = 0.47
+height = 0.075
+radial_segments = 12
+rings = 1
+
+[sub_resource type="CylinderMesh" id="M3"]
+material = ExtResource("dark")
+top_radius = 0.47
+bottom_radius = 0.47
+height = 0.075
+radial_segments = 12
+rings = 1
+
+[sub_resource type="CylinderMesh" id="M4"]
+material = ExtResource("dark")
+top_radius = 0.47
+bottom_radius = 0.47
+height = 0.075
+radial_segments = 12
+rings = 1
+
+[node name="HazardBarrel" type="Node3D"]
+
+
+[node name="Detail0" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.55, 0)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M0")
+
+[node name="Detail1" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.09, 0)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M1")
+
+[node name="Detail2" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.3, 0)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M2")
+
+[node name="Detail3" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.85, 0)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M3")
+
+[node name="Detail4" type="MeshInstance3D" parent="."]
+position = Vector3(0, 1.07, 0)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M4")
+
+[node name="Mark5" type="Label3D" parent="."]
+position = Vector3(0, 0.56, 0.453)
+text = "!"
+font_size = 48
+pixel_size = 0.006666666666666667
+outline_size = 0

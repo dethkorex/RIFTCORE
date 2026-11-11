@@ -1,0 +1,138 @@
+[gd_scene format=3]
+
+[ext_resource type="Material" path="res://assets/neon_factory/steel.tres" id="steel"]
+[ext_resource type="Material" path="res://assets/neon_factory/edge.tres" id="edge"]
+[ext_resource type="Material" path="res://assets/neon_factory/cyan.tres" id="cyan"]
+
+[sub_resource type="CylinderMesh" id="M0"]
+material = ExtResource("steel")
+top_radius = 0.15
+bottom_radius = 0.15
+height = 2.2
+radial_segments = 12
+rings = 1
+
+[sub_resource type="CylinderMesh" id="M1"]
+material = ExtResource("edge")
+top_radius = 0.183
+bottom_radius = 0.183
+height = 0.09899999999999998
+radial_segments = 12
+rings = 1
+
+[sub_resource type="CylinderMesh" id="M2"]
+material = ExtResource("cyan")
+top_radius = 0.168
+bottom_radius = 0.168
+height = 0.06599999999999995
+radial_segments = 12
+rings = 1
+
+[sub_resource type="CylinderMesh" id="M3"]
+material = ExtResource("edge")
+top_radius = 0.183
+bottom_radius = 0.183
+height = 0.09899999999999975
+radial_segments = 12
+rings = 1
+
+[sub_resource type="CylinderMesh" id="M4"]
+material = ExtResource("cyan")
+top_radius = 0.168
+bottom_radius = 0.168
+height = 0.06599999999999984
+radial_segments = 12
+rings = 1
+
+[sub_resource type="CylinderMesh" id="M5"]
+material = ExtResource("steel")
+top_radius = 0.15
+bottom_radius = 0.15
+height = 0.9
+radial_segments = 12
+rings = 1
+
+[sub_resource type="CylinderMesh" id="M6"]
+material = ExtResource("edge")
+top_radius = 0.183
+bottom_radius = 0.183
+height = 0.04049999999999998
+radial_segments = 12
+rings = 1
+
+[sub_resource type="CylinderMesh" id="M7"]
+material = ExtResource("cyan")
+top_radius = 0.168
+bottom_radius = 0.168
+height = 0.027000000000000024
+radial_segments = 12
+rings = 1
+
+[sub_resource type="CylinderMesh" id="M8"]
+material = ExtResource("edge")
+top_radius = 0.183
+bottom_radius = 0.183
+height = 0.0405000000000002
+radial_segments = 12
+rings = 1
+
+[sub_resource type="CylinderMesh" id="M9"]
+material = ExtResource("cyan")
+top_radius = 0.168
+bottom_radius = 0.168
+height = 0.02699999999999969
+radial_segments = 12
+rings = 1
+
+[node name="PipeTJoint" type="Node3D"]
+
+
+[node name="Detail0" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.35, 0)
+rotation = Vector3(0, 0, -1.5708)
+mesh = SubResource("M0")
+
+[node name="Detail1" type="MeshInstance3D" parent="."]
+position = Vector3(-0.8745, 0.35, 0)
+rotation = Vector3(0, 0, -1.5708)
+mesh = SubResource("M1")
+
+[node name="Detail2" type="MeshInstance3D" parent="."]
+position = Vector3(-0.792, 0.35, 0)
+rotation = Vector3(0, 0, -1.5708)
+mesh = SubResource("M2")
+
+[node name="Detail3" type="MeshInstance3D" parent="."]
+position = Vector3(0.9735, 0.35, 0)
+rotation = Vector3(0, 0, -1.5708)
+mesh = SubResource("M3")
+
+[node name="Detail4" type="MeshInstance3D" parent="."]
+position = Vector3(1.056, 0.35, 0)
+rotation = Vector3(0, 0, -1.5708)
+mesh = SubResource("M4")
+
+[node name="Detail5" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.8, 0)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M5")
+
+[node name="Detail6" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.44225, 0)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M6")
+
+[node name="Detail7" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.476, 0)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M7")
+
+[node name="Detail8" type="MeshInstance3D" parent="."]
+position = Vector3(0, 1.19825, 0)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M8")
+
+[node name="Detail9" type="MeshInstance3D" parent="."]
+position = Vector3(0, 1.232, 0)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M9")

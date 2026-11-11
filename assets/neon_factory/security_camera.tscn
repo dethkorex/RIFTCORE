@@ -1,0 +1,52 @@
+[gd_scene format=3]
+
+[ext_resource type="Material" path="res://assets/neon_factory/edge.tres" id="edge"]
+[ext_resource type="Material" path="res://assets/neon_factory/steel.tres" id="steel"]
+[ext_resource type="Material" path="res://assets/neon_factory/violet.tres" id="violet"]
+
+[sub_resource type="BoxMesh" id="M0"]
+material = ExtResource("edge")
+size = Vector3(0.18, 0.83, 0.44)
+
+[sub_resource type="CylinderMesh" id="M1"]
+material = ExtResource("edge")
+top_radius = 0.09
+bottom_radius = 0.09
+height = 0.6268173577685928
+radial_segments = 12
+rings = 1
+
+[sub_resource type="BoxMesh" id="M2"]
+material = ExtResource("steel")
+size = Vector3(0.67, 0.4, 0.52)
+
+[sub_resource type="CylinderMesh" id="M3"]
+material = ExtResource("violet")
+top_radius = 0.16
+bottom_radius = 0.16
+height = 0.13
+radial_segments = 12
+rings = 1
+
+[node name="SecurityCamera" type="Node3D"]
+
+
+[node name="Detail0" type="MeshInstance3D" parent="."]
+position = Vector3(-0.35, 0.53, 0)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M0")
+
+[node name="Detail1" type="MeshInstance3D" parent="."]
+position = Vector3(-0.09, 0.655, 0)
+rotation = Vector3(0, 0, -0.97837)
+mesh = SubResource("M1")
+
+[node name="Detail2" type="MeshInstance3D" parent="."]
+position = Vector3(0.23, 1, 0)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M2")
+
+[node name="Detail3" type="MeshInstance3D" parent="."]
+position = Vector3(0.24, 1, 0.3)
+rotation = Vector3(1.5708, 0, 0)
+mesh = SubResource("M3")

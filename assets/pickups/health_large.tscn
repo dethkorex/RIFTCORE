@@ -1,0 +1,74 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/enemy_pickup.gd" id="pickup"]
+[ext_resource type="Material" path="res://assets/neon_factory/edge.tres" id="shell"]
+
+[sub_resource type="StandardMaterial3D" id="Glow"]
+albedo_color = Color(0.15, 1, 0.42, 1)
+emission_enabled = true
+emission = Color(0.15, 1, 0.42, 1)
+emission_energy_multiplier = 1.7
+
+[sub_resource type="BoxMesh" id="Cell"]
+size = Vector3(0.38, 0.42, 0.26)
+material = ExtResource("shell")
+
+[sub_resource type="BoxMesh" id="Bottom"]
+size = Vector3(0.44, 0.09, 0.31)
+material = ExtResource("shell")
+
+[sub_resource type="BoxMesh" id="Top"]
+size = Vector3(0.44, 0.09, 0.31)
+material = ExtResource("shell")
+
+[sub_resource type="BoxMesh" id="Light"]
+size = Vector3(0.065, 0.24, 0.05)
+material = SubResource("Glow")
+
+[sub_resource type="BoxMesh" id="Cross"]
+size = Vector3(0.24, 0.065, 0.05)
+material = SubResource("Glow")
+
+[sub_resource type="BoxMesh" id="Left"]
+size = Vector3(0.025, 0.24, 0.04)
+material = SubResource("Glow")
+
+[sub_resource type="BoxMesh" id="Right"]
+size = Vector3(0.025, 0.24, 0.04)
+material = SubResource("Glow")
+
+[node name="health_large" type="Area3D"]
+script = ExtResource("pickup")
+kind = 0
+large = true
+
+[node name="Visual" type="Node3D" parent="."]
+scale = Vector3(1.4, 1.4, 1.4)
+
+[node name="Cell" type="MeshInstance3D" parent="Visual"]
+position = Vector3(0, 0, 0)
+mesh = SubResource("Cell")
+
+[node name="Bottom" type="MeshInstance3D" parent="Visual"]
+position = Vector3(0, -0.21, 0)
+mesh = SubResource("Bottom")
+
+[node name="Top" type="MeshInstance3D" parent="Visual"]
+position = Vector3(0, 0.21, 0)
+mesh = SubResource("Top")
+
+[node name="Light" type="MeshInstance3D" parent="Visual"]
+position = Vector3(0, 0, 0.15)
+mesh = SubResource("Light")
+
+[node name="Cross" type="MeshInstance3D" parent="Visual"]
+position = Vector3(0, 0, 0.158)
+mesh = SubResource("Cross")
+
+[node name="Left" type="MeshInstance3D" parent="Visual"]
+position = Vector3(-0.16, 0, 0.15)
+mesh = SubResource("Left")
+
+[node name="Right" type="MeshInstance3D" parent="Visual"]
+position = Vector3(0.16, 0, 0.15)
+mesh = SubResource("Right")

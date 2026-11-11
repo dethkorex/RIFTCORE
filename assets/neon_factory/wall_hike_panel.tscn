@@ -1,0 +1,40 @@
+[gd_scene format=3]
+
+[ext_resource type="Material" path="res://assets/neon_factory/platform_tread.tres" id="tread"]
+[ext_resource type="Material" path="res://assets/neon_factory/platform_rail.tres" id="rail"]
+[ext_resource type="Material" path="res://assets/neon_factory/cyan.tres" id="cyan"]
+
+[sub_resource type="BoxShape3D" id="WallShape"]
+size = Vector3(0.43, 3.25, 1.88)
+
+[sub_resource type="BoxMesh" id="WallMesh"]
+size = Vector3(0.42, 3.24, 1.86)
+material = ExtResource("tread")
+
+[sub_resource type="BoxMesh" id="Trim"]
+size = Vector3(0.46, 0.18, 1.89)
+material = ExtResource("rail")
+
+[sub_resource type="BoxMesh" id="Strip"]
+size = Vector3(0.13, 1.27, 0.04)
+material = ExtResource("cyan")
+
+[node name="WallHikePanel" type="StaticBody3D" groups=["wall_hike"]]
+
+[node name="Collider" type="CollisionShape3D" parent="."]
+shape = SubResource("WallShape")
+
+[node name="Wall" type="MeshInstance3D" parent="."]
+mesh = SubResource("WallMesh")
+
+[node name="UpperTrim" type="MeshInstance3D" parent="."]
+position = Vector3(0, 1.52, 0)
+mesh = SubResource("Trim")
+
+[node name="LowerTrim" type="MeshInstance3D" parent="."]
+position = Vector3(0, -1.52, 0)
+mesh = SubResource("Trim")
+
+[node name="ClimbStrip" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0, 0.944)
+mesh = SubResource("Strip")

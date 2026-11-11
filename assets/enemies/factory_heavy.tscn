@@ -1,0 +1,10 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://assets/enemies/heavy_armored.glb" id="armor"]
+
+[ext_resource type="Script" path="res://scripts/security_finish.gd" id="finish"]
+
+[node name="Heavy" type="Node3D"]
+script = ExtResource("finish")
+
+[node name="Armor" parent="." instance=ExtResource("armor")]
