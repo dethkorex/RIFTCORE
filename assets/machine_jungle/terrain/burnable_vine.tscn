@@ -1,0 +1,13 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/burnable_vine.gd" id="vine"]
+
+[sub_resource type="BoxShape3D" id="Barrier"]
+size = Vector3(0.48, 2.66, 2.1)
+
+[node name="BurnableVine" type="StaticBody3D" groups=["damageable_enemies"]]
+script = ExtResource("vine")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+position = Vector3(0, 1.31, 0)
+shape = SubResource("Barrier")

@@ -9,9 +9,13 @@ var origin: Vector3
 var clock := 0.0
 
 func _ready() -> void:
+	# Shootable layer: projectiles can hit it; player movement cannot.
+	collision_layer = 2
+	collision_mask = 0
 	max_health = 18.0
 	super._ready()
 	origin = position
+	add_to_group(&"shootable_cargo")
 	var scene := preload("res://assets/enemies/factory_flyer.tscn")
 	var drone := scene.instantiate() as Node3D
 	drone.scale = Vector3.ONE * 0.65

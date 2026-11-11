@@ -1,0 +1,10 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/enemy.gd" id="enemy"]
+[ext_resource type="PackedScene" path="res://assets/machine_jungle/enemies/spore_sentry.glb" id="model"]
+
+[node name="SporeSentry" type="CharacterBody3D" groups=["damageable_enemies", "jungle_enemies"]]
+script = ExtResource("enemy")
+variant = 3
+model_override = ExtResource("model")
+fire_weakness = 1.5

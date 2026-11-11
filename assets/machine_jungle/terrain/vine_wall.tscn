@@ -1,0 +1,155 @@
+[gd_scene format=3]
+
+[ext_resource type="Material" path="res://assets/machine_jungle/stone.tres" id="stone"]
+
+[ext_resource type="Material" path="res://assets/machine_jungle/fern.tres" id="fern"]
+
+[ext_resource type="Material" path="res://assets/machine_jungle/tread.tres" id="tread"]
+
+[ext_resource type="Material" path="res://assets/machine_jungle/poison.tres" id="poison"]
+
+[ext_resource type="Material" path="res://assets/machine_jungle/jade.tres" id="jade"]
+
+[sub_resource type="BoxShape3D" id="collision"]
+size = Vector3(0.48, 3.65, 1.9)
+
+
+[sub_resource type="BoxMesh" id="M0"]
+material = ExtResource("tread")
+size = Vector3(0.46, 3.63, 1.88)
+
+
+[sub_resource type="BoxMesh" id="M1"]
+material = ExtResource("fern")
+size = Vector3(0.48, 0.66, 0.075)
+
+
+[sub_resource type="CylinderMesh" id="M2"]
+material = ExtResource("jade")
+top_radius = 0.04648
+bottom_radius = 0.056
+height = 0.45
+radial_segments = 7
+
+
+[sub_resource type="BoxMesh" id="M3"]
+material = ExtResource("fern")
+size = Vector3(0.48, 0.66, 0.075)
+
+
+[sub_resource type="CylinderMesh" id="M4"]
+material = ExtResource("jade")
+top_radius = 0.04648
+bottom_radius = 0.056
+height = 0.45
+radial_segments = 7
+
+
+[sub_resource type="BoxMesh" id="M5"]
+material = ExtResource("fern")
+size = Vector3(0.48, 0.66, 0.075)
+
+
+[sub_resource type="CylinderMesh" id="M6"]
+material = ExtResource("jade")
+top_radius = 0.04648
+bottom_radius = 0.056
+height = 0.45
+radial_segments = 7
+
+
+[sub_resource type="BoxMesh" id="M7"]
+material = ExtResource("fern")
+size = Vector3(0.48, 0.66, 0.075)
+
+
+[sub_resource type="CylinderMesh" id="M8"]
+material = ExtResource("jade")
+top_radius = 0.04648
+bottom_radius = 0.056
+height = 0.45
+radial_segments = 7
+
+
+[sub_resource type="BoxMesh" id="M9"]
+material = ExtResource("stone")
+size = Vector3(0.51, 0.19, 1.91)
+
+
+[sub_resource type="BoxMesh" id="M10"]
+material = ExtResource("stone")
+size = Vector3(0.51, 0.19, 1.91)
+
+
+[node name="VineWall" type="StaticBody3D"]
+
+[node name="Collider" type="CollisionShape3D" parent="."]
+position = Vector3(0, 0, 0)
+shape = SubResource("collision")
+
+
+[node name="PanelM0" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0, 0)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M0")
+
+
+[node name="PanelM1" type="MeshInstance3D" parent="."]
+position = Vector3(0, -1.47, 0.936)
+rotation = Vector3(0, 0, 0.045)
+mesh = SubResource("M1")
+
+
+[node name="RootM2" type="MeshInstance3D" parent="."]
+position = Vector3(-0.11, -1.47, 0.985)
+rotation = Vector3(0, 0, 0.26)
+mesh = SubResource("M2")
+
+
+[node name="PanelM3" type="MeshInstance3D" parent="."]
+position = Vector3(0, -0.58, 0.936)
+rotation = Vector3(0, 0, 0.045)
+mesh = SubResource("M3")
+
+
+[node name="RootM4" type="MeshInstance3D" parent="."]
+position = Vector3(-0.11, -0.58, 0.985)
+rotation = Vector3(0, 0, 0.26)
+mesh = SubResource("M4")
+
+
+[node name="PanelM5" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.26, 0.936)
+rotation = Vector3(0, 0, 0.045)
+mesh = SubResource("M5")
+
+
+[node name="RootM6" type="MeshInstance3D" parent="."]
+position = Vector3(-0.11, 0.26, 0.985)
+rotation = Vector3(0, 0, 0.26)
+mesh = SubResource("M6")
+
+
+[node name="PanelM7" type="MeshInstance3D" parent="."]
+position = Vector3(0, 1.16, 0.936)
+rotation = Vector3(0, 0, 0.045)
+mesh = SubResource("M7")
+
+
+[node name="RootM8" type="MeshInstance3D" parent="."]
+position = Vector3(-0.11, 1.16, 0.985)
+rotation = Vector3(0, 0, 0.26)
+mesh = SubResource("M8")
+
+
+[node name="PanelM9" type="MeshInstance3D" parent="."]
+position = Vector3(0, -1.71, 0)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M9")
+
+
+[node name="PanelM10" type="MeshInstance3D" parent="."]
+position = Vector3(0, 1.71, 0)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M10")
+

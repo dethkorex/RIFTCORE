@@ -61,3 +61,37 @@ Use case stylized concept, production PBR albedo atlas for the pictured Riftcore
 
 Use case precise-object-edit. Convert supplied square production albedo trim atlas into a true grayscale surface height map with identical framing and exact geometry and feature positions. Neutral midgray on all four flat material bands regardless of their original albedo, near-black only on deep vent slots and very thin carved seam channels, light gray on raised bolt rims and bevels, slight linear grained relief on brushed metal. Hazard stripe colors on the fourth band are paint, do not encode their color as height. Do not move, redraw, rescale or offset any feature. Pure grayscale pixel values, orthographic height data, no shading, no ambient shadows or specular lighting.
 
+
+
+## Machine Jungle production art
+
+### jungleConcept
+
+Mode: reference image generation.
+
+Stylized concept asset kit for Riftcore Sector 02 Machine Jungle, nature/poison cybernetic factory overgrown with bioengineered plants. Reference image is art-style only: compact, readable armored game robots with sharp chamfers, machined material detail. Create five distinctly new jungle enemies in a single upper row of a game asset board: Rootrunner agile biped with leaf hood and root blade; Thorn Weaver four-leg spider with needle limbs and poison seed abdomen; Bark Bulwark armored beetle bruiser with layered bark shoulder plates; Spore Sentry rooted turret with three bulb barrels; Canopy Wasp hovering insect with narrow wings and glowing stinger. Emerald/olive ceramic, graphite, ivory edge metal, small jade lights and acid purple poison cores. Lower row shows modular root-ribbed floor tile, perforated canopy catwalk, tall vine wall, thorn bed trap, spore pod trap, and mechanical snap vine. Orthographic three-quarter studio presentation, complete separate objects, blue-green dark neutral background, no labels or text.
+
+### jungleTrim
+
+Mode: text-to-image generation.
+
+Stylized concept game production albedo trim atlas, 1:1 square, for RIFTCORE Machine Jungle. Four exact horizontal full-width rows of equal height: 0–25% chipped ivory bioceramic hard armor plates with tiny fasteners and fine oblique seams; 25–50% deep emerald and moss-green lacquered armor with recessed leaf-shaped grooves and microgrilles; 50–75% dark forest-green graphite and root-vein engineering treads with shallow ribbed machining; 75–100% purple poison containment warning bands with graphite diagonal stripes. Flat front projection, no cast lighting or objects, no lettering or labels, clear strip boundaries, tile left-to-right, believable detail at gameplay scale.
+
+### verdantConcept
+
+Mode: text-to-image generation.
+
+Stylized concept for RIFTCORE Sector 02 boss Verdant Colossus, a giant poison/nature industrial robot. Full body game production design in an athletic planted three-quarter pose on dark teal studio ground, only one boss. Distinct from a humanoid drill boss: broad rhinoceros beetle-inspired biped excavator shape, layered emerald hard armor and cracked ivory bioceramic pauldrons over graphite pistons, twisted artificial wooden root conduits, violet glowing seed reactor, small mint-green horned helmet eyes. Left forearm mechanical grapple vine whip with jade articulated segments and sharp seed tip, right shoulder clusters three spore-launcher bulbs with violet lenses, broad armored claw right hand, large well-defined piston legs and tree-root cleats. Industrial sci-fi robot with living vegetation accents, sharp bevels, premium realistic game mesh presentation matching the armored Neon Factory player, no text or labels, 16:9 uncropped silhouette.
+
+### junglePanorama
+
+Mode: text-to-image generation.
+
+Stylized concept, panoramic seamless horizontal parallax background for RIFTCORE Sector 02 Machine Jungle, distant view into overgrown biomechanical greenhouse megafactory. Muted emerald and midnight teal palette with vine covered industrial towers and arches, bioluminescent jade roots threaded through giant metal lattice, pockets of violet spore light, dense layered greenery under dark mist. No character, no foreground floors, no readable text. Broad sky canopy behind stage platforms. Both outer edges blend into similar softly misted dark green machinery so panorama loops horizontally. Game-ready 3:1 composition.
+
+
+
+
+## Neon Factory security redesign
+
+Reference-image generation using the earlier in-game lineup. The resulting silhouettes informed five independent Blender models and the in-game showroom. Forge Titan keeps its existing model.

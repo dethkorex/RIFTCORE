@@ -26,6 +26,10 @@ var life_taken := false
 var boss_spawn := Vector3.ZERO
 var deployed_spawn := Vector3.ZERO
 const BOSS_SCENE := preload("res://scenes/levels/forge_titan.tscn")
+const JUNGLE_BOSS := preload("res://scenes/levels/verdant_colossus.tscn")
+const JUNGLE_LEVEL := preload("res://scenes/levels/machine_jungle.tscn")
+var sector := 1
+var run_weapons: Dictionary = {}
 
 const NEON_FACTORY_LEVEL := preload("res://scenes/levels/neon_factory_test.tscn")
 
@@ -126,6 +130,11 @@ func show_main_menu() -> void:
 	RiftAudio.play_music(false)
 	menu = RiftTitleMenu.new()
 	menu.can_load = FileAccess.file_exists(checkpoint_path)
+	var save := ConfigFile.new()
+	if save.load(checkpoint_path) == OK:
+		menu.saved_sector = int(save.get_value("checkpoint", "sector", 1))
+		menu.at_sector_start = bool(save.get_value("checkpoint", "at_start", false))
+		menu.run_unlocks = save.get_value("checkpoint", "weapons", [])
 	menu.profile = profile
 	add_child(menu)
 	menu.start_requested.connect(start_game)
@@ -138,8 +147,10 @@ func start_game(play_intro := true) -> void:
 	if is_instance_valid(game_root):
 		return
 	if play_intro:
+		sector = 1
+		run_weapons.clear()
 		clear_checkpoint()
-	RiftAudio.play_music(true)
+	RiftAudio.play_music(true, sector)
 	if menu: menu.queue_free()
 	build_level()
 	if play_intro:
@@ -153,6 +164,10 @@ func play_deploy_intro() -> void:
 	var floor_at := find_safe_spawn()
 	deployed_spawn = floor_at
 	player.global_position = floor_at
+	var pad := game_root.get_node_or_null("MARKERS/PlayerSpawn/DeploymentPad")
+	if pad:
+		pad.global_position = floor_at - Vector3.UP * (player.standing_capsule.height * 0.5 + 0.055)
+		pad.pulse()
 	player.velocity = Vector3.ZERO
 	camera_rig.global_position = Vector3(clampf(floor_at.x, camera_rig.min_x, camera_rig.max_x), maxf(0.85, floor_at.y + 0.35), 0)
 	await get_tree().create_timer(0.27, false).timeout
@@ -202,7 +217,32 @@ func load_game() -> void:
 		if not is_instance_valid(menu):
 			start_game()
 		return
+	sector = clampi(int(save.get_value("checkpoint", "sector", 1)), 1, 2)
+	run_weapons.clear()
+	var weapons = save.get_value("checkpoint", "weapons", ["magma_breaker"] if sector >= 2 else [])
+	for weapon in weapons:
+		run_weapons[String(weapon)] = true
 	start_game(false)
+	var at_start := bool(save.get_value("checkpoint", "at_start", false))
+	if not at_start:
+		load_checkpoint_location(save)
+	player.gain_experience(clampi(int(save.get_value("checkpoint", "experience", 0)), 0, 1000000))
+	player.health = player.max_health
+	player.restore_energy(player.max_energy)
+	player.health_changed.emit(player.health, player.max_health)
+	player.credits = maxi(int(save.get_value("checkpoint", "credits", 0)), 0)
+	player.credits_changed.emit(player.credits)
+	player.lives = clampi(int(save.get_value("checkpoint", "lives", 3)), 1, 5)
+	player.lives_changed.emit(player.lives)
+	life_taken = bool(save.get_value("checkpoint", "life_taken", false))
+	if life_taken:
+		var life := game_root.get_node_or_null("TERRAIN/InspectionExtraLife")
+		if life:
+			life.queue_free()
+	if at_start:
+		play_deploy_intro()
+
+func load_checkpoint_location(save: ConfigFile) -> void:
 	checkpoint_station = String(save.get_value("checkpoint", "station", "midpoint"))
 	if not CHECKPOINT_STATIONS.has(checkpoint_station):
 		checkpoint_station = "midpoint"
@@ -220,24 +260,11 @@ func load_game() -> void:
 		checkpoint_spawn = saved_spawn
 	player.global_position = checkpoint_spawn
 	camera_rig.global_position.x = checkpoint_spawn.x
-	player.gain_experience(clampi(int(save.get_value("checkpoint", "experience", 0)), 0, 1000000))
-	player.health = player.max_health
-	player.restore_energy(player.max_energy)
-	player.health_changed.emit(player.health, player.max_health)
-	player.credits = maxi(int(save.get_value("checkpoint", "credits", 0)), 0)
-	player.credits_changed.emit(player.credits)
-	player.lives = clampi(int(save.get_value("checkpoint", "lives", 3)), 1, 5)
-	player.lives_changed.emit(player.lives)
-	life_taken = bool(save.get_value("checkpoint", "life_taken", false))
-	if life_taken:
-		var life := game_root.get_node_or_null("TERRAIN/InspectionExtraLife")
-		if life:
-			life.queue_free()
 
 func build_pause_menu() -> void:
 	var stack := overlay()
 	UI.label(stack, "PAUSED", 36, UI.CYAN)
-	UI.label(stack, "Neon Factory", 17, UI.MUTED)
+	UI.label(stack, "Machine Jungle" if sector == 2 else "Neon Factory", 17, UI.MUTED)
 	UI.button(stack, "Resume", toggle_pause, true).grab_focus()
 	UI.button(stack, "Restart sector", restart_run)
 	UI.button(stack, "Settings", show_pause_settings)
@@ -275,12 +302,12 @@ func show_pause_settings() -> void:
 	UI.button(stack, "Back to pause", build_pause_menu).grab_focus()
 
 func build_level() -> void:
-	if editor_level:
+	if editor_level and sector == 1:
 		game_root = editor_level
 		game_root.visible = true
 		game_root.process_mode = Node.PROCESS_MODE_INHERIT
 	else:
-		game_root = NEON_FACTORY_LEVEL.instantiate()
+		game_root = (JUNGLE_LEVEL if sector == 2 else NEON_FACTORY_LEVEL).instantiate()
 		add_child(game_root)
 	player = game_root.get_node("Actors/RiftcoreMecha") as RiftPlayer
 	player.experience = 0
@@ -290,8 +317,11 @@ func build_level() -> void:
 	player.health_changed.connect(_on_health_changed)
 	player.died.connect(_on_player_died)
 	player.fell_into_pit.connect(_on_pit_fall)
-	for enemy in game_root.get_tree().get_nodes_in_group("level_enemies"):
+	for enemy in get_tree().get_nodes_in_group("level_enemies"):
+		if not game_root.is_ancestor_of(enemy):
+			continue
 		enemy.target = player
+		enemy.scale_for_sector(sector)
 		enemy.died.connect(_enemy_defeated)
 		remaining_enemies += 1
 	camera_rig = game_root.get_node("CameraRig") as SideCameraRig
@@ -299,7 +329,7 @@ func build_level() -> void:
 	var bounds := game_root.get_node("MARKERS/CameraBounds")
 	camera_rig.min_x = bounds.get_meta("min_x")
 	camera_rig.max_x = bounds.get_meta("max_x")
-	boss = game_root.get_node("Actors/ForgeTitan") as Combatant
+	boss = game_root.get_node("Actors/VerdantColossus" if sector == 2 else "Actors/ForgeTitan") as Combatant
 	gate = game_root.get_node("Gate") as Node3D
 	boss_spawn = boss.position
 	build_hud()
@@ -309,9 +339,22 @@ func build_level() -> void:
 			checkpoint.activated.connect(_on_checkpoint_activated.bind(station))
 	game_root.get_node("ForgeHallDoor").target = player
 	bind_boss_signals()
+	install_sector_pads()
+
+func install_sector_pads() -> void:
+	var spawn := game_root.get_node("MARKERS/PlayerSpawn") as Marker3D
+	if not spawn.has_node("DeploymentPad"):
+		spawn.add_child(preload("res://assets/neon_factory/deployment_pad.tscn").instantiate())
+	var arrival := spawn.get_node("DeploymentPad") as Node3D
+	arrival.global_position = player.global_position - Vector3.UP * player.standing_capsule.height * 0.5
+	var exit := game_root.get_node("MARKERS/RoomExit") as Marker3D
+	if not exit.has_node("ExtractionPad"):
+		exit.add_child(preload("res://assets/neon_factory/extraction_pad.tscn").instantiate())
+	exit.get_node("ExtractionPad").position.y = -player.standing_capsule.height * 0.5
 
 func apply_permanent_upgrades() -> void:
-	player.magma_unlocked = profile.weapons.has("magma_breaker")
+	player.magma_unlocked = run_weapons.has("magma_breaker")
+	player.thorn_unlocked = run_weapons.has("thorn_swarm")
 	if profile.owned.has("armor"):
 		player.max_health += 12.0
 		player.health = player.max_health
@@ -321,8 +364,8 @@ func apply_permanent_upgrades() -> void:
 	if profile.owned.has("buster"):
 		player.buster_damage_multiplier = 1.15
 	if profile.owned.has("dash"):
-		player.dash_energy_cost = 9.0
 		player.dash_speed *= 1.10
+		player.dash_cooldown *= 0.85
 
 func bind_boss_signals() -> void:
 	boss.health_changed.connect(func(current: float, maximum: float):
@@ -332,12 +375,22 @@ func bind_boss_signals() -> void:
 	boss.died.connect(func():
 		boss_defeated = true
 		open_factory_gate()
-		var first_unlock := not profile.weapons.has("magma_breaker")
-		player.unlock_magma()
-		var saved := profile.unlock_weapon("magma_breaker")
-		if saved != OK:
-			push_warning("Could not save the Magma Breaker unlock: %s" % error_string(saved))
-		factory_hud.announce("MAGMA BREAKER UNLOCKED" if first_unlock else "FORGE TITAN DEFEATED", Color("ff9c45"))
+		var reward := "thorn_swarm" if sector == 2 else "magma_breaker"
+		var first_unlock := not run_weapons.has(reward)
+		if sector == 2:
+			player.thorn_unlocked = true
+			player.set_thorn_active()
+			for minion in get_tree().get_nodes_in_group(&"arena_minions"):
+				minion.queue_free()
+		else:
+			player.unlock_magma()
+		run_weapons[reward] = true
+		if checkpoint_reached:
+			save_checkpoint()
+		var message := "THORN SWARM UNLOCKED" if first_unlock else "VERDANT COLOSSUS DEFEATED"
+		if sector == 1:
+			message = "MAGMA BREAKER UNLOCKED" if first_unlock else "FORGE TITAN DEFEATED"
+		factory_hud.announce(message, Color("a9ff7a") if sector == 2 else Color("ff9c45"))
 		var barrier := game_root.get_node("ExitBarrier") as StaticBody3D
 		barrier.get_node("CollisionShape3D").set_deferred("disabled", true)
 		var release := barrier.create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
@@ -351,11 +404,14 @@ func build_hud() -> void:
 	hud = CanvasLayer.new()
 	add_child(hud)
 	factory_hud = FactoryHUD.new()
+	if sector == 2:
+		factory_hud.exit_task = "REACH JUNGLE EXTRACTION"
+		factory_hud.boss_name = "VERDANT COLOSSUS"
 	hud.add_child(factory_hud)
 	factory_hud.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	factory_hud.remaining = remaining_enemies
 	factory_hud.lives = player.lives
-	if player.magma_unlocked:
+	if player.magma_unlocked or player.thorn_unlocked:
 		factory_hud.weapon = "BUSTER CANNON"
 	factory_hud.health_capacity = player.max_health
 	factory_hud.energy_capacity = player.max_energy
@@ -397,6 +453,9 @@ func _on_checkpoint_activated(spawn: Vector3, station := "midpoint") -> void:
 
 func save_checkpoint() -> void:
 	var save := ConfigFile.new()
+	save.set_value("checkpoint", "sector", sector)
+	save.set_value("checkpoint", "weapons", run_weapons.keys())
+	save.set_value("checkpoint", "at_start", not checkpoint_reached)
 	save.set_value("checkpoint", "spawn", checkpoint_spawn)
 	save.set_value("checkpoint", "station", checkpoint_station)
 	save.set_value("checkpoint", "experience", int(player.experience))
@@ -461,7 +520,7 @@ func _on_pit_fall() -> void:
 	factory_hud.failed = false
 	factory_hud.queue_redraw()
 	factory_hud.announce("%d LIVES LEFT" % player.lives, Color("8eeaff"))
-	if checkpoint_reached:
+	if checkpoint_reached or sector == 2:
 		save_checkpoint()
 	respawning = false
 
@@ -473,10 +532,12 @@ func reset_boss_room() -> void:
 	RiftAudio.stop_effect(&"titan_windup")
 	for supply in get_tree().get_nodes_in_group(&"boss_supply"):
 		supply.queue_free()
+	for minion in get_tree().get_nodes_in_group(&"arena_minions"):
+		minion.queue_free()
 	for shot in get_tree().get_nodes_in_group(&"rift_projectile"):
 		if shot.owner_faction == "enemy" and shot.global_position.x > gate.global_position.x - 2.0:
 			shot.queue_free()
-	boss = BOSS_SCENE.instantiate() as Combatant
+	boss = (JUNGLE_BOSS if sector == 2 else BOSS_SCENE).instantiate() as Combatant
 	boss.position = boss_spawn
 	game_root.get_node("Actors").add_child(boss)
 	bind_boss_signals()
@@ -519,15 +580,26 @@ func _process(_delta: float) -> void:
 	var at_exit := player.global_position.distance_to(exit.global_position) <= 1.45
 	if at_exit and not factory_hud.reached_exit:
 		factory_hud.reached_exit = true
+		game_root.get_node("MARKERS/RoomExit/ExtractionPad").pulse()
 		factory_hud.queue_redraw()
 	if not at_exit or not boss_defeated:
 		return
 	sector_complete = true
 	bank_run_credits(160)
+	if sector == 1 and banked_run:
+		var continuation := ConfigFile.new()
+		continuation.set_value("checkpoint", "sector", 2)
+		continuation.set_value("checkpoint", "weapons", run_weapons.keys())
+		continuation.set_value("checkpoint", "at_start", true)
+		continuation.set_value("checkpoint", "experience", int(player.experience))
+		continuation.set_value("checkpoint", "lives", 3)
+		var error := continuation.save(checkpoint_path)
+		if error != OK:
+			push_warning("Could not save Machine Jungle deployment: %s" % error_string(error))
 	get_tree().paused = true
 	var stack := overlay()
 	UI.label(stack, "SECTOR COMPLETE", 36, UI.CYAN)
-	UI.label(stack, "Neon Factory", 20)
+	UI.label(stack, "Machine Jungle" if sector == 2 else "Neon Factory", 20)
 	UI.label(stack, "Credits earned  %d + 160 clear bonus" % player.credits, 17, Color("ffcd61"))
 	UI.label(stack, "XP collected  %d" % player.experience, 17, Color("ab72ff"))
 	UI.button(stack, "Continue to Command Deck", return_to_command_deck, true).grab_focus()

@@ -17,9 +17,14 @@ signal life_picked_up
 var lives := 3
 var buster_damage_multiplier := 1.0
 var magma_unlocked := false
+var thorn_unlocked := false
+var thorn_active := false
 var magma_active := false
 var original_armor: Dictionary = {}
 var forge_armor: Dictionary = {}
+var base_suit_meshes: Array[MeshInstance3D] = []
+var fire_suit_mesh: MeshInstance3D
+var nature_suit_mesh: MeshInstance3D
 
 @export_group("Movement")
 @export var move_speed := 9.0
@@ -37,14 +42,14 @@ var forge_armor: Dictionary = {}
 @export var dash_speed := 20.0
 @export var dash_duration := 0.18
 @export var dash_cooldown := 0.35
-@export var dash_energy_cost := 12.0
+@export var dash_energy_cost := 0.0
 @export_group("Combat")
 @export var fire_interval := 0.115
 @export var charge_time := 0.7
 @export var charge_energy_cost := 30.0
 @export var base_buster_damage := 18.0
 @export var melee_multiplier := 2.5
-@export var damage_gain_per_level := 0.04
+@export var damage_gain_per_level := 0.06
 @export var melee_range := 2.2
 @export var melee_cooldown := 0.42
 
@@ -125,12 +130,39 @@ func _ready() -> void:
 		climb_pose = preload("res://scripts/climb_pose.gd").new()
 		climb_pose.influence = 0.0
 		skeleton.add_child(climb_pose)
+		install_fire_suit(skeleton)
 	if animation_player:
 		make_locomotion_in_place()
 		build_finisher_clip()
 		for clip in [&"idle", &"walk", &"run", &"fall"]:
 			if animation_player.has_animation(clip):
 				animation_player.get_animation(clip).loop_mode = Animation.LOOP_LINEAR
+
+func install_fire_suit(skeleton: Skeleton3D) -> void:
+	for object in skeleton.find_children("*", "MeshInstance3D", true, false):
+		var mesh := object as MeshInstance3D
+		if mesh.skin:
+			base_suit_meshes.append(mesh)
+	fire_suit_mesh = attach_suit_mesh(skeleton, preload("res://assets/models/mecha_main/RiftcoreFireRigged.glb"))
+	nature_suit_mesh = attach_suit_mesh(skeleton, preload("res://assets/models/mecha_main/RiftcoreNatureRigged.glb"))
+
+func attach_suit_mesh(skeleton: Skeleton3D, suit: PackedScene) -> MeshInstance3D:
+	var imported := suit.instantiate() as Node3D
+	model_root.add_child(imported)
+	var skin: MeshInstance3D
+	for object in imported.find_children("*", "MeshInstance3D", true, false):
+		var mesh := object as MeshInstance3D
+		if not mesh.skin:
+			continue
+		skin = mesh
+		# Both meshes use the exact same RX-07 bind matrices and named bones.
+		# Reuse the live skeleton, so swapping never restarts clips or modifiers.
+		mesh.reparent(skeleton, true)
+		mesh.skeleton = mesh.get_path_to(skeleton)
+		mesh.visible = false
+		break
+	imported.queue_free()
+	return skin
 
 func bind_cannon_muzzle() -> void:
 	var skeleton := find_child("Skeleton3D", true, false) as Skeleton3D
@@ -247,8 +279,7 @@ func _physics_process(delta: float) -> void:
 		jump_buffer = jump_buffer_duration
 	else:
 		jump_buffer = maxf(0.0, jump_buffer - delta)
-	if resume_input_guard <= 0.0 and contact_recoil <= 0.0 and Input.is_action_just_pressed("dash") and dash_lock <= 0.0 and energy >= dash_energy_cost and (is_on_floor() or air_dash_available):
-		restore_energy(-dash_energy_cost)
+	if resume_input_guard <= 0.0 and contact_recoil <= 0.0 and Input.is_action_just_pressed("dash") and dash_lock <= 0.0 and (is_on_floor() or air_dash_available):
 		dash_left = dash_duration
 		dash_lock = dash_cooldown
 		RiftAudio.play_effect(&"dash")
@@ -260,8 +291,15 @@ func _physics_process(delta: float) -> void:
 	var stick_crouch := Input.is_action_pressed("crouch_stick") and absf(axis) < 0.35
 	var wants_crouch := Input.is_action_pressed("crouch") or stick_crouch
 	set_crouch(wants_crouch and is_on_floor() and dash_left <= 0.0 and jump_buffer <= 0.0)
-	if magma_unlocked and melee_lock <= 0.0 and Input.is_action_just_pressed("swap_weapon"):
-		set_magma_active(not magma_active)
+	if melee_lock <= 0.0 and Input.is_action_just_pressed("swap_weapon"):
+		if thorn_active:
+			set_magma_active(false)
+		elif magma_active and thorn_unlocked:
+			set_thorn_active()
+		elif magma_unlocked:
+			set_magma_active(not magma_active)
+		elif thorn_unlocked:
+			set_thorn_active()
 	update_charge(delta)
 	update_melee(delta)
 	if dash_left > 0.0:
@@ -393,7 +431,11 @@ func update_ladder(delta: float, axis: float) -> bool:
 	move_and_slide()
 	play_character_animation("idle")
 	if model_root:
-		model_root.rotation.y = lerp_angle(model_root.rotation.y, 2.40, 0.37)
+		# The rungs sit along the ladder's local -Z; RX-07's front is local +Z.
+		var toward_rungs := -ladder.global_basis.z
+		var local_forward := global_basis.inverse() * toward_rungs
+		var climb_yaw := atan2(local_forward.x, local_forward.z)
+		model_root.rotation.y = lerp_angle(model_root.rotation.y, climb_yaw, 1.0 - exp(-27.0 * delta))
 		model_root.rotation.x = lerpf(model_root.rotation.x, 0.0, 0.4)
 	if buster_pose:
 		buster_pose.influence = 0.0
@@ -414,8 +456,8 @@ func gain_experience(amount: int) -> void:
 	experience += amount
 	var gained_levels := level_for_experience(experience) - previous_level
 	if gained_levels > 0:
-		max_health += gained_levels * 10.0
-		max_energy += gained_levels * 5.0
+		max_health += gained_levels * 8.0
+		max_energy += gained_levels * 6.0
 		health = minf(max_health, health + gained_levels * 20.0)
 		health_changed.emit(health, max_health)
 		energy_changed.emit(energy, max_energy)
@@ -515,7 +557,8 @@ func buster_power() -> float:
 
 func shoot(charged := false, pose_held := false) -> void:
 	var magma := magma_active
-	var cost := (36.0 if charged else 8.0) if magma else (charge_energy_cost if charged else 0.0)
+	var thorn := thorn_active
+	var cost := (36.0 if charged else 8.0) if magma else ((30.0 if charged else 7.0) if thorn else (charge_energy_cost if charged else 0.0))
 	if energy < cost:
 		return
 	fire_lock = fire_interval
@@ -533,7 +576,12 @@ func shoot(charged := false, pose_held := false) -> void:
 		if health <= 0.0:
 			return
 	var muzzle := cannon_muzzle(aim)
-	if magma and charged:
+	if thorn:
+		var count := 5 if charged else 2
+		for i in range(count):
+			var angle := (i - (count - 1) * 0.5) * (0.18 if charged else 0.14)
+			launch_buster(muzzle, Vector3(aim * cos(angle), sin(angle), 0), charged, false, (30.0 if charged else 16.0) * level_damage_scale(), Color("a8ff64"))
+	elif magma and charged:
 		for spread in [-0.51, 0.0, 0.51]:
 			var direction := Vector3(aim * cos(spread), sin(spread), 0.0)
 			launch_buster(muzzle, direction, true, true, (62.0 if is_zero_approx(spread) else 45.0) * level_damage_scale())
@@ -542,8 +590,9 @@ func shoot(charged := false, pose_held := false) -> void:
 		launch_buster(muzzle, Vector3(aim, 0, 0), charged, magma, power)
 	RiftAudio.play_effect(&"buster_charged" if charged else &"buster")
 
-func launch_buster(muzzle: Vector3, direction: Vector3, charged: bool, magma: bool, power: float) -> void:
+func launch_buster(muzzle: Vector3, direction: Vector3, charged: bool, magma: bool, power: float, tint := Color.TRANSPARENT) -> void:
 	var projectile := RiftProjectile.new()
+	projectile.collision_mask = 3
 	get_tree().current_scene.add_child(projectile)
 	projectile.global_position = muzzle
 	projectile.damage = power
@@ -554,6 +603,8 @@ func launch_buster(muzzle: Vector3, direction: Vector3, charged: bool, magma: bo
 		projectile.lifetime = 2.35
 		projectile.burn_power = (8.0 if charged else 4.5) * level_damage_scale()
 	var shot_color := (Color("ffae35") if charged else Color("ff681c")) if magma else (Color("73f4ff") if charged else Color.CYAN)
+	if tint.a > 0.0:
+		shot_color = tint
 	projectile.setup(direction, faction, shot_color, false, charged, magma)
 	shot_fired.emit(projectile)
 
@@ -562,31 +613,32 @@ func unlock_magma() -> void:
 	magma_unlocked = true
 	set_magma_active(true)
 
+func set_thorn_active() -> void:
+	if not thorn_unlocked:
+		return
+	set_magma_active(false)
+	thorn_active = true
+	for mesh in base_suit_meshes:
+		mesh.hide()
+	if is_instance_valid(nature_suit_mesh):
+		nature_suit_mesh.show()
+	var light := get_node_or_null("CoreLight") as OmniLight3D
+	if light:
+		light.light_color = Color("a8ff64")
+	weapon_changed.emit("THORN SWARM")
+
 func set_magma_active(enabled: bool) -> void:
 	if enabled and not magma_unlocked:
 		return
 	cancel_charge()
+	thorn_active = false
 	magma_active = enabled
-	if model_root:
-		for mesh_node in model_root.find_children("*", "MeshInstance3D", true, false):
-			var piece := mesh_node as MeshInstance3D
-			if not piece.mesh or piece.get_parent() is BoneAttachment3D:
-				continue
-			for surface in range(piece.mesh.get_surface_count()):
-				var key := str(piece.get_instance_id()) + ":" + str(surface)
-				if not original_armor.has(key):
-					var source := piece.get_active_material(surface) as StandardMaterial3D
-					if not source or not source.albedo_texture:
-						continue
-					original_armor[key] = piece.get_surface_override_material(surface)
-					var material := ShaderMaterial.new()
-					material.shader = preload("res://assets/models/mecha_main/magma_armor.gdshader")
-					material.set_shader_parameter("original", source.albedo_texture)
-					if source.normal_enabled and source.normal_texture:
-						material.set_shader_parameter("original_normal", source.normal_texture)
-						material.set_shader_parameter("use_normal", true)
-					forge_armor[key] = material
-				piece.set_surface_override_material(surface, forge_armor[key] if enabled else original_armor[key])
+	for mesh in base_suit_meshes:
+		mesh.visible = not enabled
+	if is_instance_valid(fire_suit_mesh):
+		fire_suit_mesh.visible = enabled
+	if is_instance_valid(nature_suit_mesh):
+		nature_suit_mesh.hide()
 	var blade_mesh := find_child("EnergyBlade", true, false) as MeshInstance3D
 	if blade_mesh:
 		blade_mesh.material_override = RiftProjectile.light_paint(Color("ff4e19"), 2.4) if enabled else null
@@ -750,7 +802,7 @@ func play_character_animation(animation_name: String, force := false) -> void:
 	animation_player.play(animation_name, 0.035 if force or animation_name == "dash" else 0.10, speed_scale)
 
 static func defense_for_experience(total: int) -> float:
-	return minf(0.35, (level_for_experience(total) - 1) * 0.025)
+	return minf(0.25, (level_for_experience(total) - 1) * 0.02)
 
 func mitigate_damage(amount: float) -> float:
 	return amount * (1.0 - defense_for_experience(experience))

@@ -19,9 +19,11 @@
 [ext_resource type="Script" uid="uid://bdh5hc40sqolo" path="res://scripts/factory_backdrop.gd" id="factory_backdrop"]
 [ext_resource type="Script" uid="uid://dbwnwslje6f7g" path="res://scripts/factory_checkpoint.gd" id="factory_checkpoint"]
 [ext_resource type="Script" uid="uid://ey76lretdj4x" path="res://scripts/factory_ladder.gd" id="factory_ladder"]
+[ext_resource type="PackedScene" path="res://assets/neon_factory/factory_light_fixture.tscn" id="factory_light_fixture"]
 [ext_resource type="Script" uid="uid://nvsxcha3ktum" path="res://scripts/factory_trap.gd" id="factory_trap"]
+[ext_resource type="PackedScene" path="res://assets/neon_factory/wall_panel_a.tscn" id="forge_hall_panel"]
+[ext_resource type="Script" uid="uid://oxsiel3i0gcq" path="res://scripts/forge_safe_hall.gd" id="forge_safe_hall"]
 [ext_resource type="PackedScene" path="res://scenes/levels/forge_titan.tscn" id="forge_titan"]
-[ext_resource type="PackedScene" path="res://assets/neon_factory/grated_platform.tscn" id="grated_platform"]
 [ext_resource type="PackedScene" path="res://assets/neon_factory/hanging_cables.tscn" id="hanging_cables"]
 [ext_resource type="PackedScene" path="res://assets/pickups/health_large.tscn" id="health_large"]
 [ext_resource type="PackedScene" path="res://assets/pickups/health_small.tscn" id="health_small"]
@@ -36,19 +38,12 @@
 [ext_resource type="PackedScene" path="res://assets/neon_factory/platform_with_railings.tscn" id="platform_with_railings"]
 [ext_resource type="PackedScene" path="res://assets/neon_factory/reactor_core.tscn" id="reactor_core"]
 [ext_resource type="PackedScene" path="res://assets/neon_factory/sci_fi_terminal.tscn" id="sci_fi_terminal"]
-[ext_resource type="PackedScene" path="res://assets/neon_factory/thin_catwalk_platform.tscn" id="thin_catwalk_platform"]
-
 [ext_resource type="PackedScene" path="res://assets/neon_factory/small_floor_platform.tscn" id="small_floor_platform"]
-
-[ext_resource type="Script" path="res://scripts/forge_safe_hall.gd" id="forge_safe_hall"]
-[ext_resource type="PackedScene" path="res://assets/neon_factory/factory_light_fixture.tscn" id="factory_light_fixture"]
-
+[ext_resource type="PackedScene" path="res://assets/neon_factory/thin_catwalk_platform.tscn" id="thin_catwalk_platform"]
 [ext_resource type="PackedScene" path="res://assets/neon_factory/wall_hike_panel.tscn" id="wall_hike_panel"]
 
-[ext_resource type="PackedScene" path="res://assets/neon_factory/wall_panel_a.tscn" id="forge_hall_panel"]
-
-[sub_resource type="BoxShape3D" id="ForgeHallShield"]
-size = Vector3(5.7, 4.2, 2.8)
+[ext_resource type="PackedScene" path="res://assets/neon_factory/deployment_pad.tscn" id="deployment_pad"]
+[ext_resource type="PackedScene" path="res://assets/neon_factory/extraction_pad.tscn" id="extraction_pad"]
 
 [sub_resource type="Environment" id="Environment_factory"]
 background_mode = 1
@@ -66,6 +61,9 @@ size = Vector3(45.6, 0.36, 2.8)
 
 [sub_resource type="BoxShape3D" id="Shape_gate"]
 size = Vector3(0.65, 7, 3.2)
+
+[sub_resource type="BoxShape3D" id="ForgeHallShield"]
+size = Vector3(5.7, 4.2, 2.8)
 
 [sub_resource type="CapsuleShape3D" id="Shape_player"]
 radius = 0.42
@@ -126,31 +124,30 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 50, 0.1, 0)
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 96.26132, 0.6, 0)
 
 [node name="Bay2Deck4" parent="TERRAIN" unique_id=270593575 instance=ExtResource("medium_floor_platform")]
-position = Vector3(107, 0.85, 0)
-rotation = Vector3(0, 0, 0.122)
+transform = Transform3D(0.99256724, -0.12169758, 0, 0.12169758, 0.99256724, 0, 0, 0, 1, 107, 2.8339791, 0)
 
 [node name="Bay2Deck6" parent="TERRAIN" unique_id=1993765467 instance=ExtResource("medium_floor_platform")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 112, 0.25, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 115.99666, 5.1242557, 0)
 
 [node name="Bay2Trap0" type="Area3D" parent="TERRAIN" unique_id=1913380310]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 93.5, 0.1, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 93.5, 0.6, 0)
 script = ExtResource("factory_trap")
 phase_offset = 0.61
 
 [node name="Bay2Trap3" type="Area3D" parent="TERRAIN" unique_id=2081697218]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 107, 0.85, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 107, 2.834, 0)
 script = ExtResource("factory_trap")
 laser = true
 phase_offset = 2.44
 
 [node name="Bay4Deck1" parent="TERRAIN" unique_id=2059577701 instance=ExtResource("large_floor_platform")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 120, 0.1, 0)
+transform = Transform3D(0.9705601, -0.240859, 0, 0.240859, 0.9705601, 0, 0, 0, 1, 123.842545, 1.0792799, 0)
 
 [node name="Bay5Deck1" parent="TERRAIN" unique_id=751965936 instance=ExtResource("large_floor_platform")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 162, 0.1, 0)
+transform = Transform3D(0.98676723, -0.16214335, 0, 0.16214335, 0.98676723, 0, 0, 0, 1, 160.05038, 1.1136327, 0)
 
 [node name="Bay5Deck2" parent="TERRAIN" unique_id=764428295 instance=ExtResource("moving_transfer")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 169.7, 0.65, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 169.7, 4.423083, 0)
 travel = 1.25
 horizontal_travel = 0.55
 
@@ -164,21 +161,18 @@ seconds_per_leg = 2.45
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.4, 0)
 
 [node name="Bay5Deck4" parent="TERRAIN" unique_id=1559696258 instance=ExtResource("medium_floor_platform")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 183, 2.25, 0)
-
-[node name="Bay5Deck5" parent="TERRAIN" unique_id=47948085 instance=ExtResource("large_floor_platform")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 191, 1.45, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 183.3113, 3.8272238, 0)
 
 [node name="Bay5Deck6" parent="TERRAIN" unique_id=880037137 instance=ExtResource("medium_floor_platform")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 196, 0.25, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 191.40213, 5.4773583, 0)
 
 [node name="Bay5Trap0" type="Area3D" parent="TERRAIN" unique_id=1969097010]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 163.5, 0.1, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 162.7, 1.549, 0)
 script = ExtResource("factory_trap")
 phase_offset = 2.44
 
 [node name="Bay5Trap3" type="Area3D" parent="TERRAIN" unique_id=696835899]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 184, 2.25, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 184, 3.8272, 0)
 script = ExtResource("factory_trap")
 laser = true
 phase_offset = 0.67
@@ -208,14 +202,8 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 204, 0.1, 0)
 [node name="Bay8Deck1" parent="TERRAIN" unique_id=2036710045 instance=ExtResource("large_floor_platform")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 246, 0.1, 0)
 
-[node name="Bay8Deck2" parent="TERRAIN" unique_id=1595352290 instance=ExtResource("moving_transfer")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 253.7, 0.7, 0)
-travel = 1.2
-horizontal_travel = 0.7
-seconds_per_leg = 2.2
-
 [node name="Bay8Deck3" parent="TERRAIN" unique_id=441305862 instance=ExtResource("moving_transfer")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 260.4, 1.6, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 256.9575, 2.6210074, 0)
 travel = 1.05
 horizontal_travel = -0.55
 seconds_per_leg = 2.8
@@ -224,13 +212,10 @@ seconds_per_leg = 2.8
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.42, 0)
 
 [node name="Bay8Deck4" parent="TERRAIN" unique_id=192148594 instance=ExtResource("medium_floor_platform")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 267, 2.45, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 267, 5.094142, 0)
 
 [node name="Bay8Deck5" parent="TERRAIN" unique_id=594473042 instance=ExtResource("medium_floor_platform")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 275, 1.65, 0)
-
-[node name="Bay8Deck6" parent="TERRAIN" unique_id=737359507 instance=ExtResource("medium_floor_platform")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 280, 0.25, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 276.54175, 2.618651, 0)
 
 [node name="Bay8Trap0" type="Area3D" parent="TERRAIN" unique_id=1375105825]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 247.5, 0.1, 0)
@@ -238,7 +223,7 @@ script = ExtResource("factory_trap")
 phase_offset = 0.67
 
 [node name="Bay8Trap3" type="Area3D" parent="TERRAIN" unique_id=383975738]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 268, 2.45, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 268, 5.0941, 0)
 script = ExtResource("factory_trap")
 laser = true
 phase_offset = 2.5
@@ -246,25 +231,22 @@ phase_offset = 2.5
 [node name="Bay9Deck1" parent="TERRAIN" unique_id=1332363842 instance=ExtResource("large_floor_platform")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 288, 0.1, 0)
 
-[node name="Bay10Deck1" parent="TERRAIN" unique_id=442755255 instance=ExtResource("large_floor_platform")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 330, 0.1, 0)
-
 [node name="Bay10Deck2" parent="TERRAIN" unique_id=1419894259 instance=ExtResource("medium_floor_platform")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 338, 0.4, 0)
 
 [node name="Bay10Deck5" parent="TERRAIN" unique_id=1656780623 instance=ExtResource("medium_floor_platform")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 352, 0.77, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 352, 2.7644267, 0)
 
 [node name="Bay10Deck6" parent="TERRAIN" unique_id=500168322 instance=ExtResource("medium_floor_platform")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 357, 0.25, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 358.47327, 0.25, 0)
 
 [node name="Bay10Trap0" type="Area3D" parent="TERRAIN" unique_id=1658171318]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 331.5, 0.1, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 331.5, 2.12, 0)
 script = ExtResource("factory_trap")
 phase_offset = 1.89
 
 [node name="Bay10Trap3" type="Area3D" parent="TERRAIN" unique_id=1005381164]
-position = Vector3(352.7, 0.77, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 352.7, 2.7644, 0)
 script = ExtResource("factory_trap")
 laser = true
 phase_offset = 0.12
@@ -273,81 +255,75 @@ phase_offset = 0.12
 transform = Transform3D(1.32, 0, 0, 0, 1, 0, 0, 0, 1, -16.55, -0.25, 0)
 
 [node name="Deck8" parent="TERRAIN" unique_id=1866882289 instance=ExtResource("large_floor_platform")]
-position = Vector3(42.0, 0.1, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 42, 0.1, 0)
 
 [node name="AssemblyBelt" parent="TERRAIN" unique_id=1931346509 instance=ExtResource("large_floor_platform")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5.0019636, 1.82, 0)
-
-[node name="InspectionCatwalk" parent="TERRAIN" unique_id=1903397878 instance=ExtResource("jump_through_catwalk")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0.65836537, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.209546, 2.485755, 0)
 
 [node name="InspectionLanding" parent="TERRAIN" unique_id=477372791 instance=ExtResource("medium_floor_platform")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.164833, 1.6388044, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.5004473, 4.5578814, 0)
 
 [node name="ReactorLift" parent="TERRAIN" unique_id=278534672 instance=ExtResource("moving_lift_platform")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 14.3851795, 0.32937485, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 14.974115, 2.992393, 0)
 
 [node name="ReactorBalcony" parent="TERRAIN" unique_id=309569107 instance=ExtResource("platform_with_railings")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20.900255, 4.4854946, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 22.743883, 6.252304, 0)
 
 [node name="UpperTransfer" parent="TERRAIN" unique_id=434352366 instance=ExtResource("thin_catwalk_platform")]
-position = Vector3(35.0, 4.49, 0)
-
-[node name="SmelterLanding" parent="TERRAIN" unique_id=1830805346 instance=ExtResource("medium_floor_platform")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 364, 0.5, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 31.927284, 4.49, 0)
 
 [node name="SmelterBelt" parent="TERRAIN" unique_id=629403291 instance=ExtResource("conveyor_platform")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 370, 0.15, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 480.1, 0.15, 0)
 
 [node name="GateLanding" parent="TERRAIN" unique_id=1733737423 instance=ExtResource("large_floor_platform")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 377, 0, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 487.1, 0, 0)
 
 [node name="ArenaEntry" parent="TERRAIN" unique_id=1744714760 instance=ExtResource("boss_arena_floor")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 385, 0, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 495.1, 0, 0)
 
 [node name="ArenaCenter" parent="TERRAIN" unique_id=1798156785 instance=ExtResource("boss_arena_floor")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 393, 0, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 503.1, 0, 0)
 
 [node name="ArenaExit" parent="TERRAIN" unique_id=257863375 instance=ExtResource("boss_arena_floor")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 401, 0, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 511.1, 0, 0)
 
 [node name="ArenaExtension" parent="TERRAIN" unique_id=791695149 instance=ExtResource("boss_arena_floor")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 409, 0, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 519.1, 0, 0)
 
 [node name="ArenaEnd" parent="TERRAIN" unique_id=1023526779 instance=ExtResource("boss_arena_floor")]
-transform = Transform3D(0.7, 0, 0, 0, 1, 0, 0, 0, 1, 415.8, 0, 0)
+transform = Transform3D(0.7, 0, 0, 0, 1, 0, 0, 0, 1, 525.9, 0, 0)
 
 [node name="ArenaCatwalkCenter" parent="TERRAIN" unique_id=270177190 instance=ExtResource("jump_through_catwalk")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 398, 4.72, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 508.1, 4.72, 0)
 
 [node name="ArenaCatwalkWest" parent="TERRAIN" unique_id=1969503556 instance=ExtResource("jump_through_catwalk")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 388, 3.67, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 498.1, 3.67, 0)
 
 [node name="ArenaCatwalkEast" parent="TERRAIN" unique_id=156071763 instance=ExtResource("jump_through_catwalk")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 408, 3.69, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 518.1, 3.69, 0)
 
-[node name="ArenaLadderWest" type="Node3D" parent="TERRAIN" groups=["factory_ladder"]]
-position = Vector3(387.6, 0, 0)
+[node name="ArenaLadderWest" type="Node3D" parent="TERRAIN" unique_id=1593287218 groups=["factory_ladder"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 497.7, 0, 0)
 script = ExtResource("factory_ladder")
 rise = 3.67
 
-[node name="ArenaLadderEast" type="Node3D" parent="TERRAIN" groups=["factory_ladder"]]
-position = Vector3(408.45, 0, 0)
+[node name="ArenaLadderEast" type="Node3D" parent="TERRAIN" unique_id=1872091072 groups=["factory_ladder"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 518.55, 0, 0)
 script = ExtResource("factory_ladder")
 rise = 3.69
 
-[node name="ArenaLadderCenter" type="Node3D" parent="TERRAIN" groups=["factory_ladder"]]
-position = Vector3(397.72, 0, 0)
+[node name="ArenaLadderCenter" type="Node3D" parent="TERRAIN" unique_id=710670459 groups=["factory_ladder"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 507.82, 0, 0)
 script = ExtResource("factory_ladder")
 rise = 4.72
 
 [node name="ArenaVentWest" type="Area3D" parent="TERRAIN" unique_id=903328977]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 384.5, 0, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 494.6, 0, 0)
 script = ExtResource("factory_trap")
 phase_offset = 0.65
 
 [node name="ArenaVentEast" type="Area3D" parent="TERRAIN" unique_id=937741138]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 411, 0, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 521.1, 0, 0)
 script = ExtResource("factory_trap")
 phase_offset = 2.1
 
@@ -358,27 +334,19 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14, 0.12, 0)
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 49, 0.45, 0)
 
 [node name="SortingEnergy" parent="TERRAIN" unique_id=30347690 instance=ExtResource("energy_small")]
-position = Vector3(94.55, 0.99, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 94.55, 0.99, 0)
 
 [node name="UpperHealth" parent="TERRAIN" unique_id=1507126427 instance=ExtResource("health_large")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 276.25, 2.03, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 276.25, 3.00865, 0)
 
 [node name="BossEnergy" parent="TERRAIN" unique_id=317356658 instance=ExtResource("energy_small")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 382, 0.38, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 492.1, 0.38, 0)
 
 [node name="SortingFloor58" parent="TERRAIN" unique_id=1067728514 instance=ExtResource("large_floor_platform")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 58, 0.1, 0)
 
-[node name="SortingFloor66" parent="TERRAIN" unique_id=116633522 instance=ExtResource("large_floor_platform")]
-position = Vector3(66.0, 0.5, 0)
-rotation = Vector3(0, 0, 0.1)
-scale = Vector3(0.99, 1, 1)
-
-[node name="SortingFloor74" parent="TERRAIN" unique_id=824477177 instance=ExtResource("large_floor_platform")]
-position = Vector3(74.0, 0.9, 0)
-
 [node name="SortingFloor82" parent="TERRAIN" unique_id=1966269466 instance=ExtResource("large_floor_platform")]
-position = Vector3(82.0, 0.9, 0)
+transform = Transform3D(0.9758558, -0.2184157, 0, 0.2184157, 0.9758558, 0, 0, 0, 1, 80.19949, 2.4468951, 0)
 
 [node name="SortingRungExit" parent="TERRAIN" unique_id=1487264732 instance=ExtResource("jump_through_catwalk")]
 transform = Transform3D(1.14, 0, 0, 0, 1, 0, 0, 0, 1, 56.2, 2.65, 0)
@@ -389,59 +357,31 @@ script = ExtResource("factory_ladder")
 rise = 2.55
 
 [node name="SortingUpperOne" parent="TERRAIN" unique_id=255829068 instance=ExtResource("jump_through_catwalk")]
-position = Vector3(62.1, 4.08, 0)
-rotation = Vector3(0, 0, 0.071)
+transform = Transform3D(0.9974806, -0.07094037, 0, 0.07094037, 0.9974806, 0, 0, 0, 1, 62.1, 4.08, 0)
 
 [node name="SortingCacheShelf" parent="TERRAIN" unique_id=1072882651 instance=ExtResource("jump_through_catwalk")]
-position = Vector3(68.4, 5.23, 0)
-scale = Vector3(1.25, 1, 1)
+transform = Transform3D(1.25, 0, 0, 0, 1, 0, 0, 0, 1, 68.4, 5.23, 0)
 
 [node name="SortingCache" parent="TERRAIN" unique_id=1155920647 instance=ExtResource("credits_large")]
-position = Vector3(68.75, 5.62, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 68.75, 5.62, 0)
 
 [node name="SortingUpperEnergy" parent="TERRAIN" unique_id=196243372 instance=ExtResource("energy_small")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 56.26245, 3.5052385, 0)
 
-[node name="SwitchyardLaunch" parent="TERRAIN" unique_id=1783904157 instance=ExtResource("large_floor_platform")]
-transform = Transform3D(0.62, 0, 0, 0, 1, 0, 0, 0, 1, 126, 0.75, 0)
-
-[node name="SwitchyardCatch" parent="TERRAIN" unique_id=1640365061 instance=ExtResource("jump_through_catwalk")]
-transform = Transform3D(1.08, 0, 0, 0, 1, 0, 0, 0, 1, 130.9, -0.88, 0)
-
 [node name="SwitchyardHoist" parent="TERRAIN" unique_id=1431023655 instance=ExtResource("moving_transfer")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 133, 0.62, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 134.35857, 1.3346624, 0)
 travel = 2.42
 horizontal_travel = 0.65
 seconds_per_leg = 1.62
 
-[node name="SwitchyardTop" parent="TERRAIN" unique_id=510648197 instance=ExtResource("jump_through_catwalk")]
-transform = Transform3D(1.06, 0, 0, 0, 1, 0, 0, 0, 1, 138.6, 3, 0)
-
-[node name="SwitchyardTurn" parent="TERRAIN" unique_id=72721262 instance=ExtResource("jump_through_catwalk")]
-position = Vector3(145.0, 3.85, 0)
-rotation = Vector3(0, 0, 0.153)
-scale = Vector3(1.18, 1, 1)
-
 [node name="SwitchyardDrop" parent="TERRAIN" unique_id=742347536 instance=ExtResource("jump_through_catwalk")]
 transform = Transform3D(1.13, 0, 0, 0, 1, 0, 0, 0, 1, 150.2, 2.58, 0)
-
-[node name="SwitchyardExit" parent="TERRAIN" unique_id=1593298422 instance=ExtResource("large_floor_platform")]
-transform = Transform3D(0.72, 0, 0, 0, 1, 0, 0, 0, 1, 156.2, 0.76, 0)
 
 [node name="SwitchyardHealth" parent="TERRAIN" unique_id=821473276 instance=ExtResource("health_small")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 149.8, 2.97, 0)
 
 [node name="InspectionSpine212" parent="TERRAIN" unique_id=85456351 instance=ExtResource("large_floor_platform")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 212, 0.1, 0)
-
-[node name="InspectionSpine220" parent="TERRAIN" unique_id=1508228378 instance=ExtResource("large_floor_platform")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 220, 0.1, 0)
-
-[node name="InspectionSpine228" parent="TERRAIN" unique_id=1038248689 instance=ExtResource("large_floor_platform")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 228, 0.1, 0)
-
-[node name="InspectionSpine236" parent="TERRAIN" unique_id=1917123033 instance=ExtResource("large_floor_platform")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 236, 0.1, 0)
 
 [node name="InspectionLadderDeck" parent="TERRAIN" unique_id=355965629 instance=ExtResource("jump_through_catwalk")]
 transform = Transform3D(1.25, 0, 0, 0, 1, 0, 0, 0, 1, 210.5, 3.2, 0)
@@ -461,13 +401,10 @@ transform = Transform3D(1.29, 0, 0, 0, 1, 0, 0, 0, 1, 228.3, 6, 0)
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 229, 6.36, 0)
 
 [node name="InspectionCell" parent="TERRAIN" unique_id=1052707828 instance=ExtResource("energy_large")]
-position = Vector3(216.2, 4.94, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 216.2, 4.94, 0)
 
 [node name="InspectionExitStep" parent="TERRAIN" unique_id=2113978280 instance=ExtResource("jump_through_catwalk")]
-transform = Transform3D(1.04, 0, 0, 0, 1, 0, 0, 0, 1, 241, 1.18, 0)
-
-[node name="FoundryLanding" parent="TERRAIN" unique_id=617839538 instance=ExtResource("large_floor_platform")]
-transform = Transform3D(0.63, 0, 0, 0, 1, 0, 0, 0, 1, 294.7, 0.42, 0)
+transform = Transform3D(1.04, 0, 0, 0, 1, 0, 0, 0, 1, 235.89343, 4.033177, 0)
 
 [node name="FoundryLadderDeck" parent="TERRAIN" unique_id=2046886225 instance=ExtResource("jump_through_catwalk")]
 transform = Transform3D(1.21, 0, 0, 0, 1, 0, 0, 0, 1, 296.7, 3.22, 0)
@@ -477,17 +414,11 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 296, 0.42, 0)
 script = ExtResource("factory_ladder")
 rise = 2.8
 
-[node name="FoundryShelfA" parent="TERRAIN" unique_id=731938712 instance=ExtResource("jump_through_catwalk")]
-transform = Transform3D(1.08, 0, 0, 0, 1, 0, 0, 0, 1, 303, 4.28, 0)
-
 [node name="FoundryShuttle" parent="TERRAIN" unique_id=579171531 instance=ExtResource("moving_transfer")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 309.3, 3.78, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 304.35016, 5.3769617, 0)
 travel = 1.22
 horizontal_travel = 1.0
 seconds_per_leg = 1.82
-
-[node name="FoundryShelfB" parent="TERRAIN" unique_id=1288109191 instance=ExtResource("jump_through_catwalk")]
-transform = Transform3D(1.2, 0, 0, 0, 1, 0, 0, 0, 1, 315.6, 4.88, 0)
 
 [node name="FoundryCacheSpur" parent="TERRAIN" unique_id=579414018 instance=ExtResource("jump_through_catwalk")]
 transform = Transform3D(0.82, 0, 0, 0, 1, 0, 0, 0, 1, 312.1, 6.65, 0)
@@ -495,76 +426,178 @@ transform = Transform3D(0.82, 0, 0, 0, 1, 0, 0, 0, 1, 312.1, 6.65, 0)
 [node name="FoundryCache" parent="TERRAIN" unique_id=1729533130 instance=ExtResource("credits_large")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 312.1, 7.03, 0)
 
-[node name="FoundryRecovery" parent="TERRAIN" unique_id=1924244062 instance=ExtResource("large_floor_platform")]
-transform = Transform3D(0.78, 0, 0, 0, 1, 0, 0, 0, 1, 307, -0.85, 0)
-
-[node name="FoundryRecoveryEnd" parent="TERRAIN" unique_id=1488034913 instance=ExtResource("jump_through_catwalk")]
-position = Vector3(312.68, 1.49, 0)
-scale = Vector3(1.1, 1, 1)
-
 [node name="FoundryStaging" parent="TERRAIN" unique_id=1686962409 instance=ExtResource("large_floor_platform")]
-position = Vector3(321.5, 2.1, 0)
-rotation = Vector3(0, 0, -0.142)
-scale = Vector3(0.85, 1, 1)
+transform = Transform3D(0.8434129, -0.12425423, 0, 0.10561612, 0.99225044, 0, 0, 0, 0.99999994, 325.46045, 3.7754436, 0)
 
-[node name="FoundryEndDrop" parent="TERRAIN" unique_id=786349032 instance=ExtResource("jump_through_catwalk")]
-transform = Transform3D(0.97, 0, 0, 0, 1, 0, 0, 0, 1, 326.4, 1.11, 0)
-
-[node name="SmelterTraverseGrate" parent="TERRAIN" unique_id=27668799 instance=ExtResource("grated_platform")]
-position = Vector3(360.5, 0.46, 0)
-scale = Vector3(0.73, 1, 1)
-
-[node name="ReactorServiceStep" parent="TERRAIN" instance=ExtResource("small_floor_platform")]
-position = Vector3(17.1, 2.28, 0)
-
-[node name="SortingExitCatch" parent="TERRAIN" instance=ExtResource("medium_floor_platform")]
-position = Vector3(88.25, 0.9, 0)
-
-[node name="ForgeHallRepair" parent="TERRAIN" instance=ExtResource("health_large")]
-position = Vector3(375.45, 0.45, 0)
+[node name="ForgeHallRepair" parent="TERRAIN" unique_id=1230792530 instance=ExtResource("health_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 485.55, 0.45, 0)
 full_heal = true
 
-[node name="ForgeHallCheckpoint" type="Area3D" parent="TERRAIN"]
-position = Vector3(377.65, 0, 0)
+[node name="ForgeHallCheckpoint" type="Area3D" parent="TERRAIN" unique_id=1668309073]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 487.75, 0, 0)
 collision_layer = 0
 script = ExtResource("factory_checkpoint")
 
-[node name="Trigger" type="CollisionShape3D" parent="TERRAIN/ForgeHallCheckpoint"]
-position = Vector3(0, 0.95, 0)
+[node name="Trigger" type="CollisionShape3D" parent="TERRAIN/ForgeHallCheckpoint" unique_id=565653679]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.95, 0)
 shape = SubResource("CheckpointTrigger")
 
-[node name="Beacon" parent="TERRAIN/ForgeHallCheckpoint" instance=ExtResource("checkpoint_beacon")]
-position = Vector3(0, 0, -0.75)
+[node name="Beacon" parent="TERRAIN/ForgeHallCheckpoint" unique_id=526665250 instance=ExtResource("checkpoint_beacon")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.75)
 
-[node name="Status" type="Label3D" parent="TERRAIN/ForgeHallCheckpoint"]
-position = Vector3(0, 1.48, -0.65)
+[node name="Status" type="Label3D" parent="TERRAIN/ForgeHallCheckpoint" unique_id=1707778476]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.48, -0.65)
 pixel_size = 0.004
-font_size = 49
 modulate = Color(0.45, 0.94, 1, 1)
 text = "CHECKPOINT"
+font_size = 49
 
-[node name="InspectionWallHikeLeft" parent="TERRAIN" instance=ExtResource("wall_hike_panel")]
-position = Vector3(224.82, 3.78, 0)
+[node name="InspectionWallHikeLeft" parent="TERRAIN" unique_id=124185887 instance=ExtResource("wall_hike_panel")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 225.80818, 4.122138, 0)
 
-[node name="InspectionWallHikeRight" parent="TERRAIN" instance=ExtResource("wall_hike_panel")]
-position = Vector3(228.25, 3.78, 0)
+[node name="ForgeHallThreshold" parent="TERRAIN" unique_id=280758567 instance=ExtResource("small_floor_platform")]
+transform = Transform3D(0.5, 0, 0, 0, 1, 0, 0, 0, 1, 482.6, 0, 0)
 
-[node name="ForgeHallThreshold" parent="TERRAIN" instance=ExtResource("small_floor_platform")]
-position = Vector3(372.5, 0, 0)
-scale = Vector3(0.5, 1, 1)
+[node name="SwitchyardWallKick" parent="TERRAIN" unique_id=584741571 instance=ExtResource("wall_hike_panel")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 142, 4.62, 0)
 
-[node name="SwitchyardWallKick" parent="TERRAIN" instance=ExtResource("wall_hike_panel")]
-position = Vector3(142.0, 4.62, 0)
+[node name="SwitchyardCrown" parent="TERRAIN" unique_id=1427813159 instance=ExtResource("small_floor_platform")]
+transform = Transform3D(0.66, 0, 0, 0, 1, 0, 0, 0, 1, 142.91, 6.21, 0)
 
-[node name="SwitchyardCrown" parent="TERRAIN" instance=ExtResource("small_floor_platform")]
-position = Vector3(142.91, 6.21, 0)
-scale = Vector3(0.66, 1, 1)
+[node name="ReactorDashCell" parent="TERRAIN" unique_id=563081619 instance=ExtResource("energy_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 22.7, 6.6423, 0)
 
-[node name="ReactorDashCell" parent="TERRAIN" instance=ExtResource("energy_small")]
-position = Vector3(20.68, 4.88, 0)
+[node name="FoundryDashCell" parent="TERRAIN" unique_id=650752865 instance=ExtResource("energy_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 337.63, 0.79, 0)
 
-[node name="FoundryDashCell" parent="TERRAIN" instance=ExtResource("energy_small")]
-position = Vector3(337.63, 0.79, 0)
+[node name="IntakeRiseStep" parent="TERRAIN" instance=ExtResource("small_floor_platform")]
+position = Vector3(-9.65, 1.1, 0)
+
+[node name="AssemblyUpperStep" parent="TERRAIN" instance=ExtResource("small_floor_platform")]
+position = Vector3(2.45, 3.58, 0)
+
+[node name="SortingRampApproach" parent="TERRAIN" instance=ExtResource("small_floor_platform")]
+position = Vector3(102.7, 1.52, 0)
+
+[node name="SortingUpperStep" parent="TERRAIN" instance=ExtResource("small_floor_platform")]
+position = Vector3(111.5, 4.02, 0)
+
+[node name="SwitchyardWallApproach" parent="TERRAIN" instance=ExtResource("small_floor_platform")]
+position = Vector3(139.3, 3.38, 0)
+
+[node name="LiftApproachStep" parent="TERRAIN" instance=ExtResource("small_floor_platform")]
+position = Vector3(165.9, 3.0, 0)
+
+[node name="InspectionWallApproach" parent="TERRAIN" instance=ExtResource("medium_floor_platform")]
+position = Vector3(221.7, 4.95, 0)
+
+[node name="GantryLiftApproach" parent="TERRAIN" instance=ExtResource("small_floor_platform")]
+position = Vector3(252.8, 1.45, 0)
+
+[node name="FoundryDescentStep" parent="TERRAIN" instance=ExtResource("medium_floor_platform")]
+position = Vector3(332.0, 2.12, 0)
+
+[node name="SmelterRiseStep" parent="TERRAIN" instance=ExtResource("medium_floor_platform")]
+position = Vector3(345.0, 1.61, 0)
+
+[node name="FoundryLadderFoot" parent="TERRAIN" instance=ExtResource("small_floor_platform")]
+position = Vector3(294.6, 0.42, 0)
+scale = Vector3(1.5, 1, 1)
+
+[node name="AscentEntry" parent="TERRAIN" instance=ExtResource("large_floor_platform")]
+position = Vector3(365, 0.25, 0)
+
+
+[node name="ShaftOneFoot" parent="TERRAIN" instance=ExtResource("large_floor_platform")]
+position = Vector3(371.75, 0.25, 0)
+scale = Vector3(0.6875, 1, 1)
+
+[node name="ShaftOneSummit" parent="TERRAIN" instance=ExtResource("medium_floor_platform")]
+position = Vector3(378.5, 8.5, 0)
+
+
+[node name="AscentTurnOne" parent="TERRAIN" instance=ExtResource("medium_floor_platform")]
+position = Vector3(385, 7.2, 0)
+
+
+[node name="AscentTurnTwo" parent="TERRAIN" instance=ExtResource("jump_through_catwalk")]
+position = Vector3(391, 8.0, 0)
+
+
+[node name="AscentShuttle" parent="TERRAIN" instance=ExtResource("moving_transfer")]
+position = Vector3(399, 5.8, 0)
+
+travel = 1.1
+horizontal_travel = 1.1
+seconds_per_leg = 2.4
+
+[node name="AscentStep" parent="TERRAIN" instance=ExtResource("medium_floor_platform")]
+position = Vector3(408, 4.6, 0)
+
+
+[node name="AscentRest" parent="TERRAIN" instance=ExtResource("medium_floor_platform")]
+position = Vector3(419, 3.1, 0)
+
+
+[node name="ShaftTwoApproach" parent="TERRAIN" instance=ExtResource("large_floor_platform")]
+position = Vector3(429, 0.9, 0)
+
+
+[node name="ShaftTwoFoot" parent="TERRAIN" instance=ExtResource("large_floor_platform")]
+position = Vector3(435.25, 0.9, 0)
+scale = Vector3(0.5625, 1, 1)
+
+[node name="ShaftTwoSummit" parent="TERRAIN" instance=ExtResource("medium_floor_platform")]
+position = Vector3(442, 7.2, 0)
+
+
+[node name="FinalAscentDescentA" parent="TERRAIN" instance=ExtResource("jump_through_catwalk")]
+position = Vector3(450, 5.2, 0)
+
+
+[node name="FinalAscentDescentB" parent="TERRAIN" instance=ExtResource("medium_floor_platform")]
+position = Vector3(457, 3.9, 0)
+
+
+[node name="FinalAscentDescentC" parent="TERRAIN" instance=ExtResource("medium_floor_platform")]
+position = Vector3(466, 2.1, 0)
+
+
+[node name="FinalAscentDescentD" parent="TERRAIN" instance=ExtResource("medium_floor_platform")]
+position = Vector3(473, 0.8, 0)
+
+
+[node name="ShaftOneLeft" parent="TERRAIN" instance=ExtResource("wall_hike_panel")]
+position = Vector3(371.3, 6.05, 0)
+scale = Vector3(1, 2.2461538, 1)
+
+[node name="ShaftOneRight" parent="TERRAIN" instance=ExtResource("wall_hike_panel")]
+position = Vector3(374.7, 4.375, 0)
+scale = Vector3(1, 2.5384615, 1)
+
+[node name="ShaftTwoLeft" parent="TERRAIN" instance=ExtResource("wall_hike_panel")]
+position = Vector3(434.2, 5.875, 0)
+scale = Vector3(1, 1.7384615, 1)
+
+[node name="ShaftTwoRight" parent="TERRAIN" instance=ExtResource("wall_hike_panel")]
+position = Vector3(437.6, 4.05, 0)
+scale = Vector3(1, 1.9384615, 1)
+
+[node name="AscentEnergyA" parent="TERRAIN" instance=ExtResource("energy_large")]
+position = Vector3(378.2, 8.89, 0)
+
+
+[node name="AscentEnergyB" parent="TERRAIN" instance=ExtResource("energy_large")]
+position = Vector3(442, 7.59, 0)
+
+
+[node name="AscentHealth" parent="TERRAIN" instance=ExtResource("health_small")]
+position = Vector3(429, 1.29, 0)
+
+
+[node name="AscentCreditCache" parent="TERRAIN" instance=ExtResource("credits_large")]
+position = Vector3(391, 8.39, 0)
+
 
 [node name="DECOR" type="Node3D" parent="." unique_id=759099904]
 
@@ -614,7 +647,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 21, 1.25, -2.1)
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 26, -0.25, -1.8)
 
 [node name="ExtractionFrame" parent="DECOR" unique_id=17173971 instance=ExtResource("door_frame")]
-transform = Transform3D(7.54979e-08, 0, 1, 0, 1, 0, -1, 0, 7.54979e-08, 416.1, 0, 0)
+transform = Transform3D(7.54979e-08, 0, 1, 0, 1, 0, -1, 0, 7.54979e-08, 526.2, 0, 0)
 
 [node name="SortingSign" type="Label3D" parent="DECOR" unique_id=658360763]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 57.2, 1.72, -1.23)
@@ -648,89 +681,87 @@ text = "FOUNDRY  /  UPPER TRANSFER"
 font_size = 60
 outline_size = 11
 
-[node name="ReactorDashHint" type="Label3D" parent="DECOR"]
-position = Vector3(21.0, 6.23, -1.25)
+[node name="ReactorDashHint" type="Label3D" parent="DECOR" unique_id=189492548]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 21, 6.23, -1.25)
 pixel_size = 0.004
-font_size = 56
-outline_size = 10
-modulate = Color(0.60, 0.95, 1, 1)
+modulate = Color(0.6, 0.95, 1, 1)
 text = "JUMP  +  AIR DASH   >"
-
-[node name="FoundryDashHint" type="Label3D" parent="DECOR"]
-position = Vector3(338.5, 2.13, -1.25)
-pixel_size = 0.004
 font_size = 56
 outline_size = 10
-modulate = Color(0.60, 0.95, 1, 1)
-text = "AIR DASH   >"
 
-[node name="InspectionWallHikeSign" type="Label3D" parent="DECOR"]
-position = Vector3(226.5, 2.68, -1.15)
-pixel_size = 0.0036
-font_size = 51
+[node name="FoundryDashHint" type="Label3D" parent="DECOR" unique_id=91183802]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 338.5, 2.13, -1.25)
+pixel_size = 0.004
+modulate = Color(0.6, 0.95, 1, 1)
+text = "AIR DASH   >"
+font_size = 56
 outline_size = 10
+
+[node name="InspectionWallHikeSign" type="Label3D" parent="DECOR" unique_id=605990092]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 226.5, 2.68, -1.15)
+pixel_size = 0.0036
 modulate = Color(0.51, 0.9, 1, 1)
 text = "WALL KICK"
-
-[node name="SwitchyardWallKickSign" type="Label3D" parent="DECOR"]
-position = Vector3(139.0, 5.45, -1.24)
-pixel_size = 0.0035
-font_size = 54
+font_size = 51
 outline_size = 10
+
+[node name="SwitchyardWallKickSign" type="Label3D" parent="DECOR" unique_id=1114891616]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 139, 5.45, -1.24)
+pixel_size = 0.0035
 modulate = Color(0.53, 0.92, 1, 1)
 text = "HOLD INTO WALL  /  JUMP TO KICK"
+font_size = 54
+outline_size = 10
+
+[node name="ForgeHallBulkheadWest" parent="DECOR" unique_id=798472481 instance=ExtResource("forge_hall_panel")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 485.15, 0, -1.88)
+
+[node name="ForgeHallBulkheadEast" parent="DECOR" unique_id=1067224126 instance=ExtResource("forge_hall_panel")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 489.15, 0, -1.88)
+
+[node name="ForgeHallLight" parent="DECOR" unique_id=1773325563 instance=ExtResource("factory_light_fixture")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 487, 3.31, -0.64)
+
+[node name="ForgeHallSign" type="Label3D" parent="DECOR" unique_id=1068594254]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 487, 2.39, -1.03)
+pixel_size = 0.005
+modulate = Color(0.54, 0.96, 1, 1)
+text = "FORGE ACCESS  /  REPAIR BAY"
+font_size = 54
+outline_size = 10
 
 [node name="ArenaUnifiedFloor" type="StaticBody3D" parent="." unique_id=285226151]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 395.8, -0.18, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 505.9, -0.18, 0)
 script = ExtResource("arena_surface")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="ArenaUnifiedFloor" unique_id=738343586]
 shape = SubResource("ArenaUnifiedSurface")
 
-[node name="ForgeHallDoor" type="Node3D" parent="."]
-position = Vector3(373.55, 0, 0)
+[node name="ForgeHallDoor" type="Node3D" parent="." unique_id=1473586454]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 483.65, 0, 0)
 script = ExtResource("forge_safe_hall")
 
-[node name="Door" parent="ForgeHallDoor" instance=ExtResource("boss_gate_door")]
-rotation = Vector3(0, 1.5707963, 0)
-scale = Vector3(0.66, 1, 1)
+[node name="Door" parent="ForgeHallDoor" unique_id=106926064 instance=ExtResource("boss_gate_door")]
+transform = Transform3D(4.9828618e-08, 0, 1, 0, 1, 0, -0.66, 0, 7.54979e-08, 0, 0, 0)
 
-[node name="PortalFrame" parent="ForgeHallDoor" instance=ExtResource("door_frame")]
-rotation = Vector3(0, 1.5707963, 0)
-scale = Vector3(0.8, 1.15, 1)
+[node name="PortalFrame" parent="ForgeHallDoor" unique_id=1177898733 instance=ExtResource("door_frame")]
+transform = Transform3D(6.039832e-08, 0, 1, 0, 1.15, 0, -0.8, 0, 7.54979e-08, 0, 0, 0)
 
-[node name="Blocker" type="StaticBody3D" parent="ForgeHallDoor"]
+[node name="Blocker" type="StaticBody3D" parent="ForgeHallDoor" unique_id=867752310]
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="ForgeHallDoor/Blocker"]
-position = Vector3(0, 3.15, 0)
+[node name="CollisionShape3D" type="CollisionShape3D" parent="ForgeHallDoor/Blocker" unique_id=1327708521]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.15, 0)
 shape = SubResource("Shape_gate")
 
-[node name="Shield" type="Area3D" parent="ForgeHallDoor"]
-position = Vector3(3.56, 1.75, 0)
+[node name="Shield" type="Area3D" parent="ForgeHallDoor" unique_id=1849298445]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.56, 1.75, 0)
 collision_layer = 0
 
-[node name="Shape" type="CollisionShape3D" parent="ForgeHallDoor/Shield"]
+[node name="Shape" type="CollisionShape3D" parent="ForgeHallDoor/Shield" unique_id=1011238180]
 shape = SubResource("ForgeHallShield")
 
-[node name="ForgeHallBulkheadWest" parent="DECOR" instance=ExtResource("forge_hall_panel")]
-position = Vector3(375.05, 0, -1.88)
-
-[node name="ForgeHallBulkheadEast" parent="DECOR" instance=ExtResource("forge_hall_panel")]
-position = Vector3(379.05, 0, -1.88)
-
-[node name="ForgeHallLight" parent="DECOR" instance=ExtResource("factory_light_fixture")]
-position = Vector3(376.9, 3.31, -0.64)
-
-[node name="ForgeHallSign" type="Label3D" parent="DECOR"]
-position = Vector3(376.9, 2.39, -1.03)
-pixel_size = 0.005
-font_size = 54
-outline_size = 10
-modulate = Color(0.54, 0.96, 1, 1)
-text = "FORGE ACCESS  /  REPAIR BAY"
-
 [node name="Gate" type="Node3D" parent="." unique_id=1631173362]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 380.5, 0, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 490.6, 0, 0)
 
 [node name="Door" parent="Gate" unique_id=2140596334 instance=ExtResource("boss_gate_door")]
 transform = Transform3D(4.9828618e-08, 0, 1, 0, 1, 0, -0.66, 0, 7.54979e-08, 0, 0, 0)
@@ -745,7 +776,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.15, 0)
 shape = SubResource("Shape_gate")
 
 [node name="ExitBarrier" type="StaticBody3D" parent="." unique_id=1724872511]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 416.1, 0, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 526.2, 0, 0)
 
 [node name="Seal" parent="ExitBarrier" unique_id=1484470240 instance=ExtResource("boss_gate_door")]
 transform = Transform3D(4.9828618e-08, 0, -1, 0, 1, 0, 0.66, 0, 7.54979e-08, 0, 0, 0)
@@ -763,41 +794,41 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -18.65097, 0.655, 0)
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -19, 0, 0)
 
 [node name="RoomExit" type="Marker3D" parent="MARKERS" unique_id=1651149192]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 417.1, 0.82, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 527.2, 0.82, 0)
 
 [node name="CameraBounds" type="Node3D" parent="MARKERS" unique_id=1794485265]
 metadata/min_x = -18.0
-metadata/max_x = 416.0
+metadata/max_x = 526.1
 
 [node name="Actors" type="Node3D" parent="." unique_id=145851359]
 
 [node name="Bay1Patrol" type="CharacterBody3D" parent="Actors" unique_id=1435628334 groups=["damageable_enemies", "level_enemies"]]
-position = Vector3(66.6, 1.27, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1,94.2,1.32,0)
 script = ExtResource("2_enemy")
 variant = 1
 
 [node name="Bay4Patrol" type="CharacterBody3D" parent="Actors" unique_id=1876728988 groups=["damageable_enemies", "level_enemies"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 121.8, 1.77, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1,115.8,6.1743,0)
 script = ExtResource("2_enemy")
 variant = 4
 
 [node name="Bay5Patrol" type="CharacterBody3D" parent="Actors" unique_id=1220399407 groups=["damageable_enemies", "level_enemies"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 191.9, 2.19, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1,429,1.62,0)
 script = ExtResource("2_enemy")
 variant = 1
 
 [node name="Bay7Patrol" type="CharacterBody3D" parent="Actors" unique_id=236264800 groups=["damageable_enemies", "level_enemies"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 232.6, 0.82, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1,247.2,0.82,0)
 script = ExtResource("2_enemy")
 variant = 3
 
 [node name="Bay8Patrol" type="CharacterBody3D" parent="Actors" unique_id=514513993 groups=["damageable_enemies", "level_enemies"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 270.6, 3.25, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1,275.65,3.6687,0)
 script = ExtResource("2_enemy")
 variant = 4
 
 [node name="Bay9Patrol" type="CharacterBody3D" parent="Actors" unique_id=471114234 groups=["damageable_enemies", "level_enemies"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 322, 2.84, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1,327,4.2687,0)
 script = ExtResource("2_enemy")
 variant = 1
 
@@ -831,7 +862,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.8, 0, 0)
 mesh = SubResource("Mesh_sword")
 
 [node name="WalkerBot_01" type="CharacterBody3D" parent="Actors" unique_id=1010412712 groups=["damageable_enemies", "level_enemies"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5.4, 2.85, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1,-2.8,3.2058,0)
 script = ExtResource("2_enemy")
 variant = 0
 
@@ -842,17 +873,17 @@ shape = SubResource("Shape_enemy")
 mesh = SubResource("Mesh_enemy")
 
 [node name="WalkerBot_02" type="CharacterBody3D" parent="Actors" unique_id=294900165 groups=["damageable_enemies", "level_enemies"]]
-position = Vector3(51.4, 0.87, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1,57.2,0.82,0)
 script = ExtResource("2_enemy")
 variant = 3
 
 [node name="WalkerBot_03" type="CharacterBody3D" parent="Actors" unique_id=1002006341 groups=["damageable_enemies", "level_enemies"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 17.7, 3.32, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1,22.1,7.3023,0)
 script = ExtResource("2_enemy")
 variant = 4
 
 [node name="WalkerBot_04" type="CharacterBody3D" parent="Actors" unique_id=469688216 groups=["damageable_enemies", "level_enemies"]]
-position = Vector3(43.7, 0.86, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1,43.0,0.82,0)
 script = ExtResource("2_enemy")
 variant = 1
 
@@ -863,44 +894,44 @@ shape = SubResource("Shape_enemy")
 mesh = SubResource("Mesh_enemy")
 
 [node name="WalkerBot_05" type="CharacterBody3D" parent="Actors" unique_id=143739127 groups=["damageable_enemies", "level_enemies"]]
-position = Vector3(97.7, 1.36, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1,124.0,1.8384,0)
 script = ExtResource("2_enemy")
 variant = 2
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Actors/WalkerBot_05" unique_id=111619976]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.534958, 0, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
 shape = SubResource("Shape_enemy")
 
 [node name="BodyMesh" type="MeshInstance3D" parent="Actors/WalkerBot_05" unique_id=1305728427]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.607315, 0, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
 mesh = SubResource("Mesh_enemy")
 
 [node name="WalkerBot_06" type="CharacterBody3D" parent="Actors" unique_id=1483889709 groups=["damageable_enemies", "level_enemies"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 331.2, 0.79, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1,365.7,0.97,0)
 script = ExtResource("2_enemy")
 variant = 3
 
 [node name="WalkerBot_07" type="CharacterBody3D" parent="Actors" unique_id=606645174 groups=["damageable_enemies", "level_enemies"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 371.2, 2.12, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1,480.1,1.2,0)
 script = ExtResource("2_enemy")
 variant = 4
-patrol_right_limit = 372.1
+patrol_right_limit = 482.20000000000005
 
 [node name="ForgeTitan" parent="Actors" unique_id=344500344 instance=ExtResource("forge_titan")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 399, 1.45, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 509.1, 1.45, 0)
 
 [node name="IntakeCargo" type="CharacterBody3D" parent="Actors" unique_id=1791157671]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 50, 1.62, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1,50,2.55,0)
 script = ExtResource("cargo_carrier")
 reward = ExtResource("health_large")
 
 [node name="GantryCargo" type="CharacterBody3D" parent="Actors" unique_id=590612575]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 184, 3.78, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1,184,6.2772,0)
 script = ExtResource("cargo_carrier")
 reward = ExtResource("energy_large")
 
 [node name="FoundryCargo" type="CharacterBody3D" parent="Actors" unique_id=1147459071]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 288, 1.63, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1,288,2.55,0)
 script = ExtResource("cargo_carrier")
 reward = ExtResource("credits_large")
 
@@ -912,3 +943,38 @@ script = ExtResource("3_camera")
 transform = Transform3D(1, 0, 0, 0, 0.9961947, 0.087155774, 0, -0.087155774, 0.9961947, 0, 0.65, 8.55)
 current = true
 fov = 80.0
+
+[node name="DeploymentPad" parent="MARKERS/PlayerSpawn" instance=ExtResource("deployment_pad")]
+position = Vector3(0, -0.85, 0)
+
+[node name="ExtractionPad" parent="MARKERS/RoomExit" instance=ExtResource("extraction_pad")]
+position = Vector3(0, -0.85, 0)
+[node name="ShaftOneInstruction" type="Label3D" parent="DECOR"]
+position = Vector3(373, 11.4, -1.2)
+text = "HOLD INTO WALL  /  JUMP BETWEEN WALLS"
+pixel_size = 0.0038
+font_size = 47
+modulate = Color(0.5, 0.94, 1, 1)
+
+[node name="ShaftTwoInstruction" type="Label3D" parent="DECOR"]
+position = Vector3(436, 10.4, -1.2)
+text = "ALTERNATE WALL KICKS"
+pixel_size = 0.0038
+font_size = 47
+modulate = Color(0.5, 0.94, 1, 1)
+
+
+[node name="SortingGuard" type="CharacterBody3D" parent="Actors" groups=["damageable_enemies", "level_enemies"]]
+position = Vector3(81.8, 3.5248, 0)
+script = ExtResource("2_enemy")
+variant = 3
+
+[node name="SwitchyardGuard" type="CharacterBody3D" parent="Actors" groups=["damageable_enemies", "level_enemies"]]
+position = Vector3(160.7, 1.9404, 0)
+script = ExtResource("2_enemy")
+variant = 0
+
+[node name="InspectionGuard" type="CharacterBody3D" parent="Actors" groups=["damageable_enemies", "level_enemies"]]
+position = Vector3(213.6, 0.82, 0)
+script = ExtResource("2_enemy")
+variant = 2

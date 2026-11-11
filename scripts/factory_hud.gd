@@ -4,6 +4,7 @@ const PORTRAIT := preload("res://assets/ui/rx07_menu.png")
 const CYAN := Color("00caff")
 const WHITE := Color("f1f8ff")
 const INK := Color(0.018, 0.046, 0.13, 0.96)
+const HUD_SCALE := 0.75
 
 var health := 1.0
 var energy := 1.0
@@ -24,6 +25,8 @@ var lives := 3
 var failed := false
 var boss_visible := false
 var boss_health := 1.0
+var boss_name := "FORGE TITAN"
+var exit_task := "REACH THE FACTORY EXIT"
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -33,9 +36,9 @@ func _ready() -> void:
 	notice.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
 	notice.offset_left = -270
 	notice.offset_right = 270
-	notice.offset_top = 184
+	notice.offset_top = 120
 	notice.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	notice.add_theme_font_size_override("font_size", 38)
+	notice.add_theme_font_size_override("font_size", 30)
 	notice.add_theme_constant_override("outline_size", 8)
 	notice.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	notice.hide()
@@ -118,6 +121,8 @@ func task(at: Vector2, value: String, done: bool) -> void:
 	caption(at + Vector2(23, 0), value, 16, color)
 
 func _draw() -> void:
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE * HUD_SCALE)
+	var hud_size := size / HUD_SCALE
 	var health_width := clampf(150.0 + (displayed_health_capacity - 80.0) * 1.4, 150.0, 245.0)
 	var energy_width := clampf(150.0 + (displayed_energy_capacity - 75.0) * 1.8, 150.0, 245.0)
 	plate(Rect2(105, 69, 124 + maxf(health_width, energy_width), 103), 13)
@@ -137,28 +142,29 @@ func _draw() -> void:
 	gauge(139, "XP", (animated_xp - threshold) / (next_threshold - threshold), Color("ab72ff"), 150.0)
 	plate(Rect2(334, 20, 255, 31), 10)
 	caption(Vector2(352, 43), "RIFTCORE   ///", 23)
-	var right := size.x - 20.0
+	var right := hud_size.x - 20.0
 	var x := right - 348.0
 	plate(Rect2(x, 21, 348, 105), 14)
 	for y in range(56, 120, 5):
 		draw_line(Vector2(x + 5, y), Vector2(right - 5, y), Color("102752"), 1.0)
 	caption(Vector2(x + 18, 49), "⊕   OBJECTIVE", 22)
 	draw_line(Vector2(x + 12, 55), Vector2(right - 12, 55), CYAN, 1.0)
-	task(Vector2(x + 20, 80), "REACH THE FACTORY EXIT", reached_exit)
+	task(Vector2(x + 20, 80), exit_task, reached_exit)
 	task(Vector2(x + 20, 106), "OPTIONAL: SECURITY   %d LEFT" % remaining, remaining == 0)
 	plate(Rect2(right - 222, 139, 222, 36), 11)
 	caption(Vector2(right - 207, 164), "⬡   CREDITS  %04d" % credits, 19)
 	plate(Rect2(right - 222, 181, 222, 33), 9)
 	caption(Vector2(right - 207, 204), "RX   LIVES   %02d" % lives, 17)
 	if boss_visible:
-		var center := size.x * 0.5
-		plate(Rect2(center - 180, 183, 360, 47), 11, Color("ff8c36"))
-		caption(Vector2(center - 163, 205), "FORGE TITAN", 18)
-		draw_rect(Rect2(center - 163, 213, 326, 7), Color("482738"))
-		draw_rect(Rect2(center - 163, 213, 326 * boss_health, 7), Color("ff752d"))
+		var center := hud_size.x * 0.5
+		var boss_tint := Color("b076ff") if boss_name == "VERDANT COLOSSUS" else Color("ff8c36")
+		plate(Rect2(center - 180, 14, 360, 47), 11, boss_tint)
+		caption(Vector2(center - 163, 36), boss_name, 18)
+		draw_rect(Rect2(center - 163, 44, 326, 7), Color("482738"))
+		draw_rect(Rect2(center - 163, 44, 326 * boss_health, 7), boss_tint)
 	if failed:
-		plate(Rect2(size.x * 0.5 - 168, size.y * 0.72, 336, 44), 10, Color("ff536c"))
-		caption(Vector2(size.x * 0.5 - 151, size.y * 0.72 + 28), "RUN OVER   /   BANKING CREDITS" if lives <= 0 else "SYSTEM FAILURE   /   RESPAWNING", 17)
+		plate(Rect2(hud_size.x * 0.5 - 168, hud_size.y * 0.72, 336, 44), 10, Color("ff536c"))
+		caption(Vector2(hud_size.x * 0.5 - 151, hud_size.y * 0.72 + 28), "RUN OVER   /   BANKING CREDITS" if lives <= 0 else "SYSTEM FAILURE   /   RESPAWNING", 17)
 
 	plate(Rect2(18, 157, 119, 29))
 	caption(Vector2(28, 178), "DEF  %.1f%%" % (RiftPlayer.defense_for_experience(experience) * 100.0), 15, Color("a8e5ff"))

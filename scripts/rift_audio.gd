@@ -2,6 +2,7 @@ extends Node
 
 const MENU_TRACK := preload("res://assets/audio/vintage_menu.mp3")
 const LEVEL_TRACK := preload("res://assets/audio/space_boss_battle.ogg")
+const JUNGLE_TRACK := preload("res://assets/audio/machine_jungle.ogg")
 const EFFECTS := {
 	&"menu_move": [preload("res://assets/audio/menu_move.ogg"), -20.0, 1],
 	&"menu_confirm": [preload("res://assets/audio/menu_confirm.ogg"), -13.0, 2],
@@ -22,6 +23,7 @@ const EFFECTS := {
 var music: AudioStreamPlayer
 var menu_track: AudioStreamMP3
 var level_track: AudioStreamOggVorbis
+var jungle_track: AudioStreamOggVorbis
 var voices: Dictionary[StringName, AudioStreamPlayer] = {}
 var music_fade: Tween
 var dash_fade: Tween
@@ -34,8 +36,10 @@ func _ready() -> void:
 	add_child(music)
 	menu_track = MENU_TRACK.duplicate() as AudioStreamMP3
 	level_track = LEVEL_TRACK.duplicate() as AudioStreamOggVorbis
+	jungle_track = JUNGLE_TRACK.duplicate() as AudioStreamOggVorbis
 	menu_track.loop = true
 	level_track.loop = true
+	jungle_track.loop = true
 	for cue in EFFECTS:
 		var voice := AudioStreamPlayer.new()
 		voice.bus = &"SFX"
@@ -45,8 +49,8 @@ func _ready() -> void:
 		add_child(voice)
 		voices[cue] = voice
 
-func play_music(in_level: bool) -> void:
-	var track: AudioStream = level_track if in_level else menu_track
+func play_music(in_level: bool, sector := 1) -> void:
+	var track: AudioStream = (jungle_track if sector == 2 else level_track) if in_level else menu_track
 	var volume := -16.0 if in_level else -14.0
 	if music.stream == track and music.playing:
 		return

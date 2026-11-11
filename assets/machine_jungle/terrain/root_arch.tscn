@@ -1,0 +1,130 @@
+[gd_scene format=3]
+
+[ext_resource type="Material" path="res://assets/machine_jungle/stone.tres" id="stone"]
+
+[ext_resource type="Material" path="res://assets/machine_jungle/fern.tres" id="fern"]
+
+[ext_resource type="Material" path="res://assets/machine_jungle/tread.tres" id="tread"]
+
+[ext_resource type="Material" path="res://assets/machine_jungle/poison.tres" id="poison"]
+
+[ext_resource type="Material" path="res://assets/machine_jungle/jade.tres" id="jade"]
+
+[sub_resource type="CylinderMesh" id="M0"]
+material = ExtResource("tread")
+top_radius = 0.2573
+bottom_radius = 0.31
+height = 2.51
+radial_segments = 7
+
+
+[sub_resource type="CylinderMesh" id="M1"]
+material = ExtResource("fern")
+top_radius = 0.1992
+bottom_radius = 0.24
+height = 1.52
+radial_segments = 7
+
+
+[sub_resource type="BoxMesh" id="M2"]
+material = ExtResource("stone")
+size = Vector3(0.54, 0.27, 0.61)
+
+
+[sub_resource type="CylinderMesh" id="M3"]
+material = ExtResource("jade")
+top_radius = 0.05478
+bottom_radius = 0.066
+height = 1.03
+radial_segments = 7
+
+
+[sub_resource type="CylinderMesh" id="M4"]
+material = ExtResource("tread")
+top_radius = 0.2573
+bottom_radius = 0.31
+height = 2.51
+radial_segments = 7
+
+
+[sub_resource type="CylinderMesh" id="M5"]
+material = ExtResource("fern")
+top_radius = 0.1992
+bottom_radius = 0.24
+height = 1.52
+radial_segments = 7
+
+
+[sub_resource type="BoxMesh" id="M6"]
+material = ExtResource("stone")
+size = Vector3(0.54, 0.27, 0.61)
+
+
+[sub_resource type="CylinderMesh" id="M7"]
+material = ExtResource("jade")
+top_radius = 0.05478
+bottom_radius = 0.066
+height = 1.03
+radial_segments = 7
+
+
+[sub_resource type="BoxMesh" id="M8"]
+material = ExtResource("poison")
+size = Vector3(1.17, 0.24, 0.69)
+
+
+[node name="JungleRootArch" type="Node3D"]
+
+[node name="RootM0" type="MeshInstance3D" parent="."]
+position = Vector3(-1.62, 1.19, -0.34)
+rotation = Vector3(0, 0, -0.24)
+mesh = SubResource("M0")
+
+
+[node name="RootM1" type="MeshInstance3D" parent="."]
+position = Vector3(-1.17, 2.11, -0.34)
+rotation = Vector3(0, 0, -0.8)
+mesh = SubResource("M1")
+
+
+[node name="PanelM2" type="MeshInstance3D" parent="."]
+position = Vector3(-1.6, 0.32, -0.3)
+rotation = Vector3(0, 0, -0.11)
+mesh = SubResource("M2")
+
+
+[node name="RootM3" type="MeshInstance3D" parent="."]
+position = Vector3(-0.82, 2.39, -0.3)
+rotation = Vector3(0, 0, -1.18)
+mesh = SubResource("M3")
+
+
+[node name="RootM4" type="MeshInstance3D" parent="."]
+position = Vector3(1.62, 1.19, -0.34)
+rotation = Vector3(0, 0, 0.24)
+mesh = SubResource("M4")
+
+
+[node name="RootM5" type="MeshInstance3D" parent="."]
+position = Vector3(1.17, 2.11, -0.34)
+rotation = Vector3(0, 0, 0.8)
+mesh = SubResource("M5")
+
+
+[node name="PanelM6" type="MeshInstance3D" parent="."]
+position = Vector3(1.6, 0.32, -0.3)
+rotation = Vector3(0, 0, 0.11)
+mesh = SubResource("M6")
+
+
+[node name="RootM7" type="MeshInstance3D" parent="."]
+position = Vector3(0.82, 2.39, -0.3)
+rotation = Vector3(0, 0, 1.18)
+mesh = SubResource("M7")
+
+
+[node name="PanelM8" type="MeshInstance3D" parent="."]
+position = Vector3(0, 2.77, -0.34)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M8")
+

@@ -1,0 +1,145 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/security_finish.gd" id="finish"]
+[ext_resource type="PackedScene" path="res://assets/enemies/redesign_v3/scout.glb" id="m0"]
+[ext_resource type="PackedScene" path="res://assets/enemies/redesign_v3/quad.glb" id="m1"]
+[ext_resource type="PackedScene" path="res://assets/enemies/redesign_v3/heavy.glb" id="m2"]
+[ext_resource type="PackedScene" path="res://assets/enemies/redesign_v3/turret.glb" id="m3"]
+[ext_resource type="PackedScene" path="res://assets/enemies/redesign_v3/flyer.glb" id="m4"]
+
+[sub_resource type="Environment" id="Studio"]
+background_mode = 1
+background_color = Color(0.025, 0.045, 0.085, 1)
+ambient_light_source = 3
+ambient_light_color = Color(0.6, 0.72, 0.9, 1)
+ambient_light_energy = 0.7
+tonemap_mode = 2
+
+[sub_resource type="StandardMaterial3D" id="PlinthMaterial"]
+albedo_color = Color(0.035, 0.055, 0.09, 1)
+roughness = 0.36
+metallic = 0.5
+
+[sub_resource type="CylinderMesh" id="Plinth"]
+top_radius = 0.79
+bottom_radius = 0.84
+height = 0.12
+radial_segments = 8
+material = SubResource("PlinthMaterial")
+
+[node name="SecurityRedesignShowroom" type="Node3D"]
+
+[node name="Environment" type="WorldEnvironment" parent="."]
+environment = SubResource("Studio")
+
+[node name="KeyLight" type="DirectionalLight3D" parent="."]
+rotation_degrees = Vector3(-35, -35, 0)
+light_color = Color(0.89, 0.94, 1, 1)
+light_energy = 2.0
+
+[node name="RimLight" type="DirectionalLight3D" parent="."]
+rotation_degrees = Vector3(-25, 140, 0)
+light_color = Color(0.22, 0.62, 1, 1)
+light_energy = 1.5
+
+[node name="Camera3D" type="Camera3D" parent="."]
+position = Vector3(0, 2.5, 10)
+rotation_degrees = Vector3(-14, 0, 0)
+projection = 1
+size = 6.0
+current = true
+
+[node name="Robot0" type="Node3D" parent="."]
+position = Vector3(-4.3, 0, 0)
+rotation = Vector3(0, 0.48, 0)
+scale = Vector3(1.2, 1.2, 1.2)
+script = ExtResource("finish")
+
+[node name="Armor" parent="Robot0" instance=ExtResource("m0")]
+
+[node name="Plinth0" type="MeshInstance3D" parent="."]
+position = Vector3(-4.3, -0.83, 0)
+mesh = SubResource("Plinth")
+
+[node name="Label0" type="Label3D" parent="."]
+position = Vector3(-4.3, -1.09, 0)
+text = "SCOUT"
+pixel_size = 0.003
+font_size = 36
+modulate = Color(0.6, 0.8, 1, 1)
+
+[node name="Robot1" type="Node3D" parent="."]
+position = Vector3(-2.15, 0, 0)
+rotation = Vector3(0, 0.48, 0)
+scale = Vector3(1.2, 1.2, 1.2)
+script = ExtResource("finish")
+
+[node name="Armor" parent="Robot1" instance=ExtResource("m1")]
+
+[node name="Plinth1" type="MeshInstance3D" parent="."]
+position = Vector3(-2.15, -0.83, 0)
+mesh = SubResource("Plinth")
+
+[node name="Label1" type="Label3D" parent="."]
+position = Vector3(-2.15, -1.09, 0)
+text = "CRAWLER"
+pixel_size = 0.003
+font_size = 36
+modulate = Color(0.6, 0.8, 1, 1)
+
+[node name="Robot2" type="Node3D" parent="."]
+position = Vector3(0.0, 0, 0)
+rotation = Vector3(0, 0.48, 0)
+scale = Vector3(1.2, 1.2, 1.2)
+script = ExtResource("finish")
+
+[node name="Armor" parent="Robot2" instance=ExtResource("m2")]
+
+[node name="Plinth2" type="MeshInstance3D" parent="."]
+position = Vector3(0.0, -0.83, 0)
+mesh = SubResource("Plinth")
+
+[node name="Label2" type="Label3D" parent="."]
+position = Vector3(0.0, -1.09, 0)
+text = "BULWARK"
+pixel_size = 0.003
+font_size = 36
+modulate = Color(0.6, 0.8, 1, 1)
+
+[node name="Robot3" type="Node3D" parent="."]
+position = Vector3(2.15, 0, 0)
+rotation = Vector3(0, 0.48, 0)
+scale = Vector3(1.2, 1.2, 1.2)
+script = ExtResource("finish")
+
+[node name="Armor" parent="Robot3" instance=ExtResource("m3")]
+
+[node name="Plinth3" type="MeshInstance3D" parent="."]
+position = Vector3(2.15, -0.83, 0)
+mesh = SubResource("Plinth")
+
+[node name="Label3" type="Label3D" parent="."]
+position = Vector3(2.15, -1.09, 0)
+text = "TURRET"
+pixel_size = 0.003
+font_size = 36
+modulate = Color(0.6, 0.8, 1, 1)
+
+[node name="Robot4" type="Node3D" parent="."]
+position = Vector3(4.3, 0, 0)
+rotation = Vector3(0, 0.48, 0)
+scale = Vector3(1.2, 1.2, 1.2)
+script = ExtResource("finish")
+
+[node name="Armor" parent="Robot4" instance=ExtResource("m4")]
+
+[node name="Plinth4" type="MeshInstance3D" parent="."]
+position = Vector3(4.3, -0.83, 0)
+mesh = SubResource("Plinth")
+
+[node name="Label4" type="Label3D" parent="."]
+position = Vector3(4.3, -1.09, 0)
+text = "INTERCEPTOR"
+pixel_size = 0.003
+font_size = 36
+modulate = Color(0.6, 0.8, 1, 1)

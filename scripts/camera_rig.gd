@@ -2,7 +2,7 @@ class_name SideCameraRig
 extends Node3D
 
 @export var damping := 7.0
-@export var gameplay_distance := 8.55
+@export var gameplay_distance := 7.43
 @export var look_ahead := 1.25
 var target: RiftPlayer
 var min_x := -18.0

@@ -5,6 +5,9 @@ signal start_requested
 signal load_requested
 
 var can_load := false
+var saved_sector := 1
+var at_sector_start := false
+var run_unlocks: Array = []
 var profile
 var shop_status := ""
 
@@ -54,8 +57,8 @@ func show_page(next: String) -> void:
 			var saves := card(columns, 1.35)
 			UI.label(saves, "Load game", 34, UI.CYAN)
 			if can_load:
-				UI.label(saves, "Sector 01  /  Last Neon Factory checkpoint")
-				UI.button(saves, "Resume checkpoint", func(): load_requested.emit(), true).grab_focus()
+				UI.label(saves, "Sector 02  /  Machine Jungle" if saved_sector == 2 else "Sector 01  /  Last Neon Factory checkpoint")
+				UI.button(saves, "Deploy to Machine Jungle" if at_sector_start else "Resume checkpoint", func(): load_requested.emit(), true).grab_focus()
 			else:
 				UI.label(saves, "No saved checkpoint yet. Reach the midpoint beacon in Neon Factory to unlock Load.", 19, UI.MUTED)
 			portrait(card(columns))
@@ -151,10 +154,13 @@ func build_command_deck(columns: HBoxContainer) -> void:
 	UI.label(dossier, "RX-07   //   RIFTCORE FRAME", 20, UI.CYAN)
 	portrait(dossier)
 	var nav := card(columns)
-	UI.label(nav, "SECTOR 01", 15, UI.VIOLET)
-	UI.label(nav, "Neon Factory", 34)
+	var jungle_ready := can_load and saved_sector == 2
+	UI.label(nav, "SECTOR 02" if jungle_ready else "SECTOR 01", 15, UI.VIOLET)
+	UI.label(nav, "Machine Jungle" if jungle_ready else "Neon Factory", 34)
 	UI.label(nav, "BANK  /  %04d CREDITS" % (profile.credits if profile else 0), 16, UI.MUTED)
-	var launch := UI.button(nav, "Deploy  ›", show_page.bind("Sector select"), true)
+	var launch := UI.button(nav, "Deploy to Machine Jungle  ›" if at_sector_start else "Resume Machine Jungle  ›", func(): load_requested.emit(), true) if jungle_ready else UI.button(nav, "Deploy  ›", show_page.bind("Sector select"), true)
+	if jungle_ready:
+		UI.button(nav, "New run  /  Neon Factory", show_page.bind("Sector select"))
 	launch.custom_minimum_size.y = 55
 	nav.add_child(HSeparator.new())
 	for item in [["Loadout", "Loadout"], ["Field Guide", "Collection"], ["Upgrades", "Upgrades"], ["Challenges", "Challenges"], ["Settings", "Settings"]]:
@@ -198,12 +204,14 @@ func build_sector(columns: HBoxContainer) -> void:
 func build_loadout(columns: HBoxContainer) -> void:
 	var gear := card(columns)
 	UI.label(gear, "Equipped gear", 27, UI.CYAN)
-	for line in ["Buster Cannon\nSingle shot per press", "Energy Blade\nClose-range slash", "Dash Module\nUses 12 energy per dash"]:
+	for line in ["Buster Cannon\nSingle shot per press", "Energy Blade\nClose-range slash", "Dash Module\nFree dash and air dash"]:
 		var row := PanelContainer.new()
 		gear.add_child(row)
 		UI.label(row, line)
-	if profile and profile.weapons.has("magma_breaker"):
-		UI.label(gear, "Magma Breaker unlocked · Q / RB during a run", 16, Color("ffad66"))
+	if "magma_breaker" in run_unlocks:
+		UI.label(gear, "Saved run: Magma Breaker · Q / RB to swap", 16, Color("ffad66"))
+	if "thorn_swarm" in run_unlocks:
+		UI.label(gear, "Saved run: Thorn Swarm · Q / RB to swap", 16, Color("a8ff64"))
 	var model := card(columns, 1.7)
 	portrait(model)
 	UI.label(model, "RX-07   /   STANDARD FRAME", 18, UI.VIOLET)

@@ -1,0 +1,57 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/player.gd" id="1_player"]
+[ext_resource type="PackedScene" path="res://assets/models/mecha_main/RiftcoreMechaUAL.glb" id="4_rx07"]
+
+[sub_resource type="CapsuleShape3D" id="Shape_player"]
+radius = 0.42
+height = 1.7
+
+[sub_resource type="StandardMaterial3D" id="Material_player"]
+albedo_color = Color(0.035, 0.35, 1, 1)
+metallic = 0.7
+roughness = 0.2
+
+[sub_resource type="CapsuleMesh" id="Mesh_player"]
+material = SubResource("Material_player")
+radius = 0.42
+height = 1.7
+
+[sub_resource type="StandardMaterial3D" id="Material_sword"]
+albedo_color = Color(0.3, 0.9, 1, 1)
+emission_enabled = true
+emission = Color(0.05, 0.55, 1, 1)
+emission_energy_multiplier = 4.0
+
+[sub_resource type="BoxMesh" id="Mesh_sword"]
+material = SubResource("Material_sword")
+size = Vector3(1.65, 0.12, 0.18)
+
+[node name="RiftcoreMecha" type="CharacterBody3D" unique_id=1991757749]
+script = ExtResource("1_player")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=1899822815]
+shape = SubResource("Shape_player")
+
+[node name="BodyMesh" type="MeshInstance3D" parent="." unique_id=126578107]
+visible = false
+mesh = SubResource("Mesh_player")
+
+[node name="ModelRoot" type="Node3D" parent="." unique_id=235385013]
+transform = Transform3D(-3.6199901e-06, 0, 1, 0, 1, 0, -1, 0, -3.6199901e-06, 0, -0.85, 0)
+
+[node name="MechaModel" parent="ModelRoot" unique_id=1687611567 instance=ExtResource("4_rx07")]
+
+[node name="CoreLight" type="OmniLight3D" parent="." unique_id=537171445]
+light_color = Color(0.2, 0.85, 1, 1)
+light_energy = 2.2
+omni_range = 3.5
+
+[node name="SwordPivot" type="Node3D" parent="." unique_id=594913675]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.55, 0.15, 0)
+visible = false
+
+[node name="EnergyBlade" type="MeshInstance3D" parent="SwordPivot" unique_id=1884313681]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.8, 0, 0)
+mesh = SubResource("Mesh_sword")
+

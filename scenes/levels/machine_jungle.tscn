@@ -1,0 +1,649 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://assets/machine_jungle/terrain/root_rib_floor.tscn" id="root_rib_floor"]
+[ext_resource type="PackedScene" path="res://assets/machine_jungle/terrain/canopy_catwalk.tscn" id="canopy_catwalk"]
+[ext_resource type="PackedScene" path="res://assets/machine_jungle/terrain/vine_wall.tscn" id="vine_wall"]
+[ext_resource type="PackedScene" path="res://assets/machine_jungle/terrain/root_arch.tscn" id="root_arch"]
+[ext_resource type="PackedScene" path="res://assets/machine_jungle/terrain/spore_reservoir.tscn" id="spore_reservoir"]
+[ext_resource type="PackedScene" path="res://assets/machine_jungle/enemies/rootrunner.tscn" id="rootrunner"]
+[ext_resource type="PackedScene" path="res://assets/machine_jungle/enemies/thorn_weaver.tscn" id="thorn_weaver"]
+[ext_resource type="PackedScene" path="res://assets/machine_jungle/enemies/bark_bulwark.tscn" id="bark_bulwark"]
+[ext_resource type="PackedScene" path="res://assets/machine_jungle/enemies/spore_sentry.tscn" id="spore_sentry"]
+[ext_resource type="PackedScene" path="res://assets/machine_jungle/enemies/canopy_wasp.tscn" id="canopy_wasp"]
+[ext_resource type="PackedScene" path="res://assets/machine_jungle/traps/snap_vine.tscn" id="snap_vine"]
+[ext_resource type="PackedScene" path="res://assets/machine_jungle/traps/spore_pod.tscn" id="spore_pod"]
+[ext_resource type="PackedScene" path="res://assets/machine_jungle/traps/thorn_bed.tscn" id="thorn_bed"]
+[ext_resource type="PackedScene" path="res://assets/pickups/health_large.tscn" id="health_large"]
+[ext_resource type="PackedScene" path="res://assets/pickups/energy_large.tscn" id="energy_large"]
+[ext_resource type="PackedScene" path="res://assets/pickups/energy_small.tscn" id="energy_small"]
+[ext_resource type="PackedScene" path="res://assets/pickups/xp_orb.tscn" id="xp_orb"]
+[ext_resource type="PackedScene" path="res://assets/pickups/extra_life.tscn" id="extra_life"]
+[ext_resource type="PackedScene" path="res://assets/neon_factory/checkpoint_beacon.tscn" id="checkpoint_beacon"]
+[ext_resource type="PackedScene" path="res://assets/neon_factory/boss_gate_door.tscn" id="boss_gate_door"]
+[ext_resource type="PackedScene" path="res://assets/neon_factory/door_frame.tscn" id="door_frame"]
+[ext_resource type="Script" path="res://scripts/factory_checkpoint.gd" id="factory_checkpoint"]
+[ext_resource type="Script" path="res://scripts/climb_vine.gd" id="factory_ladder"]
+[ext_resource type="Script" path="res://scripts/forge_safe_hall.gd" id="forge_safe_hall"]
+[ext_resource type="Script" path="res://scripts/camera_rig.gd" id="camera_rig"]
+[ext_resource type="Script" path="res://scripts/jungle_backdrop.gd" id="jungle_backdrop"]
+[ext_resource type="PackedScene" path="res://scenes/actors/riftcore_player.tscn" id="player"]
+[ext_resource type="PackedScene" path="res://scenes/levels/verdant_colossus.tscn" id="boss"]
+
+[ext_resource type="PackedScene" path="res://assets/machine_jungle/terrain/burnable_vine.tscn" id="vine"]
+
+[ext_resource type="PackedScene" path="res://assets/neon_factory/deployment_pad.tscn" id="deployment_pad"]
+[ext_resource type="PackedScene" path="res://assets/neon_factory/extraction_pad.tscn" id="extraction_pad"]
+
+[ext_resource type="PackedScene" path="res://assets/machine_jungle/terrain/vine_hoist.tscn" id="hoist"]
+
+[ext_resource type="PackedScene" path="res://assets/machine_jungle/terrain/root_perch.tscn" id="root_perch"]
+
+[sub_resource type="Environment" id="JungleLight"]
+background_mode = 1
+background_color = Color(0.018, 0.07, 0.055, 1)
+ambient_light_source = 3
+ambient_light_color = Color(0.55, 0.87, 0.72, 1)
+ambient_light_energy = 0.9
+tonemap_mode = 2
+
+[sub_resource type="BoxShape3D" id="CheckpointTrigger"]
+size = Vector3(2.1, 1.9, 1.8)
+
+[sub_resource type="BoxShape3D" id="Shape_gate"]
+size = Vector3(0.65, 7, 3.2)
+
+[sub_resource type="BoxShape3D" id="ForgeHallShield"]
+size = Vector3(5.7, 4.2, 2.8)
+
+[sub_resource type="BoxShape3D" id="ArenaFloor"]
+size = Vector3(48, 0.36, 2.1)
+
+[node name="MachineJungle" type="Node3D"]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("JungleLight")
+
+[node name="CanopyLight" type="DirectionalLight3D" parent="."]
+rotation = Vector3(-0.7, -0.6, 0)
+light_color = Color(0.81, 1, 0.87, 1)
+light_energy = 1.45
+shadow_enabled = true
+
+[node name="Panorama" type="Node3D" parent="."]
+script = ExtResource("jungle_backdrop")
+
+[node name="TERRAIN" type="Node3D" parent="."]
+
+[node name="RootDeck00" parent="TERRAIN" instance=ExtResource("root_rib_floor")]
+position = Vector3(0, 0, 0)
+
+[node name="RootDeck01" parent="TERRAIN" instance=ExtResource("root_rib_floor")]
+position = Vector3(8, 0, 0)
+
+[node name="RootDeck02" parent="TERRAIN" instance=ExtResource("root_rib_floor")]
+position = Vector3(16, 0.18, 0)
+
+[node name="RootDeck03" parent="TERRAIN" instance=ExtResource("root_rib_floor")]
+position = Vector3(24, 0.32, 0)
+
+[node name="RootDeck04" parent="TERRAIN" instance=ExtResource("root_rib_floor")]
+position = Vector3(32, 0.32, 0)
+
+[node name="RootDeck05" parent="TERRAIN" instance=ExtResource("root_rib_floor")]
+position = Vector3(39, 0.85, 0)
+scale = Vector3(0.75, 1, 1)
+
+[node name="RootDeck06" parent="TERRAIN" instance=ExtResource("root_rib_floor")]
+position = Vector3(48, 4.5, 0)
+scale = Vector3(0.94, 1, 1)
+
+[node name="RootDeck07" parent="TERRAIN" instance=ExtResource("root_rib_floor")]
+position = Vector3(56, 3.36, 0)
+scale = Vector3(0.8, 1, 1)
+
+[node name="RootDeck08" parent="TERRAIN" instance=ExtResource("root_rib_floor")]
+position = Vector3(63, 3.36, 0)
+scale = Vector3(0.75, 1, 1)
+
+[node name="RootDeck09" parent="TERRAIN" instance=ExtResource("root_rib_floor")]
+position = Vector3(80, 3.36, 0)
+
+[node name="RootDeck10" parent="TERRAIN" instance=ExtResource("root_rib_floor")]
+position = Vector3(88, 1.91, 0)
+
+[node name="RootDeck11" parent="TERRAIN" instance=ExtResource("root_rib_floor")]
+position = Vector3(96, 0.72, 0)
+
+[node name="RootDeck12" parent="TERRAIN" instance=ExtResource("root_rib_floor")]
+position = Vector3(104, 0.72, 0)
+
+[node name="RootDeck13" parent="TERRAIN" instance=ExtResource("root_rib_floor")]
+position = Vector3(112, 0.72, 0)
+
+[node name="RootDeck14" parent="TERRAIN" instance=ExtResource("root_rib_floor")]
+position = Vector3(120, 1.42, 0)
+
+[node name="RootDeck15" parent="TERRAIN" instance=ExtResource("root_rib_floor")]
+position = Vector3(128, 2.1, 0)
+
+[node name="RootDeck16" parent="TERRAIN" instance=ExtResource("root_rib_floor")]
+position = Vector3(136, 2.1, 0)
+
+[node name="RootDeck17" parent="TERRAIN" instance=ExtResource("root_rib_floor")]
+position = Vector3(144, 0.9, 0)
+
+[node name="RootDeck18" parent="TERRAIN" instance=ExtResource("root_rib_floor")]
+position = Vector3(152, 0.9, 0)
+
+[node name="RootDeck19" parent="TERRAIN" instance=ExtResource("root_rib_floor")]
+position = Vector3(160, 0.25, 0)
+
+[node name="ArenaTread168" parent="TERRAIN" instance=ExtResource("root_rib_floor")]
+position = Vector3(222, 0.25, 0)
+collision_layer = 0
+
+[node name="ArenaTread176" parent="TERRAIN" instance=ExtResource("root_rib_floor")]
+position = Vector3(230, 0.25, 0)
+collision_layer = 0
+
+[node name="ArenaTread184" parent="TERRAIN" instance=ExtResource("root_rib_floor")]
+position = Vector3(238, 0.25, 0)
+collision_layer = 0
+
+[node name="ArenaTread192" parent="TERRAIN" instance=ExtResource("root_rib_floor")]
+position = Vector3(246, 0.25, 0)
+collision_layer = 0
+
+[node name="ArenaTread200" parent="TERRAIN" instance=ExtResource("root_rib_floor")]
+position = Vector3(254, 0.25, 0)
+collision_layer = 0
+
+[node name="ArenaTread208" parent="TERRAIN" instance=ExtResource("root_rib_floor")]
+position = Vector3(262, 0.25, 0)
+collision_layer = 0
+
+[node name="Canopy0" parent="TERRAIN" instance=ExtResource("canopy_catwalk")]
+position = Vector3(23, 1.88, 0)
+
+[node name="Canopy1" parent="TERRAIN" instance=ExtResource("canopy_catwalk")]
+position = Vector3(28, 3.3, 0)
+
+[node name="Canopy2" parent="TERRAIN" instance=ExtResource("canopy_catwalk")]
+position = Vector3(33, 3.98, 0)
+
+[node name="Canopy3" parent="TERRAIN" instance=ExtResource("canopy_catwalk")]
+position = Vector3(109, 3.72, 0)
+
+[node name="Canopy4" parent="TERRAIN" instance=ExtResource("canopy_catwalk")]
+position = Vector3(114, 4.58, 0)
+
+[node name="Canopy5" parent="TERRAIN" instance=ExtResource("root_perch")]
+position = Vector3(232.8,3.0,0)
+
+[node name="Canopy6" parent="TERRAIN" instance=ExtResource("root_perch")]
+position = Vector3(247,5.7,0)
+
+[node name="Canopy7" parent="TERRAIN" instance=ExtResource("root_perch")]
+position = Vector3(256.2,3.7,0)
+
+[node name="WallHike" parent="TERRAIN" instance=ExtResource("vine_wall")]
+position = Vector3(42.45, 2.675, 0)
+
+[node name="ServiceLadder0" type="Node3D" parent="TERRAIN" groups=["factory_ladder"]]
+position = Vector3(109, 0.72, 0)
+script = ExtResource("factory_ladder")
+rise = 3
+
+[node name="ServiceLadder1" type="Node3D" parent="TERRAIN" groups=["factory_ladder"]]
+position = Vector3(232.8,0.25,0)
+script = ExtResource("factory_ladder")
+rise = 2.75
+
+[node name="ServiceLadder2" type="Node3D" parent="TERRAIN" groups=["factory_ladder"]]
+position = Vector3(247,0.25,0)
+script = ExtResource("factory_ladder")
+rise = 5.45
+
+[node name="ServiceLadder3" type="Node3D" parent="TERRAIN" groups=["factory_ladder"]]
+position = Vector3(256.2,0.25,0)
+script = ExtResource("factory_ladder")
+rise = 3.45
+
+[node name="JungleTrap0" parent="TERRAIN" instance=ExtResource("thorn_bed")]
+position = Vector3(13, 0.18, 0)
+
+[node name="JungleTrap1" parent="TERRAIN" instance=ExtResource("spore_pod")]
+position = Vector3(30, 0.32, 0)
+
+[node name="JungleTrap2" parent="TERRAIN" instance=ExtResource("snap_vine")]
+position = Vector3(57, 3.36, 0)
+
+[node name="JungleTrap3" parent="TERRAIN" instance=ExtResource("spore_pod")]
+position = Vector3(103, 0.72, 0)
+
+[node name="JungleTrap4" parent="TERRAIN" instance=ExtResource("thorn_bed")]
+position = Vector3(114.8, 0.72, 0)
+
+[node name="JungleTrap5" parent="TERRAIN" instance=ExtResource("snap_vine")]
+position = Vector3(134, 2.1, 0)
+
+[node name="JungleTrap6" parent="TERRAIN" instance=ExtResource("spore_pod")]
+position = Vector3(150, 0.9, 0)
+
+[node name="TrailCell" parent="TERRAIN" instance=ExtResource("energy_small")]
+position = Vector3(6, 0.4, 0)
+
+[node name="CanopyCache" parent="TERRAIN" instance=ExtResource("xp_orb")]
+position = Vector3(33, 4.38, 0)
+large = true
+xp_amount = 90
+
+[node name="DashReserve" parent="TERRAIN" instance=ExtResource("energy_large")]
+position = Vector3(63.2, 3.76, 0)
+
+[node name="ServiceCache" parent="TERRAIN" instance=ExtResource("xp_orb")]
+position = Vector3(114, 4.97, 0)
+large = true
+xp_amount = 90
+
+[node name="InspectionExtraLife" parent="TERRAIN" instance=ExtResource("extra_life")]
+position = Vector3(109, 4.12, 0)
+
+[node name="HallRepair" parent="TERRAIN" instance=ExtResource("health_large")]
+position = Vector3(220, 0.68, 0)
+full_heal = true
+
+[node name="ArenaCell" parent="TERRAIN" instance=ExtResource("energy_small")]
+position = Vector3(233, 4.14, 0)
+
+[node name="MidpointCheckpoint" type="Area3D" parent="TERRAIN"]
+position = Vector3(96.5, 0.72, 0)
+collision_layer = 0
+script = ExtResource("factory_checkpoint")
+
+[node name="Trigger" type="CollisionShape3D" parent="TERRAIN/MidpointCheckpoint"]
+position = Vector3(0, 0.95, 0)
+shape = SubResource("CheckpointTrigger")
+
+[node name="Beacon" parent="TERRAIN/MidpointCheckpoint" instance=ExtResource("checkpoint_beacon")]
+position = Vector3(0, 0, -0.75)
+
+[node name="Status" type="Label3D" parent="TERRAIN/MidpointCheckpoint"]
+position = Vector3(0, 1.48, -0.65)
+pixel_size = 0.004
+font_size = 48
+modulate = Color(0.65, 1, 0.78, 1)
+text = "CHECKPOINT"
+
+[node name="ForgeHallCheckpoint" type="Area3D" parent="TERRAIN"]
+position = Vector3(222.1, 0.25, 0)
+collision_layer = 0
+script = ExtResource("factory_checkpoint")
+
+[node name="Trigger" type="CollisionShape3D" parent="TERRAIN/ForgeHallCheckpoint"]
+position = Vector3(0, 0.95, 0)
+shape = SubResource("CheckpointTrigger")
+
+[node name="Beacon" parent="TERRAIN/ForgeHallCheckpoint" instance=ExtResource("checkpoint_beacon")]
+position = Vector3(0, 0, -0.75)
+
+[node name="Status" type="Label3D" parent="TERRAIN/ForgeHallCheckpoint"]
+position = Vector3(0, 1.48, -0.65)
+pixel_size = 0.004
+font_size = 48
+modulate = Color(0.65, 1, 0.78, 1)
+text = "CHECKPOINT"
+
+[node name="RootGapRecoveryHoist" parent="TERRAIN" instance=ExtResource("hoist")]
+position = Vector3(71.2, 0.78, 0)
+
+[node name="CanopyLift" parent="TERRAIN" instance=ExtResource("hoist")]
+position = Vector3(26.5, 0.52, 0)
+travel = 1.05
+horizontal_travel = 0.0
+
+[node name="CanopyVine" parent="TERRAIN" instance=ExtResource("vine")]
+position = Vector3(30.5, 3.98, 0)
+
+[node name="SporeCacheVine" parent="TERRAIN" instance=ExtResource("vine")]
+position = Vector3(112.1, 4.58, 0)
+
+[node name="CanopyAscentFoot" parent="TERRAIN" instance=ExtResource("root_rib_floor")]
+position = Vector3(168.75, 0.25, 0)
+scale = Vector3(1.1875, 1, 1)
+
+[node name="CanopyAscentSummit" parent="TERRAIN" instance=ExtResource("canopy_catwalk")]
+position = Vector3(177.2, 7.35, 0)
+
+
+[node name="CanopyAscentBridge" parent="TERRAIN" instance=ExtResource("canopy_catwalk")]
+position = Vector3(185, 6.0, 0)
+
+
+[node name="CanopyAscentDescent" parent="TERRAIN" instance=ExtResource("canopy_catwalk")]
+position = Vector3(192, 4.6, 0)
+
+
+[node name="RootVaultFoot" parent="TERRAIN" instance=ExtResource("root_rib_floor")]
+position = Vector3(199.25, 3.5, 0)
+scale = Vector3(1.0625, 1, 1)
+
+[node name="RootVaultSummit" parent="TERRAIN" instance=ExtResource("canopy_catwalk")]
+position = Vector3(207.8, 9.0, 0)
+
+
+[node name="RootVaultExit" parent="TERRAIN" instance=ExtResource("canopy_catwalk")]
+position = Vector3(214.3, 6.8, 0)
+
+
+[node name="JungleShaftLeft" parent="TERRAIN" instance=ExtResource("vine_wall")]
+position = Vector3(170.3, 5.6000000000000005, 0)
+scale = Vector3(1, 1.7534247, 1)
+
+[node name="JungleShaftRight" parent="TERRAIN" instance=ExtResource("vine_wall")]
+position = Vector3(173.7, 3.8, 0)
+scale = Vector3(1, 1.9452055, 1)
+
+[node name="RootVaultLeft" parent="TERRAIN" instance=ExtResource("vine_wall")]
+position = Vector3(200.1, 8.05, 0)
+scale = Vector3(1, 1.3150685, 1)
+
+[node name="RootVaultRight" parent="TERRAIN" instance=ExtResource("vine_wall")]
+position = Vector3(203.5, 6.25, 0)
+scale = Vector3(1, 1.5068493, 1)
+
+[node name="AscentReserve" parent="TERRAIN" instance=ExtResource("energy_large")]
+position = Vector3(177.2, 7.74, 0)
+
+
+[node name="RootVaultHeal" parent="TERRAIN" instance=ExtResource("health_large")]
+position = Vector3(199, 3.89, 0)
+
+
+[node name="RootVaultCredits" parent="TERRAIN" instance=ExtResource("xp_orb")]
+position = Vector3(207.8, 9.4, 0)
+xp_amount = 20
+
+[node name="DECOR" type="Node3D" parent="."]
+
+[node name="CanopyRoot0" parent="DECOR" instance=ExtResource("root_arch")]
+position = Vector3(1, 0, -3.3)
+
+[node name="CanopyRoot1" parent="DECOR" instance=ExtResource("root_arch")]
+position = Vector3(17, 0.18, -3.3)
+
+[node name="CanopyRoot2" parent="DECOR" instance=ExtResource("root_arch")]
+position = Vector3(39, 0.85, -3.3)
+
+[node name="CanopyRoot3" parent="DECOR" instance=ExtResource("root_arch")]
+position = Vector3(55, 3.36, -3.3)
+
+[node name="CanopyRoot4" parent="DECOR" instance=ExtResource("root_arch")]
+position = Vector3(80, 3.36, -3.3)
+
+[node name="CanopyRoot5" parent="DECOR" instance=ExtResource("root_arch")]
+position = Vector3(96, 0.72, -3.3)
+
+[node name="CanopyRoot6" parent="DECOR" instance=ExtResource("root_arch")]
+position = Vector3(114, 0.72, -3.3)
+
+[node name="CanopyRoot7" parent="DECOR" instance=ExtResource("root_arch")]
+position = Vector3(132, 2.1, -3.3)
+
+[node name="CanopyRoot8" parent="DECOR" instance=ExtResource("root_arch")]
+position = Vector3(150, 0.9, -3.3)
+
+[node name="CanopyRoot9" parent="DECOR" instance=ExtResource("root_arch")]
+position = Vector3(223, 0.25, -3.3)
+
+[node name="CanopyRoot10" parent="DECOR" instance=ExtResource("root_arch")]
+position = Vector3(239, 0.25, -3.3)
+
+[node name="CanopyRoot11" parent="DECOR" instance=ExtResource("root_arch")]
+position = Vector3(257, 0.25, -3.3)
+
+[node name="Reservoir0" parent="DECOR" instance=ExtResource("spore_reservoir")]
+position = Vector3(8, 0, -2.35)
+
+[node name="Reservoir1" parent="DECOR" instance=ExtResource("spore_reservoir")]
+position = Vector3(32, 0.32, -2.35)
+
+[node name="Reservoir2" parent="DECOR" instance=ExtResource("spore_reservoir")]
+position = Vector3(96, 0.72, -2.35)
+
+[node name="Reservoir3" parent="DECOR" instance=ExtResource("spore_reservoir")]
+position = Vector3(120, 1.42, -2.35)
+
+[node name="Reservoir4" parent="DECOR" instance=ExtResource("spore_reservoir")]
+position = Vector3(152, 0.9, -2.35)
+
+[node name="Reservoir5" parent="DECOR" instance=ExtResource("spore_reservoir")]
+position = Vector3(237, 0.25, -2.35)
+
+[node name="Reservoir6" parent="DECOR" instance=ExtResource("spore_reservoir")]
+position = Vector3(250, 0.25, -2.35)
+
+[node name="EntrySign" type="Label3D" parent="DECOR"]
+position = Vector3(3, 2.6, -1.9)
+text = "02  /  MACHINE JUNGLE"
+font_size = 49
+pixel_size = 0.0045
+modulate = Color(0.57, 1, 0.74, 1)
+
+[node name="WallSign" type="Label3D" parent="DECOR"]
+position = Vector3(40.8, 2.5, -1.9)
+text = "WALL KICK"
+font_size = 49
+pixel_size = 0.0045
+modulate = Color(0.57, 1, 0.74, 1)
+
+[node name="DashSign" type="Label3D" parent="DECOR"]
+position = Vector3(63.4, 5.12, -1.9)
+text = "JUMP  +  AIR DASH  >"
+font_size = 49
+pixel_size = 0.0045
+modulate = Color(0.57, 1, 0.74, 1)
+
+[node name="HallSign" type="Label3D" parent="DECOR"]
+position = Vector3(220.8, 2.8, -1.9)
+text = "QUARANTINE  /  REPAIR BAY"
+font_size = 49
+pixel_size = 0.0045
+modulate = Color(0.57, 1, 0.74, 1)
+
+[node name="BossSign" type="Label3D" parent="DECOR"]
+position = Vector3(243, 6.9, -1.9)
+text = "VERDANT CORE"
+font_size = 49
+pixel_size = 0.0045
+modulate = Color(0.57, 1, 0.74, 1)
+
+[node name="ArenaUnifiedFloor" type="StaticBody3D" parent="."]
+position = Vector3(242, 0.07, 0)
+
+[node name="Shape" type="CollisionShape3D" parent="ArenaUnifiedFloor"]
+shape = SubResource("ArenaFloor")
+
+[node name="ForgeHallDoor" type="Node3D" parent="."]
+position = Vector3(217.6, 0.25, 0)
+script = ExtResource("forge_safe_hall")
+
+[node name="Door" parent="ForgeHallDoor" instance=ExtResource("boss_gate_door")]
+rotation = Vector3(0, 1.5707963, 0)
+scale = Vector3(0.66, 1, 1)
+
+[node name="PortalFrame" parent="ForgeHallDoor" instance=ExtResource("door_frame")]
+rotation = Vector3(0, 1.5707963, 0)
+scale = Vector3(0.8, 1.15, 1)
+
+[node name="Blocker" type="StaticBody3D" parent="ForgeHallDoor"]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="ForgeHallDoor/Blocker"]
+position = Vector3(0, 3.15, 0)
+shape = SubResource("Shape_gate")
+
+[node name="Shield" type="Area3D" parent="ForgeHallDoor"]
+position = Vector3(3.56, 1.75, 0)
+collision_layer = 0
+
+[node name="Shape" type="CollisionShape3D" parent="ForgeHallDoor/Shield"]
+shape = SubResource("ForgeHallShield")
+
+[node name="Gate" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 225.8, 0.25, 0)
+
+[node name="Door" parent="Gate" instance=ExtResource("boss_gate_door")]
+transform = Transform3D(4.9828618e-08, 0, 1, 0, 1, 0, -0.66, 0, 7.54979e-08, 0, 0, 0)
+
+[node name="PortalFrame" parent="Gate" instance=ExtResource("door_frame")]
+transform = Transform3D(6.039832e-08, 0, 1, 0, 1.15, 0, -0.8, 0, 7.54979e-08, 0, 0, 0)
+
+[node name="Blocker" type="StaticBody3D" parent="Gate"]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Gate/Blocker"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.15, 0)
+shape = SubResource("Shape_gate")
+
+[node name="ExitBarrier" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 261.6, 0.25, 0)
+
+[node name="Seal" parent="ExitBarrier" instance=ExtResource("boss_gate_door")]
+transform = Transform3D(4.9828618e-08, 0, -1, 0, 1, 0, 0.66, 0, 7.54979e-08, 0, 0, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="ExitBarrier"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.15, 0)
+shape = SubResource("Shape_gate")
+
+[node name="MARKERS" type="Node3D" parent="."]
+
+[node name="PlayerSpawn" type="Marker3D" parent="MARKERS"]
+position = Vector3(0, 0.88, 0)
+
+[node name="RoomExit" type="Marker3D" parent="MARKERS"]
+position = Vector3(263.25, 1.1, 0)
+
+[node name="CameraBounds" type="Node3D" parent="MARKERS"]
+metadata/min_x = 0.0
+metadata/max_x = 261.0
+
+[node name="Actors" type="Node3D" parent="."]
+
+[node name="RiftcoreMecha" parent="Actors" instance=ExtResource("player")]
+position = Vector3(0, 0.88, 0)
+
+[node name="VerdantColossus" parent="Actors" instance=ExtResource("boss")]
+position = Vector3(243, 1.8, 0)
+
+[node name="JungleUnit00" parent="Actors" groups=["level_enemies"] instance=ExtResource("rootrunner")]
+position = Vector3(7, 0.72, 0)
+
+[node name="JungleUnit01" parent="Actors" groups=["level_enemies"] instance=ExtResource("thorn_weaver")]
+position = Vector3(14, 0.8999999999999999, 0)
+
+[node name="JungleUnit02" parent="Actors" groups=["level_enemies"] instance=ExtResource("spore_sentry")]
+position = Vector3(21, 1.04, 0)
+
+[node name="JungleUnit03" parent="Actors" groups=["level_enemies"] instance=ExtResource("bark_bulwark")]
+position = Vector3(26, 1.04, 0)
+
+[node name="JungleUnit04" parent="Actors" groups=["level_enemies"] instance=ExtResource("rootrunner")]
+position = Vector3(34, 1.04, 0)
+
+[node name="JungleUnit05" parent="Actors" groups=["level_enemies"] instance=ExtResource("canopy_wasp")]
+position = Vector3(30, 4.65, 0)
+
+[node name="JungleUnit06" parent="Actors" groups=["level_enemies"] instance=ExtResource("bark_bulwark")]
+position = Vector3(48.9, 5.22, 0)
+
+[node name="JungleUnit07" parent="Actors" groups=["level_enemies"] instance=ExtResource("spore_sentry")]
+position = Vector3(57, 4.08, 0)
+
+[node name="JungleUnit08" parent="Actors" groups=["level_enemies"] instance=ExtResource("thorn_weaver")]
+position = Vector3(63.2, 4.08, 0)
+
+[node name="JungleUnit09" parent="Actors" groups=["level_enemies"] instance=ExtResource("thorn_weaver")]
+position = Vector3(81, 4.08, 0)
+
+[node name="JungleUnit10" parent="Actors" groups=["level_enemies"] instance=ExtResource("rootrunner")]
+position = Vector3(87, 2.63, 0)
+
+[node name="JungleUnit11" parent="Actors" groups=["level_enemies"] instance=ExtResource("canopy_wasp")]
+position = Vector3(90, 3.45, 0)
+
+[node name="JungleUnit12" parent="Actors" groups=["level_enemies"] instance=ExtResource("bark_bulwark")]
+position = Vector3(101, 1.44, 0)
+
+[node name="JungleUnit13" parent="Actors" groups=["level_enemies"] instance=ExtResource("rootrunner")]
+position = Vector3(108, 1.44, 0)
+
+[node name="JungleUnit14" parent="Actors" groups=["level_enemies"] instance=ExtResource("spore_sentry")]
+position = Vector3(114, 1.44, 0)
+
+[node name="JungleUnit15" parent="Actors" groups=["level_enemies"] instance=ExtResource("thorn_weaver")]
+position = Vector3(120, 2.1399999999999997, 0)
+
+[node name="JungleUnit16" parent="Actors" groups=["level_enemies"] instance=ExtResource("bark_bulwark")]
+position = Vector3(127, 2.8200000000000003, 0)
+
+[node name="JungleUnit17" parent="Actors" groups=["level_enemies"] instance=ExtResource("rootrunner")]
+position = Vector3(132, 2.8200000000000003, 0)
+
+[node name="JungleUnit18" parent="Actors" groups=["level_enemies"] instance=ExtResource("canopy_wasp")]
+position = Vector3(139, 3.64, 0)
+
+[node name="JungleUnit19" parent="Actors" groups=["level_enemies"] instance=ExtResource("spore_sentry")]
+position = Vector3(145, 1.62, 0)
+
+[node name="JungleUnit20" parent="Actors" groups=["level_enemies"] instance=ExtResource("thorn_weaver")]
+position = Vector3(153, 1.62, 0)
+
+[node name="JungleUnit21" parent="Actors" groups=["level_enemies"] instance=ExtResource("bark_bulwark")]
+position = Vector3(160, 0.97, 0)
+
+[node name="CameraRig" type="Node3D" parent="."]
+position = Vector3(0, 1.35, 0)
+script = ExtResource("camera_rig")
+
+
+[node name="DeploymentPad" parent="MARKERS/PlayerSpawn" instance=ExtResource("deployment_pad")]
+position = Vector3(0, -0.85, 0)
+
+[node name="ExtractionPad" parent="MARKERS/RoomExit" instance=ExtResource("extraction_pad")]
+position = Vector3(0, -0.85, 0)
+[node name="CanopyAscentInstruction" type="Label3D" parent="DECOR"]
+position = Vector3(171.5, 10.5, -1.2)
+text = "CANOPY ASCENT  /  ALTERNATE WALL KICKS"
+pixel_size = 0.0038
+font_size = 47
+modulate = Color(0.5, 0.94, 1, 1)
+
+[node name="RootVaultInstruction" type="Label3D" parent="DECOR"]
+position = Vector3(201.8, 11.9, -1.2)
+text = "ROOT VAULT  /  WALL TO WALL"
+pixel_size = 0.0038
+font_size = 47
+modulate = Color(0.5, 0.94, 1, 1)
+
+
+[node name="RootPerchWestUpper" parent="TERRAIN" instance=ExtResource("root_perch")]
+position = Vector3(239.2, 4.3, 0)
+
+[node name="VineToWestUpper" type="Node3D" parent="TERRAIN" groups=["factory_ladder"]]
+position = Vector3(239.2, 0.25, 0)
+script = ExtResource("factory_ladder")
+rise = 4.05
+
+[node name="GroveReactorWest" parent="DECOR" instance=ExtResource("spore_reservoir")]
+position = Vector3(235.5, 0.25, -3)
+scale = Vector3(1.4, 2.5, 1.4)
+
+[node name="GroveReactorEast" parent="DECOR" instance=ExtResource("spore_reservoir")]
+position = Vector3(252.5, 0.25, -3)
+scale = Vector3(1.4, 3.2, 1.4)
+
+[node name="GroveCounterplayHint" type="Label3D" parent="DECOR"]
+position = Vector3(243.5, 7.6, -1.3)
+text = "CLIMB ABOVE THE TOXIN  /  STRIKE THE EXPOSED CORE"
+pixel_size = 0.0033
+font_size = 43
+modulate = Color(0.7, 1, 0.6, 1)

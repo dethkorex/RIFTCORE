@@ -1,8 +1,8 @@
 extends Node3D
 
-func ignite() -> void:
+func ignite(tint := Color("62e7ff")) -> void:
 	var flash := OmniLight3D.new()
-	flash.light_color = Color("62e7ff")
+	flash.light_color = tint
 	flash.light_energy = 5.0
 	flash.omni_range = 5.0
 	add_child(flash)
@@ -13,7 +13,7 @@ func ignite() -> void:
 		mesh.size = Vector3(0.19, 0.06, 0.06)
 		var material := StandardMaterial3D.new()
 		material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		material.albedo_color = Color("fcf6c3") if index % 3 == 0 else Color("00d9ff")
+		material.albedo_color = Color("fcf6c3") if index % 3 == 0 else tint
 		mesh.material = material
 		fragment.mesh = mesh
 		var angle := TAU * index / 18.0

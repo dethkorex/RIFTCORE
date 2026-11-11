@@ -44,6 +44,16 @@ var gait_phase := 0.0
 var last_support: StaticBody3D
 var last_ground_local := Vector3.ZERO
 var gait_joints: Array[Node3D] = []
+var sector_damage_scale := 1.0
+var sector_experience_scale := 1.0
+
+func scale_for_sector(sector: int) -> void:
+	var steps := maxi(0, sector - 1)
+	max_health = [40.0, 55.0, 95.0, 60.0, 35.0][variant] * (1.0 + 0.30 * steps)
+	health = max_health
+	sector_damage_scale = 1.0 + 0.20 * steps
+	sector_experience_scale = 1.0 + 0.10 * steps
+	health_changed.emit(health, max_health)
 
 func _ready() -> void:
 	max_health = [40.0, 55.0, 95.0, 60.0, 35.0][variant]
@@ -187,7 +197,7 @@ func damage_on_contact(body: RiftPlayer) -> void:
 	if contact_lock > 0.0 or health <= 0.0:
 		return
 	contact_lock = 0.8
-	body.take_damage(14.0, global_position)
+	body.take_damage(14.0 * sector_damage_scale, global_position)
 
 func fire_at_player() -> void:
 	var side := signf(target.global_position.x - global_position.x)
@@ -208,7 +218,7 @@ func fire_at_player() -> void:
 	get_parent().add_child(shot)
 	shot.global_position = origin
 	shot.speed = 15.0 if variant == Variant.TURRET else 11.5
-	shot.damage = 15.0 if variant == Variant.HEAVY else 9.0
+	shot.damage = (15.0 if variant == Variant.HEAVY else 9.0) * sector_damage_scale
 	shot.setup(aim, faction, Color("ff5d71"))
 
 func spawn_pickup(scene: PackedScene, at: Vector3, temporary: bool, experience := 0, anchor: StaticBody3D = null) -> void:
@@ -249,7 +259,7 @@ func find_drop_anchor() -> Dictionary:
 func _on_died() -> void:
 	var anchor := find_drop_anchor()
 	var drop_position: Vector3 = anchor.position
-	spawn_pickup(XP_ORB, drop_position, false, XP_REWARDS[variant], anchor.body)
+	spawn_pickup(XP_ORB, drop_position, false, roundi(XP_REWARDS[variant] * sector_experience_scale), anchor.body)
 	if global_position.y > -3.0 and randf() < drop_chance:
 		var pool := LARGE_DROPS if randf() < 0.2 else SMALL_DROPS
 		spawn_pickup(pool.pick_random(), drop_position + Vector3.FORWARD * 0.25, true, 0, anchor.body)

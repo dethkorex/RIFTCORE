@@ -1,0 +1,38 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/root_perch.gd" id="perch"]
+[ext_resource type="Material" path="res://assets/machine_jungle/tread.tres" id="bark"]
+[ext_resource type="Material" path="res://assets/machine_jungle/fern.tres" id="fern"]
+[ext_resource type="Material" path="res://assets/machine_jungle/jade.tres" id="jade"]
+
+[sub_resource type="CylinderShape3D" id="Floor"]
+radius = 1.55
+height = 0.28
+
+[sub_resource type="CylinderMesh" id="Platform"]
+top_radius = 1.55
+bottom_radius = 1.38
+height = 0.28
+radial_segments = 10
+material = ExtResource("fern")
+
+[sub_resource type="TorusMesh" id="Rail"]
+inner_radius = 1.35
+outer_radius = 1.42
+material = ExtResource("jade")
+
+[node name="RootPerch" type="StaticBody3D" groups=["factory_one_way"]]
+script = ExtResource("perch")
+scale = Vector3(1, 1, 0.66)
+
+[node name="Collider" type="CollisionShape3D" parent="."]
+position = Vector3(0, -0.14, 0)
+shape = SubResource("Floor")
+
+[node name="Deck" type="MeshInstance3D" parent="."]
+position = Vector3(0, -0.14, 0)
+mesh = SubResource("Platform")
+
+[node name="RootHalo" type="MeshInstance3D" parent="."]
+position = Vector3(0, -0.10, 0)
+mesh = SubResource("Rail")

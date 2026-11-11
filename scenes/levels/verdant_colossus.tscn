@@ -1,0 +1,24 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/verdant_boss.gd" id="boss"]
+[ext_resource type="PackedScene" path="res://assets/machine_jungle/enemies/verdant_colossus.glb" id="model"]
+
+[sub_resource type="BoxShape3D" id="Body"]
+size = Vector3(2.32, 3.10, 1.22)
+
+[node name="VerdantColossus" type="CharacterBody3D" groups=["damageable_enemies"]]
+collision_layer = 1
+collision_mask = 1
+script = ExtResource("boss")
+max_health = 1700.0
+fire_weakness = 1.5
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("Body")
+
+[node name="Armor" type="Node3D" parent="."]
+position = Vector3(0, -1.55, 0)
+rotation = Vector3(0, -1.04, 0)
+
+[node name="Model" parent="Armor" instance=ExtResource("model")]
+
