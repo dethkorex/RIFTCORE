@@ -164,4 +164,4 @@ func _draw() -> void:
 	caption(Vector2(28, 178), "DEF  %.1f%%" % (RiftPlayer.defense_for_experience(experience) * 100.0), 15, Color("a8e5ff"))
 	if not weapon.is_empty():
 		plate(Rect2(18, 192, 287, 29))
-		caption(Vector2(28, 213), weapon + "   /   Q · LB", 15, Color("ffaf60") if weapon == "MAGMA BREAKER" else CYAN)
+		caption(Vector2(28, 213), weapon + "   /   Q · RB", 15, Color("ffaf60") if weapon == "MAGMA BREAKER" else CYAN)

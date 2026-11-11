@@ -17,7 +17,7 @@ The installed launcher checks GitHub Releases. When an update is available, sele
 | Sword / three-tap combo | K | Y |
 | Climb | W / S or up/down | Left stick or D-pad up/down |
 | Crouch | S / down | Down |
-| Swap weapon | Q | LB |
+| Swap weapon | Q | RB |
 | Pause | Escape | Start |
 
 Resolution, fullscreen, Master/Music/SFX levels, and keyboard/controller bindings are saved in Settings. Three lives per stage, optional extra lives, checkpoint saves, and a persistent credit bank support repeat runs. Collect dropped XP orbs to level up. Defense rises with each level. Beating Forge Titan permanently unlocks Magma Breaker; fresh deployments still begin at level 1.

@@ -82,7 +82,7 @@ func configure_input() -> void:
 	add_joy_button("jump", JOY_BUTTON_A)
 	add_joy_button("dash", JOY_BUTTON_B)
 	add_joy_button("shoot", JOY_BUTTON_X)
-	add_joy_button("swap_weapon", JOY_BUTTON_LEFT_SHOULDER)
+	add_joy_button("swap_weapon", JOY_BUTTON_RIGHT_SHOULDER)
 	add_joy_button("melee", JOY_BUTTON_Y)
 	add_joy_button("crouch", JOY_BUTTON_DPAD_DOWN)
 	add_joy_action("crouch_stick", JOY_AXIS_LEFT_Y, 1.0)
