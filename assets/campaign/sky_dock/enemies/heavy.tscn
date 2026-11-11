@@ -1,0 +1,10 @@
+[gd_scene format=3]
+[ext_resource type="Script" path="res://scripts/enemy.gd" id="enemy"]
+[ext_resource type="PackedScene" path="res://assets/campaign/sky_dock/enemies/heavy.glb" id="model"]
+[node name="HangarBastion" type="CharacterBody3D" groups=["damageable_enemies"]]
+script = ExtResource("enemy")
+variant = 2
+model_override = ExtResource("model")
+fire_weakness = 1.0
+weakness_weapon = "data_lance"
+weapon_weakness = 1.4

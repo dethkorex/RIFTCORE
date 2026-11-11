@@ -1,0 +1,147 @@
+[gd_scene format=3]
+
+[ext_resource type="Material" path="res://assets/campaign/riftcore_nexus/stone.tres" id="stone"]
+
+[ext_resource type="Material" path="res://assets/campaign/riftcore_nexus/fern.tres" id="fern"]
+
+[ext_resource type="Material" path="res://assets/campaign/riftcore_nexus/tread.tres" id="tread"]
+
+[ext_resource type="Material" path="res://assets/campaign/riftcore_nexus/poison.tres" id="poison"]
+
+[ext_resource type="Material" path="res://assets/campaign/riftcore_nexus/jade.tres" id="jade"]
+
+[ext_resource type="Script" path="res://scripts/biome_mesh_finish.gd" id="finish"]
+
+[sub_resource type="BoxShape3D" id="collision"]
+size = Vector3(0.48, 3.5, 1.86)
+
+
+[sub_resource type="BoxMesh" id="M0"]
+material = ExtResource("tread")
+size = Vector3(0.456, 3.5, 1.8228)
+
+
+[sub_resource type="BoxMesh" id="M1"]
+material = ExtResource("fern")
+size = Vector3(0.51, 0.63, 0.071)
+
+
+[sub_resource type="BoxMesh" id="M2"]
+material = ExtResource("jade")
+size = Vector3(0.1, 0.33, 0.021)
+
+
+[sub_resource type="BoxMesh" id="M3"]
+material = ExtResource("fern")
+size = Vector3(0.51, 0.63, 0.071)
+
+
+[sub_resource type="BoxMesh" id="M4"]
+material = ExtResource("jade")
+size = Vector3(0.1, 0.33, 0.021)
+
+
+[sub_resource type="BoxMesh" id="M5"]
+material = ExtResource("fern")
+size = Vector3(0.51, 0.63, 0.071)
+
+
+[sub_resource type="BoxMesh" id="M6"]
+material = ExtResource("jade")
+size = Vector3(0.1, 0.33, 0.021)
+
+
+[sub_resource type="BoxMesh" id="M7"]
+material = ExtResource("fern")
+size = Vector3(0.51, 0.63, 0.071)
+
+
+[sub_resource type="BoxMesh" id="M8"]
+material = ExtResource("jade")
+size = Vector3(0.1, 0.33, 0.021)
+
+
+[sub_resource type="BoxMesh" id="M9"]
+material = ExtResource("stone")
+size = Vector3(0.52, 0.18, 1.93)
+
+
+[sub_resource type="BoxMesh" id="M10"]
+material = ExtResource("stone")
+size = Vector3(0.52, 0.18, 1.93)
+
+
+[node name="TheArchitectWall" type="StaticBody3D"]
+
+[node name="Collider" type="CollisionShape3D" parent="."]
+position = Vector3(0, 0, 0)
+shape = SubResource("collision")
+
+
+[node name="PanelM0" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0, 0)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M0")
+
+
+[node name="PanelM1" type="MeshInstance3D" parent="."]
+position = Vector3(0, -1.25, 0.94)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M1")
+
+
+[node name="PanelM2" type="MeshInstance3D" parent="."]
+position = Vector3(0, -1.25, 0.99)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M2")
+
+
+[node name="PanelM3" type="MeshInstance3D" parent="."]
+position = Vector3(0, -0.43, 0.94)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M3")
+
+
+[node name="PanelM4" type="MeshInstance3D" parent="."]
+position = Vector3(0, -0.43, 0.99)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M4")
+
+
+[node name="PanelM5" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.43, 0.94)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M5")
+
+
+[node name="PanelM6" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.43, 0.99)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M6")
+
+
+[node name="PanelM7" type="MeshInstance3D" parent="."]
+position = Vector3(0, 1.25, 0.94)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M7")
+
+
+[node name="PanelM8" type="MeshInstance3D" parent="."]
+position = Vector3(0, 1.25, 0.99)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M8")
+
+
+[node name="PanelM9" type="MeshInstance3D" parent="."]
+position = Vector3(0, -1.66, 0)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M9")
+
+
+[node name="PanelM10" type="MeshInstance3D" parent="."]
+position = Vector3(0, 1.66, 0)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M10")
+
+[node name="BevelFinish" type="Node3D" parent="."]
+script = ExtResource("finish")

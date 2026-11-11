@@ -1,0 +1,98 @@
+[gd_scene format=3]
+
+[ext_resource type="Material" path="res://assets/campaign/scrapyard_expanse/stone.tres" id="stone"]
+
+[ext_resource type="Material" path="res://assets/campaign/scrapyard_expanse/fern.tres" id="fern"]
+
+[ext_resource type="Material" path="res://assets/campaign/scrapyard_expanse/tread.tres" id="tread"]
+
+[ext_resource type="Material" path="res://assets/campaign/scrapyard_expanse/poison.tres" id="poison"]
+
+[ext_resource type="Material" path="res://assets/campaign/scrapyard_expanse/jade.tres" id="jade"]
+
+[ext_resource type="Script" path="res://scripts/biome_mesh_finish.gd" id="finish"]
+
+[sub_resource type="BoxMesh" id="M0"]
+material = ExtResource("tread")
+size = Vector3(1.15, 0.5, 1.04)
+
+
+[sub_resource type="CylinderMesh" id="M1"]
+material = ExtResource("fern")
+top_radius = 0.332
+bottom_radius = 0.4
+height = 2.25
+radial_segments = 7
+
+
+[sub_resource type="CylinderMesh" id="M2"]
+material = ExtResource("stone")
+top_radius = 0.3569
+bottom_radius = 0.43
+height = 0.26
+radial_segments = 7
+
+
+[sub_resource type="CylinderMesh" id="M3"]
+material = ExtResource("jade")
+top_radius = 0.1079
+bottom_radius = 0.13
+height = 1.35
+radial_segments = 7
+
+
+[sub_resource type="CylinderMesh" id="M4"]
+material = ExtResource("stone")
+top_radius = 0.0996
+bottom_radius = 0.12
+height = 1.76
+radial_segments = 7
+
+
+[sub_resource type="CylinderMesh" id="M5"]
+material = ExtResource("stone")
+top_radius = 0.0996
+bottom_radius = 0.12
+height = 1.76
+radial_segments = 7
+
+
+[node name="RustRevenantRelay" type="Node3D"]
+
+[node name="PanelM0" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.25, 0)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M0")
+
+
+[node name="RootM1" type="MeshInstance3D" parent="."]
+position = Vector3(0, 1.55, 0)
+rotation = Vector3(0, 0, 0.0)
+mesh = SubResource("M1")
+
+
+[node name="RootM2" type="MeshInstance3D" parent="."]
+position = Vector3(0, 2.38, 0)
+rotation = Vector3(0, 0, 0.0)
+mesh = SubResource("M2")
+
+
+[node name="RootM3" type="MeshInstance3D" parent="."]
+position = Vector3(0, 1.55, 0.28)
+rotation = Vector3(0, 0, 0.0)
+mesh = SubResource("M3")
+
+
+[node name="RootM4" type="MeshInstance3D" parent="."]
+position = Vector3(-0.46, 1.12, 0.01)
+rotation = Vector3(0, 0, -0.22)
+mesh = SubResource("M4")
+
+
+[node name="RootM5" type="MeshInstance3D" parent="."]
+position = Vector3(0.46, 1.12, 0.01)
+rotation = Vector3(0, 0, 0.22)
+mesh = SubResource("M5")
+
+[node name="BevelFinish" type="Node3D" parent="."]
+script = ExtResource("finish")

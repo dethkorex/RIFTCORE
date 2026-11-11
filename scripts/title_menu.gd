@@ -13,6 +13,7 @@ var shop_status := ""
 
 const UI := preload("res://scripts/rift_ui.gd")
 const PORTRAIT := preload("res://assets/ui/rx07_menu.png")
+const Catalog := preload("res://scripts/sector_catalog.gd")
 
 var layout: VBoxContainer
 var page := "Title"
@@ -57,8 +58,9 @@ func show_page(next: String) -> void:
 			var saves := card(columns, 1.35)
 			UI.label(saves, "Load game", 34, UI.CYAN)
 			if can_load:
-				UI.label(saves, "Sector 02  /  Machine Jungle" if saved_sector == 2 else "Sector 01  /  Last Neon Factory checkpoint")
-				UI.button(saves, "Deploy to Machine Jungle" if at_sector_start else "Resume checkpoint", func(): load_requested.emit(), true).grab_focus()
+				var title: String = Catalog.info(saved_sector).title
+				UI.label(saves, "Sector %02d  /  %s" % [saved_sector, title])
+				UI.button(saves, "Deploy to " + title if at_sector_start else "Resume checkpoint", func(): load_requested.emit(), true).grab_focus()
 			else:
 				UI.label(saves, "No saved checkpoint yet. Reach the midpoint beacon in Neon Factory to unlock Load.", 19, UI.MUTED)
 			portrait(card(columns))
@@ -154,12 +156,14 @@ func build_command_deck(columns: HBoxContainer) -> void:
 	UI.label(dossier, "RX-07   //   RIFTCORE FRAME", 20, UI.CYAN)
 	portrait(dossier)
 	var nav := card(columns)
-	var jungle_ready := can_load and saved_sector == 2
-	UI.label(nav, "SECTOR 02" if jungle_ready else "SECTOR 01", 15, UI.VIOLET)
-	UI.label(nav, "Machine Jungle" if jungle_ready else "Neon Factory", 34)
+	var continuation := can_load and saved_sector > 1
+	var next_sector := saved_sector if continuation else 1
+	var sector_name: String = Catalog.info(next_sector).title
+	UI.label(nav, "SECTOR %02d" % next_sector, 15, UI.VIOLET)
+	UI.label(nav, sector_name, 34)
 	UI.label(nav, "BANK  /  %04d CREDITS" % (profile.credits if profile else 0), 16, UI.MUTED)
-	var launch := UI.button(nav, "Deploy to Machine Jungle  ›" if at_sector_start else "Resume Machine Jungle  ›", func(): load_requested.emit(), true) if jungle_ready else UI.button(nav, "Deploy  ›", show_page.bind("Sector select"), true)
-	if jungle_ready:
+	var launch := UI.button(nav, ("Deploy to " if at_sector_start else "Resume ") + sector_name + "  ›", func(): load_requested.emit(), true) if continuation else UI.button(nav, "Deploy  ›", show_page.bind("Sector select"), true)
+	if continuation:
 		UI.button(nav, "New run  /  Neon Factory", show_page.bind("Sector select"))
 	launch.custom_minimum_size.y = 55
 	nav.add_child(HSeparator.new())
@@ -208,10 +212,13 @@ func build_loadout(columns: HBoxContainer) -> void:
 		var row := PanelContainer.new()
 		gear.add_child(row)
 		UI.label(row, line)
-	if "magma_breaker" in run_unlocks:
-		UI.label(gear, "Saved run: Magma Breaker · Q / RB to swap", 16, Color("ffad66"))
-	if "thorn_swarm" in run_unlocks:
-		UI.label(gear, "Saved run: Thorn Swarm · Q / RB to swap", 16, Color("a8ff64"))
+	if not run_unlocks.is_empty():
+		var rewards := PackedStringArray()
+		for id in run_unlocks:
+			var info := Catalog.weapon(String(id))
+			if not info.is_empty():
+				rewards.append(String(info.reward_name))
+		UI.label(gear, "Saved run arsenal · Q / RB to swap\n" + ", ".join(rewards), 16, UI.CYAN)
 	var model := card(columns, 1.7)
 	portrait(model)
 	UI.label(model, "RX-07   /   STANDARD FRAME", 18, UI.VIOLET)

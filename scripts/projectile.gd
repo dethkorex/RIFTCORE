@@ -17,6 +17,9 @@ var is_charged := false
 var is_magma := false
 var burn_power := 0.0
 var clock := 0.0
+var weapon_id := ""
+var pierces := 0
+var struck: Dictionary = {}
 
 func setup(dir: Vector3, faction: String, tint: Color = Color.CYAN, drill := false, charged := false, magma := false) -> void:
 	direction = dir.normalized()
@@ -79,21 +82,53 @@ func _on_body_entered(body: Node) -> void:
 	if spent:
 		return
 	if body.has_method("take_damage") and body.get("faction") != owner_faction:
-		spent = true
+		if struck.has(body.get_instance_id()):
+			return
+		struck[body.get_instance_id()] = true
 		if body.has_method("take_projectile_damage"):
 			body.take_projectile_damage(damage)
 		else:
 			var prior: float = body.health if "health" in body else 0.0
 			if is_magma and body.has_method("take_fire_damage"):
 				body.take_fire_damage(damage, global_position)
+			elif not weapon_id.is_empty() and body.has_method("take_element_damage"):
+				body.take_element_damage(damage, global_position, weapon_id)
 			else:
 				body.take_damage(damage, global_position)
 			if is_magma and burn_power > 0.0 and body.has_method("ignite") and body.health < prior:
 				body.ignite(burn_power, 3.0)
+			apply_reward_effect(body)
+		if pierces > 0:
+			pierces -= 1
+			damage *= 0.78
+			return
+		spent = true
 		impact()
 	elif body is StaticBody3D or body is AnimatableBody3D:
 		spent = true
 		impact()
+
+func apply_reward_effect(body: Node3D) -> void:
+	if weapon_id == "frost_lance" and "stagger_left" in body and "recoil" in body:
+		body.stagger_left = maxf(body.stagger_left, 0.45)
+		body.recoil = 0.0
+	if weapon_id == "chimera_burst" and body.has_method("ignite"):
+		body.ignite(5.0, 2.2)
+	if weapon_id == "gale_edge" and "recoil" in body and not body.planted_override and body.variant != 3:
+		body.recoil = direction.x * 7.5
+	if weapon_id not in ["tidal_arc", "singularity_shot", "scrap_reaver", "core_override"]:
+		return
+	var radius := 4.5 if weapon_id == "tidal_arc" else (3.3 if weapon_id == "singularity_shot" else 2.65)
+	var targets: Array[Node3D] = []
+	for candidate in get_tree().get_nodes_in_group("damageable_enemies"):
+		if candidate != body and candidate.global_position.distance_to(body.global_position) < radius and candidate.health > 0.0:
+			targets.append(candidate)
+	targets.sort_custom(func(a: Node3D, b: Node3D): return a.global_position.distance_squared_to(body.global_position) < b.global_position.distance_squared_to(body.global_position))
+	for i in range(mini(targets.size(), 3 if is_charged else 2)):
+		var target := targets[i]
+		target.take_damage(damage * 0.38, body.global_position)
+		if weapon_id == "singularity_shot" and "recoil" in target and not target.planted_override and target.variant != 3:
+			target.recoil = signf(body.global_position.x - target.global_position.x) * 6.5
 
 func impact() -> void:
 	var burst := Node3D.new()

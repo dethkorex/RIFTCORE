@@ -1,0 +1,10 @@
+[gd_scene format=3]
+[ext_resource type="Script" path="res://scripts/enemy.gd" id="enemy"]
+[ext_resource type="PackedScene" path="res://assets/campaign/scrapyard_expanse/enemies/flyer.glb" id="model"]
+[node name="RustKite" type="CharacterBody3D" groups=["damageable_enemies"]]
+script = ExtResource("enemy")
+variant = 4
+model_override = ExtResource("model")
+fire_weakness = 1.0
+weakness_weapon = "singularity_shot"
+weapon_weakness = 1.4

@@ -1,0 +1,83 @@
+[gd_scene format=3]
+
+[ext_resource type="Material" path="res://assets/campaign/frozen_reactor/stone.tres" id="stone"]
+
+[ext_resource type="Material" path="res://assets/campaign/frozen_reactor/fern.tres" id="fern"]
+
+[ext_resource type="Material" path="res://assets/campaign/frozen_reactor/tread.tres" id="tread"]
+
+[ext_resource type="Material" path="res://assets/campaign/frozen_reactor/poison.tres" id="poison"]
+
+[ext_resource type="Material" path="res://assets/campaign/frozen_reactor/jade.tres" id="jade"]
+
+[ext_resource type="Script" path="res://scripts/biome_mesh_finish.gd" id="finish"]
+
+[sub_resource type="BoxMesh" id="M0"]
+material = ExtResource("tread")
+size = Vector3(0.49, 4, 0.68)
+
+
+[sub_resource type="BoxMesh" id="M1"]
+material = ExtResource("jade")
+size = Vector3(0.095, 2.91, 0.038)
+
+
+[sub_resource type="BoxMesh" id="M2"]
+material = ExtResource("tread")
+size = Vector3(0.49, 4, 0.68)
+
+
+[sub_resource type="BoxMesh" id="M3"]
+material = ExtResource("jade")
+size = Vector3(0.095, 2.91, 0.038)
+
+
+[sub_resource type="BoxMesh" id="M4"]
+material = ExtResource("stone")
+size = Vector3(3.77, 0.5, 0.69)
+
+
+[sub_resource type="BoxMesh" id="M5"]
+material = ExtResource("jade")
+size = Vector3(2.76, 0.09, 0.051)
+
+
+[node name="CryoWardenArch" type="Node3D"]
+
+[node name="PanelM0" type="MeshInstance3D" parent="."]
+position = Vector3(-1.64, 2, 0)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M0")
+
+
+[node name="PanelM1" type="MeshInstance3D" parent="."]
+position = Vector3(-1.64, 1.93, 0.36)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M1")
+
+
+[node name="PanelM2" type="MeshInstance3D" parent="."]
+position = Vector3(1.64, 2, 0)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M2")
+
+
+[node name="PanelM3" type="MeshInstance3D" parent="."]
+position = Vector3(1.64, 1.93, 0.36)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M3")
+
+
+[node name="PanelM4" type="MeshInstance3D" parent="."]
+position = Vector3(0, 3.99, 0)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M4")
+
+
+[node name="PanelM5" type="MeshInstance3D" parent="."]
+position = Vector3(0, 3.86, 0.39)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M5")
+
+[node name="BevelFinish" type="Node3D" parent="."]
+script = ExtResource("finish")

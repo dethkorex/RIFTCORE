@@ -2,6 +2,7 @@ extends Node
 
 const UI := preload("res://scripts/rift_ui.gd")
 const FactoryHUD := preload("res://scripts/factory_hud.gd")
+const Catalog := preload("res://scripts/sector_catalog.gd")
 var sector_complete := false
 var deploying := false
 var remaining_enemies := 0
@@ -25,9 +26,6 @@ var banked_run := false
 var life_taken := false
 var boss_spawn := Vector3.ZERO
 var deployed_spawn := Vector3.ZERO
-const BOSS_SCENE := preload("res://scenes/levels/forge_titan.tscn")
-const JUNGLE_BOSS := preload("res://scenes/levels/verdant_colossus.tscn")
-const JUNGLE_LEVEL := preload("res://scenes/levels/machine_jungle.tscn")
 var sector := 1
 var run_weapons: Dictionary = {}
 
@@ -217,11 +215,19 @@ func load_game() -> void:
 		if not is_instance_valid(menu):
 			start_game()
 		return
-	sector = clampi(int(save.get_value("checkpoint", "sector", 1)), 1, 2)
+	sector = clampi(int(save.get_value("checkpoint", "sector", 1)), 1, Catalog.SECTORS.size())
+	if not ResourceLoader.exists(Catalog.info(sector).level):
+		push_warning("The saved sector scene is unavailable.")
+		return
 	run_weapons.clear()
-	var weapons = save.get_value("checkpoint", "weapons", ["magma_breaker"] if sector >= 2 else [])
-	for weapon in weapons:
-		run_weapons[String(weapon)] = true
+	var legacy_weapons: Array = []
+	for prior in range(1, sector):
+		legacy_weapons.append(Catalog.info(prior).reward)
+	var weapons = save.get_value("checkpoint", "weapons", legacy_weapons)
+	if weapons is Array:
+		for weapon in weapons:
+			if not Catalog.weapon(String(weapon)).is_empty():
+				run_weapons[String(weapon)] = true
 	start_game(false)
 	var at_start := bool(save.get_value("checkpoint", "at_start", false))
 	if not at_start:
@@ -264,7 +270,7 @@ func load_checkpoint_location(save: ConfigFile) -> void:
 func build_pause_menu() -> void:
 	var stack := overlay()
 	UI.label(stack, "PAUSED", 36, UI.CYAN)
-	UI.label(stack, "Machine Jungle" if sector == 2 else "Neon Factory", 17, UI.MUTED)
+	UI.label(stack, Catalog.info(sector).title, 17, UI.MUTED)
 	UI.button(stack, "Resume", toggle_pause, true).grab_focus()
 	UI.button(stack, "Restart sector", restart_run)
 	UI.button(stack, "Settings", show_pause_settings)
@@ -307,7 +313,8 @@ func build_level() -> void:
 		game_root.visible = true
 		game_root.process_mode = Node.PROCESS_MODE_INHERIT
 	else:
-		game_root = (JUNGLE_LEVEL if sector == 2 else NEON_FACTORY_LEVEL).instantiate()
+		var stage := NEON_FACTORY_LEVEL if sector == 1 else load(Catalog.info(sector).level) as PackedScene
+		game_root = stage.instantiate()
 		add_child(game_root)
 	player = game_root.get_node("Actors/RiftcoreMecha") as RiftPlayer
 	player.experience = 0
@@ -329,7 +336,7 @@ func build_level() -> void:
 	var bounds := game_root.get_node("MARKERS/CameraBounds")
 	camera_rig.min_x = bounds.get_meta("min_x")
 	camera_rig.max_x = bounds.get_meta("max_x")
-	boss = game_root.get_node("Actors/VerdantColossus" if sector == 2 else "Actors/ForgeTitan") as Combatant
+	boss = game_root.get_node("Actors/" + Catalog.info(sector).boss_node) as Combatant
 	gate = game_root.get_node("Gate") as Node3D
 	boss_spawn = boss.position
 	build_hud()
@@ -355,6 +362,7 @@ func install_sector_pads() -> void:
 func apply_permanent_upgrades() -> void:
 	player.magma_unlocked = run_weapons.has("magma_breaker")
 	player.thorn_unlocked = run_weapons.has("thorn_swarm")
+	player.run_weapon_ids = run_weapons.keys()
 	if profile.owned.has("armor"):
 		player.max_health += 12.0
 		player.health = player.max_health
@@ -375,22 +383,17 @@ func bind_boss_signals() -> void:
 	boss.died.connect(func():
 		boss_defeated = true
 		open_factory_gate()
-		var reward := "thorn_swarm" if sector == 2 else "magma_breaker"
+		var info := Catalog.info(sector)
+		var reward: String = info.reward
 		var first_unlock := not run_weapons.has(reward)
-		if sector == 2:
-			player.thorn_unlocked = true
-			player.set_thorn_active()
-			for minion in get_tree().get_nodes_in_group(&"arena_minions"):
-				minion.queue_free()
-		else:
-			player.unlock_magma()
+		player.unlock_sector_weapon(reward)
+		for minion in get_tree().get_nodes_in_group(&"arena_minions"):
+			minion.queue_free()
 		run_weapons[reward] = true
 		if checkpoint_reached:
 			save_checkpoint()
-		var message := "THORN SWARM UNLOCKED" if first_unlock else "VERDANT COLOSSUS DEFEATED"
-		if sector == 1:
-			message = "MAGMA BREAKER UNLOCKED" if first_unlock else "FORGE TITAN DEFEATED"
-		factory_hud.announce(message, Color("a9ff7a") if sector == 2 else Color("ff9c45"))
+		var message: String = info.reward_name + " unlocked" if first_unlock else info.boss + " defeated"
+		factory_hud.announce(message.to_upper(), Color(info.color))
 		var barrier := game_root.get_node("ExitBarrier") as StaticBody3D
 		barrier.get_node("CollisionShape3D").set_deferred("disabled", true)
 		var release := barrier.create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
@@ -404,14 +407,14 @@ func build_hud() -> void:
 	hud = CanvasLayer.new()
 	add_child(hud)
 	factory_hud = FactoryHUD.new()
-	if sector == 2:
-		factory_hud.exit_task = "REACH JUNGLE EXTRACTION"
-		factory_hud.boss_name = "VERDANT COLOSSUS"
+	factory_hud.exit_task = "REACH SECTOR EXTRACTION" if sector > 2 else ("REACH JUNGLE EXTRACTION" if sector == 2 else "REACH THE FACTORY EXIT")
+	factory_hud.boss_name = String(Catalog.info(sector).boss).to_upper()
+	factory_hud.boss_tint = Color(Catalog.info(sector).color)
 	hud.add_child(factory_hud)
 	factory_hud.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	factory_hud.remaining = remaining_enemies
 	factory_hud.lives = player.lives
-	if player.magma_unlocked or player.thorn_unlocked:
+	if not run_weapons.is_empty():
 		factory_hud.weapon = "BUSTER CANNON"
 	factory_hud.health_capacity = player.max_health
 	factory_hud.energy_capacity = player.max_energy
@@ -520,7 +523,7 @@ func _on_pit_fall() -> void:
 	factory_hud.failed = false
 	factory_hud.queue_redraw()
 	factory_hud.announce("%d LIVES LEFT" % player.lives, Color("8eeaff"))
-	if checkpoint_reached or sector == 2:
+	if checkpoint_reached or sector > 1:
 		save_checkpoint()
 	respawning = false
 
@@ -537,7 +540,7 @@ func reset_boss_room() -> void:
 	for shot in get_tree().get_nodes_in_group(&"rift_projectile"):
 		if shot.owner_faction == "enemy" and shot.global_position.x > gate.global_position.x - 2.0:
 			shot.queue_free()
-	boss = (JUNGLE_BOSS if sector == 2 else BOSS_SCENE).instantiate() as Combatant
+	boss = (load(Catalog.info(sector).boss_scene) as PackedScene).instantiate() as Combatant
 	boss.position = boss_spawn
 	game_root.get_node("Actors").add_child(boss)
 	bind_boss_signals()
@@ -585,22 +588,24 @@ func _process(_delta: float) -> void:
 	if not at_exit or not boss_defeated:
 		return
 	sector_complete = true
-	bank_run_credits(160)
-	if sector == 1 and banked_run:
+	var bonus := 160 + 25 * (sector - 1)
+	bank_run_credits(bonus)
+	var final_sector := sector >= Catalog.SECTORS.size()
+	if banked_run and ResourceLoader.exists(Catalog.info(sector + 1).level):
 		var continuation := ConfigFile.new()
-		continuation.set_value("checkpoint", "sector", 2)
+		continuation.set_value("checkpoint", "sector", mini(sector + 1, Catalog.SECTORS.size()))
 		continuation.set_value("checkpoint", "weapons", run_weapons.keys())
 		continuation.set_value("checkpoint", "at_start", true)
 		continuation.set_value("checkpoint", "experience", int(player.experience))
 		continuation.set_value("checkpoint", "lives", 3)
 		var error := continuation.save(checkpoint_path)
 		if error != OK:
-			push_warning("Could not save Machine Jungle deployment: %s" % error_string(error))
+			push_warning("Could not save the next sector deployment: %s" % error_string(error))
 	get_tree().paused = true
 	var stack := overlay()
-	UI.label(stack, "SECTOR COMPLETE", 36, UI.CYAN)
-	UI.label(stack, "Machine Jungle" if sector == 2 else "Neon Factory", 20)
-	UI.label(stack, "Credits earned  %d + 160 clear bonus" % player.credits, 17, Color("ffcd61"))
+	UI.label(stack, "CAMPAIGN COMPLETE" if final_sector else "SECTOR COMPLETE", 36, UI.CYAN)
+	UI.label(stack, Catalog.info(sector).title, 20)
+	UI.label(stack, "Credits earned  %d + %d clear bonus" % [player.credits, bonus], 17, Color("ffcd61"))
 	UI.label(stack, "XP collected  %d" % player.experience, 17, Color("ab72ff"))
 	UI.button(stack, "Continue to Command Deck", return_to_command_deck, true).grab_focus()
 

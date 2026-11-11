@@ -1,0 +1,125 @@
+[gd_scene format=3]
+
+[ext_resource type="Material" path="res://assets/campaign/buried_archives/stone.tres" id="stone"]
+
+[ext_resource type="Material" path="res://assets/campaign/buried_archives/fern.tres" id="fern"]
+
+[ext_resource type="Material" path="res://assets/campaign/buried_archives/tread.tres" id="tread"]
+
+[ext_resource type="Material" path="res://assets/campaign/buried_archives/poison.tres" id="poison"]
+
+[ext_resource type="Material" path="res://assets/campaign/buried_archives/jade.tres" id="jade"]
+
+[ext_resource type="Script" path="res://scripts/biome_mesh_finish.gd" id="finish"]
+
+[sub_resource type="BoxShape3D" id="collision"]
+size = Vector3(4, 0.24, 1.88)
+
+
+[sub_resource type="BoxMesh" id="M0"]
+material = ExtResource("tread")
+size = Vector3(3.992, 0.232, 1.868)
+
+
+[sub_resource type="BoxMesh" id="M1"]
+material = ExtResource("fern")
+size = Vector3(1.965, 0.074, 1.6732)
+
+
+[sub_resource type="BoxMesh" id="M2"]
+material = ExtResource("jade")
+size = Vector3(0.616, 0.067, 0.042)
+
+
+[sub_resource type="BoxMesh" id="M3"]
+material = ExtResource("stone")
+size = Vector3(0.828, 0.141, 0.033)
+
+
+[sub_resource type="BoxMesh" id="M4"]
+material = ExtResource("fern")
+size = Vector3(1.965, 0.074, 1.6732)
+
+
+[sub_resource type="BoxMesh" id="M5"]
+material = ExtResource("jade")
+size = Vector3(0.616, 0.067, 0.042)
+
+
+[sub_resource type="BoxMesh" id="M6"]
+material = ExtResource("stone")
+size = Vector3(0.828, 0.141, 0.033)
+
+
+[sub_resource type="BoxMesh" id="M7"]
+material = ExtResource("stone")
+size = Vector3(0.22, 0.24, 1.88)
+
+
+[sub_resource type="BoxMesh" id="M8"]
+material = ExtResource("stone")
+size = Vector3(0.22, 0.24, 1.88)
+
+
+[node name="SandCipherPerch" type="StaticBody3D" groups=["factory_one_way"]]
+
+[node name="Collider" type="CollisionShape3D" parent="."]
+position = Vector3(0, -0.12, 0)
+shape = SubResource("collision")
+
+
+[node name="PanelM0" type="MeshInstance3D" parent="."]
+position = Vector3(0, -0.12, 0)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M0")
+
+
+[node name="PanelM1" type="MeshInstance3D" parent="."]
+position = Vector3(-1.0, -0.037, 0)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M1")
+
+
+[node name="PanelM2" type="MeshInstance3D" parent="."]
+position = Vector3(-1.0, -0.1272, 0.968)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M2")
+
+
+[node name="PanelM3" type="MeshInstance3D" parent="."]
+position = Vector3(-1.0, -0.1368, 0.955)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M3")
+
+
+[node name="PanelM4" type="MeshInstance3D" parent="."]
+position = Vector3(1.0, -0.037, 0)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M4")
+
+
+[node name="PanelM5" type="MeshInstance3D" parent="."]
+position = Vector3(1.0, -0.1272, 0.968)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M5")
+
+
+[node name="PanelM6" type="MeshInstance3D" parent="."]
+position = Vector3(1.0, -0.1368, 0.955)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M6")
+
+
+[node name="PanelM7" type="MeshInstance3D" parent="."]
+position = Vector3(-1.88, -0.12, 0)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M7")
+
+
+[node name="PanelM8" type="MeshInstance3D" parent="."]
+position = Vector3(1.88, -0.12, 0)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M8")
+
+[node name="BevelFinish" type="Node3D" parent="."]
+script = ExtResource("finish")

@@ -2,9 +2,10 @@
 extends Node3D
 
 var skyline: MeshInstance3D
+@export var panorama_texture: Texture2D
 
 func _ready() -> void:
-	var texture := load("res://assets/machine_jungle/jungle_panorama.png") as Texture2D
+	var texture := panorama_texture if panorama_texture else load("res://assets/machine_jungle/jungle_panorama.png") as Texture2D
 	if not texture:
 		return
 	skyline = MeshInstance3D.new()

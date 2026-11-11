@@ -95,3 +95,5 @@ Stylized concept, panoramic seamless horizontal parallax background for RIFTCORE
 ## Neon Factory security redesign
 
 Reference-image generation using the earlier in-game lineup. The resulting silhouettes informed five independent Blender models and the in-game showroom. Forge Titan keeps its existing model.
+
+For sectors 03–10, `assets/campaign/art-prompts.json` records the boss concept, trim sheet, and backdrop prompts. The gameplay meshes are original Blender builds from `assets/campaign/build_models.py`: five enemy variants and a boss mesh per sector. The editable kit scenes and sector layouts come from `assets/campaign/build_levels.py`, using `sector_plan.json` for the theme and palette.

@@ -1,0 +1,21 @@
+[gd_scene format=3]
+[ext_resource type="Script" path="res://scripts/campaign_boss.gd" id="boss"]
+[ext_resource type="PackedScene" path="res://assets/campaign/orbital_array/enemies/eclipse_nova.glb" id="model"]
+[ext_resource type="PackedScene" path="res://assets/campaign/orbital_array/enemies/flyer.tscn" id="minion"]
+[sub_resource type="BoxShape3D" id="Hull"]
+size = Vector3(2.4, 3.10, 1.25)
+[node name="EclipseNova" type="CharacterBody3D" groups=["damageable_enemies"]]
+script = ExtResource("boss")
+sector_number = 8
+accent = Color(0.7373, 0.6039, 1.0000, 1.0000)
+max_health = 2910.0
+minion_scene = ExtResource("minion")
+fire_weakness = 1.0
+weakness_weapon = "chimera_burst"
+weapon_weakness = 1.48
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("Hull")
+[node name="Armor" type="Node3D" parent="."]
+position = Vector3(0, -1.55, 0)
+rotation = Vector3(0, -1.04, 0)
+[node name="Model" parent="Armor" instance=ExtResource("model")]

@@ -1,0 +1,10 @@
+[gd_scene format=3]
+[ext_resource type="Script" path="res://scripts/enemy.gd" id="enemy"]
+[ext_resource type="PackedScene" path="res://assets/campaign/frozen_reactor/enemies/flyer.glb" id="model"]
+[node name="IceWisp" type="CharacterBody3D" groups=["damageable_enemies"]]
+script = ExtResource("enemy")
+variant = 4
+model_override = ExtResource("model")
+fire_weakness = 1.4
+weakness_weapon = "magma_breaker"
+weapon_weakness = 1.4

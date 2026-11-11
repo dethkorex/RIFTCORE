@@ -1,0 +1,72 @@
+[gd_scene format=3]
+
+[ext_resource type="Material" path="res://assets/campaign/abyssal_plant/stone.tres" id="stone"]
+
+[ext_resource type="Material" path="res://assets/campaign/abyssal_plant/fern.tres" id="fern"]
+
+[ext_resource type="Material" path="res://assets/campaign/abyssal_plant/tread.tres" id="tread"]
+
+[ext_resource type="Material" path="res://assets/campaign/abyssal_plant/poison.tres" id="poison"]
+
+[ext_resource type="Material" path="res://assets/campaign/abyssal_plant/jade.tres" id="jade"]
+
+[ext_resource type="Script" path="res://scripts/biome_mesh_finish.gd" id="finish"]
+
+[sub_resource type="BoxMesh" id="M0"]
+material = ExtResource("fern")
+size = Vector3(3.1, 3.72, 0.47)
+
+
+[sub_resource type="BoxMesh" id="M1"]
+material = ExtResource("poison")
+size = Vector3(2.9, 0.37, 0.08)
+
+
+[sub_resource type="BoxMesh" id="M2"]
+material = ExtResource("jade")
+size = Vector3(0.09, 2.19, 0.03)
+
+
+[sub_resource type="BoxMesh" id="M3"]
+material = ExtResource("jade")
+size = Vector3(0.09, 2.19, 0.03)
+
+
+[sub_resource type="BoxMesh" id="M4"]
+material = ExtResource("stone")
+size = Vector3(1.26, 0.21, 0.045)
+
+
+[node name="VoltKrakenGate" type="Node3D"]
+
+[node name="PanelM0" type="MeshInstance3D" parent="."]
+position = Vector3(0, 1.86, 0)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M0")
+
+
+[node name="PanelM1" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.29, 0.26)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M1")
+
+
+[node name="PanelM2" type="MeshInstance3D" parent="."]
+position = Vector3(-0.93, 1.98, 0.27)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M2")
+
+
+[node name="PanelM3" type="MeshInstance3D" parent="."]
+position = Vector3(0.93, 1.98, 0.27)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M3")
+
+
+[node name="PanelM4" type="MeshInstance3D" parent="."]
+position = Vector3(0, 2.94, 0.27)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("M4")
+
+[node name="BevelFinish" type="Node3D" parent="."]
+script = ExtResource("finish")

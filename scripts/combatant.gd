@@ -8,6 +8,8 @@ const DAMAGE_NUMBER := preload("res://scripts/damage_number.gd")
 
 @export var max_health: float = 100.0
 @export_range(1.0, 3.0, 0.1) var fire_weakness := 1.0
+@export var weakness_weapon := ""
+@export var weapon_weakness := 1.45
 var incoming_critical := false
 var health: float
 var invulnerable_time := 0.0
@@ -31,6 +33,11 @@ func take_damage(amount: float, source_position := Vector3.ZERO) -> void:
 func take_fire_damage(amount: float, source_position := Vector3.ZERO) -> void:
 	incoming_critical = fire_weakness > 1.0
 	take_damage(amount * fire_weakness, source_position)
+	incoming_critical = false
+
+func take_element_damage(amount: float, source_position: Vector3, weapon_id: String) -> void:
+	incoming_critical = not weapon_id.is_empty() and weapon_id == weakness_weapon
+	take_damage(amount * (weapon_weakness if incoming_critical else 1.0), source_position)
 	incoming_critical = false
 
 func show_damage(amount: float, burning := false, critical := false) -> void:

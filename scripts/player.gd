@@ -7,6 +7,7 @@ signal experience_changed(total: int)
 
 const START_HEALTH := 80.0
 const START_ENERGY := 75.0
+const Catalog := preload("res://scripts/sector_catalog.gd")
 signal fell_into_pit
 signal shot_fired(projectile: RiftProjectile)
 signal melee_performed
@@ -20,6 +21,8 @@ var magma_unlocked := false
 var thorn_unlocked := false
 var thorn_active := false
 var magma_active := false
+var run_weapon_ids: Array = []
+var special_weapon := ""
 var original_armor: Dictionary = {}
 var forge_armor: Dictionary = {}
 var base_suit_meshes: Array[MeshInstance3D] = []
@@ -254,6 +257,7 @@ func _physics_process(delta: float) -> void:
 	if health <= 0.0:
 		cancel_charge()
 		return
+	var terrain := environment_control()
 	landing_left = maxf(0.0, landing_left - delta)
 	fire_lock = maxf(0.0, fire_lock - delta)
 	dash_lock = maxf(0.0, dash_lock - delta)
@@ -292,30 +296,24 @@ func _physics_process(delta: float) -> void:
 	var wants_crouch := Input.is_action_pressed("crouch") or stick_crouch
 	set_crouch(wants_crouch and is_on_floor() and dash_left <= 0.0 and jump_buffer <= 0.0)
 	if melee_lock <= 0.0 and Input.is_action_just_pressed("swap_weapon"):
-		if thorn_active:
-			set_magma_active(false)
-		elif magma_active and thorn_unlocked:
-			set_thorn_active()
-		elif magma_unlocked:
-			set_magma_active(not magma_active)
-		elif thorn_unlocked:
-			set_thorn_active()
+		cycle_weapon()
 	update_charge(delta)
 	update_melee(delta)
 	if dash_left > 0.0:
 		dash_left -= delta
 		velocity = Vector3(facing * dash_speed, 0.0, 0.0)
 	else:
-		var accel := acceleration if is_on_floor() else air_acceleration
+		var accel := acceleration * terrain.x if is_on_floor() else air_acceleration
 		if axis * velocity.x < 0.0:
-			accel = acceleration * 1.7 if is_on_floor() else air_reverse_acceleration
+			accel = acceleration * 1.7 * terrain.x if is_on_floor() else air_reverse_acceleration
 		elif not is_on_floor() and absf(axis) < 0.08:
 			accel = air_braking
 		if contact_recoil <= 0.0 and wall_launch_lock <= 0.0:
 			velocity.x = move_toward(velocity.x, 0.0 if crouching else axis * move_speed, accel * delta)
 		if not is_on_floor():
 			var gravity_scale := fall_gravity_multiplier if velocity.y < 0.0 else 1.0
-			velocity.y = maxf(-max_fall_speed, velocity.y - gravity * gravity_scale * delta)
+			velocity.y = maxf(-max_fall_speed * clampf(terrain.y * 1.4, 0.36, 1.0), velocity.y - gravity * gravity_scale * terrain.y * delta)
+		velocity.x += terrain.z * delta
 		if wall_sliding:
 			velocity.y = maxf(velocity.y, -wall_slide_speed)
 		if jump_buffer > 0.0 and wall_grace > 0.0 and coyote <= 0.0 and contact_recoil <= 0.0:
@@ -329,6 +327,9 @@ func _physics_process(delta: float) -> void:
 			velocity.y = jump_velocity
 			jump_buffer = 0.0
 			coyote = 0.0
+		elif jump_buffer > 0.0 and terrain.w > 0.0 and contact_recoil <= 0.0:
+			velocity.y = 8.4
+			jump_buffer = 0.0
 		if Input.is_action_just_released("jump") and not Input.is_action_pressed("jump") and velocity.y > 0.0:
 			velocity.y *= 0.45
 	velocity.z = -global_position.z * 18.0
@@ -371,6 +372,22 @@ func _physics_process(delta: float) -> void:
 		collision_layer = 0
 		hide()
 		fell_into_pit.emit()
+
+func environment_control() -> Vector4:
+	# Ground grip, gravity, lateral flow, and buoyant jump.
+	var result := Vector4(1, 1, 0, 0)
+	for zone in get_tree().get_nodes_in_group("terrain_modifier"):
+		if not zone.get_overlapping_bodies().has(self):
+			continue
+		match int(zone.kind):
+			0: result.x = 0.24
+			1:
+				result.y = 0.46
+				result.w = 1.0
+				result.z += zone.direction * 13.0
+			2: result.z += zone.direction * 27.0
+			3: result.y = 0.47
+	return result
 
 func update_wall_contact(delta: float, axis: float) -> void:
 	wall_launch_lock = maxf(0.0, wall_launch_lock - delta)
@@ -534,7 +551,7 @@ func update_charge(delta: float) -> void:
 		var sphere := SphereMesh.new()
 		var glow := StandardMaterial3D.new()
 		glow.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		glow.albedo_color = Color("ff7a25") if magma_active else Color("49dfff")
+		glow.albedo_color = Color("ff7a25") if magma_active else (Color(Catalog.weapon(special_weapon).color) if not special_weapon.is_empty() else (Color("a8ff64") if thorn_active else Color("49dfff")))
 		sphere.material = glow
 		charge_orb.mesh = sphere
 		add_child(charge_orb)
@@ -558,7 +575,8 @@ func buster_power() -> float:
 func shoot(charged := false, pose_held := false) -> void:
 	var magma := magma_active
 	var thorn := thorn_active
-	var cost := (36.0 if charged else 8.0) if magma else ((30.0 if charged else 7.0) if thorn else (charge_energy_cost if charged else 0.0))
+	var special := special_weapon
+	var cost := (36.0 if charged else 8.0) if magma else ((30.0 if charged else 7.0) if thorn or not special.is_empty() else (charge_energy_cost if charged else 0.0))
 	if energy < cost:
 		return
 	fire_lock = fire_interval
@@ -576,11 +594,13 @@ func shoot(charged := false, pose_held := false) -> void:
 		if health <= 0.0:
 			return
 	var muzzle := cannon_muzzle(aim)
-	if thorn:
+	if not special.is_empty():
+		launch_reward_weapon(muzzle, aim, charged, special)
+	elif thorn:
 		var count := 5 if charged else 2
 		for i in range(count):
 			var angle := (i - (count - 1) * 0.5) * (0.18 if charged else 0.14)
-			launch_buster(muzzle, Vector3(aim * cos(angle), sin(angle), 0), charged, false, (30.0 if charged else 16.0) * level_damage_scale(), Color("a8ff64"))
+			launch_buster(muzzle, Vector3(aim * cos(angle), sin(angle), 0), charged, false, (30.0 if charged else 16.0) * level_damage_scale(), Color("a8ff64"), "thorn_swarm")
 	elif magma and charged:
 		for spread in [-0.51, 0.0, 0.51]:
 			var direction := Vector3(aim * cos(spread), sin(spread), 0.0)
@@ -590,24 +610,94 @@ func shoot(charged := false, pose_held := false) -> void:
 		launch_buster(muzzle, Vector3(aim, 0, 0), charged, magma, power)
 	RiftAudio.play_effect(&"buster_charged" if charged else &"buster")
 
-func launch_buster(muzzle: Vector3, direction: Vector3, charged: bool, magma: bool, power: float, tint := Color.TRANSPARENT) -> void:
+func launch_buster(muzzle: Vector3, direction: Vector3, charged: bool, magma: bool, power: float, tint := Color.TRANSPARENT, weapon_id := "") -> void:
 	var projectile := RiftProjectile.new()
 	projectile.collision_mask = 3
 	get_tree().current_scene.add_child(projectile)
 	projectile.global_position = muzzle
 	projectile.damage = power
+	projectile.weapon_id = weapon_id
 	if charged:
 		projectile.speed = 29.0
 	if magma:
 		projectile.speed = 24.0 if charged else 25.0
 		projectile.lifetime = 2.35
 		projectile.burn_power = (8.0 if charged else 4.5) * level_damage_scale()
+	match weapon_id:
+		"frost_lance":
+			projectile.speed = 36.0
+			projectile.pierces = 2 if charged else 1
+		"data_lance":
+			projectile.speed = 42.0
+			projectile.pierces = 4 if charged else 1
+		"gale_edge":
+			projectile.speed = 32.0
+		"singularity_shot":
+			projectile.speed = 17.0
+		"scrap_reaver":
+			projectile.speed = 20.0
+		"core_override":
+			projectile.pierces = 2 if charged else 1
 	var shot_color := (Color("ffae35") if charged else Color("ff681c")) if magma else (Color("73f4ff") if charged else Color.CYAN)
 	if tint.a > 0.0:
 		shot_color = tint
 	projectile.setup(direction, faction, shot_color, false, charged, magma)
 	shot_fired.emit(projectile)
 
+func launch_reward_weapon(muzzle: Vector3, aim: float, charged: bool, id: String) -> void:
+	var info := Catalog.weapon(id)
+	var count := 1
+	var power := 35.0 if not charged else 111.0
+	match id:
+		"gale_edge":
+			count = 5 if charged else 3
+			power = 38.0 if charged else 15.0
+		"chimera_burst":
+			count = 5 if charged else 3
+			power = 46.0 if charged else 19.0
+		"scrap_reaver":
+			power = 136.0 if charged else 47.0
+		"core_override":
+			count = 5 if charged else 3
+			power = 55.0 if charged else 23.0
+	for i in count:
+		var spread := (i - (count - 1) * 0.5) * (0.18 if charged else 0.13)
+		launch_buster(muzzle, Vector3(aim * cos(spread), sin(spread), 0), charged, false, power * level_damage_scale(), Color(info.color), id)
+
+func cycle_weapon() -> void:
+	var equipped := "magma_breaker" if magma_active else ("thorn_swarm" if thorn_active else special_weapon)
+	var choices: Array[String] = [""]
+	for entry in Catalog.SECTORS:
+		var id: String = entry.reward
+		if id in run_weapon_ids or (id == "magma_breaker" and magma_unlocked) or (id == "thorn_swarm" and thorn_unlocked):
+			choices.append(id)
+	if choices.size() > 1:
+		equip_sector_weapon(choices[posmod(choices.find(equipped) + 1, choices.size())])
+
+func unlock_sector_weapon(id: String) -> void:
+	if id not in run_weapon_ids:
+		run_weapon_ids.append(id)
+	if id == "magma_breaker":
+		magma_unlocked = true
+	elif id == "thorn_swarm":
+		thorn_unlocked = true
+	equip_sector_weapon(id)
+
+func equip_sector_weapon(id: String) -> void:
+	match id:
+		"magma_breaker":
+			set_magma_active(true)
+		"thorn_swarm":
+			set_thorn_active()
+		_:
+			set_magma_active(false)
+			if not id.is_empty() and id in run_weapon_ids:
+				var info := Catalog.weapon(id)
+				special_weapon = id
+				var light := get_node_or_null("CoreLight") as OmniLight3D
+				if light:
+					light.light_color = Color(info.color)
+				weapon_changed.emit(String(info.reward_name).to_upper())
 
 func unlock_magma() -> void:
 	magma_unlocked = true
@@ -631,6 +721,7 @@ func set_magma_active(enabled: bool) -> void:
 	if enabled and not magma_unlocked:
 		return
 	cancel_charge()
+	special_weapon = ""
 	thorn_active = false
 	magma_active = enabled
 	for mesh in base_suit_meshes:

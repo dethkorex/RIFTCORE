@@ -26,6 +26,7 @@ var failed := false
 var boss_visible := false
 var boss_health := 1.0
 var boss_name := "FORGE TITAN"
+var boss_tint := Color("ff8c36")
 var exit_task := "REACH THE FACTORY EXIT"
 
 func _ready() -> void:
@@ -157,7 +158,6 @@ func _draw() -> void:
 	caption(Vector2(right - 207, 204), "RX   LIVES   %02d" % lives, 17)
 	if boss_visible:
 		var center := hud_size.x * 0.5
-		var boss_tint := Color("b076ff") if boss_name == "VERDANT COLOSSUS" else Color("ff8c36")
 		plate(Rect2(center - 180, 14, 360, 47), 11, boss_tint)
 		caption(Vector2(center - 163, 36), boss_name, 18)
 		draw_rect(Rect2(center - 163, 44, 326, 7), Color("482738"))
