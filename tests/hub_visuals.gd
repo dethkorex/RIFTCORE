@@ -94,5 +94,5 @@ func run() -> void:
 	hub.update_station()
 	root.push_input(interact)
 	check(game.menu.page == "Social", "Social opens from its own pad")
-	check(game.menu.find_children("*", "Button", true, false).any(func(button): return button.text == "Open Steam Friends"), "Social links to Steam Friends")
+	check(game.menu.find_children("*", "Button", true, false).any(func(button): return button.text == "Paste Steam ID"), "Social accepts Steam IDs in-game")
 	quit(failures)

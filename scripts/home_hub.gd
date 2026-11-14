@@ -19,6 +19,8 @@ const STATIONS := [
 
 var avatar: RiftPlayer
 var partner: RiftPlayer
+var partner_label: Label3D
+var local_online_label: Label3D
 var partner_x := 0.0
 var partner_facing := 0.0
 var station_sync := 0.0
@@ -55,6 +57,9 @@ func _ready() -> void:
 	prompt = label_in_space(avatar, "", Vector3(0, 1.52, 0.25), 36, Color.WHITE)
 	prompt.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	prompt.no_depth_test = true
+	local_online_label = label_in_space(avatar, "", Vector3(0, 1.21, 0), 27, Color("91edff"))
+	local_online_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	local_online_label.hide()
 	camera = Camera3D.new()
 	add_child(camera)
 	camera.position = Vector3(0, 2.75, 10.6)
@@ -64,6 +69,7 @@ func _ready() -> void:
 	build_hud()
 	RiftRelay.partner_moved.connect(update_partner)
 	RiftRelay.changed.connect(refresh_partner_room)
+	refresh_partner_room()
 	update_station()
 
 func _physics_process(delta: float) -> void:
@@ -105,7 +111,7 @@ func _process(delta: float) -> void:
 		var lamp: OmniLight3D = pad.light
 		lamp.light_energy = move_toward(lamp.light_energy, 1.75 if active else 0.0, delta * 7.0)
 
-func update_partner(x: float, facing: float, animation: String) -> void:
+func update_partner(x: float, facing: float, animation: String, display_name: String) -> void:
 	if not is_instance_valid(partner):
 		partner = AVATAR.instantiate() as RiftPlayer
 		add_child(partner)
@@ -114,13 +120,16 @@ func update_partner(x: float, facing: float, animation: String) -> void:
 		partner.set_process(false)
 		partner.collision_layer = 0
 		partner.collision_mask = 0
-		var label := label_in_space(partner, "PARTNER", Vector3(0, 1.54, 0), 29, Color("ca99ff"))
-		label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		partner_label = label_in_space(partner, "", Vector3(0, 1.54, 0), 29, Color("ca99ff"))
+		partner_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	partner_label.text = display_name
 	partner_x = x
 	partner_facing = facing
 	partner.play_character_animation(animation)
 
 func refresh_partner_room() -> void:
+	local_online_label.text = RiftRelay.local_name
+	local_online_label.visible = not RiftRelay.connected_room.is_empty()
 	if RiftRelay.room_size != 2 and is_instance_valid(partner):
 		partner.queue_free()
 		partner = null

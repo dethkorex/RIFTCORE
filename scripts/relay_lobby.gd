@@ -2,10 +2,12 @@ extends Node
 
 signal changed
 signal deploy_requested(host: bool)
-signal partner_moved(x: float, facing: float, animation: String)
+signal partner_moved(x: float, facing: float, animation: String, display_name: String)
+signal guest_joined
 signal mission_returned
 signal mission_disconnected(message: String)
 
+const Profile := preload("res://scripts/rogue_profile.gd")
 const Keys := preload("res://addons/GD-Sync/Scripts/KeyStore.gd")
 const Client := preload("res://addons/GD-Sync/MultiplayerClient.gd")
 const RelayEnums := preload("res://addons/GD-Sync/Scripts/Enums/Enums.gd")
@@ -21,6 +23,7 @@ var room_size := 0
 var available := false
 var pending_invite := 0
 var mission_active := false
+var local_name := "RX-07"
 
 var relay: Node
 var request_timeout: Timer
@@ -145,8 +148,12 @@ func _room_joined(lobby_name: String) -> void:
 	relay.expose_func(_receive_deploy, RelayEnums.EXPOSE_PERMISSION.HOST)
 	relay.expose_func(_receive_return, RelayEnums.EXPOSE_PERMISSION.HOST)
 	relay.expose_func(_receive_partner_position)
+	var joined_as_guest := pending == "join"
 	connected_room = room_code
 	pending = ""
+	relay.player_set_data("operator_name", local_name)
+	if joined_as_guest:
+		guest_joined.emit.call_deferred()
 	_players_changed(0)
 	if pending_invite != 0:
 		_send_pending_invite.call_deferred()
@@ -193,14 +200,14 @@ func _receive_deploy() -> void:
 
 func send_station_position(x: float, facing: float, animation: String) -> void:
 	if room_size == 2 and not mission_active and is_instance_valid(relay):
-		relay.call_func_unreliable(_receive_partner_position, x, facing, animation)
+		relay.call_func_unreliable(_receive_partner_position, x, facing, animation, local_name)
 
-func _receive_partner_position(x: float, facing: float, animation: String) -> void:
+func _receive_partner_position(x: float, facing: float, animation: String, display_name: String) -> void:
 	var sender: int = relay.get_sender_id()
 	if mission_active or room_size != 2 or sender == relay.get_client_id() or not relay.lobby_get_all_clients().has(sender):
 		return
 	if is_finite(x) and is_finite(facing) and animation in ["idle", "walk", "run"]:
-		partner_moved.emit(clampf(x, -19.15, 19.15), clampf(facing, -1.57, 1.57), animation)
+		partner_moved.emit(clampf(x, -19.15, 19.15), clampf(facing, -1.57, 1.57), animation, Profile.clean_operator_name(display_name))
 
 func return_to_station() -> void:
 	if mission_active and relay.is_host():

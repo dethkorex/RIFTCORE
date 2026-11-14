@@ -1,6 +1,11 @@
-# RIFTCORE 0.5 — Fractured Connections (development preview)
+# RIFTCORE 5.9.1 — Fractured Connections (development preview)
 
 ## Game changes
+
+- Choose a player name when creating a save. Names appear over operators in online sessions and in the partner direction indicator.
+- Guests enter the room leader’s Operations Station through a loading screen. Each player’s camera follows their own operator.
+
+- Social shows Steam IDs with Copy ID and Save actions, accepts numeric friend codes and profile links, and distinguishes your Steam connection from each friend’s presence.
 
 - Play Neon Factory Defense with a friend. Create or join a room in Social, then the host selects Deploy Co-op. Both players fight the same security units and see the same mission result.
 - Explore Operations Station together after joining a room. Only the room leader can deploy or return the group. Inventories, equipment, and station menus remain personal.

@@ -72,6 +72,7 @@ var endings: Array[String] = []
 var materials: Dictionary = {}
 var core_shards := 0
 const COSMETICS := {"Standard": Color("55e7ff"), "Magenta": Color("ff67ce"), "Gold": Color("ffd069")}
+var operator_name := "RX-07"
 var player_xp := 0
 var cosmetic := "Standard"
 var credits := 0
@@ -82,6 +83,15 @@ var reserve_lives := 0
 var gear := {}
 var manual_only := false
 var loadouts: Dictionary = {}
+
+static func clean_operator_name(value: String) -> String:
+	var cleaned := ""
+	for character in value.strip_edges():
+		var code := character.unicode_at(0)
+		if code >= 32 and code != 127 and not (code >= 0x202a and code <= 0x202e) and not (code >= 0x2066 and code <= 0x2069):
+			cleaned += character
+	cleaned = cleaned.strip_edges().left(20)
+	return "RX-07" if cleaned.is_empty() else cleaned
 
 func restore() -> void:
 	var data := ConfigFile.new()
@@ -102,6 +112,7 @@ func storage_capacity() -> int:
 	return 12 + floori(player_level() / 5.0) + rank("storage") * 7
 
 func decode_from(data: ConfigFile) -> void:
+	operator_name = clean_operator_name(str(data.get_value("profile", "operator_name", "RX-07")))
 	materials.clear()
 	blueprints.clear()
 	if data.has_section("blueprints"):
@@ -179,6 +190,7 @@ func encode_into(data: ConfigFile) -> void:
 		data.set_value("archive", ending, true)
 	data.set_value("profile", "credits", credits)
 	data.set_value("profile", "player_xp", player_xp)
+	data.set_value("profile", "operator_name", operator_name)
 	data.set_value("profile", "cosmetic", cosmetic)
 	data.set_value("profile", "materials", materials)
 	data.set_value("profile", "core_shards", core_shards)

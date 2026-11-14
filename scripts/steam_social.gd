@@ -26,14 +26,19 @@ func connect_steam() -> void:
 		var configured := int(ProjectSettings.get_setting("riftcore/steam_app_id", 0))
 		var expected := configured if configured > 0 else OS.get_environment("SteamAppId").to_int()
 		if expected <= 0 or expected == 480:
-			message = "Steam presence needs a RIFTCORE Steam App ID. You can still save contacts and open Steam Friends."
+			message = "Live Steam presence is unavailable without a RIFTCORE Steamworks App ID. Room codes still work."
 			return
 		var result: Dictionary = steam.steamInitEx(expected, false)
 		ready_to_query = int(result.get("status", -1)) == 0
 		if ready_to_query:
 			app_id = steam.getAppID()
 			ready_to_query = app_id == expected
-	message = "Steam is connected." if ready_to_query and steam.loggedOn() else "Steam is offline or unavailable. Open Steam, sign in, then refresh."
+	if not ready_to_query:
+		message = "RIFTCORE could not connect to Steam. Open Steam and try Refresh Presence."
+	elif not steam.loggedOn():
+		message = "Your Steam client is connected to RIFTCORE, but is signed out or disconnected from Steam."
+	else:
+		message = "Your Steam connection is online."
 
 func _process(_delta: float) -> void:
 	if ready_to_query and (not steam.loggedOn() or get_node_or_null("/root/GDSync") == null):
@@ -44,11 +49,14 @@ func contacts() -> Array[Dictionary]:
 	var connected: bool = ready_to_query and steam.loggedOn()
 	if connected:
 		for index in steam.getFriendCount(FRIEND):
-			ids[str(steam.getFriendByIndex(index, FRIEND))] = ""
+			var friend_id: int = steam.getFriendByIndex(index, FRIEND)
+			var game: Dictionary = steam.getFriendGamePlayed(friend_id)
+			if app_id > 0 and int(game.get("id", 0)) == app_id:
+				ids[str(friend_id)] = ""
 	var rows: Array[Dictionary] = []
 	for id in ids:
 		var name := String(followed.get(id, ""))
-		var status := "Status unavailable"
+		var status := "Friend presence unavailable"
 		var priority := 3
 		if connected and steam.getFriendRelationship(int(id)) == 3:
 			var display: String = steam.getFriendPersonaName(int(id))
@@ -58,17 +66,31 @@ func contacts() -> Array[Dictionary]:
 			if int(info.get("id", 0)) == app_id and app_id > 0:
 				status = "Playing RIFTCORE"
 				priority = 0
-			elif int(steam.getFriendPersonaState(int(id))) > 0:
-				status = "Online on Steam"
+			elif int(steam.getFriendPersonaState(int(id))) in [1, 2, 3, 4, 5, 6]:
+				status = "Friend is online"
 				priority = 1
 			else:
-				status = "Offline on Steam"
+				status = "Friend appears offline"
 				priority = 2
 		if name.is_empty():
 			name = id
 		rows.append({"id": id, "name": name, "status": status, "priority": priority, "saved": followed.has(id)})
 	rows.sort_custom(func(a, b): return a.priority < b.priority if a.priority != b.priority else a.name.nocasecmp_to(b.name) < 0)
 	return rows
+
+func resolve_contact_id(value: String) -> String:
+	value = value.strip_edges()
+	for prefix in ["https://steamcommunity.com/profiles/", "http://steamcommunity.com/profiles/"]:
+		if value.begins_with(prefix):
+			var profile_id := value.trim_prefix(prefix).get_slice("?", 0).get_slice("#", 0).trim_suffix("/")
+			return profile_id if valid_id(profile_id) else ""
+	if valid_id(value):
+		return value
+	if value.is_valid_int() and value.length() <= 10:
+		var account := value.to_int()
+		if account > 0 and account <= 4294967295:
+			return str(STEAM_MIN + account)
+	return ""
 
 func valid_id(value: String) -> bool:
 	return value.length() == 17 and value.is_valid_int() and value.to_int() > STEAM_MIN and value.to_int() <= STEAM_MIN + 4294967295

@@ -19,6 +19,9 @@ var peer: Node
 var operators: Array[RiftPlayer] = []
 var enemies: Array[WalkerBot] = []
 var room_status: Label
+var partner_status: Label
+var camera: SideCameraRig
+var nameplates: Array[Label3D] = []
 var return_button: Button
 var rewards_status: Label
 var stats: Label
@@ -64,6 +67,16 @@ func _ready() -> void:
 				operator.set_deferred("collision_layer", 0)
 			)
 		operators.append(operator)
+		var plate := Label3D.new()
+		plate.position.y = 1.48
+		plate.font = UI.BODY
+		plate.font_size = 30
+		plate.pixel_size = 0.0048
+		plate.outline_size = 10
+		plate.modulate = UI.CYAN if index == (0 if host else 1) else UI.VIOLET
+		plate.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		operator.add_child(plate)
+		nameplates.append(plate)
 		targets.append([])
 	for index in ENEMY_POSITIONS.size():
 		var enemy := WalkerBot.new()
@@ -89,7 +102,7 @@ func _ready() -> void:
 			enemy.collision_mask = 0
 		enemies.append(enemy)
 		enemy_targets.append([])
-	var camera := SideCameraRig.new()
+	camera = SideCameraRig.new()
 	camera.target = operators[0 if host else 1]
 	camera.min_x = 0.0
 	camera.max_x = 42.0
@@ -135,6 +148,7 @@ func build_hud() -> void:
 	var content := UI.column(panel, 5)
 	UI.label(content, "NEON FACTORY DEFENSE", 27, UI.CYAN)
 	stats = UI.label(content, "", 16)
+	partner_status = UI.label(content, "", 16, UI.CYAN)
 	room_status = UI.label(content, "2.5× enemy health and damage  /  1.5× shared XP", 16, UI.MUTED)
 	rewards_status = UI.label(content, "", 15, UI.CYAN)
 	return_button = UI.button(content, "Leave Mission", func(): exit_requested.emit(), false, 34)
@@ -288,6 +302,27 @@ func _process(delta: float) -> void:
 				if enemy.health != data[2]:
 					enemy.health = data[2]
 					enemy.health_changed.emit(enemy.health, enemy.max_health)
+	var partner_index := 1 if host else 0
+	var partner := operators[partner_index]
+	var leader: int = peer.get_host()
+	var companion: int = leader
+	for id in peer.lobby_get_all_clients():
+		if id != leader:
+			companion = id
+	for index in nameplates.size():
+		var id := leader if index == 0 else companion
+		nameplates[index].text = Profile.clean_operator_name(str(peer.player_get_data(id, "operator_name", "RX-07")))
+	var partner_name := nameplates[partner_index].text
+	var local := camera.target
+	var offset := partner.global_position.x - local.global_position.x
+	var view := camera.get_node("Camera3D") as Camera3D
+	var on_screen := get_viewport().get_visible_rect().has_point(view.unproject_position(partner.global_position))
+	if partner.health <= 0.0:
+		partner_status.text = "%s is down" % partner_name
+	elif on_screen:
+		partner_status.text = "%s is nearby" % partner_name
+	else:
+		partner_status.text = "%s  %s  %.0f m" % ["←" if offset < 0.0 else "→", partner_name, absf(offset)]
 	stats.text = "HOST HP %d    PARTNER HP %d    SECURITY %d LEFT\nSHARED  %d XP  /  %d BOLTS  /  %d BLUEPRINTS" % [operators[0].health, operators[1].health, enemies.filter(func(enemy): return is_instance_valid(enemy) and enemy.health > 0 and enemy.visible).size(), team_xp, team_bolts, team_blueprints.size() if host else blueprint_count]
 
 func send_shot(shot: RiftProjectile) -> void:

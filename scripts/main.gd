@@ -61,6 +61,7 @@ var game_root: Node3D
 var pause_menu: Control
 var editor_level: Node3D
 var coop_mission: Node3D
+var coop_join_loading: CanvasLayer
 
 func _ready() -> void:
 	var arguments := OS.get_cmdline_user_args()
@@ -142,6 +143,7 @@ func verify_live_relay(arguments: PackedStringArray) -> void:
 		get_tree().quit(1)
 		return
 
+	profile.operator_name = "Leader RX" if host else "Guest RX"
 	open_home_hub()
 	home_hub.station_requested.emit("Social")
 	if host:
@@ -153,7 +155,7 @@ func verify_live_relay(arguments: PackedStringArray) -> void:
 		finish_relay_check(false)
 		return
 	if host:
-		print("RELAY ROOM CODE ", RiftRelay.connected_room)
+		printerr("RELAY ROOM CODE ", RiftRelay.connected_room)
 	var peer := RiftRelay.relay
 	if not await wait_for_relay(func(): return RiftRelay.room_size == 2, 75.0):
 		finish_relay_check(false)
@@ -184,7 +186,10 @@ func verify_live_relay(arguments: PackedStringArray) -> void:
 		finish_relay_check(await wait_for_relay(func(): return peer.lobby_get_data("rift_check_ack", false), 15.0))
 
 func verify_coop_mission(host: bool) -> void:
-	menu.leave_page()
+	if host:
+		menu.leave_page()
+	else:
+		await get_tree().create_timer(0.8).timeout
 	var previous_credits: int = profile.credits
 	var previous_xp: int = profile.player_xp
 	profile.gear["impact_liner" if host else "pulse_lens"] = "stored"
@@ -195,7 +200,7 @@ func verify_coop_mission(host: bool) -> void:
 		Input.action_release("move_right")
 		RiftRelay.relay.lobby_set_data("coop_guest_in_hub", not RiftRelay.can_deploy())
 	else:
-		var together := await wait_for_relay(func(): return is_instance_valid(home_hub.partner) and home_hub.partner.position.x > 2.0 and RiftRelay.relay.lobby_get_data("coop_guest_in_hub", false), 8.0)
+		var together := await wait_for_relay(func(): return is_instance_valid(home_hub.partner) and home_hub.partner_label.text == "Guest RX" and home_hub.partner.position.x > 2.0 and RiftRelay.relay.lobby_get_data("coop_guest_in_hub", false), 8.0)
 		if not together:
 			finish_relay_check(false)
 			return
@@ -204,6 +209,13 @@ func verify_coop_mission(host: bool) -> void:
 		finish_relay_check(false)
 		return
 	var mission = coop_mission
+	var names_ready := await wait_for_relay(func(): return is_instance_valid(mission) and mission.nameplates[0].text == "Leader RX" and mission.nameplates[1].text == "Guest RX", 5.0)
+	if not names_ready:
+		finish_relay_check(false)
+		return
+	if mission.camera.target != mission.operators[0 if host else 1]:
+		finish_relay_check(false)
+		return
 	if not is_equal_approx(mission.enemies[0].max_health, 100.0) or not is_equal_approx(mission.enemies[0].sector_damage_scale, 2.5):
 		finish_relay_check(false)
 		return
@@ -228,9 +240,18 @@ func verify_coop_mission(host: bool) -> void:
 			await get_tree().create_timer(1.0).timeout
 		finish_relay_check(moved and won and returned)
 		return
+	var host_spawn: float = mission.operators[0].position.x
 	var guest_moved := await wait_for_relay(func(): return is_instance_valid(mission) and mission.operators[1].position.x > 3.7 and RiftRelay.relay.lobby_get_data("coop_guest_saw_movement", false), 8.0)
 	var guest_hit := await wait_for_relay(func(): return is_instance_valid(mission) and (not is_instance_valid(mission.enemies[0]) or mission.enemies[0].health < mission.enemies[0].max_health), 8.0)
 	if guest_moved and guest_hit:
+		var guest_before: float = mission.operators[1].position.x
+		Input.action_press("move_right")
+		await get_tree().create_timer(0.52).timeout
+		Input.action_release("move_right")
+		await get_tree().create_timer(0.2).timeout
+		if mission.operators[0].position.x < host_spawn + 2.0 or absf(mission.operators[1].position.x - guest_before) > 0.7:
+			finish_relay_check(false)
+			return
 		mission.team_blueprints.append("bp_01_00")
 		for enemy in mission.enemies:
 			if is_instance_valid(enemy):
@@ -343,6 +364,7 @@ func add_joy_button(action: StringName, button: JoyButton) -> void:
 func show_main_menu() -> void:
 	if not RiftRelay.deploy_requested.is_connected(start_coop_mission):
 		RiftRelay.deploy_requested.connect(start_coop_mission)
+		RiftRelay.guest_joined.connect(enter_leader_hub)
 		RiftRelay.mission_disconnected.connect(close_coop_mission)
 		RiftRelay.mission_returned.connect(close_coop_mission.bind("Back at Operations Station."))
 	RiftAudio.play_music(false)
@@ -360,9 +382,28 @@ func show_main_menu() -> void:
 		get_tree().remove_meta(&"open_command_deck")
 		open_home_hub()
 
+func enter_leader_hub() -> void:
+	if not is_instance_valid(home_hub) or is_instance_valid(coop_mission):
+		return
+	coop_join_loading = ActLoadingScreen.new()
+	var loading = coop_join_loading
+	add_child(loading)
+	loading.show_loading("ONLINE PARTY", "JOINING LEADER’S STATION")
+	menu.hide()
+	menu.process_mode = Node.PROCESS_MODE_DISABLED
+	home_hub.set_panel_open(true)
+	await get_tree().create_timer(0.65).timeout
+	if is_instance_valid(home_hub) and not RiftRelay.mission_active:
+		home_hub.set_panel_open(false)
+	if is_instance_valid(loading):
+		loading.fade_out()
+
 func start_coop_mission(is_host: bool) -> void:
 	if is_instance_valid(coop_mission) or is_instance_valid(game_root):
 		return
+	if is_instance_valid(coop_join_loading):
+		coop_join_loading.queue_free()
+		coop_join_loading = null
 	if is_instance_valid(home_hub):
 		remove_home_hub()
 	menu.hide()
@@ -422,13 +463,15 @@ func refresh_menu_save() -> void:
 		menu.at_sector_start = bool(save.get_value("checkpoint", "at_start", false))
 		menu.run_unlocks = save.get_value("checkpoint", "weapons", [])
 
-func select_save_slot(number: int, fresh: bool) -> void:
+func select_save_slot(number: int, fresh: bool, operator_name := "") -> void:
 	var selected := ManualSave.new(number)
 	if not fresh and not selected.load_slot():
 		menu.show_slot_error()
 		return
 	save_session = selected
 	profile = selected.profile
+	if fresh:
+		profile.operator_name = profile.clean_operator_name(operator_name)
 	get_tree().set_meta(&"riftcore_save_session", selected)
 	open_home_hub()
 
@@ -470,6 +513,7 @@ func write_checkpoint(data: ConfigFile) -> Error:
 	return OK
 
 func open_home_hub() -> void:
+	RiftRelay.local_name = profile.operator_name
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	if is_instance_valid(home_hub):
 		return

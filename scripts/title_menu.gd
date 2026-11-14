@@ -6,12 +6,13 @@ signal load_requested
 signal hub_requested
 signal station_closed
 signal sector_requested(number: int)
-signal slot_requested(number: int, fresh: bool)
+signal slot_requested(number: int, fresh: bool, operator_name: String)
 signal save_requested
 
 var active_slot := 0
 var developer_session := false
 var replace_slot := 0
+var new_operator_name := ""
 var slot_error := ""
 var save_status: Label
 var relay_status: Label
@@ -126,7 +127,7 @@ func show_page(next: String) -> void:
 			UI.label(form, "Start over in Slot %d?" % replace_slot, 32, UI.CYAN)
 			UI.label(form, "Your next manual save will replace the existing file.", 19, UI.MUTED)
 			UI.button(form, "Keep Existing Save", show_page.bind("New Game"), true).grab_focus()
-			UI.button(form, "Start New Game", func(): slot_requested.emit(replace_slot, true))
+			UI.button(form, "Start New Game", func(): slot_requested.emit(replace_slot, true, new_operator_name))
 		"Save Game":
 			var form := card(columns, 1.35)
 			UI.label(form, "Save Game", 34, UI.CYAN)
@@ -312,6 +313,13 @@ func build_start_screen() -> void:
 		button.focus_neighbor_top = button.get_path_to(buttons[posmod(i - 1, buttons.size())])
 		button.focus_neighbor_bottom = button.get_path_to(buttons[(i + 1) % buttons.size()])
 	UI.label(stack, "RX-07    //    SYSTEM READY", 13, UI.MUTED)
+	var version := UI.label(self, "v%s" % ProjectSettings.get_setting("application/config/version"), 15, UI.MUTED)
+	version.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+	version.offset_left = -194
+	version.offset_top = -42
+	version.offset_right = -22
+	version.offset_bottom = -16
+	version.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	buttons[0].grab_focus()
 
 func build_archive(columns: HBoxContainer) -> void:
@@ -345,43 +353,59 @@ func build_social(columns: HBoxContainer) -> void:
 	UI.label(list, "SOCIAL  /  STEAM FRIENDS", 30, UI.CYAN)
 	UI.label(list, "Quick Invite opens a room automatically for friends playing RIFTCORE.", 15, UI.MUTED)
 	UI.label(list, RiftSocial.message, 16, UI.MUTED)
+	var copy_notice := UI.label(list, "", 14, UI.CYAN)
 	var rows := scroll_entries(list)
 	for friend in RiftSocial.contacts():
 		var row := HBoxContainer.new()
 		rows.add_child(row)
 		var tint := UI.CYAN if friend.priority == 0 else UI.MUTED
-		var label := UI.label(row, "%s  /  %s" % [friend.name, friend.status], 16, tint)
-		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var identity := UI.column(row, 2)
+		identity.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		UI.label(identity, friend.name, 17, tint)
+		UI.label(identity, "%s  ·  %s" % [friend.status, friend.id], 14, UI.MUTED)
+		UI.button(row, "Copy ID", func():
+			DisplayServer.clipboard_set(friend.id)
+			copy_notice.text = "Copied %s’s Steam ID." % friend.name
+		, false, 34)
 		UI.button(row, "Profile", RiftSocial.open_profile.bind(friend.id), false, 34)
 		if friend.priority == 0:
 			var invite := UI.button(row, "Quick Invite", RiftRelay.invite_friend.bind(int(friend.id)), false, 34)
 			steam_invite_buttons.append(invite)
-		if friend.saved:
+		if not friend.saved:
+			UI.button(row, "Add Friend", func():
+				inventory_status = "Contact saved." if RiftSocial.save_contact(friend.id, friend.name) else "Could not save contact."
+				show_page("Social")
+			, false, 34)
+		else:
 			UI.button(row, "Remove", func():
 				var removed := RiftSocial.save_contact(friend.id, "")
 				inventory_status = "" if removed else "Could not remove contact."
 				show_page("Social")
 			, false, 34)
 	if rows.get_child_count() == 0:
-		UI.label(rows, "No friends or saved contacts to display.", 16, UI.MUTED)
+		UI.label(rows, "No Steam friends are showing as in RIFTCORE. You can add a contact by ID.", 16, UI.MUTED)
 	var tools := card(columns, 0.8)
 	UI.label(tools, "CONTACTS", 27, UI.CYAN)
-	UI.button(tools, "Open Steam Friends", RiftSocial.open_friends, false, 36)
 	UI.button(tools, "Refresh Presence", show_page.bind("Social"), false, 36)
 	UI.label(tools, "Save a Steam contact", 19)
 	var steam_id := LineEdit.new()
-	steam_id.placeholder_text = "SteamID64"
-	steam_id.max_length = 17
+	steam_id.placeholder_text = "Steam ID, friend code, or profile link"
+	steam_id.max_length = 160
 	tools.add_child(steam_id)
+	UI.button(tools, "Paste Steam ID", func():
+		steam_id.text = DisplayServer.clipboard_get().strip_edges().left(steam_id.max_length)
+		steam_id.grab_focus()
+		steam_id.caret_column = steam_id.text.length()
+	, false, 34)
 	var alias := LineEdit.new()
 	alias.placeholder_text = "Display name (optional)"
 	alias.max_length = 40
 	tools.add_child(alias)
 	var notice := UI.label(tools, inventory_status, 15, UI.VIOLET)
 	UI.button(tools, "Save Contact", func():
-		var id := steam_id.text.strip_edges()
-		if not RiftSocial.valid_id(id):
-			notice.text = "Enter a valid 17-digit SteamID64 from their Steam profile."
+		var id := RiftSocial.resolve_contact_id(steam_id.text)
+		if id.is_empty():
+			notice.text = "Use a Steam ID, numeric friend code, or a numeric Steam profile link."
 			return
 		if RiftSocial.save_contact(id, alias.text.strip_edges() if not alias.text.strip_edges().is_empty() else id):
 			inventory_status = "Contact saved."
@@ -389,7 +413,7 @@ func build_social(columns: HBoxContainer) -> void:
 		else:
 			notice.text = "Could not save contact."
 	, false, 36)
-	UI.label(tools, "Steam supplies presence for Steam friends. Saved contacts are shortcuts to their profiles.", 15, UI.MUTED)
+	UI.label(tools, "Steam friends appear here while playing RIFTCORE. Saved contacts stay on your list.", 15, UI.MUTED)
 	build_online_room(columns)
 
 func build_online_room(columns: HBoxContainer) -> void:
@@ -449,12 +473,22 @@ func refresh_online_room() -> void:
 
 func open_slot_picker(mode: String) -> void:
 	slot_error = ""
+	new_operator_name = ""
 	show_page(mode)
 
 func build_save_slots(columns: HBoxContainer, fresh: bool) -> void:
 	var slots := card(columns, 1.35)
 	UI.label(slots, "Choose a Save Slot", 34, UI.CYAN)
 	UI.label(slots, "Save manually at the station or from Pause." if fresh else "Choose a slot to return to its station.", 19, UI.MUTED)
+	var name_field: LineEdit
+	if fresh:
+		UI.label(slots, "Player Name", 18, UI.CYAN)
+		name_field = LineEdit.new()
+		name_field.max_length = 20
+		name_field.placeholder_text = "RX-07"
+		name_field.text = new_operator_name
+		name_field.text_changed.connect(func(value: String): new_operator_name = value)
+		slots.add_child(name_field)
 	var first: Button
 	for number in range(1, ManualSave.SLOT_COUNT + 1):
 		var data := ManualSave.read_slot(number)
@@ -470,7 +504,9 @@ func build_save_slots(columns: HBoxContainer, fresh: bool) -> void:
 		button.disabled = not fresh and not occupied
 		if not button.disabled and not first:
 			first = button
-	if first:
+	if name_field:
+		name_field.grab_focus()
+	elif first:
 		first.grab_focus()
 	if not slot_error.is_empty():
 		UI.label(slots, slot_error, 18, UI.CYAN)
@@ -481,7 +517,7 @@ func choose_slot(number: int, fresh: bool, occupied: bool) -> void:
 		replace_slot = number
 		show_page("Replace Slot")
 	else:
-		slot_requested.emit(number, fresh)
+		slot_requested.emit(number, fresh, new_operator_name if fresh else "")
 
 func show_slot_error() -> void:
 	slot_error = "That save could not be opened."

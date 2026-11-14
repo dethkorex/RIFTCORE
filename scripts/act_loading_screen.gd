@@ -5,7 +5,7 @@ var shade: ColorRect
 var heading: Label
 var progress: ProgressBar
 
-func show_loading(sector_title: String) -> void:
+func show_loading(sector_title: String, title := "LOADING ACT II") -> void:
 	layer = 100
 	shade = ColorRect.new()
 	shade.color = Color("080f23")
@@ -19,7 +19,7 @@ func show_loading(sector_title: String) -> void:
 	column.custom_minimum_size.x = 490.0
 	var sector := UI.label(column, sector_title.to_upper(), 20, Color("9db5ce"))
 	sector.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	heading = UI.label(column, "LOADING ACT II", 49, Color("86edff"))
+	heading = UI.label(column, title, 49, Color("86edff"))
 	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	progress = ProgressBar.new()
 	progress.custom_minimum_size.y = 6
