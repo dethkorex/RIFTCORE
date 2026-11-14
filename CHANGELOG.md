@@ -4,7 +4,7 @@
 
 - Added 50 Core Enhancements across five sockets and 50 Shop products, including existing crafting materials, recovery supplies and temporary buffs.
 - Renamed Blueprints to Crafting. Recovered blueprints go to Storage → Gear after extraction. Learn them there to unlock recipes. Previously learned recipes carry forward.
-- Assign four square quick slots from Storage → Gear. Use the D-pad or keyboard 1–4 in a mission. Quick stacks hold five and inventory stacks hold 100.
+- Assign four square quick slots from Storage → Gear. Use the D-pad or keyboard 1–4 in a mission. Each direction holds one item, for up to four total. Inventory stacks hold 100.
 - Made midair ladder grabs more forgiving. The menu cursor hides on controller input and returns on mouse movement or click.
 - Unified the game and launcher under the Barlow Condensed font family.
 - Moved Social next to Deploy. Start or join a group from Deploy or Social. Add recent teammates in Friends and compare seasonal best sector times on the Leaderboard. Friends’ times sync when you group together.

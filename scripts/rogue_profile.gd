@@ -22,7 +22,7 @@ const Enhancements := preload("res://scripts/enhancement_catalog.gd")
 const Stock := preload("res://scripts/stock_catalog.gd")
 static var stock := Stock.catalog()
 static var enhancements := Enhancements.catalog()
-const QUICK_MAX := 5
+const QUICK_MAX := 1
 const STACK_MAX := 100
 var blueprint_items := {}
 var inventory := {}
@@ -147,8 +147,11 @@ func decode_from(data: ConfigFile) -> void:
 		for index in mini(quick_slots.size(), assigned.size()):
 			if assigned[index] is Dictionary:
 				var id := String(assigned[index].get("id", ""))
-				if stock.has(id) and not stock[id].has("material"):
-					quick_slots[index] = {"id": id, "count": clampi(int(assigned[index].get("count", 0)), 0, QUICK_MAX)}
+				var count := clampi(int(assigned[index].get("count", 0)), 0, 5)
+				if count > 0 and stock.has(id) and not stock[id].has("material"):
+					quick_slots[index] = {"id": id, "count": QUICK_MAX}
+					if count > QUICK_MAX:
+						inventory[id] = mini(STACK_MAX, int(inventory.get(id, 0)) + count - QUICK_MAX)
 	memories.clear()
 	for index in range(1, Story.MEMORIES.size() + 1):
 		if data.get_value("archive", "fragment_%d" % index, false):
@@ -461,7 +464,7 @@ func clear_quick(index: int) -> String:
 		quick_slots[index] = slot
 		inventory[id] = previous
 		return "Could not save the quick slot."
-	return "Stack returned to inventory."
+	return "Item returned to inventory."
 
 func consume_quick(index: int, operator: RiftPlayer) -> bool:
 	if index < 0 or index >= quick_slots.size() or operator.health <= 0:

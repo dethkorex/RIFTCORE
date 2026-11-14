@@ -60,21 +60,18 @@ func show_quick_slots(profile) -> void:
 		var key: String = ["↑", "←", "→", "↓"][index] if not Input.get_connected_joypads().is_empty() else str(index + 1)
 		var count := UI.label(stack, key, 14, UI.CYAN)
 		count.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		if profile.stock.has(id):
-			var icon := TextureRect.new()
-			icon.texture = icons.icon(profile.stock[id].icon, profile.stock[id].icon)
-			icon.custom_minimum_size = Vector2(23, 23)
-			icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-			icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-			icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			stack.add_child(icon)
-		var quantity := UI.label(stack, str(slot.get("count", 0)), 14)
-		quantity.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		if profile.has_signal("quick_changed"):
-			profile.quick_changed.connect(func():
-				if is_instance_valid(quantity):
-					quantity.text = str(profile.quick_slots[index].get("count", 0))
-			)
+		var icon := TextureRect.new()
+		var item_icon: Texture2D = icons.icon(profile.stock[id].icon, profile.stock[id].icon) if profile.stock.has(id) else null
+		icon.custom_minimum_size = Vector2(23, 23)
+		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		stack.add_child(icon)
+		var refresh := func():
+			if is_instance_valid(icon):
+				icon.texture = item_icon if int(profile.quick_slots[index].get("count", 0)) > 0 else null
+		refresh.call()
+		profile.quick_changed.connect(refresh)
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
