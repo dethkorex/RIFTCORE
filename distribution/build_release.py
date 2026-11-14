@@ -145,7 +145,8 @@ def main() -> None:
     migration_dir.mkdir(exist_ok=True)
     migration_notes = "Update and play upgrades Launcher 0.1 in place, then opens Launcher 0.2 and checks the playtest channel. Existing saves, game versions and shortcuts are retained."
     migration = {"tag": "v0.4.100", "assets": {}, "notes": migration_notes}
-    manifest = {"tag": a.tag, "assets": {}, "notes": notes}
+    manifest = {"tag": a.tag, "assets": {}, "launcher": {}, "notes": notes}
+    launcher_build = int(re.search(r"const LAUNCHER_BUILD := (\d+)", (launcher / "launcher.gd").read_text(encoding="utf-8"))[1])
     (out / "PATCH_NOTES.md").write_text(notes + "\n", encoding="utf-8")
     with local_templates(ROOT / "export_presets.cfg", templates), local_templates(launcher / "export_presets.cfg", templates):
         for platform, (preset, binary, _) in ENGINE_ASSETS.items():
@@ -154,6 +155,12 @@ def main() -> None:
             with embedded_release(a.tag, a.repo):
                 export(engine, ROOT, preset, version / binary, work / f"{platform}-game.log")
             export(engine, launcher, preset, payload / binary, work / f"{platform}-launcher.log")
+            launcher_asset = out / (f"RIFTCORE-Launcher-{platform}" + (".exe" if platform == "windows-x64" else ""))
+            shutil.copy2(payload / binary, launcher_asset)
+            with launcher_asset.open("rb") as handle:
+                launcher_hash = hashlib.file_digest(handle, "sha256").hexdigest()
+            manifest["launcher"][platform] = {"file": launcher_asset.name, "build": launcher_build,
+                                               "size": launcher_asset.stat().st_size, "sha256": launcher_hash}
             if platform == "windows-x64":
                 shutil.copy2(icon_cache, payload / "riftcore.ico")
             else:

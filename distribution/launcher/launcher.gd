@@ -2,12 +2,15 @@ extends Control
 
 const UpdateClient := preload("res://update_client.gd")
 
+const LAUNCHER_BUILD := 3
+
 var client := UpdateClient.new()
 var install_root := ""
 var repo := ""
 var installed := ""
 var next_tag := ""
 var update_manifest: Dictionary
+var launcher_update := false
 var bundled_notes := ""
 var preview_channel := false
 var status: Label
@@ -29,6 +32,13 @@ func _ready() -> void:
 		repo = String(config.get_value("updates", "repository", ""))
 		preview_channel = config.get_value("updates", "preview_channel", false)
 	resume_upgrade = root_arg.has("--resume-upgrade")
+	if root_arg.has("--replace-launcher"):
+		var folder := OS.get_executable_path().get_base_dir()
+		if folder.get_file().begins_with("launcher-") and folder.get_base_dir().get_file() == "downloads":
+			install_root = folder.get_base_dir().get_base_dir()
+			build_ui()
+			migrate_launcher.call_deferred(true)
+			return
 	if OS.get_executable_path().get_base_dir().get_file() == UpdateClient.LEGACY_MIGRATION_TAG:
 		var bridge_root := install_root.get_base_dir().get_base_dir()
 		if install_root.get_base_dir().get_file() == "versions" and FileAccess.file_exists(bridge_root.path_join("updates.cfg")):
@@ -55,11 +65,13 @@ func _input(event: InputEvent) -> void:
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 		Input.set_default_cursor_shape(Input.CURSOR_ARROW)
 
-func migrate_launcher() -> void:
+func migrate_launcher(self_update := false) -> void:
 	status.text = "Upgrading the RIFTCORE launcher…"
 	var target := install_root.path_join(client.game_filename)
 	var staged := target + ".upgrade"
 	var backup := target + ".previous"
+	if FileAccess.file_exists(backup):
+		DirAccess.remove_absolute(backup)
 	if DirAccess.copy_absolute(OS.get_executable_path(), staged, 493) != OK:
 		status.text = "Could not stage the launcher update. Reopen the launcher to retry."
 		return
@@ -94,7 +106,8 @@ func migrate_launcher() -> void:
 		DirAccess.rename_absolute(backup, target)
 		status.text = "The launcher could not restart. Reopen it to retry."
 		return
-	DirAccess.remove_absolute(backup)
+	if not self_update:
+		DirAccess.remove_absolute(backup)
 	get_tree().quit()
 
 func relaunched_arguments() -> PackedStringArray:
@@ -124,7 +137,7 @@ func build_ui() -> void:
 	add_brand_art(header, preload("res://branding/riftcore-icon.svg"), Vector2(92, 92))
 	add_brand_art(header, preload("res://branding/riftcore-wordmark.svg"), Vector2(400, 82))
 	var version := Label.new()
-	version.text = "INSTALLER  0.2"
+	version.text = "LAUNCHER  0.2  /  BUILD %d" % LAUNCHER_BUILD
 	version.add_theme_color_override("font_color", Color("ff78cb"))
 	stack.add_child(version)
 	stack.add_child(HSeparator.new())
@@ -260,8 +273,11 @@ func apply_manifest(info: Variant) -> void:
 		show_notes(tag, latest_notes)
 	else:
 		show_fallback_notes("No patch notes were published for this build.")
-	if not client.compare_tags(tag, installed):
+	launcher_update = int(client.launcher_entry(info).get("build", 0)) > LAUNCHER_BUILD
+	if not client.compare_tags(tag, installed) and not launcher_update:
 		status.text = "%s is up to date." % installed
+		if resume_upgrade:
+			launch_game()
 		return
 	next_tag = tag
 	update_manifest = info
@@ -280,6 +296,14 @@ func apply_update() -> void:
 	progress.show()
 	progress.value = 0
 	status.text = "Downloading %s…" % next_tag
+	if launcher_update:
+		status.text = "Updating the launcher…"
+		var replacement := await client.stage_launcher(update_manifest)
+		if replacement.is_empty() or OS.create_process(replacement, PackedStringArray(["--", "--replace-launcher"])) <= 0:
+			fail_update("Could not update the launcher. You can still play installed.")
+			return
+		get_tree().quit()
+		return
 	var error := await client.install(update_manifest)
 	if not error.is_empty():
 		fail_update(error)

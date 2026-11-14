@@ -125,6 +125,33 @@ func download_progress() -> float:
 		return 0.0
 	return 100.0 * float(transfer.get_downloaded_bytes()) / expected_bytes
 
+func launcher_entry(info: Dictionary) -> Dictionary:
+	var entry: Variant = info.get("launcher", {}).get(target_platform) if info.get("launcher", {}) is Dictionary else null
+	var tag := String(info.get("tag", ""))
+	if not entry is Dictionary or not is_match(TAG_PATTERN, tag):
+		return {}
+	var name := "RIFTCORE-Launcher-%s" % target_platform + (".exe" if OS.get_name() == "Windows" else "")
+	var build := int(entry.get("build", 0))
+	var bytes := int(entry.get("size", 0))
+	var hash := String(entry.get("sha256", ""))
+	if build < 1 or entry.get("file") != name or bytes < 1 or bytes > MAX_PACKAGE or not is_match(HASH_PATTERN, hash):
+		return {}
+	return {"file": name, "build": build, "size": bytes, "sha256": hash}
+
+func stage_launcher(info: Dictionary) -> String:
+	var entry := launcher_entry(info)
+	if entry.is_empty():
+		return ""
+	var folder := install_root.path_join("downloads").path_join("launcher-%d-%d" % [OS.get_process_id(), Time.get_ticks_usec()])
+	if DirAccess.make_dir_recursive_absolute(folder) != OK:
+		return ""
+	var path := folder.path_join(game_filename)
+	if not await download_verified(String(info.tag), entry, path):
+		return ""
+	if OS.get_name() != "Windows" and FileAccess.set_unix_permissions(path, 493) != OK:
+		return ""
+	return path
+
 func install(info: Dictionary) -> String:
 	var entry := package_entry(info)
 	if entry.is_empty() or not is_match(REPO_PATTERN, repo):
@@ -137,8 +164,17 @@ func install(info: Dictionary) -> String:
 	if result != OK:
 		return "Could not write to the update folder (%s)." % error_string(result)
 	var zip_path := staging.path_join("%s-%d-%d.zip" % [tag, OS.get_process_id(), Time.get_ticks_usec()])
+	if not await download_verified(tag, entry, zip_path):
+		return "Download failed or did not pass the integrity check. Your installed game is unchanged."
+	var error := unpack_version(zip_path, tag)
+	DirAccess.remove_absolute(zip_path)
+	if error.is_empty():
+		prune_versions(tag)
+	return error
+
+func download_verified(tag: String, entry: Dictionary, path: String) -> bool:
 	transfer = HTTPRequest.new()
-	transfer.download_file = zip_path
+	transfer.download_file = path
 	transfer.timeout = 900.0
 	transfer.body_size_limit = MAX_PACKAGE
 	expected_bytes = entry.size
@@ -148,19 +184,45 @@ func install(info: Dictionary) -> String:
 		response = await transfer.request_completed
 	transfer.queue_free()
 	transfer = null
-	if response.is_empty() or response[0] != HTTPRequest.RESULT_SUCCESS or response[1] != 200:
-		DirAccess.remove_absolute(zip_path)
-		return "Download failed. Your installed game is unchanged."
-	var file := FileAccess.open(zip_path, FileAccess.READ)
-	var correct_size: bool = file != null and file.get_length() == entry.size
-	if file:
-		file.close()
-	if not correct_size or FileAccess.get_sha256(zip_path) != entry.sha256:
-		DirAccess.remove_absolute(zip_path)
-		return "The download did not pass the integrity check."
-	var error := unpack_version(zip_path, tag)
-	DirAccess.remove_absolute(zip_path)
-	return error
+	var valid: bool = not response.is_empty() and response[0] == HTTPRequest.RESULT_SUCCESS and response[1] == 200
+	valid = valid and FileAccess.file_exists(path) and FileAccess.get_size(path) == entry.size and FileAccess.get_sha256(path) == entry.sha256
+	if not valid and FileAccess.file_exists(path):
+		DirAccess.remove_absolute(path)
+	return valid
+
+func prune_versions(current: String) -> void:
+	var versions := install_root.path_join("versions")
+	var directory := DirAccess.open(versions)
+	if directory == null:
+		return
+	var rollback := ""
+	for tag in directory.get_directories():
+		if tag != LEGACY_MIGRATION_TAG and is_match(TAG_PATTERN, tag) and compare_tags(current, tag):
+			if version_is_complete(versions.path_join(tag), [game_filename, "RIFTCORE.pck"]) and compare_tags(tag, rollback):
+				rollback = tag
+	# Remove only known package files. Unknown files, links and newer versions are retained.
+	var allowed := [game_filename, "RIFTCORE.pck", "GODOT_LICENSE.txt", "GODOT_COPYRIGHT.txt",
+		"GODOTSTEAM_LICENSE.md", "steam_api64.dll", "libgodotsteam.windows.template_release.x86_64.dll",
+		"libsteam_api.so", "libgodotsteam.linux.template_release.x86_64.so"]
+	for tag in directory.get_directories():
+		if tag == rollback or tag == LEGACY_MIGRATION_TAG or not is_match(TAG_PATTERN, tag) or not compare_tags(current, tag) or directory.is_link(tag):
+			continue
+		var folder := DirAccess.open(versions.path_join(tag))
+		if folder == null or not folder.get_directories().is_empty():
+			continue
+		var files := folder.get_files()
+		if not Array(files).all(func(name): return name in allowed and not folder.is_link(name)):
+			continue
+		# Moving first keeps a locked/running Windows version intact.
+		var stale := tag + "-superseded-%d" % Time.get_ticks_usec()
+		if directory.rename(tag, stale) != OK:
+			continue
+		var stale_folder := DirAccess.open(versions.path_join(stale))
+		if stale_folder == null:
+			continue
+		for name in files:
+			stale_folder.remove(name)
+		directory.remove(stale)
 
 func unpack_version(zip_path: String, tag: String) -> String:
 	if not is_match(TAG_PATTERN, tag):

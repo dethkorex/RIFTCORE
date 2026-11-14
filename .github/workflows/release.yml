@@ -94,6 +94,17 @@ jobs:
             grep -F "SOCIAL SMOKE PASS" /tmp/game.log
             ! grep -E "SCRIPT ERROR:|Failed to load" /tmp/launcher.log /tmp/native.log /tmp/installed.log /tmp/game.log
           '
+      - name: Verify launcher self-replacement on Linux
+        run: |
+          base="$(mktemp -d)"
+          staged="$base/downloads/launcher-qa/RIFTCORE"
+          mkdir -p "$(dirname "$staged")"
+          printf '#!/bin/sh\nexit 0\n' > "$base/RIFTCORE"
+          printf '[updates]\nrepository=""\n' > "$base/updates.cfg"
+          install -m 755 release-tools/artifacts/RIFTCORE-Launcher-linux-x64 "$staged"
+          "$staged" --headless --quit-after 500 -- --replace-launcher
+          cmp "$base/RIFTCORE" "$staged"
+          test -s "$base/RIFTCORE.previous"
       - name: Verify the Launcher 0.1 migration on Linux
         run: |
           base="$(mktemp -d)"
@@ -136,6 +147,18 @@ jobs:
       - name: Play the packaged Windows co-op mission
         shell: pwsh
         run: python distribution/verify_coop.py game/RIFTCORE.exe
+      - name: Verify launcher self-replacement on Windows
+        shell: pwsh
+        run: |
+          $base = Join-Path $PWD 'self-update'
+          $folder = New-Item -ItemType Directory -Force (Join-Path $base 'downloads/launcher-qa')
+          $target = Join-Path $base 'RIFTCORE.exe'
+          $staged = Join-Path $folder.FullName 'RIFTCORE.exe'
+          Copy-Item game/RIFTCORE.exe $target
+          Copy-Item RIFTCORE-Launcher-windows-x64.exe $staged
+          Set-Content (Join-Path $base 'updates.cfg') '[updates]`nrepository=""'.Replace('`n', [Environment]::NewLine)
+          $run = Start-Process -FilePath $staged -ArgumentList @('--headless','--quit-after','600','--','--replace-launcher') -Wait -PassThru
+          if ($run.ExitCode -ne 0 -or (Get-FileHash $target).Hash -ne (Get-FileHash $staged).Hash -or !(Test-Path "$target.previous")) { exit 1 }
       - uses: actions/download-artifact@v4
         with:
           name: riftcore-legacy-migration

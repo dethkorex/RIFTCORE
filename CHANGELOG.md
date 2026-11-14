@@ -2,6 +2,7 @@
 
 ## 5.9.2
 
+- Launcher 0.2 now supports verified self-updates. Game updates keep one previous build and remove older, unmodified game packages to free disk space. Saves are unaffected.
 - Added **Update Game** to Settings. Check releases and read patch notes in the game. From the title screen, install and restart without opening the launcher.
 - Reorganized Settings into Display & Audio, Controls, and Update Game. The binding list scrolls independently.
 - Fixed update installs that hit incomplete version folders. Updates verify the download and report the specific extraction, permission, or activation error when installation fails.
