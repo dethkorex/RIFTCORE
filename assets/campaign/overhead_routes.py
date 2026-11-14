@@ -62,7 +62,7 @@ OVERHEAD = {
 # The device is placed at a local fraction of the same width.
 ARENAS = {
     "machine_jungle": (
-        ("ROOT GUARD LOFT", ((.23,5,2.3),(.38,5,4.15),(.71,6,3.3)), "vine", .38),
+        ("ROOT GUARD LOFT", ((.19,5,2.3),(.43,5,4.15),(.73,6,3.3)), "vine", .43),
         ("COLOSSUS CANOPY", ((.17,8,3.65),(.61,7,6.05),(.81,5,4.5)), "vine", .81),
     ),
     "frozen_reactor": (

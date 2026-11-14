@@ -6,6 +6,12 @@ signal shot_fired(shot: RiftProjectile)
 const XP_REWARDS := [12, 16, 26, 18, 16]
 const XP_ORB := preload("res://assets/pickups/xp_orb.tscn")
 const ATTACK_FX := preload("res://scripts/attack_fx.gd")
+const Catalog := preload("res://scripts/sector_catalog.gd")
+const ARMOR := preload("res://assets/enemies/security_finish.gdshader")
+const HEIGHT_ATLAS := preload("res://assets/enemies/security_height.png")
+const ALBEDO_ATLAS := preload("res://assets/enemies/security_trim.png")
+const CERAMIC_TONES := ["5e7898", "66784c", "7299b2", "648892", "a08059", "8399b1", "9ca39c", "837b9e", "ab8553", "8e6089"]
+static var armor_finishes: Dictionary = {}
 const SMALL_DROPS := [
 	preload("res://assets/pickups/health_small.tscn"),
 	preload("res://assets/pickups/energy_small.tscn"),
@@ -19,6 +25,14 @@ const LARGE_DROPS := [
 @export_range(0.0, 1.0) var drop_chance := 0.03
 enum Variant { SCOUT, QUAD, HEAVY, TURRET, FLYER }
 @export var variant: Variant
+@export_range(0, 10) var detachment_sector := 0
+@export_range(-1, 5) var patrol_model := -1
+const STANDARD_ROLES := [Variant.SCOUT, Variant.QUAD, Variant.HEAVY, Variant.TURRET, Variant.FLYER, Variant.FLYER]
+const STANCE_COLORS := [Color("ffc278"), Color("8deeee"), Color("eadb68"), Color("9bb7ff"), Color("d99bff"), Color("f5e9a6")]
+var defense_marker: MeshInstance3D
+var maneuver_time := 0.0
+var attacks_launched := 0
+var has_defense := false
 @export var model_override: PackedScene
 @export var patrol_right_limit := 100000.0
 @export var planted_override := false
@@ -66,6 +80,9 @@ func scale_for_sector(sector: int, act := 1) -> void:
 	health_changed.emit(health, max_health)
 
 func _ready() -> void:
+	if patrol_model >= 0:
+		variant = STANDARD_ROLES[patrol_model]
+	has_defense = variant == Variant.HEAVY or patrol_model == 3
 	max_health = [40.0, 55.0, 95.0, 60.0, 35.0][variant]
 	move_speed = [2.4, 3.6, 1.35, 0.0, 2.5][variant]
 	super._ready()
@@ -74,6 +91,11 @@ func _ready() -> void:
 	build_visuals()
 	install_model()
 	install_health_bar()
+	if has_defense:
+		var mask := BoxMesh.new()
+		mask.size = Vector3(0.045, 1.30, 0.76)
+		defense_marker = ATTACK_FX.piece(self, mask, Vector3.ZERO, Vector3.ONE, Color("b77cf5"))
+		defense_marker.hide()
 	died.connect(_on_died)
 
 func build_visuals() -> void:
@@ -100,9 +122,16 @@ func build_visuals() -> void:
 
 func install_model() -> void:
 	var visual := model_override if model_override else MODELS[variant] as PackedScene
+	if detachment_sector > 0:
+		var model_name := "sector_%02d_%d" % [detachment_sector, variant] if patrol_model < 0 else "patrol_%d" % patrol_model
+		var polished := load("res://assets/enemies/detachments/%s.glb" % model_name) as PackedScene
+		if polished:
+			visual = polished
 	robot = visual.instantiate() as Node3D
 	add_child(robot)
 	robot.scale = Vector3.ONE * 1.16
+	if detachment_sector > 0:
+		finish_armor()
 	for index in range(4):
 		var limb := robot.find_child("Gait_%d" % index, true, false) as Node3D
 		if limb:
@@ -116,6 +145,33 @@ func install_model() -> void:
 		Vector3(1.1, 0.78, 0.95),
 	][variant] * 1.16
 	collider.shape = hitbox
+
+func finish_armor() -> void:
+	var kit := detachment_sector if patrol_model < 0 else 0
+	var tone := Color(CERAMIC_TONES[kit - 1]) if kit > 0 else Color("8798ad")
+	var atlas := ALBEDO_ATLAS
+	if kit > 2:
+		var path := "res://assets/campaign/%s/trim.png" % Catalog.info(kit).id
+		if ResourceLoader.exists(path):
+			atlas = load(path)
+	for piece in robot.find_children("*", "MeshInstance3D", true, false):
+		for surface in piece.mesh.get_surface_count():
+			var material := piece.get_active_material(surface) as StandardMaterial3D
+			if not material or not material.albedo_texture:
+				continue
+			var slot := material.resource_name
+			var key := "%d:%s" % [kit, slot]
+			if not armor_finishes.has(key):
+				var finish := ShaderMaterial.new()
+				finish.shader = ARMOR
+				finish.set_shader_parameter("armor_albedo", atlas)
+				finish.set_shader_parameter("trim_height", HEIGHT_ATLAS)
+				var coating := tone if slot.contains("Ceramic") else tone.darkened(.27) if slot.contains("Cobalt") else Color("8394aa")
+				finish.set_shader_parameter("chassis_coat", coating)
+				finish.set_shader_parameter("alloy", .46 if slot.contains("Ceramic") else .62)
+				finish.set_shader_parameter("roughness_bias", .43)
+				armor_finishes[key] = finish
+			piece.set_surface_override_material(surface, armor_finishes[key])
 
 func install_health_bar() -> void:
 	var bar := MeshInstance3D.new()
@@ -137,6 +193,8 @@ func _physics_process(delta: float) -> void:
 	contact_lock = maxf(0.0, contact_lock - delta)
 	shot_clock -= delta
 	attack_time = maxf(0.0, attack_time - delta)
+	maneuver_time = maxf(0.0, maneuver_time - delta)
+	refresh_defense()
 	var tracking := false
 	if is_instance_valid(target) and target.health > 0.0:
 		var distance := target.global_position.x - global_position.x
@@ -151,7 +209,10 @@ func _physics_process(delta: float) -> void:
 			prepare_shot()
 	if not tracking and absf(global_position.x - patrol_center) > 4.0:
 		direction = -signf(global_position.x - patrol_center)
-	velocity.x = 0.0 if planted_override or shot_windup > 0.0 else direction * move_speed
+	var move_factor := 1.0
+	if maneuver_time > 0.0:
+		move_factor = -0.68 if patrol_model in [0, 5] else 1.78 if variant == Variant.QUAD else 1.0
+	velocity.x = 0.0 if planted_override or shot_windup > 0.0 else direction * move_speed * move_factor
 	if is_on_floor() and variant != Variant.TURRET:
 		var ledge := global_position + Vector3(direction * 0.75, 0.0, 0.0)
 		var probe := PhysicsRayQueryParameters3D.create(ledge, ledge + Vector3.DOWN * 1.1)
@@ -168,7 +229,9 @@ func _physics_process(delta: float) -> void:
 		recoil = move_toward(recoil, 0.0, 25.0 * delta)
 	if variant == Variant.FLYER:
 		hover_clock += delta
-		velocity.y = (home_height + sin(hover_clock * 2.6) * 0.17 - global_position.y) * 4.0
+		var hover_height := .70 if tracking and patrol_model == 4 else .32
+		var evasion := .7 if maneuver_time > 0.0 and (patrol_model == 5 or detachment_sector == 6) else 0.0
+		velocity.y = (home_height + sin(hover_clock * 2.6) * hover_height + evasion - global_position.y) * 4.0
 	elif not is_on_floor():
 		velocity.y -= 28.0 * delta
 	velocity.z = -global_position.z * 12.0
@@ -196,6 +259,24 @@ func _physics_process(delta: float) -> void:
 		if support and contact.get_normal().y > 0.62:
 			last_support = support
 			last_ground_local = support.to_local(contact.get_position() + Vector3.UP * 0.42)
+
+func refresh_defense() -> void:
+	if defense_marker:
+		defense_marker.position.x = direction * .76
+		defense_marker.visible = guard_active()
+
+func guard_active() -> bool:
+	return has_defense and attack_time <= 0.0 and shot_windup <= 0.0 and stagger_left <= 0.0
+
+func hit_by_projectile(shot: RiftProjectile) -> bool:
+	if shot.owner_faction != "player" or shot.is_charged or not guard_active():
+		return false
+	if (shot.global_position.x - global_position.x) * direction < 0.08:
+		return false
+	# A closed front plate blocks basic buster fire. Charged fire, melee,
+	# attacking from behind or shooting while the enemy fires defeat it.
+	shot_clock = minf(shot_clock, .45)
+	return true
 
 func take_damage(amount: float, source_position := Vector3.ZERO) -> void:
 	var previous := health
@@ -228,19 +309,49 @@ func prepare_shot() -> void:
 func fire_at_player() -> void:
 	attack_time = 0.4
 	var origin := global_position + Vector3(direction * 0.76, 0.13, 0.0)
-	var tint := ATTACK_FX.tint_for(sector_number)
+	var tint: Color = ATTACK_FX.tint_for(sector_number) if patrol_model < 0 else STANCE_COLORS[patrol_model]
 	ATTACK_FX.muzzle(get_parent(), origin, tint)
-	var spread: Array[float] = [0.0]
-	if second_act and variant in [Variant.TURRET, Variant.FLYER]:
-		spread.assign([-0.16, 0.16] if variant == Variant.FLYER else [-0.21, 0.0, 0.21])
+	var spread := attack_spread()
+	maneuver_time = .42
+	attacks_launched += 1
 	for angle in spread:
 		var shot := RiftProjectile.new()
 		get_parent().add_child(shot)
 		shot.global_position = origin
 		shot.speed = (17.0 if variant == Variant.TURRET else 13.2) * (1.10 if second_act else 1.0)
+		if patrol_model == 2 or detachment_sector == 1:
+			shot.speed *= 1.14
+		elif detachment_sector == 3 or patrol_model == 5:
+			shot.speed *= .82
 		shot.damage = (15.0 if variant == Variant.HEAVY else 9.0) * sector_damage_scale
-		shot.setup(locked_aim.rotated(Vector3.BACK, angle), faction, tint, false, variant == Variant.HEAVY, false, sector_number, variant)
+		var role: int = variant if patrol_model < 0 else mini(patrol_model+1, 7)
+		var style := sector_number if patrol_model < 0 else 0
+		shot.setup(locked_aim.rotated(Vector3.BACK, float(angle)), faction, tint, false, variant == Variant.HEAVY, false, style, role)
 		shot_fired.emit(shot)
+
+func attack_spread() -> Array:
+	if patrol_model >= 0:
+		match patrol_model:
+			0: return [0.0]
+			1: return [-.12, .12]
+			2: return [0.0, .32] if second_act else [0.0]
+			3: return [-.19, 0.0, .19]
+			4: return [-.20, -.06]
+			5: return [-.27, .27, 0.0]
+	match detachment_sector:
+		1: return [0.0] if attacks_launched % 2 == 0 else [-.18, .18]
+		2: return [.16, .30] if variant == Variant.FLYER else [0.0, .30]
+		3: return [-.22, .22] if variant == Variant.TURRET else [.06]
+		4: return [0.15, .37]
+		5: return [0.24 if attacks_launched % 2 == 0 else -.24, 0.0]
+		6: return [-.25, -.10] if variant == Variant.FLYER else [0.0, .23]
+		7: return [-.25, 0.0, .25]
+		8: return [.12, -.12]
+		9: return [0.0, .14, -.14] if variant == Variant.HEAVY else [0.0]
+		10: return [-.32, 0.0, .32]
+	if second_act and variant in [Variant.TURRET, Variant.FLYER]:
+		return [-.16, .16] if variant == Variant.FLYER else [-.21, 0.0, .21]
+	return [0.0]
 
 func spawn_pickup(scene: PackedScene, at: Vector3, temporary: bool, experience := 0, anchor: StaticBody3D = null) -> void:
 	var pickup := scene.instantiate() as Area3D

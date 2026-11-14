@@ -304,6 +304,9 @@ func load_stage() -> void:
 			node.phase_time = func(): return factory_trap_clock
 		if node.scene_file_path.begins_with("res://assets/pickups/") or node.is_in_group(&"factory_salvage_chest"):
 			stage_props.append(stage.get_path_to(node))
+	for barricade in get_tree().get_nodes_in_group(&"factory_breakable"):
+		if stage.is_ancestor_of(barricade):
+			stage_props.append(stage.get_path_to(barricade))
 	for platform in get_tree().get_nodes_in_group(&"factory_one_way"):
 		if stage.is_ancestor_of(platform) and platform.get_script() == preload("res://scripts/phase_platform.gd"):
 			platform.phase_time = func(): return factory_trap_clock
@@ -795,7 +798,7 @@ func broadcast_state(reliable_operators := false) -> void:
 	security.resize(enemies.size() * 6)
 	props_consumed.clear()
 	for operator in operators:
-		players.append([operator.global_position, operator.model_root.rotation, operator.health, operator.energy, operator.current_animation, operator.facing, operator.equipped_suit(), operator.lives, operator.max_health, operator.max_energy, operator.velocity, operator.fire_lock, operator.charge_held, operator.melee_lock, operator.quick_profile.quick_slots if operator.quick_profile else [], operator.supplies])
+		players.append([operator.global_position, operator.model_root.rotation, operator.health, operator.energy, operator.current_animation, operator.facing, operator.equipped_suit(), operator.lives, operator.max_health, operator.max_energy, operator.velocity, operator.fire_lock, operator.charge_held, operator.melee_lock, operator.quick_profile.quick_slots if operator.quick_profile else [], operator.supplies, operator.charge_elapsed if operator.charge_held else 0.0])
 	for index in enemies.size():
 		var enemy := enemies[index]
 		if is_instance_valid(enemy) and enemy.health > 0:
@@ -806,13 +809,17 @@ func broadcast_state(reliable_operators := false) -> void:
 			security[offset + 3] = enemy.robot.rotation.y
 			security[offset + 4] = enemy.robot.rotation.z
 			security[offset + 5] = enemy.health
+	var fractures := {}
 	for index in stage_props.size():
-		if not stage.has_node(stage_props[index]):
+		var prop := stage.get_node_or_null(stage_props[index])
+		if not prop:
 			props_consumed.append(index)
+		elif prop.is_in_group(&"factory_breakable") and prop.fractures > 0:
+			fractures[index] = prop.fractures
 	var platform_positions: Array[Vector3] = []
 	for platform in moving_platforms:
 		platform_positions.append(platform.position)
-	var boss_state := [Vector3.ZERO, Vector3.ZERO, 0.0, boss_started, boss_defeated, gate.get_node("Door").position.y, platform_positions, entrance_open, checkpoint, factory_trap_clock]
+	var boss_state := [Vector3.ZERO, Vector3.ZERO, 0.0, boss_started, boss_defeated, gate.get_node("Door").position.y, platform_positions, entrance_open, checkpoint, factory_trap_clock, fractures]
 	if is_instance_valid(boss):
 		boss_state[0] = boss.global_position
 		boss_state[1] = boss.rotation
@@ -822,7 +829,7 @@ func broadcast_state(reliable_operators := false) -> void:
 		var snapshot := players.duplicate()
 		for other in players.size():
 			if other != index:
-				snapshot[other] = players[other].slice(0, 11)
+				snapshot[other] = players[other].slice(0, 11) + [players[other][16]]
 		if reliable_operators:
 			peer.call_func_on(roster[index], receive_operators, act, snapshot, state_sequence)
 		else:
@@ -866,7 +873,7 @@ func receive_state(remote_act: int, security: PackedFloat32Array, arena: Array, 
 		for path_name in ["TERRAIN/MidpointCheckpoint", "TERRAIN/ForgeHallCheckpoint"]:
 			var beacon := stage.get_node_or_null(path_name) as Node3D
 			if beacon and beacon.global_position.distance_to(remote_checkpoint - Vector3.UP * 0.88) < 0.15:
-				beacon.get_node("Status").text = "CHECKPOINT ACTIVE"
+				beacon.set("online", true)
 	for index in mini(moving_platforms.size(), arena[6].size()):
 		moving_platforms[index].position = arena[6][index]
 	if arena.size() > 9:
@@ -876,10 +883,18 @@ func receive_state(remote_act: int, security: PackedFloat32Array, arena: Array, 
 	if boss_defeated:
 		stage.get_node("ExitBarrier").hide()
 		stage.get_node("ExitBarrier/CollisionShape3D").set_deferred("disabled", true)
+	if arena.size() > 10:
+		for index in arena[10]:
+			if index >= 0 and index < stage_props.size():
+				var barricade := stage.get_node_or_null(stage_props[index])
+				if barricade and barricade.has_method("set_fractures"):
+					barricade.set_fractures(arena[10][index])
 	for index in consumed:
 		if index >= 0 and index < stage_props.size():
 			var prop := stage.get_node_or_null(stage_props[index])
-			if prop:
+			if prop and prop.is_in_group(&"factory_breakable"):
+				prop.set_fractures(5)
+			elif prop:
 				prop.hide()
 	team_xp = xp
 	team_bolts = bolts
@@ -926,12 +941,18 @@ func _process(delta: float) -> void:
 				else:
 					operator.global_position = projected
 				operator.model_root.rotation = data[1]
+				operator.reflect_saber_pose(data[4])
 				operator.play_character_animation(data[4])
 				operator.facing = data[5]
+				operator.present_charge(float(data[11]) if data.size() > 11 else 0.0, data[3] >= operator.charged_shot_cost())
 			else:
 				operator.fire_lock = data[11]
 				operator.charge_held = data[12] and not operator.controls_suspended
+				operator.present_charge(float(data[16]) if data.size() > 16 and operator.charge_held else 0.0, data[3] >= operator.charged_shot_cost())
 				operator.melee_lock = data[13]
+				operator.reflect_saber_pose(data[4])
+				if operator.melee_lock > 0.0:
+					operator.play_character_animation(data[4])
 				if data[14].size() == 4:
 					for slot in 4:
 						var actual: Dictionary = data[14][slot]
@@ -1006,9 +1027,9 @@ func receive_challenge_results(results: Dictionary) -> void:
 		extracted_results = results
 
 func send_shot(shot: RiftProjectile) -> void:
-	peer.call_func(receive_shot, shot.global_position, shot.direction, shot.speed, shot.palette, shot.is_charged, shot.is_magma, shot.owner_faction)
+	peer.call_func(receive_shot, shot.global_position, shot.direction, shot.speed, shot.palette, shot.is_charged, shot.is_magma, shot.owner_faction, shot.launch_profile, shot.range_remaining if is_finite(shot.range_remaining) else -1.0)
 
-func receive_shot(at: Vector3, direction: Vector3, speed: float, tint: Color, charged: bool, magma: bool, faction: String) -> void:
+func receive_shot(at: Vector3, direction: Vector3, speed: float, tint: Color, charged: bool, magma: bool, faction: String, profile_id := 0, flight_range := -1.0) -> void:
 	if host or peer.get_sender_id() != peer.get_host():
 		return
 	var shot := RiftProjectile.new()
@@ -1017,7 +1038,9 @@ func receive_shot(at: Vector3, direction: Vector3, speed: float, tint: Color, ch
 	shot.speed = speed
 	add_child(shot)
 	shot.global_position = at
-	shot.setup(direction, faction, tint, false, charged, magma)
+	var sector_style := (profile_id >> 3) if profile_id >= 0 else 0
+	shot.range_remaining = flight_range if flight_range >= 0.0 else INF
+	shot.setup(direction, faction, tint, profile_id == -1, charged, magma, sector_style, profile_id & 7, profile_id == -2)
 
 func receive_outcome(success: bool, xp: int, bolts: int, blueprints: Array, duration: float) -> void:
 	if not host and peer.get_sender_id() == peer.get_host():

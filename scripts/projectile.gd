@@ -20,12 +20,28 @@ var is_magma := false
 var burn_power := 0.0
 var clock := 0.0
 var weapon_id := ""
+var launch_profile := 0
+var range_remaining := INF
+var acceleration := 0.0
+var vertical_drift := 0.0
+var heavy_report := false
 var pierces := 0
 var struck: Dictionary = {}
 
-func setup(dir: Vector3, faction: String, tint: Color = Color.CYAN, drill := false, charged := false, magma := false, sector := 0, role := 0) -> void:
+func setup(dir: Vector3, faction: String, tint: Color = Color.CYAN, drill := false, charged := false, magma := false, sector := 0, role := 0, saber := false) -> void:
 	direction = dir.normalized()
 	owner_faction = faction
+	launch_profile = -2 if saber else (-1 if drill else (sector << 3) | role)
+	if faction == "enemy":
+		match sector:
+			3: acceleration = 16.0
+			4: vertical_drift = -0.8
+			5: acceleration = -4.2
+			6: acceleration = 8.0
+			8: vertical_drift = -0.32
+			9: vertical_drift = -0.46 if role == 2 else 0.0
+			10: acceleration = 6.2
+		heavy_report = drill or charged or role == 4
 	add_to_group(&"rift_projectile")
 	palette = tint
 	is_charged = charged
@@ -35,7 +51,9 @@ func setup(dir: Vector3, faction: String, tint: Color = Color.CYAN, drill := fal
 	var up := Vector3.UP if absf(direction.y) < 0.96 else Vector3.BACK
 	skin.basis = Basis.looking_at(direction, up, true)
 	var hot := tint.lerp(Color.WHITE, 0.79)
-	if drill:
+	if saber:
+		ATTACK_FX.charged_saber(skin, tint)
+	elif drill:
 		spinner = drill_visual(skin, tint, 1.0)
 		var jet := part(skin, cached_mesh("Orb"), light_paint(hot, 2.0), Vector3(0, 0, -0.47), Vector3(0.12, 0.12, 0.23))
 		jet.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -69,17 +87,28 @@ func setup(dir: Vector3, faction: String, tint: Color = Color.CYAN, drill := fal
 	var collision := CollisionShape3D.new()
 	var sphere := SphereShape3D.new()
 	sphere.radius = (0.57 if charged else 0.31) if magma else (0.48 if charged else (0.26 if drill else 0.18))
-	collision.shape = sphere
+	if saber:
+		var arc := BoxShape3D.new()
+		arc.size = Vector3(1.06, 1.92, .66)
+		collision.shape = arc
+		collision.basis = skin.basis
+	else:
+		collision.shape = sphere
 	add_child(collision)
 	body_entered.connect(_on_body_entered)
 
 func _physics_process(delta: float) -> void:
-	position += direction * speed * delta
+	if clock == 0.0 and owner_faction == "enemy":
+		RiftAudio.enemy_shot(global_position, heavy_report)
+	var step := minf(speed * delta, range_remaining)
+	position += direction * step + Vector3.UP * vertical_drift * clock * delta
+	range_remaining -= step
+	speed = maxf(4.0, speed + acceleration * delta)
 	lifetime -= delta
 	clock += delta
 	if is_instance_valid(spinner):
 		spinner.rotate_z(delta * (11.0 if is_charged else 24.0))
-	if lifetime <= 0.0:
+	if lifetime <= 0.0 or range_remaining <= 0.0:
 		queue_free()
 
 func _on_body_entered(body: Node) -> void:

@@ -101,7 +101,14 @@ var combo_hit_at := 0.0
 var combo_hit := false
 var combo_facing := 1.0
 var combo_duration := 0.0
-const SWING_DURATIONS := [0.18, 0.18, 0.23]
+const SWING_CLIPS := [&"saber_cut", &"saber_return", &"slash_finisher"]
+const SWING_DURATIONS := [0.20, 0.19, 0.26]
+const SABER_CHARGE_TIME := 0.52
+var saber_hold := -1.0
+var saber_primed := false
+var combo_wave := false
+var combo_trail := false
+var sword_pivot: Node3D
 
 var air_dash_available := true
 var spawn_position := Vector3.ZERO
@@ -114,7 +121,7 @@ var low_profile := false
 var contact_recoil := 0.0
 var ladder: Node3D
 var ladder_lock := 0.0
-var drop_through: StaticBody3D
+var drop_through: Dictionary = {}
 var ladder_support_exception: StaticBody3D
 var hatch_floor: StaticBody3D
 var wall_side := 0.0
@@ -125,10 +132,15 @@ var wall_sliding := false
 @export var wall_kick_speed := 6.7
 @export var wall_kick_height := 13.5
 var climb_pose: SkeletonModifier3D
+var slide_pose: SkeletonModifier3D
 var standing_capsule := CapsuleShape3D.new()
 var charge_held := false
 var charge_elapsed := 0.0
-var charge_orb: MeshInstance3D
+const ChargingOrb := preload("res://scripts/buster_charge_orb.gd")
+const CHARGE_SHELL := preload("res://assets/vfx/buster_charge_shell.gdshader")
+var charge_orb: ChargingOrb
+var charge_shell: ShaderMaterial
+var full_charge_visual := false
 var muzzle_skeleton: Skeleton3D
 var muzzle_bone := -1
 var muzzle_offset := Vector3.ZERO
@@ -158,12 +170,15 @@ func _ready() -> void:
 		climb_pose = preload("res://scripts/climb_pose.gd").new()
 		climb_pose.influence = 0.0
 		skeleton.add_child(climb_pose)
+		slide_pose = preload("res://scripts/ground_slide_pose.gd").new()
+		slide_pose.influence = 0.0
+		skeleton.add_child(slide_pose)
 		if buster_pose:
 			skeleton.move_child(buster_pose, -1)
 		install_fire_suit(skeleton)
 	if animation_player:
 		make_locomotion_in_place()
-		build_finisher_clip()
+		build_combat_clips()
 		for clip in [&"idle", &"walk", &"run", &"fall"]:
 			if animation_player.has_animation(clip):
 				animation_player.get_animation(clip).loop_mode = Animation.LOOP_LINEAR
@@ -315,6 +330,8 @@ func set_controls_suspended(suspended: bool) -> void:
 		shot_buffer_left = 0.0
 		jump_buffer = 0.0
 		combo_queued = 0
+		saber_hold = -1.0
+		saber_primed = false
 		remote_pressed.clear()
 		remote_released.clear()
 
@@ -368,10 +385,10 @@ func simulate_movement(delta: float) -> void:
 	var axis := movement_axis("move_left", "move_right")
 	ladder_lock = maxf(0.0, ladder_lock - delta)
 	update_wall_contact(delta, axis)
-	var dropping := false
-	var down := action_held("crouch") or action_held("crouch_stick")
-	if grounded() and down and action_pressed("dash") and not is_instance_valid(ladder):
-		dropping = start_platform_drop()
+	var stick_crouch := action_held("crouch_stick") and absf(axis) < 0.35
+	var wants_crouch := action_held("crouch") or stick_crouch
+	var drop_command := grounded() and wants_crouch and action_pressed("dash") and not is_instance_valid(ladder)
+	var dropping := drop_command and start_platform_drop()
 	if not dropping and update_ladder(delta, axis):
 		return
 	if climb_pose:
@@ -393,20 +410,18 @@ func simulate_movement(delta: float) -> void:
 		jump_buffer = jump_buffer_duration
 	else:
 		jump_buffer = maxf(0.0, jump_buffer - delta)
-	if not dropping and resume_input_guard <= 0.0 and contact_recoil <= 0.0 and action_pressed("dash") and dash_lock <= 0.0 and (grounded() or air_dash_available):
+	if not drop_command and resume_input_guard <= 0.0 and contact_recoil <= 0.0 and action_pressed("dash") and dash_lock <= 0.0 and (grounded() or air_dash_available):
 		dash_left = dash_duration
 		dash_elapsed = 0.0
 		dash_facing = facing
 		ground_dash = grounded()
 		dash_lock = dash_cooldown
-		RiftAudio.play_effect(&"dash")
+		RiftAudio.play_effect(&"ground_slide" if ground_dash else &"dash")
 		var flash := preload("res://scripts/dash_flash.gd").new()
 		get_parent().add_child(flash)
 		flash.global_position = global_position
 		flash.ignite(facing)
 		if not grounded(): air_dash_available = false
-	var stick_crouch := action_held("crouch_stick") and absf(axis) < 0.35
-	var wants_crouch := action_held("crouch") or stick_crouch
 	set_crouch(not dropping and wants_crouch and grounded() and dash_left <= 0.0 and jump_buffer <= 0.0)
 	if not local_prediction and melee_lock <= 0.0:
 		if action_pressed("swap_weapon"):
@@ -500,24 +515,26 @@ func apply_ceiling_rebound(incoming: Vector3) -> void:
 
 func update_dash(delta: float, axis: float) -> void:
 	dash_elapsed += delta
-	var reversing := axis * dash_facing < -0.27
-	var released := not action_held("dash") and dash_elapsed >= 0.065
-	var at_edge := ground_dash and is_on_floor() and absf(axis) < 0.17 and not has_dash_floor(delta)
-	if reversing or released or at_edge:
+	var blocked := is_on_wall() and get_wall_normal().x * dash_facing < -0.60
+	var under_cover := ground_dash and low_profile and standing_blocked()
+	var reversing := not under_cover and axis * dash_facing < -0.27
+	var released := not under_cover and not action_held("dash") and dash_elapsed >= 0.065
+	var at_edge := ground_dash and is_on_floor() and (under_cover or absf(axis) < 0.17) and not has_dash_floor(delta)
+	if reversing or released or at_edge or blocked:
 		dash_left = 0.0
-		velocity.x = 0.0 if at_edge or reversing else clampf(velocity.x * 0.45, -move_speed, move_speed)
+		velocity.x = 0.0 if at_edge or reversing or blocked else clampf(velocity.x * 0.45, -move_speed, move_speed)
 		if reversing:
 			facing = signf(axis)
 		return
 	var steering := lerpf(0.78, 1.0, absf(axis)) if absf(axis) >= 0.17 else 1.0
-	var speed := lerpf(move_speed, dash_speed, clampf(dash_left / 0.045, 0.0, 1.0))
+	var speed := dash_speed * 1.5 if under_cover else lerpf(move_speed, dash_speed, clampf(dash_left / 0.045, 0.0, 1.0))
 	velocity = Vector3(dash_facing * speed * steering, 0.0, 0.0)
-	dash_left = maxf(0.0, dash_left - delta)
+	dash_left = maxf(delta if under_cover else 0.0, dash_left - delta)
 	if dash_left == 0.0:
 		velocity.x = clampf(velocity.x, -move_speed, move_speed)
 
 func has_dash_floor(delta: float) -> bool:
-	var ahead := global_position + Vector3(dash_facing * (standing_capsule.radius * 0.50 + dash_speed * delta), -standing_capsule.height * 0.5 + 0.30, 0)
+	var ahead := global_position + Vector3(dash_facing * (standing_capsule.radius * 0.50 + absf(velocity.x) * delta), -standing_capsule.height * 0.5 + 0.30, 0)
 	var ray := PhysicsRayQueryParameters3D.create(ahead, ahead + Vector3.DOWN * 0.74, 1, [get_rid()])
 	var hit := get_world_3d().direct_space_state.intersect_ray(ray)
 	return not hit.is_empty() and hit.normal.y > 0.5
@@ -546,7 +563,7 @@ func catch_hatch_landing(previous: Vector3, incoming: Vector3, previous_hatch: S
 		return
 	var half := standing_capsule.height * 0.5
 	for deck in get_tree().get_nodes_in_group(&"factory_one_way"):
-		if deck == drop_through or not deck.is_visible_in_tree() or not deck.has_meta("hatch_walk_support"):
+		if drop_through.has(deck) or not deck.is_visible_in_tree() or not deck.has_meta("hatch_walk_support"):
 			continue
 		var shape := deck.get_node_or_null("Collider") as CollisionShape3D
 		if not shape or shape.disabled:
@@ -576,6 +593,14 @@ func catch_hatch_landing(previous: Vector3, incoming: Vector3, previous_hatch: S
 		return
 
 func update_one_way_collisions() -> void:
+	# Restore the slab once the entire body is clear, including thick catwalks.
+	var head_y := global_position.y + standing_capsule.height * 0.5
+	for deck in drop_through.keys():
+		if not is_instance_valid(deck):
+			drop_through.erase(deck)
+		elif head_y <= drop_through[deck]:
+			remove_collision_exception_with(deck)
+			drop_through.erase(deck)
 	var exceptions := get_collision_exceptions()
 	for deck in get_tree().get_nodes_in_group(&"factory_one_way"):
 		var platform := deck as StaticBody3D
@@ -600,14 +625,12 @@ func update_one_way_collisions() -> void:
 				slope_allowance = standing_capsule.radius * Vector2(normal.x, normal.z).length() / normal.y
 				side_contact = not platform.has_meta("hatch_walk_support") and outside_one_way_edge(platform_shape, half_size)
 		var soles := global_position.y - standing_capsule.height * 0.5
-		if platform == drop_through and soles < surface_y - 0.22:
-			drop_through = null
 		var climbing_through := is_instance_valid(ladder) and velocity.y > 0.0 and absf(global_position.x - ladder.global_position.x) < 0.48
 		var ascending := velocity.y > 0.0 and soles < surface_y - 0.04 - slope_allowance
 		var below := not is_on_floor() and soles < surface_y - 0.20 - slope_allowance
 		var hatch := platform.has_meta("hatch_walk_support")
 		var pass_below_hatch := hatch and soles < surface_y - 0.18
-		var ignore := platform == drop_through or platform == ladder_support_exception or pass_below_hatch or (not hatch and (ascending or below) and (not side_contact or climbing_through))
+		var ignore := drop_through.has(platform) or platform == ladder_support_exception or pass_below_hatch or (not hatch and (ascending or below) and (not side_contact or climbing_through))
 		if ignore and not exceptions.has(platform):
 			add_collision_exception_with(platform)
 		elif not ignore and exceptions.has(platform):
@@ -660,25 +683,49 @@ func update_wall_contact(delta: float, axis: float) -> void:
 		wall_sliding = velocity.y <= 0.0
 		return
 
+func allows_platform_drop(body: Node3D) -> bool:
+	return is_instance_valid(body) and (body.is_in_group(&"factory_one_way") or body.is_in_group(&"factory_drop_through"))
+
 func start_platform_drop() -> bool:
 	if is_instance_valid(hatch_floor):
-		return drop_from(hatch_floor)
-	for index in range(get_slide_collision_count()):
-		var hit := get_slide_collision(index)
-		var deck := hit.get_collider() as StaticBody3D
-		if not deck or not deck.is_in_group(&"factory_one_way") or hit.get_normal().dot(Vector3.UP) < cos(floor_max_angle):
-			continue
-		return drop_from(deck)
-	return false
-
-func drop_from(deck: StaticBody3D) -> bool:
-	drop_through = deck
+		add_drop_exception(hatch_floor, global_position.y - standing_capsule.height * .5)
+	else:
+		for index in range(get_slide_collision_count()):
+			var hit := get_slide_collision(index)
+			var deck := hit.get_collider() as StaticBody3D
+			if allows_platform_drop(deck) and hit.get_normal().dot(Vector3.UP) >= cos(floor_max_angle):
+				add_drop_exception(deck, hit.get_position().y)
+		# A seam can support both feet. Drop through any adjacent marked deck
+		# at the same surface height so its edge does not catch the capsule.
+		var sole := global_position - Vector3.UP * standing_capsule.height * 0.5
+		for offset in [-standing_capsule.radius * 0.95, 0.0, standing_capsule.radius * 0.95]:
+			var contact := sole + Vector3(offset, 0.12, 0.0)
+			var probe := PhysicsRayQueryParameters3D.create(contact, contact + Vector3.DOWN * 0.35, collision_mask, [get_rid()])
+			var hit := get_world_3d().direct_space_state.intersect_ray(probe)
+			if not hit.is_empty():
+				var deck := hit.collider as StaticBody3D
+				if allows_platform_drop(deck):
+					add_drop_exception(deck, hit.position.y)
+	if drop_through.is_empty():
+		return false
 	hatch_floor = null
-	add_collision_exception_with(deck)
 	velocity.y = -4.5
 	jump_buffer = 0.0
-	ladder_lock = 0.25
+	ladder_lock = 0.32
 	return true
+
+func add_drop_exception(deck: StaticBody3D, top: float) -> void:
+	var clear_below := top - .025
+	for id in deck.get_shape_owners():
+		var collider := deck.shape_owner_get_owner(id) as CollisionShape3D
+		if not collider or deck.is_shape_owner_disabled(id):
+			continue
+		var half := one_way_half_size(collider)
+		if half != Vector3.ZERO:
+			var vertical := absf(collider.global_basis.y.y)
+			clear_below = minf(clear_below, top - 2.0 * half.y / maxf(vertical, .5) + .02)
+	drop_through[deck] = clear_below
+	add_collision_exception_with(deck)
 
 func climb_rise(climb: Node3D) -> float:
 	return (climb.global_basis.y * float(climb.rise)).y
@@ -842,12 +889,7 @@ func set_crouch(enabled: bool) -> void:
 	var should_lower := enabled or slide
 	var collider := $CollisionShape3D as CollisionShape3D
 	if not should_lower and low_profile:
-		var query := PhysicsShapeQueryParameters3D.new()
-		query.shape = standing_capsule
-		query.transform = global_transform.translated(Vector3.UP * 0.04)
-		query.collision_mask = collision_mask
-		query.exclude = [get_rid()] + get_collision_exceptions().map(func(body): return body.get_rid())
-		should_lower = not get_world_3d().direct_space_state.intersect_shape(query, 1).is_empty()
+		should_lower = standing_blocked()
 	if should_lower == low_profile:
 		return
 	low_profile = should_lower
@@ -855,15 +897,22 @@ func set_crouch(enabled: bool) -> void:
 	capsule.height = 1.05 if low_profile else standing_capsule.height
 	collider.position.y = -(standing_capsule.height - capsule.height) * 0.5
 
+func standing_blocked() -> bool:
+	var query := PhysicsShapeQueryParameters3D.new()
+	query.shape = standing_capsule
+	query.transform = global_transform.translated(Vector3.UP * 0.04)
+	query.collision_mask = 1
+	query.exclude = [get_rid()] + get_collision_exceptions().map(func(body): return body.get_rid())
+	return not get_world_3d().direct_space_state.intersect_shape(query, 1).is_empty()
+
 func cancel_charge() -> void:
-	if not charge_held and not is_instance_valid(charge_orb):
+	if not charge_held and not is_instance_valid(charge_orb) and not full_charge_visual:
 		return
 	charge_held = false
 	charge_elapsed = 0.0
-	RiftAudio.stop_effect(&"buster_charge")
-	if is_instance_valid(charge_orb):
-		charge_orb.queue_free()
-		charge_orb = null
+	if not remote_input:
+		RiftAudio.stop_effect(&"buster_charge")
+	present_charge(0.0, false)
 
 func update_charge(delta: float) -> void:
 	if shot_buffer_left > 0.0:
@@ -889,20 +938,41 @@ func update_charge(delta: float) -> void:
 				queued_pose = pose_held
 		return
 	charge_elapsed += delta
-	if charge_elapsed < 0.18:
+	present_charge(charge_elapsed, energy >= charged_shot_cost())
+
+func present_charge(held_time: float, has_energy: bool) -> void:
+	var primed := held_time >= charge_time and has_energy
+	if full_charge_visual != primed:
+		full_charge_visual = primed
+		if primed and charge_shell == null:
+			charge_shell = ShaderMaterial.new()
+			charge_shell.shader = CHARGE_SHELL
+		var meshes: Array[MeshInstance3D] = base_suit_meshes.duplicate()
+		if is_instance_valid(fire_suit_mesh):
+			meshes.append(fire_suit_mesh)
+		if is_instance_valid(nature_suit_mesh):
+			meshes.append(nature_suit_mesh)
+		for shell in meshes:
+			shell.material_overlay = charge_shell if primed else null
+	if held_time < .18:
+		if is_instance_valid(charge_orb):
+			charge_orb.queue_free()
+			charge_orb = null
 		return
 	if not is_instance_valid(charge_orb):
-		charge_orb = MeshInstance3D.new()
-		var sphere := SphereMesh.new()
-		var glow := StandardMaterial3D.new()
-		glow.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		glow.albedo_color = Color("ff7a25") if magma_active else (Color(Catalog.weapon(special_weapon).color) if not special_weapon.is_empty() else (Color("a8ff64") if thorn_active else Color("49dfff")))
-		sphere.material = glow
-		charge_orb.mesh = sphere
+		charge_orb = ChargingOrb.new()
 		add_child(charge_orb)
-		RiftAudio.play_effect(&"buster_charge")
-	var progress := clampf(charge_elapsed / charge_time, 0.0, 1.0)
-	charge_orb.scale = Vector3.ONE * lerpf(0.10, 0.56, progress)
+		if not remote_input and not local_prediction:
+			RiftAudio.play_effect(&"buster_charge")
+	var tint := Color("4cdeff")
+	if magma_active:
+		tint = Color("ff8026")
+	elif not special_weapon.is_empty():
+		tint = Color(Catalog.weapon(special_weapon).color)
+	elif thorn_active:
+		tint = Color("a8ff64")
+	charge_orb.charge(clampf(held_time / charge_time, 0.0, 1.0), tint, primed)
+	charge_orb.global_position = cannon_muzzle(facing)
 
 func cannon_muzzle(aim: float) -> Vector3:
 	if is_instance_valid(buster_pose) and buster_pose.influence > 0.0 and buster_pose.muzzle_local != Vector3.ZERO:
@@ -960,6 +1030,22 @@ func shoot(charged := false, pose_held := false) -> void:
 		launch_buster(muzzle, Vector3(aim, 0, 0), charged, magma, power)
 	RiftAudio.play_effect(&"buster_charged" if charged else &"buster")
 
+func buster_range(muzzle: Vector3, direction: Vector3) -> float:
+	# The authority has one camera. Use the normal camera footprint around a
+	# remote shooter instead of using the host's distance from that operator.
+	var camera := get_viewport().get_camera_3d()
+	if remote_input or camera == null or absf(camera.global_position.x - muzzle.x) > 9.0:
+		return 15.0
+	var rect := get_viewport().get_visible_rect()
+	var pixel := Vector2(rect.end.x if direction.x >= 0.0 else rect.position.x, rect.get_center().y)
+	var origin := camera.project_ray_origin(pixel)
+	var ray := camera.project_ray_normal(pixel)
+	if absf(ray.z) < .001:
+		return 15.0
+	var boundary := origin.x + ray.x * ((muzzle.z - origin.z) / ray.z)
+	var margin := 3.2
+	return clampf((boundary - muzzle.x) * signf(direction.x) + margin, 5.0, 20.0)
+
 func launch_buster(muzzle: Vector3, direction: Vector3, charged: bool, magma: bool, power: float, tint := Color.TRANSPARENT, weapon_id := "") -> void:
 	var projectile := RiftProjectile.new()
 	projectile.collision_mask = 3 | 16 | (8 if magma else 0)
@@ -967,6 +1053,7 @@ func launch_buster(muzzle: Vector3, direction: Vector3, charged: bool, magma: bo
 	projectile.global_position = muzzle
 	projectile.damage = power * (buster_damage_multiplier if magma or not weapon_id.is_empty() else 1.0)
 	projectile.weapon_id = weapon_id
+	projectile.range_remaining = buster_range(muzzle, direction)
 	if charged:
 		projectile.speed = 29.0
 	if magma:
@@ -1097,77 +1184,156 @@ func set_magma_active(enabled: bool) -> void:
 		light.light_color = Color("ff8e42") if enabled else Color("3ddcff")
 	weapon_changed.emit("MAGMA BREAKER" if enabled else "BUSTER CANNON")
 
-func build_finisher_clip() -> void:
+func build_combat_clips() -> void:
 	if not animation_player.has_animation(&"slash") or not animation_player.has_animation_library(&""):
 		return
 	var library := animation_player.get_animation_library(&"")
-	if library.has_animation(&"slash_finisher"):
+	if library.has_animation(SWING_CLIPS[0]):
 		return
-	var finisher := animation_player.get_animation(&"slash").duplicate() as Animation
-	for track in range(finisher.get_track_count()):
-		if finisher.track_get_type(track) != Animation.TYPE_ROTATION_3D:
+	var source := library.get_animation(&"slash")
+	library.add_animation(SWING_CLIPS[0], sample_combat_pose(source, [0.0, 0.25, 0.49, 0.76, 1.0], [0.03, 0.19, 0.52, 0.83, 0.95], 0.06))
+	library.add_animation(SWING_CLIPS[1], sample_combat_pose(source, [0.0, 0.25, 0.46, 0.76, 1.0], [0.91, 0.78, 0.51, 0.27, 0.11], -0.10))
+	library.add_animation(SWING_CLIPS[2], sample_combat_pose(source, [0.0, 0.28, 0.49, 0.75, 1.0], [0.10, 0.20, 0.60, 0.88, 0.98], 0.22))
+	var crouch := library.get_animation(&"crouch")
+	if crouch:
+		var slide := sample_combat_pose(crouch, [0.0, 0.16, 0.67, 1.0], [0.64, 0.82, 0.85, 0.80], 0.0, true)
+		slide.loop_mode = Animation.LOOP_LINEAR
+		library.add_animation(&"slide", slide)
+
+func sample_combat_pose(source: Animation, stops: Array, poses: Array, accent: float, slide := false) -> Animation:
+	var clip := source.duplicate() as Animation
+	clip.loop_mode = Animation.LOOP_NONE
+	for track in clip.get_track_count():
+		var kind := clip.track_get_type(track)
+		if kind not in [Animation.TYPE_ROTATION_3D, Animation.TYPE_POSITION_3D, Animation.TYPE_SCALE_3D]:
 			continue
-		var path := String(finisher.track_get_path(track))
-		if not path.ends_with(":mixamorig_LeftArm") and not path.ends_with(":mixamorig_Spine2"):
-			continue
-		var accent := 0.28 if path.ends_with(":mixamorig_LeftArm") else 0.12
-		for key in range(finisher.track_get_key_count(track)):
-			var t := finisher.track_get_key_time(track, key) / finisher.length
-			var pose: Quaternion = finisher.track_get_key_value(track, key)
-			var offset := sin(t * TAU) * accent
-			finisher.track_set_key_value(track, key, (pose * Quaternion(Vector3.BACK, offset)).normalized())
-	library.add_animation(&"slash_finisher", finisher)
+		var path := String(clip.track_get_path(track))
+		while clip.track_get_key_count(track) > 0:
+			clip.track_remove_key(track, 0)
+		for sample in stops.size():
+			var at: float = source.length * poses[sample]
+			var key_time: float = clip.length * stops[sample]
+			match kind:
+				Animation.TYPE_ROTATION_3D:
+					var pose := source.rotation_track_interpolate(track, at)
+					var weight := sin(PI * float(stops[sample]))
+					var offset := 0.0
+					if slide:
+						if path.ends_with("_Spine") or path.ends_with("_Spine1"):
+							offset = -0.15
+						elif path.ends_with("_LeftUpLeg"):
+							offset = 0.20
+						elif path.ends_with("_RightUpLeg"):
+							offset = -0.17
+						pose = pose * Quaternion(Vector3.RIGHT, offset)
+					elif path.ends_with("_LeftArm") or path.ends_with("_Spine2"):
+						pose = pose * Quaternion(Vector3.BACK, accent * weight * (0.35 if path.ends_with("_Spine2") else 1.0))
+					clip.rotation_track_insert_key(track, key_time, pose.normalized())
+				Animation.TYPE_POSITION_3D:
+					clip.position_track_insert_key(track, key_time, source.position_track_interpolate(track, at))
+				Animation.TYPE_SCALE_3D:
+					clip.scale_track_insert_key(track, key_time, source.scale_track_interpolate(track, at))
+	return clip
 
 func update_melee(delta: float) -> void:
 	var pressed := action_pressed("melee") and contact_recoil <= 0.0 and dash_left <= 0.0
+	if pressed:
+		saber_hold = 0.0
+	if saber_hold >= 0.0 and action_held("melee"):
+		saber_hold += delta
+		if saber_hold >= SABER_CHARGE_TIME and not saber_primed:
+			saber_primed = true
+			var ready := preload("res://scripts/attack_fx.gd")
+			ready.charge(get_tree().current_scene, global_position + Vector3(0, .3, .2),
+				Color("ff6525") if magma_active else Color("35beff"), .20)
+	elif saber_hold >= 0.0:
+		saber_hold = -1.0
+		if saber_primed:
+			saber_primed = false
+			if contact_recoil <= 0.0 and dash_left <= 0.0:
+				combo_queued = 0
+				perform_melee(3, true)
 	if melee_lock > 0.0:
 		if pressed and combo_step + combo_queued < 3:
 			combo_queued += 1
 		combo_time += delta
+		if not combo_trail and combo_time >= combo_hit_at - 0.045:
+			combo_trail = true
+			emit_saber_trail(combo_duration - combo_time, combo_step == 3)
 		if not combo_hit and combo_time >= combo_hit_at:
 			combo_hit = true
-			strike_melee()
+			if combo_wave:
+				launch_saber_wave()
+			else:
+				strike_melee()
 		melee_lock = maxf(0.0, combo_duration - combo_time)
 		if melee_lock <= 0.0:
 			if combo_queued > 0 and combo_step < 3:
 				combo_queued -= 1
 				perform_melee(combo_step + 1)
 			else:
-				var blade := find_child("SwordPivot", true, false) as Node3D
-				if blade:
-					blade.hide()
+				if sword_pivot:
+					sword_pivot.hide()
 				combo_grace = 0.19 if combo_step < 3 else 0.0
 	elif pressed:
 		perform_melee(combo_step + 1 if combo_grace > 0.0 and combo_step < 3 else 1)
 	else:
 		combo_grace = maxf(0.0, combo_grace - delta)
 
-func perform_melee(step := 1) -> void:
+func perform_melee(step := 1, charged := false) -> void:
 	combo_step = step
 	combo_duration = SWING_DURATIONS[step - 1]
 	combo_time = 0.0
-	combo_hit_at = [0.075, 0.077, 0.115][step - 1]
+	combo_hit_at = combo_duration * [0.49, 0.46, 0.49][step - 1]
 	combo_hit = false
+	combo_trail = false
+	combo_wave = charged
 	combo_facing = facing
 	combo_hot = magma_active
 	melee_lock = combo_duration
 	cancel_charge()
-	if animation_player and animation_player.has_animation(&"slash"):
-		var clip := &"slash_finisher" if step == 3 and animation_player.has_animation(&"slash_finisher") else &"slash"
-		var reverse := step == 2
-		var speed_scale := animation_player.get_animation(clip).length / combo_duration
-		current_animation = String(clip)
-		animation_player.speed_scale = 1.0
-		animation_player.play(clip, 0.018, -speed_scale if reverse else speed_scale, reverse)
-	var sword := find_child("SwordPivot", true, false) as Node3D
-	if sword:
-		sword.show()
+	var clip: StringName = SWING_CLIPS[step - 1]
+	if animation_player and animation_player.has_animation(clip):
+		play_character_animation(String(clip), true)
+	if not is_instance_valid(sword_pivot):
+		sword_pivot = find_child("SwordPivot", true, false) as Node3D
+	if sword_pivot:
+		sword_pivot.show()
 		if not sword_follows_hand:
-			sword.rotation_degrees.z = -72.0 * facing if step != 2 else 65.0 * facing
-			var slash := create_tween()
-			slash.tween_property(sword, "rotation_degrees:z", 62.0 * facing if step != 2 else -71.0 * facing, combo_duration)
-		PACK_VFX.blade_trail(sword, combo_duration, saber_tint(), step == 3)
-	RiftAudio.play_effect(&"saber_swing")
+			sword_pivot.rotation_degrees.z = -72.0 * facing if step != 2 else 65.0 * facing
+			var slash := create_tween().set_trans(Tween.TRANS_SINE)
+			slash.tween_property(sword_pivot, "rotation_degrees:z", 62.0 * facing if step != 2 else -71.0 * facing, combo_duration)
+
+func emit_saber_trail(duration: float, finisher: bool) -> void:
+	if sword_pivot:
+		PACK_VFX.blade_trail(sword_pivot, duration, saber_tint(), finisher)
+	if not combo_wave:
+		RiftAudio.play_effect(&"saber_swing")
+
+func reflect_saber_pose(clip: String) -> void:
+	var step := SWING_CLIPS.find(StringName(clip))
+	if not is_instance_valid(sword_pivot):
+		sword_pivot = find_child("SwordPivot", true, false) as Node3D
+	if sword_pivot:
+		sword_pivot.visible = step >= 0
+		if step >= 0 and clip != current_animation:
+			combo_hot = magma_active
+			PACK_VFX.blade_trail(sword_pivot, SWING_DURATIONS[step] * .60, saber_tint(), step == 2)
+
+func launch_saber_wave() -> void:
+	var wave := RiftProjectile.new()
+	wave.collision_mask = 3 | 16
+	wave.lifetime = .79
+	wave.range_remaining = buster_range(global_position, Vector3.RIGHT * combo_facing)
+	wave.speed = 22.0
+	wave.damage = buster_power() * melee_multiplier * 1.8
+	wave.pierces = 2
+	wave.burn_power = 3.8 * level_damage_scale() if combo_hot else 0.0
+	get_tree().current_scene.add_child(wave)
+	wave.global_position = global_position + Vector3(combo_facing * .72, .26, 0)
+	wave.setup(Vector3.RIGHT * combo_facing, "player", saber_tint(), false, true, combo_hot, 0, 0, true)
+	RiftAudio.play_effect(&"saber_charge_release")
+	melee_performed.emit()
 
 func saber_tint() -> Color:
 	return Color("ff6525") if combo_hot else Color("35beff")
@@ -1186,6 +1352,7 @@ func strike_melee() -> void:
 			else:
 				candidate.take_damage(power, global_position)
 			if candidate.health < before:
+				RiftAudio.play_effect(&"saber_impact")
 				PACK_VFX.saber_hit.call_deferred(get_parent(), candidate.global_position + Vector3(0, 0.34, 0.3), combo_facing, saber_tint())
 				if combo_hot and candidate.has_method("ignite"):
 					candidate.ignite(3.8 * level_damage_scale(), 2.5)
@@ -1217,19 +1384,19 @@ func update_character_visuals(axis: float) -> void:
 		if is_instance_valid(charge_orb):
 			visual_facing = facing
 		model_root.rotation.y = PI * 0.5 * (combo_facing if melee_lock > 0.0 else visual_facing)
-		model_root.rotation.x = lerpf(model_root.rotation.x, 0.46 if dash_left > 0.0 else (0.13 if wall_sliding else 0.0), 0.48)
+		model_root.rotation.x = lerpf(model_root.rotation.x, 0.31 if dash_left > 0.0 and not ground_dash else (0.13 if wall_sliding else 0.0), 0.48)
 	var swinging := melee_lock > 0.0
 	if buster_pose:
 		buster_pose.ladder_direction = 0.0
 		buster_pose.crouched = low_profile
-		var aiming := not swinging and (charge_held or is_instance_valid(charge_orb) or fire_lock > 0.0)
+		var aiming := not swinging and not (ground_dash and dash_left > 0.0) and (charge_held or is_instance_valid(charge_orb) or fire_lock > 0.0)
 		buster_pose.influence = move_toward(buster_pose.influence, 1.0 if aiming else 0.0, 0.30)
 	if is_instance_valid(charge_orb):
 		charge_orb.global_position = cannon_muzzle(facing)
 	if swinging:
 		return
 	if dash_left > 0.0:
-		play_character_animation("dash")
+		play_character_animation("slide" if ground_dash else "dash")
 	elif wall_sliding:
 		play_character_animation("fall")
 		if animation_player:
@@ -1250,6 +1417,8 @@ func play_character_animation(animation_name: String, force := false) -> void:
 		return
 	if not force and current_animation == animation_name:
 		return
+	if slide_pose:
+		slide_pose.influence = 1.0 if animation_name == "slide" else 0.0
 	current_animation = animation_name
 	animation_player.speed_scale = 1.0
 	var speed_scale := 1.0
@@ -1260,8 +1429,9 @@ func play_character_animation(animation_name: String, force := false) -> void:
 		"dash": speed_scale = duration / dash_duration
 		"shoot": speed_scale = duration / 0.15
 		"crouch_shoot": speed_scale = duration / 0.15
-		"slash": speed_scale = duration / 0.30
-	animation_player.play(animation_name, 0.035 if force or animation_name == "dash" else 0.10, speed_scale)
+		"saber_cut", "saber_return", "slash_finisher":
+			speed_scale = duration / SWING_DURATIONS[SWING_CLIPS.find(StringName(animation_name))]
+	animation_player.play(animation_name, 0.035 if force or animation_name in ["dash", "slide"] else 0.10, speed_scale)
 
 static func defense_for_experience(total: int) -> float:
 	return minf(0.25, (level_for_experience(total) - 1) * 0.02)

@@ -9,7 +9,7 @@ const HARDWARE := [
 	preload("res://assets/neon_factory/interiors/press_trap.glb"),
 ]
 const PERIOD := 4.8
-const WARNING := 2.45
+const WARNING := 2.12
 const ACTIVATE := 3.40
 const RETRACT := 4.27
 
@@ -18,7 +18,7 @@ const RETRACT := 4.27
 
 var hazard: Node3D
 var collar: MeshInstance3D
-var indicator: Label3D
+var alert_edges: Array[MeshInstance3D] = []
 var rotor: Node3D
 var clock := 0.0
 var struck: Dictionary = {}
@@ -39,12 +39,8 @@ func _ready() -> void:
 	add_child(zone)
 	add_child(HARDWARE[kind].instantiate())
 	collar = part(self, Vector3(width * 0.73, 0.035, 0.055), Vector3(0, 0.157, 0.81), Color("343c4a"))
-	indicator = Label3D.new()
-	indicator.position = Vector3(0, 0.37, 0.92)
-	indicator.pixel_size = 0.0045
-	indicator.font_size = 28
-	indicator.outline_size = 8
-	add_child(indicator)
+	for edge in [-1.0, 1.0]:
+		alert_edges.append(part(self, Vector3(maxf(width, .56), .025, .051), Vector3(0, .082, edge * .98), Color("ffd06a"), 2.65))
 	if kind == Kind.DRILL:
 		hazard = VFX.make_spikes()
 		hazard.scale = Vector3(0.90, 1.55, 0.90)
@@ -74,6 +70,9 @@ func _physics_process(delta: float) -> void:
 		VFX.throw_sparks(self, Color("ff5560"), 0.90)
 	active_last_tick = active
 	update_display(active, warning)
+	for edge in alert_edges:
+		if edge.visible:
+			edge.scale.z = 1.0 + .44 * sin(clock * 15.0)
 	if not active:
 		struck.clear()
 		return
@@ -88,10 +87,10 @@ func update_display(active: bool, warning: bool) -> void:
 		return
 	last_display = state
 	var tint := Color("ff526b") if active else (Color("ffc251") if warning else Color("6abbc8"))
-	collar.material_override = RiftProjectile.light_paint(tint, 1.5 if active or warning else 0.26)
-	indicator.modulate = tint
-	var title: String = ["DRILL", "LASER", "PRESS"][kind]
-	indicator.text = title + ("  /  ACTIVE" if active else ("  /  CLEAR ZONE" if warning else ""))
+	collar.material_override = RiftProjectile.light_paint(tint, 2.15 if active or warning else 0.26)
+	for border in alert_edges:
+		border.visible = active or warning
+		border.material_override = RiftProjectile.light_paint(tint, 2.5)
 	if kind == Kind.LASER:
 		hazard.show_phase(state)
 	elif kind == Kind.PRESS:

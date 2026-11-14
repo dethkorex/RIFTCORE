@@ -8,6 +8,7 @@ from branch_junctions import JUNCTIONS, ROUTE_BEATS
 from exterior_routes import EXTERIORS
 from interior_routes import ROUTES
 from overhead_routes import ARENAS, OVERHEAD
+from signature_rooms import ROOMS
 
 PROJECT = Path(__file__).resolve().parents[2]
 LEVELS = PROJECT / "scenes/levels"
@@ -32,6 +33,7 @@ PIT_Y = -22.0
 # 12.27 m with a late air dash; 11.07 m onto a 1 m higher landing.
 RUN_REACH = 7.65
 DASH_REACH = 12.27
+MIN_CLIMB_RISE = 3.65  # A full held jump reaches 2.895 m at 60 Hz.
 SAFE_RUN_GAP = round(RUN_REACH * .69, 2)
 SAFE_DASH_GAP = round(DASH_REACH * .76, 2)
 MIDDLE_RISE = 3.35
@@ -116,6 +118,7 @@ class Scene:
                    ("RCBiome", "res://scripts/biome_zone.gd", "Script"),
                    ("RCShutter", FACTORY + "service_shutter.tscn", "PackedScene"),
                    ("RCPhase", f"res://assets/campaign/{self.sector}/terrain/phase.tscn", "PackedScene"),
+                   ("RCBarricade", "res://scripts/breakable_barricade.gd", "Script"),
                    ("RCHatch", f"res://assets/campaign/{self.sector}/terrain/climb_platform_center.tscn", "PackedScene"),
                    ("RCPit", "res://scripts/spike_pit.gd", "Script"),
                    ("RCLaser", "res://scripts/factory_interior_trap.gd", "Script"),
@@ -169,9 +172,10 @@ size = Vector3(1.52, 1.25, 1.5)"""
         self.nodes.append("\n".join(lines))
         return f"{parent}/{name}" if parent != "." else name
 
-    def solid(self, name, art, pos, dimensions, art_scale, offset=0, angle=0, moving=False, layer=1):
+    def solid(self, name, art, pos, dimensions, art_scale, offset=0, angle=0, moving=False, layer=1, drop=False):
         body = self.node(name, pos=pos, kind="AnimatableBody3D" if moving else "StaticBody3D",
-                         rotation=vec(0, 0, angle), collision_layer=layer)
+                         rotation=vec(0, 0, angle), collision_layer=layer,
+                         group="factory_drop_through" if drop else None)
         self.node("Art", parent=body, art="RC" + art, scale=vec(*art_scale))
         shape = f"BoxShape3D_{len(self.nodes):04d}"
         self.shapes.append(f'[sub_resource type="BoxShape3D" id="{shape}"]\nsize = {vec(*dimensions)}')
@@ -181,8 +185,9 @@ size = Vector3(1.52, 1.25, 1.5)"""
         high = low if high is None else high
         length = math.hypot(b-a, high-low)
         height = .46 if thin else .84
+        drop = thin and not moving and not name.startswith(("Sump", "Shutter", "Gate", "Compact"))
         self.solid(name, "Deck", ((a+b)/2, (low+high)/2, 0), (length+.006, height, 4.8),
-                   (length/6, height/.84, 1), -height/2, math.atan2(high-low,b-a), moving)
+                   (length/6, height/.84, 1), -height/2, math.atan2(high-low,b-a), moving, drop=drop)
 
     def stretch(self, name, a, b, y, thin=False):
         n = max(1, math.ceil((b-a)/7.5))
@@ -192,7 +197,6 @@ size = Vector3(1.52, 1.25, 1.5)"""
     def spike_pit(self, name, a, b, y):
         self.node(name,kind="Area3D",script=ext("RCPit"),pos=((a+b)/2,y,0),
                   width=b-a,tint=self.color())
-        self.label(name+"Sign","SPIKES  /  JUMP",a-2.0,y+3.7,z=-1.65,pixels=.0042)
 
     def wall(self, name, x, bottom, top):
         height = top-bottom
@@ -202,9 +206,6 @@ size = Vector3(1.52, 1.25, 1.5)"""
         shade = shade or self.accent
         return "Color(" + ", ".join(str(round(int(shade[i:i+2], 16)/255, 4)) for i in (0,2,4)) + ", 1)"
 
-    def label(self, name, message, x, y, z=-2.15, parent=None, pixels=.0046):
-        self.node(name, parent=parent, kind="Label3D", pos=(x,y,z), text=f'"{message}"',
-                  font=ext("RCFont"), font_size=54, outline_size=10, pixel_size=pixels, modulate=self.color())
 
     def jungle_opening(self, b, floor):
         if b != self.cave_entrance:
@@ -212,8 +213,6 @@ size = Vector3(1.52, 1.25, 1.5)"""
         parent = self.node("OpenCanopy")
         self.node("CaveMouth", parent=parent, art="RCJungleMouth",
                   pos=(b,floor,-.12), rotation=vec(0,-math.pi/2,0))
-        self.label("CaveMouthSign","ROOT CAVES",b-3.4,floor+3.1,z=-1.45,
-                   parent=parent,pixels=.0052)
         if self.act == 1:
             self.solid("RootCellarCanopy","Deck",(b+3.1,floor+4.55,0),
                        (7.4,.84,4.8),(7.4/6.0,1,1),-.42)
@@ -250,7 +249,6 @@ size = Vector3(1.52, 1.25, 1.5)"""
         self.jungle_bank("ViaductFarBedrock",gap+15.1,gap+20.7,floor-.58,floor-.58)
         self.jungle_bank("ViaductDescendingBedrock",gap+20.7,q,floor-.58,floor-1.60)
         self.spawns.append((q-2,floor-1.60))
-        self.label("ViaductDashSign","JUMP / AIR DASH",gap-2.8,floor+1.25,z=-1.6)
         return floor-1.60
 
     def exposed_shell(self, start, end, entry_y, exit_y, *, end_frame=True):
@@ -272,8 +270,6 @@ size = Vector3(1.52, 1.25, 1.5)"""
             self.node("ReturnFrame", parent=parent, art="RCExteriorFrame",
                       pos=(end-.72,exit_y,0), rotation=vec(0,-math.pi/2,0),
                       scale=vec(1.43,1.36,1.10))
-            self.label("ReturnSign", self.exterior.exit_sign, end-2.1,exit_y+3.86,z=-2.15,
-                       parent=parent,pixels=.0041)
 
     def exterior_traverse(self, p, q, floor):
         route = self.exterior
@@ -292,8 +288,6 @@ size = Vector3(1.52, 1.25, 1.5)"""
             self.stretch("EaveApproach",p,gap_left,depart)
         spike_y = min(depart,shelf)-3.4
         self.spike_pit("ExteriorSpikes",gap_left,gap_right,spike_y)
-        self.label("ExteriorJumpSign","AIR DASH" if route.gap>6.4 else "JUMP",
-                   gap_left-1.9,depart+1.33,z=-1.65)
         if route.style == "stepped":
             second = min(q-4.0,gap_right+6.0)
             self.deck("EaveStep",gap_right,second,shelf)
@@ -349,7 +343,6 @@ size = Vector3(1.52, 1.25, 1.5)"""
         self.node("Casing", parent=target, art="RCDoorRelay", pos=(0,-.26,0))
         self.node("Collision", parent=target, kind="CollisionShape3D", shape=sub("RCRelayShape"))
         self.node("Lamp", parent=target, kind="MeshInstance3D", pos=(0,0,.26), mesh=sub("RCRelayLamp"))
-        self.label("Status", "SHOOT TARGET", 0, 1.2, -1.35, parent=target)
 
     def cache(self, x, y, blueprint=True):
         # Keep the name unique within the sector's checkpoint state.
@@ -365,7 +358,16 @@ size = Vector3(1.52, 1.25, 1.5)"""
         path = f"TERRAIN/InteriorCache{self.cache_count:02d}"
         self.node("Casing", parent=path, art="RCCache")
         self.node("Collision", parent=path, kind="CollisionShape3D", pos=(0,.56,0), shape=sub("RCCacheShape"))
-        self.label("Sign", "SALVAGE CACHE", 0, 1.22, -.25, parent=path, pixels=.0033)
+
+    def sealed_cache(self, q, floor):
+        # A short raised crawlspace at the last landing. The hall stays open.
+        shelf = floor+2.45
+        self.deck("MaintenanceAlcove",q+.2,q+7.9,shelf,thin=True)
+        self.deck("AlcoveCeiling",q+1.55,q+7.9,shelf+2.35,thin=True)
+        self.wall("AlcoveEnd",q+7.75,shelf,shelf+2.1)
+        self.node("FracturedBarricade",kind="StaticBody3D",pos=(q+2.15,shelf,0),
+                  script=ext("RCBarricade"),accent=self.color())
+        self.cache(q+5.7,shelf,blueprint=False)
 
     def hazard(self, x, y, exposed):
         kind, label = HAZARDS[self.number-2][int(exposed)]
@@ -394,7 +396,6 @@ size = Vector3(1.52, 1.25, 1.5)"""
                       power=13+self.number+(self.act-1)*3, direction=direction,
                       burnable_spore_pod=str(pod).lower())
             self.nodes[-1] += f"\nkind = {kind}"
-        self.label(name+"Sign", label, x, y+2.8, z=-1.60)
 
     def junction(self, spec, p, q, floor, beat):
         """Build parallel lanes above a lower crossing and rejoin at the right apron."""
@@ -406,8 +407,8 @@ size = Vector3(1.52, 1.25, 1.5)"""
         start_step = p+17 if spec.upper_route in ("late","reverse","lift") else p+7
         upper_start = start_step+7
         self.stretch("ForkApron",p,p+5,floor)
-        self.deck("MiddleStep",p+1.0,p+4.5,floor+1.45,thin=True)
-        self.deck("MiddleUpperStep",p+5,p+8.5,floor+2.2,thin=True)
+        # One readable takeoff replaces two nearly overlapping steps.
+        self.deck("MiddleStep",p+2.0,p+7.7,floor+1.85,thin=True)
 
         if spec.upper_route == "lift":
             self.stretch("MiddleWest",p+9.2,upper_start-5.6,mid,thin=True)
@@ -419,13 +420,6 @@ size = Vector3(1.52, 1.25, 1.5)"""
         self.route_crossovers(spec, beat, middle_landing+5.8, end, mid, high)
         if not spec.depth:
             self.deck("MiddleMerge",end,end+3.25,mid,floor+1.08,thin=True)
-        else:
-            self.label("MiddleDropSign","DROP TO THE BASEMENT",end-9.0,mid+1.2,z=-1.7)
-        self.label("MiddleRouteSign",spec.lanes[1]+"  >",p+9,mid+1.72,z=-1.7)
-        self.label("LowRouteSign",spec.lanes[0]+"  >",p+8,floor+1.25,z=-1.7)
-        self.label("MiddleGapSign", "AIR DASH ACROSS" if self.act == 2 else "RUNNING JUMP",
-                   gap_center-mid_gap*.5-2.8, mid+1.1, z=-1.55)
-        self.label("HighRouteSign",spec.lanes[2],upper_start+4,high+1.75,z=-1.7)
 
         if spec.upper_route == "reverse":
             left_end = gap_center-6
@@ -435,7 +429,6 @@ size = Vector3(1.52, 1.25, 1.5)"""
             self.deck("UpperReturnLow",gap_center+9.1,gap_center+12.5,high-1.74,thin=True)
             self.deck("UpperReturnTurn",gap_center+4.9,gap_center+8.25,high-.65,thin=True)
             self.deck("UpperReturnWest",gap_center+.5,gap_center+3.6,high-.06,thin=True)
-            self.label("UpperWestSign","<  SALVAGE VAULT",left_end-2,high+1.3,z=-1.65)
             self.deck("VaultExitStep",p+6.3,p+9.1,mid+1.45,thin=True)
             self.deck("VaultSecondStep",p+7.9,p+9.9,mid+3.0,thin=True)
             self.cache(left_end-1.6,high,blueprint=False)
@@ -458,7 +451,6 @@ size = Vector3(1.52, 1.25, 1.5)"""
                     self.deck("LateUpperStep",east_step,east_step+4,mid+1.45,thin=True)
                     self.deck("LateUpperSecond",east_step-3.2,east_step-.55,mid+3.13,thin=True)
                     upper_start = p+11
-                    self.label("LateAccessSign","<  UPPER SALVAGE",east_step,mid+2.75,z=-1.65)
                 else:
                     self.deck("UpperEntryStep",start_step,start_step+4.0,mid+1.45,thin=True)
                     self.deck("UpperSecondStep",start_step+4.5,start_step+7,mid+3.13,thin=True)
@@ -537,7 +529,6 @@ size = Vector3(1.52, 1.25, 1.5)"""
                     self.stretch("EchoLanding",start+17.3,landing_end,middle-.5,thin=True)
             else:
                 self.stretch("EchoRejoin",start+14.35,end,middle,thin=True)
-            self.label("EchoSign","DOWN TO THE LOWER SPAN",start+5,middle+.72,z=-1.66)
         elif beat == "switch":
             # A target lowers a balcony shortcut. The bottom shelf is an
             # independent crossing, so a missed shot costs time, not a reset.
@@ -547,7 +538,6 @@ size = Vector3(1.52, 1.25, 1.5)"""
             self.deck("SwitchLowerLanding",start+4.3,start+7.3,middle-1.32,thin=True)
             self.deck("SwitchLowerExit",start+8.7,start+12.0,middle-.92,thin=True)
             self.stretch("SwitchMerge",start+12.4,end,middle,thin=True)
-            self.label("SwitchRouteSign","SHOOT TO DROP THE SHORTCUT",start+2,middle+2.6,z=-1.55)
         elif beat == "ferry":
             # The lift travels across as well as up. The exposed staggered
             # ledges are an alternate route for players who skip the switch.
@@ -610,9 +600,6 @@ size = Vector3(1.52, 1.25, 1.5)"""
         self.wall("ShutterHeader",gate_x,floor+8.76,floor+22.2)
         self.relay(west+6.5,low,"SumpShutter",11.0,False,"RETURN SHUTTER")
         self.wall("RelaySightBaffle",west+14.0,low-.45,low+2.05)
-        self.label("DropNavigation","DROP TO SUBLEVEL  v",drop-3.8,floor+.25,z=-1.65)
-        self.label("SumpNavigation","<  JUMP THE BAFFLE TO REACH THE SHUTTER CONTROL",drop-5.0,low+2.0,z=-1.65)
-        self.label("TurnNavigation","RETURN HATCH   /   CROSS EAST  >",shaft+2.7,ceiling+.95,z=-1.65)
         self.field("SumpField", min(gap_b+10.5,drop-1.8), low, lower_kind, lower_label,
                    direction=-1, width=3.2 if lower_kind>=4 else 5.2)
         self.cache(west+1.8,low,blueprint=False)
@@ -650,11 +637,9 @@ size = Vector3(1.52, 1.25, 1.5)"""
         self.deck("MainRaisedLanding",far_gap+far_width,far_gap+far_width+3.8,floor+step)
         self.deck("MainLandingRamp",far_gap+far_width+3.8,far_gap+far_width+7.4,floor+step,floor)
         self.stretch("MainEast",far_gap+far_width+7.4,b,floor)
-        self.label("LoftEastWarning","AIR DASH" if self.act==2 else "RUNNING JUMP",far_gap-2.6,floor+2.65,z=-1.5)
         span("EntrySide", -9,-5,1.4)
         span("EntryTurn",-4.4,-.6,2.75)
         span("EntryDock",.2,4.6,dock)
-        self.label("OverheadEntry",spec.title+"  /  UP",x(0),floor+7.4,z=-1.63)
         if spec.mechanism == "lift":
             # A platform carries the operator the whole way from the dock.
             span("HighHoist",5.05,10.15,dock,moving=True)
@@ -668,9 +653,14 @@ size = Vector3(1.52, 1.25, 1.5)"""
             span("OverheadKickSill",10.58,11.60,dock+1.35)
             self.wall("OverheadEntranceGrip",entrance,floor+dock+2.12,floor+dock+8.6)
             self.wall("OverheadExitGrip",exit_wall,floor+dock,floor+dock+6.15)
-            span("GripLanding",12.4,19.6,dock+6.15)
-            self.node("OverheadLedgeHatch",art="RCHatch",pos=(x(17.70),floor+lift_level,0),
-                      deck_width=3.55,climb_height=lift_level-dock-6.15)
+            grip_height = dock+6.15
+            if lift_level-grip_height < MIN_CLIMB_RISE:
+                span("GripLanding",12.4,16.25,grip_height)
+                span("GripExitRamp",16.25,19.475,grip_height,lift_level)
+            else:
+                span("GripLanding",12.4,19.6,grip_height)
+                self.node("OverheadLedgeHatch",art="RCHatch",pos=(x(17.70),floor+lift_level,0),
+                          deck_width=3.55,climb_height=lift_level-grip_height)
         else:
             hatch_x = x(6.5)
             first_y = 9.4 if spec.mechanism in ("buoyant","gravity") else 9.7
@@ -705,11 +695,9 @@ size = Vector3(1.52, 1.25, 1.5)"""
             self.node("OverheadPhaseStep",art="RCPhase",
                       pos=(x(launch_end+spec.gaps[0]*.5),floor+spec.rise-.45,0),
                       period=3.8 if self.act==2 else 4.55,phase_offset=.45)
-            self.label("OverheadPhaseSign","CROSS ON THE PHASE PULSE",x(midpoint),floor+middle_height+2.3,z=-1.6)
         else:
             self.field("OverheadGimmick",x(midpoint),floor+middle_height,kind,label,
                        direction=direction,width=3.2)
-        self.label("OverheadJumpSign","AIR DASH TO SALVAGE",x(launch_end-2.4),floor+lift_level+1.18,z=-1.60)
 
         # Drop beyond the vault side and turn back below the high decks.
         turn_tip = min(vault_end+7.2,spec.width+8.8)
@@ -719,8 +707,6 @@ size = Vector3(1.52, 1.25, 1.5)"""
         span("ReturnOuter",vault_end-2.1,turn_tip-2.45,second_return)
         span("ReturnCross",vault_start-3.8,vault_end-3.2,second_return-1.75)
         span("ReturnDrop",vault_start-10.1,vault_start-4.8,max(2.1,second_return-4.2))
-        self.label("OverheadReturnSign", "RETURN TO MAIN DECK",x(vault_start-2.5),
-                   floor+second_return+1.2,z=-1.60)
         for index,at in enumerate((launch_end-3,midpoint,vault_end-2)):
             support_height = 24.0 - spec.rise
             self.node(f"OverheadBrace{index}",art="RCWall",
@@ -737,7 +723,6 @@ size = Vector3(1.52, 1.25, 1.5)"""
         title,decks,mechanic,location = ARENAS[self.sector][self.act-1]
         width = escape-gate
         at = gate+width*location
-        self.label("ArenaTactics",title,gate+width*.5,floor+8.4,z=-1.5)
         for index,(fraction,length,height) in enumerate(decks):
             x = gate+width*fraction
             if mechanic=="vine" and fraction==location:
@@ -757,17 +742,61 @@ size = Vector3(1.52, 1.25, 1.5)"""
             self.relay(at-2.9,floor,"ArenaElevator",destination,True,"DODGE LIFT")
         elif mechanic=="cover":
             self.solid("ProjectileShield","Wall",(at,floor+1.42,0),(.76,2.85,2.5),(1,2.85/4.25,.62),layer=128)
-            self.label("ArenaCoverSign","PROJECTILE COVER",at,floor+3.25,z=-1.45)
         elif mechanic=="phase":
             self.node("ArenaPhaseDeck",art="RCPhase",pos=(at,floor+3.2,0),
                       period=4.35 if self.act==1 else 3.65,phase_offset=1.2)
-            self.label("ArenaPhaseSign","PHASE LEDGE",at,floor+4.35,z=-1.45)
         elif mechanic!="vine":
             effect = {"current": 1, "gravity": 3, "vent": 6}[mechanic]
             sign = {"current": "CURRENT / JUMP CLEAR", "gravity": "FLOAT FIELD", "vent": "VENT / QUICK ESCAPE"}[mechanic]
             # Make the gravity/vent recovery influence large enough to reach
             # the next deck, while leaving the boss's floor continuous.
             self.field("ArenaMovementField",at,floor,effect,sign,direction=-1 if self.act==2 else 1,width=5.8,field_height=7.6 if mechanic=="gravity" else 2.6)
+
+    def signature_room(self, profile, p, q, floor):
+        # Room edges remain level; route changes are carried into the next room.
+        span = q-p
+        turn = p+span*profile.turn
+        ledge = floor+profile.ledge
+        high = floor+profile.rise
+        if profile.design == "climb":
+            # A full-story rise earns the hatch, with a wall-hike alternative.
+            shaft = min(q-8.2, max(p+13.0, turn+6.1))
+            self.stretch("TowerApproach",p,p+3,floor)
+            self.deck("TowerApron",p+3,shaft-4.1,floor,ledge)
+            self.deck("TowerFoot",shaft-4.1,shaft+2.22,ledge)
+            self.wall("TowerStop",shaft+2.32,ledge-.8,high)
+            self.wall("TowerGrip",shaft-2.65,ledge+1.9,high+2.55)
+            self.node("TowerHatch",art="RCHatch",pos=(shaft,high,0),
+                      deck_width=4.7,climb_height=high-ledge)
+            self.stretch("TowerGallery",shaft+2.35,q,high)
+            self.cache(q-3.4,high,blueprint=False)
+            return high, ledge-.9
+        # A one-screen gap is supported by structural masses on both sides.
+        gap = min(profile.pit, SAFE_RUN_GAP)
+        edge = min(q-gap-7.0, max(p+7.5,turn))
+        far = edge+gap
+        landing = ledge + (.68 if profile.design=="low_branch" else .24)
+        self.deck("EmbankmentIn",p,edge-3.5,floor,ledge)
+        self.deck("EmbankmentLip",edge-3.5,edge,ledge)
+        self.spike_pit("SignatureCrossing",edge,far,min(ledge,landing)-3.35)
+        self.deck("EmbankmentLanding",far,far+3.0,landing)
+        self.deck("EmbankmentOut",far+3.0,q,landing,high)
+        if profile.design == "low_branch":
+            # The protected shelf is a tight route to a cache on the near side.
+            shelf = max(floor,ledge)+2.44
+            self.deck("RecessFloor",p+.4,edge-1.6,shelf,thin=True)
+            self.deck("RecessLintel",p+2.4,edge-1.6,shelf+2.12,thin=True)
+            self.wall("RecessEnd",edge-1.8,shelf,shelf+2.1)
+            self.cache(edge-3.55,shelf,blueprint=False)
+        else:
+            # Solid faces visually carry the steps instead of leaving rows of
+            # unconnected slabs against the panorama.
+            for index,(start,end,y) in enumerate(((p,edge,ledge),(far,q,landing))):
+                self.node(f"EmbankmentFrame{index}",art="RCWall",
+                          pos=((start+end)*.5,y-1.25,-2.44),
+                          scale=vec((end-start)/.8,.76,.68))
+        self.spawns.append((far+1.45,landing))
+        return high, min(floor,ledge,landing)-2.4
 
     def build_rooms(self, act_routes, floor, gate_y):
         self.shapes = []
@@ -781,12 +810,15 @@ size = Vector3(1.52, 1.25, 1.5)"""
                       rotation=vec(-.62,-.45,0),light_color="Color(0.83, 1, 0.88, 1)",
                       light_energy=.60,shadow_enabled="true")
         checkpoint = None
+        signature = ROOMS[self.sector][self.act-1]
         overhead = OVERHEAD[self.sector][self.act-1]
         junctions = {spec.room: spec for spec in JUNCTIONS[self.sector][self.act-1]}
         beats = iter(ROUTE_BEATS[self.sector][self.act-1])
         for i, (kind,width,title) in enumerate(act_routes):
             entry_floor = floor
             spec = junctions.get(title)
+            if title == signature.name:
+                width = max(width, 43 if signature.design=="climb" else 39)
             if spec:
                 width = round(spec.span * (1.27 if spec.depth else 1.22))
                 kind = "switchback" if spec.depth else "junction"
@@ -801,7 +833,6 @@ size = Vector3(1.52, 1.25, 1.5)"""
             p = a + (13 if i==0 else 7)
             q = b - 8
             high = floor
-            self.label("RoomSign", title, p-2, floor+3.45)
             if i==2:
                 edge = a+2.15
                 self.deck("EntryTakeoff",a,edge,floor)
@@ -824,6 +855,8 @@ size = Vector3(1.52, 1.25, 1.5)"""
                 high = self.jungle_traverse(a,p,q,floor)
             elif title == self.exterior.room:
                 high = self.exterior_traverse(p,q,floor)
+            elif title == signature.name:
+                high,bottom = self.signature_room(signature,p,q,floor)
             elif kind == "shaft" or kind == "branch":
                 right = p + 9 + shift
                 span = 4.0
@@ -835,23 +868,36 @@ size = Vector3(1.52, 1.25, 1.5)"""
                 self.wall("WestGrip",left,floor+2.12,floor+8.6)
                 self.wall("EastGrip",right,floor,high)
                 self.stretch("ExitLanding",right+.40,q,high)
-                self.label("WallJumpSign","WALL JUMP UP THE SHAFT", left-2, floor+3.45)
                 if kind == "branch":
-                    self.deck("UpperVault",left-11.7,left-.45,high+2.4,thin=True)
-                    self.cache(left-7.8,high+2.4)
-                    self.label("BacktrackSign","UPPER SALVAGE ROUTE",left-5,high+3.65)
+                    shelf = high+2.35
+                    self.stretch("UpperVault",left-11.7,left-.45,shelf,thin=True)
+                    self.wall("VaultBack",left-11.55,shelf,shelf+2.6)
+                    self.deck("VaultRoof",left-11.7,left-3.8,shelf+2.8,thin=True)
+                    self.cache(left-8.4,shelf)
                     self.spawns.append((q-3,high))
             elif kind == "loop":
-                low=max(-2.05,floor-1.55-shift*.18)
-                self.deck("DescendingRamp",p,p+6,floor,low)
-                self.stretch("LowerPassage",p+6,q-6,low)
-                self.deck("AscendingRamp",q-6,q,low,floor)
-                self.deck("UpperEntry",p+1,p+8,floor+2.35,thin=True)
-                self.stretch("Bypass",p+12,q-4,floor+2.6+shift*.13,thin=True)
-                self.deck("UpperReturn",q-2,q+3,floor+2.25,thin=True)
-                self.cache(q-6,floor+2.6+shift*.13)
-                self.spawns.append((p+10,low))
-                self.hazard(p+13,low,exposed=False)
+                low = floor - (1.9 if self.act==1 else 2.5)
+                bend = p + (13.5 if self.act==1 else 19.0) + shift
+                gap = min(SAFE_RUN_GAP, 3.7 + shift*.24 + .25*(self.act-1))
+                right = bend + gap
+                step = low + (.68 if self.act==1 else 1.14)
+                self.deck("DescentUnderBalcony",p,p+5.8,floor,low)
+                self.stretch("LowerGallery",p+5.8,bend,low)
+                self.spike_pit("GalleryCut",bend,right,low-3.15)
+                self.stretch("LowerGalleryFar",right,q-6.5,step)
+                self.deck("GalleryExitRamp",q-6.5,q,step,floor)
+                upper = floor+2.4
+                if self.act == 1:
+                    self.deck("WestBalcony",p+1,p+7.4,upper,thin=True)
+                    self.stretch("Bypass",p+11.4,q-6,upper+.55,thin=True)
+                    self.cache(q-8,upper+.55)
+                else:
+                    self.deck("EastBalcony",q-6.2,q-.65,upper,thin=True)
+                    self.stretch("WestboundBypass",p+3.2,q-10,upper+.35,thin=True)
+                    self.cache(p+5.3,upper+.35)
+                self.spawns.append((right+2.0,step))
+                self.hazard(p+9.6,low,exposed=False)
+                bottom = low-1.35
             elif kind in ("bridge","lift"):
                 gap = 6.15 + (shift*.25 if self.act==1 else shift*.40)
                 edge=(p+q-gap)*.5
@@ -889,25 +935,29 @@ size = Vector3(1.52, 1.25, 1.5)"""
                 else:
                     self.deck("Incline",p+4,q-2,floor,high)
                 self.deck("Transition",q-2,q,high)
-                if kind != "hall":
-                    if self.sector == "machine_jungle" and self.act == 2 and i == 2:
-                        self.label("CaveDescentSign","HOLLOW TRUNK / DOWN",p+4.5,floor+2.05,z=-1.55)
-                    self.deck("PatrolShelf",p+1,p+7,max(floor,high)+2.8,thin=True)
+                if kind == "hall":
+                    self.sealed_cache(q,high)
+                else:
                     self.spawns.append((q+3,high))
             else:
                 self.stretch("Ground",p,q,floor)
-                turn = p + 4 + shift
+                # A room-length gallery is a single walkable balcony. A
+                # climb or an approach jump earns access at one end.
+                route_y = floor+3.95 if self.sector=="machine_jungle" else floor+3.72+shift*.18
                 if self.sector == "machine_jungle":
                     hatch = "RCVineLeft" if self.act == 1 else "RCVineRight"
-                    self.node("CanopyVines", art=hatch, pos=(p+4.5,floor+2.5,0),
-                              deck_width=7.0, climb_height=2.5)
+                    access = p+5 if self.act == 1 else q-5
+                    self.node("CanopyVines",art=hatch,pos=(access,route_y,0),
+                              deck_width=4.3,climb_height=route_y-floor)
+                    start,end = (access+2.15,q-3.1) if self.act==1 else (p+5.1,access-2.15)
                 else:
-                    self.deck("WestWalk",p+1,p+8,floor+2.5,thin=True)
-                self.deck("HighWalk",turn+5,q-3,floor+3.85+shift*.20,thin=True)
-                self.deck("EastWalk",q-2,q+3,floor+2.25,thin=True)
-                self.spawns.append((q-5,floor+3.85+shift*.20))
-                if self.cache_count < 4:
-                    self.cache(turn+6,floor+3.85+shift*.20)
+                    self.deck("LoadingSteps",p+3,p+7,floor+1.95,thin=True)
+                    start,end = p+7.7,q-3.0
+                if end-start >= 2.5:
+                    self.stretch("GalleryBalcony",start,end,route_y,thin=True)
+                    self.spawns.append((end-1.2,route_y))
+                    if self.cache_count < 4:
+                        self.cache(end-2.0 if self.act==1 else start+1.3,route_y)
                 self.spawns.append((q-2,floor))
                 self.hazard(p+8.3,floor,exposed=True)
             self.stretch("Exit",q,b,high)
@@ -994,9 +1044,19 @@ size = Vector3(1.52, 1.25, 1.5)"""
             x,y = self.spawns[slot]
             if i > 0 and slot == (i-1)*len(self.spawns)//len(actors):
                 x += 2.4
-            flying = any(word in entries[key].splitlines()[0] for word in ("flyer", "canopy_wasp"))
+            # Four sector chassis and six shared patrols, mixed through the act.
+            sector_assets = ("rootrunner","bark_bulwark","spore_sentry","canopy_wasp") if self.sector=="machine_jungle" and self.act==1 else ("scout","heavy","turret","flyer")
+            shared_roles = (0,1,2,3,4,4)
+            common = (i-4+self.act-1)%6 if 4<=i<10 else -1
+            if i>=10 and i%2==0:
+                common = (i//2+self.act)%6
+            role_index = (i + (i//4 if i>=4 else 0)) % 4
+            actor = sector_assets[role_index]
+            role = shared_roles[common] if common>=0 else (0,2,3,4)[role_index]
             block = re.sub(r"(?m)^patrol_right_limit = .*\n?", "", entries[key])
-            entries[key] = relocate(block,x,y+(3 if flying else .95),0) + f"\npatrol_right_limit = {end-3:.3f}"
+            block = re.sub(r'instance=ExtResource\("[^"]+"\)',f'instance=ExtResource("{actor}")',block,count=1)
+            entries[key] = relocate(block,x,y+(2.85 if role==4 else .95),0) + (
+                f"\npatrol_right_limit = {end-3:.3f}\ndetachment_sector = {self.number}\npatrol_model = {common}")
         result = []
         for key, block in entries.items():
             name = key.rsplit("/",1)[-1]
@@ -1006,7 +1066,7 @@ size = Vector3(1.52, 1.25, 1.5)"""
                 if ' parent=' not in block.splitlines()[0]:
                     result.append(block + f"\nmetadata/interior_layout = true\nmetadata/pit_floor_y = {PIT_Y}")
                 continue
-            if key.startswith("TERRAIN/ArenaPerch") or key.startswith("DECOR/ArenaName"):
+            if key.startswith("TERRAIN/ArenaPerch") or 'type="Label3D"' in block.splitlines()[0]:
                 continue
             if key == "MARKERS/CameraBounds":
                 block = re.sub(r"metadata/max_x = .*","metadata/max_x = " + str(exit_x),block)

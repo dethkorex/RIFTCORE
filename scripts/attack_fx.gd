@@ -62,6 +62,29 @@ static func projectile(parent: Node3D, sector: int, role: int, heavy: bool) -> v
 	var length := (0.48 + 0.1 * role) * size
 	piece(parent, bulb, Vector3(0, 0, -0.34), Vector3(0.068, 0.068, length), tint.darkened(0.17))
 
+static func charged_saber(parent: Node3D, tint: Color) -> void:
+	var surface := ImmediateMesh.new()
+	var material := paint(tint).duplicate() as StandardMaterial3D
+	material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	material.vertex_color_use_as_albedo = true
+	material.albedo_color = Color.WHITE
+	material.emission_energy_multiplier = .50
+	surface.surface_begin(Mesh.PRIMITIVE_TRIANGLE_STRIP, material)
+	for i in range(25):
+		var t := float(i) / 24.0
+		var arc := sin(t * PI)
+		var height := (t - .5) * 2.23
+		var forward := -.65 + .94 * arc
+		surface.surface_set_color(tint.lerp(Color.WHITE, .76))
+		surface.surface_add_vertex(Vector3(height * .22, height, forward))
+		surface.surface_set_color(tint.darkened(.28))
+		surface.surface_add_vertex(Vector3(height * .22, height, forward - arc * .65))
+	surface.surface_end()
+	var slash := MeshInstance3D.new()
+	slash.mesh = surface
+	slash.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	parent.add_child(slash)
+
 static func muzzle(parent: Node3D, at: Vector3, tint: Color, strength := 0.8) -> void:
 	var flash := Node3D.new()
 	parent.add_child(flash)

@@ -190,6 +190,7 @@ func build_particles() -> void:
 	particles.amount = clampi(roundi(dimensions.x * 7.0), 23, 55)
 	particles.lifetime = 1.25
 	particles.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+	particles.local_coords = true
 	var ambient := kind in [Kind.WATER, Kind.WIND, Kind.LOW_GRAVITY]
 	particles.emission_box_extents = Vector3(dimensions.x * 0.43, dimensions.y * 0.42 if ambient else 0.035, 0.53)
 	particles.position.y = dimensions.y * 0.48 if ambient else 0.085
@@ -204,10 +205,10 @@ func build_particles() -> void:
 	particles.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	var fade := Gradient.new()
 	fade.offsets = PackedFloat32Array([0.0, 0.16, 0.66, 1.0])
-	fade.colors = PackedColorArray([Color(tint, 0), Color(tint.lightened(0.46), 0.91), Color(tint, 0.63), Color(tint, 0)])
+	fade.colors = PackedColorArray([Color(tint, 0), Color(tint.lightened(0.52), 0.95), Color(tint, 0.76), Color(tint, 0)])
 	particles.color_ramp = fade
 	var sprite := QuadMesh.new()
-	sprite.size = Vector2(1.50, 1.44) if kind in [Kind.VENT, Kind.MUTATION, Kind.UPDRAFT] else Vector2(0.35, 0.70)
+	sprite.size = Vector2(1.83, 1.56) if kind in [Kind.VENT, Kind.MUTATION, Kind.UPDRAFT] else Vector2(0.35, 0.70)
 	var material := StandardMaterial3D.new()
 	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
@@ -239,7 +240,7 @@ func update_visuals(phase: float, live: bool) -> void:
 		if warning_strip.visible:
 			warning_finish.set_shader_parameter("live", live)
 			warning_light.light_color = tint if live else Color("ffba4e")
-			warning_light.light_energy = 2.45 if live else 0.7 + charge * 0.8
+			warning_light.light_energy = 3.0 if live else 0.9 + charge * 1.1
 	if indicators:
 		indicators.emission_energy_multiplier = 0.48 + charge * 4.0
 	if surface:

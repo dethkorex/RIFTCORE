@@ -23,4 +23,3 @@ func activate(body: Node3D) -> void:
 	pulse.tween_property(ring, "scale", Vector3.ONE * 3.4, 0.65)
 	pulse.tween_property(ring, "position:y", 0.95, 0.65)
 	pulse.chain().tween_callback(ring.queue_free)
-	$Status.text = "CHECKPOINT ACTIVE"

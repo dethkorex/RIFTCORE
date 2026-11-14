@@ -10,10 +10,18 @@ const QUICK_DEFAULTS := [JOY_BUTTON_DPAD_UP, JOY_BUTTON_DPAD_LEFT, JOY_BUTTON_DP
 const AXES := ["move_left", "move_right", "climb_up", "climb_down", "crouch"]
 var path := "user://riftcore_settings.cfg"
 signal hud_scale_changed
+const DISPLAY_MODES := ["Windowed", "Borderless Fullscreen", "Exclusive Fullscreen"]
+const VSYNC_CHOICES := ["Off", "On", "Adaptive", "Mailbox"]
+const FRAME_LIMITS := [0, 30, 60, 90, 120, 144, 165, 240]
+const CONTROLLER_STYLES := ["Xbox", "PlayStation"]
+const PAD_BUTTONS := [0, 1, 2, 3, 9, 10, 7, 8, 4, 6, 11, 12, 13, 14]
 const QUALITY_SCALES := [0.67, 0.85, 1.0]
 var volumes := {"Master": 1.0, "Music": 0.85, "SFX": 1.0, "Voice": 1.0}
 var resolution_index := 2
-var fullscreen := true
+var display_mode := 1
+var vsync_mode := 1
+var frame_limit := 0
+var controller_style := 0
 var graphics_quality := 2
 var hud_scale := 1.0
 var vibration := true
@@ -38,7 +46,11 @@ func restore() -> void:
 		for bus_name in volumes:
 			volumes[bus_name] = clampf(float(data.get_value("audio", bus_name, volumes[bus_name])), 0.0, 1.0)
 		resolution_index = clampi(int(data.get_value("video", "resolution", resolution_index)), 0, MODES.size() - 1)
-		fullscreen = bool(data.get_value("video", "fullscreen", fullscreen))
+		var previous_fullscreen := bool(data.get_value("video", "fullscreen", true))
+		display_mode = clampi(int(data.get_value("video", "window_mode", int(previous_fullscreen))), 0, DISPLAY_MODES.size() - 1)
+		vsync_mode = clampi(int(data.get_value("video", "vsync", 1)), 0, VSYNC_CHOICES.size() - 1)
+		frame_limit = clampi(int(data.get_value("video", "frame_limit", 0)), 0, FRAME_LIMITS.size() - 1)
+		controller_style = clampi(int(data.get_value("controller", "layout", 0)), 0, CONTROLLER_STYLES.size() - 1)
 		graphics_quality = clampi(int(data.get_value("video", "quality", 2)), 0, QUALITY_SCALES.size() - 1)
 		hud_scale = clampf(float(data.get_value("gameplay", "hud_scale", 1.0)), 0.80, 1.15)
 		vibration = bool(data.get_value("controller", "vibration", true))
@@ -60,7 +72,11 @@ func save() -> Error:
 	for bus_name in volumes:
 		data.set_value("audio", bus_name, volumes[bus_name])
 	data.set_value("video", "resolution", resolution_index)
-	data.set_value("video", "fullscreen", fullscreen)
+	data.set_value("video", "fullscreen", display_mode != 0)
+	data.set_value("video", "window_mode", display_mode)
+	data.set_value("video", "vsync", vsync_mode)
+	data.set_value("video", "frame_limit", frame_limit)
+	data.set_value("controller", "layout", controller_style)
 	data.set_value("video", "quality", graphics_quality)
 	data.set_value("gameplay", "hud_scale", hud_scale)
 	data.set_value("controller", "vibration", vibration)
@@ -89,21 +105,22 @@ func set_volume(bus_name: String, value: float) -> void:
 	apply_volume(bus_name)
 	save()
 
-func set_display(index: int, fill_screen: bool) -> void:
+func set_display(index: int, mode: int) -> void:
 	resolution_index = clampi(index, 0, MODES.size() - 1)
-	fullscreen = fill_screen
+	display_mode = clampi(mode, 0, DISPLAY_MODES.size() - 1)
 	apply_video()
 	save()
 
 func apply_video() -> void:
+	Engine.max_fps = FRAME_LIMITS[frame_limit]
 	if DisplayServer.get_name() == "headless":
 		return
 	var window := get_window()
 	var target: Vector2i = MODES[resolution_index]
 	var screen := window.current_screen
 	var available := DisplayServer.screen_get_usable_rect(screen)
-	if fullscreen:
-		window.mode = Window.MODE_FULLSCREEN
+	if display_mode != 0:
+		window.mode = Window.MODE_EXCLUSIVE_FULLSCREEN if display_mode == 2 else Window.MODE_FULLSCREEN
 		var pixels := DisplayServer.screen_get_size(screen)
 		window.scaling_3d_scale = clampf(float(target.x) / maxf(1.0, pixels.x), 0.25, 2.0)
 	else:
@@ -115,6 +132,7 @@ func apply_video() -> void:
 		window.position = available.position + (available.size - fitted) / 2
 		window.scaling_3d_scale = 1.0
 	window.scaling_3d_scale *= QUALITY_SCALES[graphics_quality]
+	DisplayServer.window_set_vsync_mode(vsync_mode as DisplayServer.VSyncMode)
 
 func set_hud_scale(value: float) -> void:
 	hud_scale = clampf(value, 0.80, 1.15)
@@ -181,7 +199,7 @@ func set_binding(action: String, event: InputEvent, device: String) -> String:
 		return "D-pad directions are reserved for quick items."
 	if not ACTIONS.has(action) or device_of(event) != device:
 		return "Choose a %s input." % ("keyboard" if device == "key" else "controller")
-	if event is InputEventJoypadMotion and not action in AXES:
+	if event is InputEventJoypadMotion and not action in AXES and event.axis not in [JOY_AXIS_TRIGGER_LEFT, JOY_AXIS_TRIGGER_RIGHT]:
 		return "Use a controller button for this action."
 	var data := to_data(event)
 	if data.is_empty():
@@ -197,6 +215,26 @@ func set_binding(action: String, event: InputEvent, device: String) -> String:
 	bindings[action] = slots
 	apply_bindings()
 	return "Binding saved." if save() == OK else "Binding applied for this session."
+
+func assign_button(action: String, input: InputEventJoypadButton) -> String:
+	var prior := action_for_button(input.button_index)
+	if prior.is_empty() or prior == action:
+		return set_binding(action, input, "pad")
+	var previous: InputEventJoypadButton
+	for event in InputMap.action_get_events(action):
+		if event is InputEventJoypadButton:
+			previous = event
+			break
+	if not previous:
+		return "Already assigned to %s. Rebind it from the action list first." % ACTIONS[prior]
+	var prior_slots: Dictionary = bindings.get(prior, {})
+	prior_slots["pad"] = to_data(previous)
+	bindings[prior] = prior_slots
+	var new_slots: Dictionary = bindings.get(action, {})
+	new_slots["pad"] = to_data(input)
+	bindings[action] = new_slots
+	apply_bindings()
+	return "Bindings swapped." if save() == OK else "Bindings swapped for this session."
 
 func apply_bindings() -> void:
 	for action in defaults:
@@ -233,6 +271,26 @@ func reset_bindings(device := "") -> void:
 	apply_bindings()
 	save()
 
+func pad_label(input: InputEvent) -> String:
+	if input is InputEventJoypadButton:
+		var xbox := {0:"A", 1:"B", 2:"X", 3:"Y", 4:"View", 6:"Menu", 7:"LS Click", 8:"RS Click", 9:"LB", 10:"RB"}
+		var playstation := {0:"Cross", 1:"Circle", 2:"Square", 3:"Triangle", 4:"Share", 6:"Options", 7:"L3", 8:"R3", 9:"L1", 10:"R1"}
+		var shared := {11:"D-pad ↑", 12:"D-pad ↓", 13:"D-pad ←", 14:"D-pad →"}
+		var labels := playstation if controller_style == 1 else xbox
+		return str(labels.get(input.button_index, shared.get(input.button_index, "Button %d" % input.button_index)))
+	if input is InputEventJoypadMotion:
+		var axis_names := ["Left Stick X", "Left Stick Y", "Right Stick X", "Right Stick Y", "L2" if controller_style == 1 else "LT", "R2" if controller_style == 1 else "RT"]
+		var axis: int = input.axis
+		return (axis_names[axis] if axis < axis_names.size() else "Axis %d" % axis) + ("+" if input.axis_value > 0 else "−")
+	return ""
+
+func action_for_button(button: int) -> String:
+	for action in ACTIONS:
+		for event in InputMap.action_get_events(action):
+			if event is InputEventJoypadButton and event.button_index == button:
+				return action
+	return ""
+
 func binding_label(action: String, device: String) -> String:
 	var names: PackedStringArray = []
 	var events := InputMap.action_get_events(action)
@@ -246,11 +304,6 @@ func binding_label(action: String, device: String) -> String:
 		elif event is InputEventMouseButton:
 			var labels := {MOUSE_BUTTON_LEFT: "Left Mouse", MOUSE_BUTTON_RIGHT: "Right Mouse", MOUSE_BUTTON_MIDDLE: "Middle Mouse", MOUSE_BUTTON_XBUTTON1: "Mouse 4", MOUSE_BUTTON_XBUTTON2: "Mouse 5"}
 			names.append(labels.get(event.button_index, "Mouse %d" % event.button_index))
-		elif event is InputEventJoypadButton:
-			var labels := {0: "A", 1: "B", 2: "X", 3: "Y", 4: "Back", 6: "Start", 9: "LB", 10: "RB", 11: "D-pad up", 12: "D-pad down", 13: "D-pad left", 14: "D-pad right"}
-			names.append(str(labels.get(event.button_index, "Button %d" % event.button_index)))
-		elif event is InputEventJoypadMotion:
-			var axis_names := ["LS X", "LS Y", "RS X", "RS Y", "LT", "RT"]
-			var axis := event.axis as int
-			names.append((axis_names[axis] if axis < axis_names.size() else "Axis %d" % axis) + ("+" if event.axis_value > 0 else "−"))
+		else:
+			names.append(pad_label(event))
 	return " / ".join(names) if not names.is_empty() else "Unbound"

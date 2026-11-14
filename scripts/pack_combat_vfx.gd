@@ -12,8 +12,8 @@ static func blade_trail(blade: Node3D, duration: float, tint: Color, finisher: b
 	trail.name = "SaberRibbon"
 	trail.base_offset = Vector3(0.08, 0, 0)
 	trail.tip_offset = Vector3(1.62, 0, 0)
-	trail.lifetime = 0.16 if finisher else 0.12
-	trail.intensity = 1.35 if finisher else 1.05
+	trail.lifetime = 0.17 if finisher else 0.135
+	trail.intensity = 1.52 if finisher else 1.16
 	trail.palette = saber_palette(tint)
 	trail.light_enabled = false
 	trail.emitting = false
@@ -60,7 +60,7 @@ static func projectile_hit(parent: Node3D, direction: Vector3, tint: Color, char
 		sparks.name = "MetalImpact"
 		sparks.autoplay = false
 		sparks.size = 0.78 if charged else 0.51
-		sparks.spark_count = 12 if charged else 7
+		sparks.spark_count = 16 if charged else 9
 		sparks.debris_count = 3
 		sparks.dust_count = 0
 		parent.add_child(sparks)

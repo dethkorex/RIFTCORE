@@ -13,6 +13,10 @@ var note: Label
 var cancel_capture: Button
 var initial_focus: Control
 var slots: Dictionary = {}
+var pad_keys: Dictionary = {}
+var assign_popup: PopupMenu
+var assigning_button := -1
+var controller_layout: OptionButton
 var can_restart := false
 var updater: Node
 var current_version := ""
@@ -31,6 +35,7 @@ func _ready() -> void:
 	tabs = TabContainer.new()
 	tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	tabs.add_theme_stylebox_override("panel", UI.frame(Color("101e32"), Color("365d79"), 1))
+	tabs.add_theme_stylebox_override("tab_focus", StyleBoxEmpty.new())
 	tabs.add_theme_stylebox_override("tab_selected", UI.frame(Color("34244f"), UI.VIOLET))
 	tabs.add_theme_stylebox_override("tab_hovered", UI.frame(Color("34244f"), UI.VIOLET))
 	tabs.add_theme_stylebox_override("tab_unselected", UI.frame(Color("12253d"), Color("3b6384")))
@@ -42,8 +47,21 @@ func _ready() -> void:
 			func(value: float): RiftSettings.set_volume(key, value / 100.0))
 	var video := settings_tab("Video", "Display")
 	var mode := add_selector(video, "Resolution", RiftSettings.MODES.map(func(size): return "%d × %d" % [size.x, size.y]), RiftSettings.resolution_index)
-	add_toggle(video, "Fullscreen", RiftSettings.fullscreen, func(enabled: bool): RiftSettings.set_display(RiftSettings.resolution_index, enabled))
-	mode.item_selected.connect(func(index: int): RiftSettings.set_display(index, RiftSettings.fullscreen))
+	var window_mode := add_selector(video, "Display Mode", RiftSettings.DISPLAY_MODES, RiftSettings.display_mode)
+	window_mode.item_selected.connect(func(index: int): RiftSettings.set_display(RiftSettings.resolution_index, index))
+	mode.item_selected.connect(func(index: int): RiftSettings.set_display(index, RiftSettings.display_mode))
+	var vsync := add_selector(video, "V-Sync", RiftSettings.VSYNC_CHOICES, RiftSettings.vsync_mode)
+	vsync.item_selected.connect(func(index: int):
+		RiftSettings.vsync_mode = index
+		RiftSettings.apply_video()
+		RiftSettings.save()
+	)
+	var fps := add_selector(video, "Frame Limit", RiftSettings.FRAME_LIMITS.map(func(limit): return "%d FPS" % limit if limit > 0 else "Unlimited"), RiftSettings.frame_limit)
+	fps.item_selected.connect(func(index: int):
+		RiftSettings.frame_limit = index
+		RiftSettings.apply_video()
+		RiftSettings.save()
+	)
 	var quality := add_selector(video, "Graphics Quality", ["Performance", "Balanced", "High"], RiftSettings.graphics_quality)
 	quality.item_selected.connect(func(index: int):
 		RiftSettings.graphics_quality = index
@@ -124,6 +142,13 @@ func add_slider(panel: VBoxContainer, title: String, value: float, minimum: int,
 func build_bindings(title: String, device: String) -> void:
 	var panel := settings_tab(title, "Bindings")
 	if device == "pad":
+		panel.get_child(0).text = "Controller Layout"
+		controller_layout = add_selector(panel, "Button Layout", RiftSettings.CONTROLLER_STYLES, RiftSettings.controller_style)
+		controller_layout.item_selected.connect(func(index: int):
+			RiftSettings.controller_style = index
+			RiftSettings.save()
+			refresh()
+		)
 		add_toggle(panel, "Controller vibration", RiftSettings.vibration, func(enabled: bool):
 			RiftSettings.vibration = enabled
 			if not enabled:
@@ -140,7 +165,14 @@ func build_bindings(title: String, device: String) -> void:
 	scroll.custom_minimum_size.y = 170
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	scroll.follow_focus = true
-	panel.add_child(scroll)
+	var sections := HBoxContainer.new()
+	sections.add_theme_constant_override("separation", 22)
+	sections.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	panel.add_child(sections)
+	if device == "pad":
+		build_controller_buttons(sections)
+	sections.add_child(scroll)
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var grid := GridContainer.new()
 	grid.columns = 2
 	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -158,6 +190,66 @@ func build_bindings(title: String, device: String) -> void:
 		refresh()
 		notes[device].text = "Default bindings restored."
 	, false, 34)
+
+func build_controller_buttons(parent: HBoxContainer) -> void:
+	var board := Panel.new()
+	board.custom_minimum_size = Vector2(346, 244)
+	board.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	board.add_theme_stylebox_override("panel", UI.frame(Color("101d31"), Color("2d6588"), 1))
+	parent.add_child(board)
+	for button_index in RiftSettings.PAD_BUTTONS:
+		var chip := UI.button(board, "", pick_controller_action.bind(button_index), false, 28)
+		chip.custom_minimum_size = Vector2(44 if button_index in [0,1,2,3,11,12,13,14] else 68, 28)
+		chip.size = chip.custom_minimum_size
+		if button_index in RiftSettings.QUICK_DEFAULTS:
+			chip.disabled = true
+		pad_keys[button_index] = chip
+	assign_popup = PopupMenu.new()
+	add_child(assign_popup)
+	assign_popup.id_pressed.connect(func(id: int):
+		var input := InputEventJoypadButton.new()
+		input.button_index = assigning_button
+		notes["pad"].text = RiftSettings.assign_button(RiftSettings.ACTIONS.keys()[id], input)
+		refresh()
+	)
+	refresh_controller_buttons()
+
+func pick_controller_action(button_index: int) -> void:
+	assigning_button = button_index
+	assign_popup.clear()
+	var assigned := RiftSettings.action_for_button(button_index)
+	for action in RiftSettings.ACTIONS:
+		assign_popup.add_item(RiftSettings.ACTIONS[action] + ("  ✓" if action == assigned else ""))
+	var rect: Rect2 = pad_keys[button_index].get_global_rect()
+	assign_popup.position = Vector2i(get_window().position + Vector2i(rect.end.x, rect.position.y)) if not get_window().gui_embed_subwindows else Vector2i(rect.end.x, rect.position.y)
+	assign_popup.popup()
+
+func refresh_controller_buttons() -> void:
+	if is_instance_valid(controller_layout):
+		controller_layout.select(RiftSettings.controller_style)
+	var playstation := RiftSettings.controller_style == 1
+	var left_cluster := Vector2(73, 110) if playstation else Vector2(96, 159)
+	var right_cluster := Vector2(249, 110)
+	var button_layout := {
+		0: right_cluster + Vector2(0, 31), 1: right_cluster + Vector2(46, 0),
+		2: right_cluster + Vector2(-46, 0), 3: right_cluster + Vector2(0, -31),
+		9: Vector2(76,37), 10: Vector2(268,37), 4: Vector2(131,82), 6: Vector2(204,82),
+		7: Vector2(124,200) if playstation else Vector2(62,90), 8: Vector2(205,200),
+		11: left_cluster + Vector2(0,-30), 12: left_cluster + Vector2(0,30),
+		13: left_cluster + Vector2(-43,0), 14: left_cluster + Vector2(43,0),
+	}
+	for index in pad_keys:
+		var input := InputEventJoypadButton.new()
+		input.button_index = index
+		var name := RiftSettings.pad_label(input)
+		var action := RiftSettings.action_for_button(index)
+		var quick := RiftSettings.QUICK_DEFAULTS.find(index)
+		var purpose: String = "Quick Slot %d" % (quick+1) if quick >= 0 else RiftSettings.ACTIONS.get(action, "Assign an action")
+		var chip: Button = pad_keys[index]
+		chip.text = name.trim_prefix("D-pad ") if quick >= 0 else name
+		chip.tooltip_text = "%s  /  %s" % [name, purpose]
+		chip.size = Vector2(maxf(chip.custom_minimum_size.x, chip.get_minimum_size().x),28)
+		chip.position = button_layout[index] - chip.size * .5
 
 func _unhandled_input(event: InputEvent) -> void:
 	var step := ControllerOverlay.shoulder_step(event)
@@ -252,6 +344,7 @@ func refresh() -> void:
 	for action in RiftSettings.ACTIONS:
 		for device in ["key", "pad"]:
 			slots[action + ":" + device].text = "Listening…" if action == pending_action and device == pending_device else RiftSettings.binding_label(action, device)
+	refresh_controller_buttons()
 
 func _input(event: InputEvent) -> void:
 	if pending_action.is_empty() or not is_visible_in_tree():

@@ -1002,9 +1002,7 @@ func load_checkpoint_location(save: ConfigFile) -> void:
 	if checkpoint_station == "forge_hall":
 		var first = game_root.get_node(CHECKPOINT_STATIONS["midpoint"])
 		first.online = true
-		first.get_node("Status").text = "CHECKPOINT ACTIVE"
 	checkpoint.online = true
-	checkpoint.get_node("Status").text = "CHECKPOINT ACTIVE"
 	checkpoint_reached = true
 	checkpoint_spawn = checkpoint.global_position + Vector3.UP * 0.95
 	var saved_spawn = save.get_value("checkpoint", "spawn", checkpoint_spawn)
@@ -1138,7 +1136,6 @@ func build_level() -> void:
 		boss.queue_free()
 		boss = create_miniboss()
 		actors.add_child(boss)
-		decorate_miniboss_room()
 	boss.max_health *= combat_scale
 	boss.health = boss.max_health
 	boss.hide()
@@ -1160,29 +1157,6 @@ func create_miniboss() -> Combatant:
 	guard.configure(sector, Color(info.color), info.weak, gate.global_position, exit.global_position.x)
 	guard.position = Vector3(boss_spawn.x, gate.position.y + guard.chassis_height, 0.0)
 	return guard
-
-func decorate_miniboss_room() -> void:
-	var title: String = Miniboss.TITLES[sector - 1].to_upper()
-	var decor := game_root.get_node("DECOR")
-	for child in decor.get_children():
-		if child is Label3D and child.name in [&"ArenaName", &"BossSign", &"GroveCounterplayHint"]:
-			child.hide()
-	var signpost := Label3D.new()
-	signpost.font = preload("res://assets/ui/fonts/BarlowCondensed-ExtraBoldItalic.ttf")
-	signpost.text = "ACT 1  /  " + title
-	signpost.modulate = Color(Catalog.info(sector).color)
-	signpost.font_size = 54
-	signpost.pixel_size = 0.0055
-	decor.add_child(signpost)
-	signpost.global_position = Vector3(gate.global_position.x + 8.0, gate.global_position.y + 4.35, -1.8)
-	var exit_sign := Label3D.new()
-	exit_sign.font = preload("res://assets/ui/fonts/BarlowCondensed-ExtraBoldItalic.ttf")
-	exit_sign.text = "ACT 2"
-	exit_sign.font_size = 48
-	exit_sign.pixel_size = 0.006
-	decor.add_child(exit_sign)
-	var exit := game_root.get_node("MARKERS/RoomExit") as Node3D
-	exit_sign.global_position = exit.global_position + Vector3(0.0, 2.5, -1.25)
 
 func install_sector_pads() -> void:
 	var spawn := game_root.get_node("MARKERS/PlayerSpawn") as Marker3D

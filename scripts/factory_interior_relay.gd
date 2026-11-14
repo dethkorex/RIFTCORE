@@ -7,7 +7,6 @@ extends StaticBody3D
 @export var repeat_hold := 4.5
 @onready var platform := get_node(platform_path) as AnimatableBody3D
 @onready var lamp: MeshInstance3D = $Lamp
-@onready var signpost: Label3D = $Status
 var triggered := false
 var running := false
 var red := Color("ff5d43")
@@ -44,8 +43,6 @@ func show_state(powered: bool) -> void:
 		return
 	shown_power = int(powered)
 	lamp.material_override = RiftProjectile.light_paint(green if powered else red, 2.25)
-	signpost.modulate = green if powered else red
-	signpost.text = operation + ("  /  ACTIVE" if powered else "  /  SHOOT TARGET")
 
 func reflect_motion() -> void:
 	show_state(not platform.position.is_equal_approx(get_meta("parked", platform.position)))

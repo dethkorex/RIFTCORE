@@ -16,7 +16,11 @@ const EFFECTS := {
 	&"menu_confirm": [preload("res://assets/audio/menu_confirm.ogg"), -13.0, 2],
 	&"buster": [preload("res://assets/audio/buster.ogg"), -10.0, 3],
 	&"armor_hit": [preload("res://assets/audio/armor_hit.ogg"), -8.0, 2],
-	&"saber_swing": [preload("res://assets/audio/dash.ogg"), -18.0, 3],
+	&"saber_swing": [preload("res://assets/audio/saber_swing.wav"), -12.0, 3],
+	&"saber_impact": [preload("res://assets/audio/saber_impact.wav"), -11.0, 3],
+	&"saber_charge_release": [preload("res://assets/audio/saber_charge_release.wav"), -9.0, 2],
+	&"ground_slide": [preload("res://assets/audio/ground_slide.wav"), -14.0, 2],
+	&"barricade_crack": [preload("res://assets/audio/barricade_crack.wav"), -9.0, 2],
 	&"dash": [preload("res://assets/audio/dash.ogg"), -13.0, 1],
 	&"deploy_zap": [preload("res://assets/audio/buster_charged.ogg"), -10.0, 1],
 	&"titan_windup": [preload("res://assets/audio/buster_charge.ogg"), -12.0, 1],
@@ -38,6 +42,8 @@ var jungle_track: AudioStreamOggVorbis
 var voices: Dictionary[StringName, AudioStreamPlayer] = {}
 var music_fade: Tween
 var dash_fade: Tween
+const ENEMY_SHOTS := [preload("res://assets/audio/enemy_pulse.wav"),preload("res://assets/audio/enemy_heavy.wav")]
+var last_enemy_volley := {"at": Vector3.INF, "time": -100}
 var last_menu_move := -100
 
 func _ready() -> void:
@@ -114,7 +120,7 @@ func play_effect(cue: StringName) -> void:
 		if now - last_menu_move < 85:
 			return
 		last_menu_move = now
-	voice.pitch_scale = randf_range(0.95, 1.05) if cue == &"buster" or cue == &"armor_hit" else 1.0
+	voice.pitch_scale = randf_range(0.95, 1.05) if cue == &"buster" or cue == &"armor_hit" or cue == &"saber_swing" else 1.0
 	if cue == &"dash":
 		if dash_fade and dash_fade.is_valid():
 			dash_fade.kill()
@@ -123,6 +129,27 @@ func play_effect(cue: StringName) -> void:
 		dash_fade.tween_interval(0.15)
 		dash_fade.tween_property(voice, "volume_db", -42.0, 0.15)
 		dash_fade.tween_callback(voice.stop)
+	voice.play()
+
+func enemy_shot(at: Vector3, heavy: bool) -> void:
+	var camera := get_viewport().get_camera_3d()
+	if not camera or absf(camera.global_position.x - at.x) > 31.0:
+		return
+	var now := Time.get_ticks_msec()
+	# A spread has one muzzle report, even though multiple projectiles replicate.
+	if now - int(last_enemy_volley.time) < 70 and at.distance_squared_to(last_enemy_volley.at) < 1.4:
+		return
+	last_enemy_volley = {"at": at, "time": now}
+	var voice := AudioStreamPlayer3D.new()
+	voice.bus = &"SFX"
+	voice.stream = ENEMY_SHOTS[int(heavy)]
+	voice.volume_db = -10.0 if heavy else -12.5
+	voice.unit_size = 11.0
+	voice.max_distance = 33.0
+	voice.pitch_scale = randf_range(0.94,1.06)
+	add_child(voice)
+	voice.global_position = at
+	voice.finished.connect(voice.queue_free)
 	voice.play()
 
 func stop_effect(cue: StringName) -> void:
