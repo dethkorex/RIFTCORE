@@ -67,9 +67,13 @@ func show_quick_slots(profile) -> void:
 		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		stack.add_child(icon)
+		var quantity := UI.label(stack, "", 14, UI.WHITE)
+		quantity.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		var refresh := func():
 			if is_instance_valid(icon):
-				icon.texture = item_icon if int(profile.quick_slots[index].get("count", 0)) > 0 else null
+				var remaining := int(profile.quick_slots[index].get("count", 0))
+				icon.texture = item_icon if remaining > 0 else null
+				quantity.text = str(remaining)
 		refresh.call()
 		profile.quick_changed.connect(refresh)
 

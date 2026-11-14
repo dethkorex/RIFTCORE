@@ -1138,7 +1138,7 @@ func build_storage_grid(parent: VBoxContainer) -> void:
 		elif item.kind == "Blueprints":
 			action.text = "Learn Blueprint"
 		elif item.kind == "Supplies":
-			description.text += "  ·  Choose a direction below to assign one."
+			description.text += "  ·  Choose a direction below to assign up to three."
 	var tiles := {}
 	for id in items:
 		var item: Dictionary = items[id]
@@ -1181,7 +1181,7 @@ func build_quick_assignments(parent: VBoxContainer) -> void:
 		var id: String = stack.get("id", "")
 		var icon := EquipmentIcons.icon("utility", "utility") if id.is_empty() else EquipmentIcons.icon(profile.stock[id].icon, profile.stock[id].icon)
 		var direction: String = ["↑", "←", "→", "↓"][index]
-		var button := UI.item_tile(row, icon, UI.CYAN, 0, direction, func():
+		var button := UI.item_tile(row, icon, UI.CYAN, 0, "%s  %d/%d" % [direction, stack.get("count", 0), Profile.QUICK_MAX], func():
 			if Profile.stock.has(focused_item) and not Profile.stock[focused_item].has("material"):
 				inventory_status = profile.assign_quick(index, focused_item)
 			else:
