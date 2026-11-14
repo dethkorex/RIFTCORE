@@ -234,8 +234,8 @@ size = Vector3(1.52, 1.25, 1.5)"""
             self.jungle_bank("NurseryBedrock",a,gap,floor,floor)
             self.jungle_bank("NurseryFarBedrock",gap+4.45,gap+9.0,floor+.80,floor+.80)
             self.jungle_bank("NurseryRisingBedrock",gap+9.0,q-3,floor+.80,floor+2.10)
-            self.deck("CanopyCacheDeck",gap-10.0,gap-5.1,floor+2.15,thin=True)
-            self.cache(gap-7.6,floor+2.15)
+            self.deck("CanopyCacheDeck",gap-10.0,gap-5.1,floor+2.65,thin=True)
+            self.cache(gap-7.6,floor+2.65)
             self.spawns.append((q-2,floor+2.10))
             return floor+2.10
         gap = p+6.4
@@ -305,8 +305,8 @@ size = Vector3(1.52, 1.25, 1.5)"""
             self.deck("EaveEnd",q-1.5,q,high)
         self.spawns.append((q+1.75,high))
         if route.style == "ledge" and width >= 25:
-            self.deck("EaveLookout",p+.8,p+5.5,floor+2.15,thin=True)
-            self.cache(p+3.5,floor+2.15,blueprint=False)
+            self.deck("EaveLookout",p+.8,p+5.5,floor+2.65,thin=True)
+            self.cache(p+3.5,floor+2.65,blueprint=False)
         return high
 
     def shell(self, a, b, floor, roof, variation, cave_lip_floor=None):

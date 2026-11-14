@@ -1,4 +1,4 @@
-# RIFTCORE Alpha 6.1.3
+# RIFTCORE Alpha 6.1.4
 
 - Every sector alternates between open-air stretches and enclosed routes. Cross factory catwalks, ice ridges, launch decks, and orbital walkways before heading back indoors.
 - Machine Jungle restores the outdoor panorama and leads from the canopy into the Root Caves and Hollow Trunk.
