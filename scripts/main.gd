@@ -597,40 +597,7 @@ func apply_permanent_upgrades() -> void:
 	player.magma_unlocked = run_weapons.has("magma_breaker")
 	player.thorn_unlocked = run_weapons.has("thorn_swarm")
 	player.run_weapon_ids = run_weapons.keys()
-	var armor_rank: int = profile.rank("armor")
-	var capacitor_rank: int = profile.rank("capacitor")
-	var buster_rank: int = profile.rank("buster")
-	var dash_rank: int = profile.rank("dash")
-	if armor_rank > 0:
-		player.max_health += 28.0 if armor_rank == 2 else 12.0
-		player.health = player.max_health
-		player.armor_resistance = 0.10 if armor_rank == 2 else 0.0
-	if capacitor_rank > 0:
-		player.max_energy += 32.0 if capacitor_rank == 2 else 15.0
-		player.energy = player.max_energy
-		player.charge_cost_multiplier = 0.80 if capacitor_rank == 2 else 1.0
-	if buster_rank > 0:
-		player.buster_damage_multiplier = 1.32 if buster_rank == 2 else 1.15
-	if dash_rank > 0:
-		player.dash_speed *= 1.20 if dash_rank == 2 else 1.10
-		player.dash_cooldown *= 0.68 if dash_rank == 2 else 0.85
-	for slot in profile.GEAR_SLOTS:
-		var id := profile.equipped_for(slot)
-		if id.is_empty():
-			continue
-		var stats: Dictionary = profile.GEAR[id].stats
-		player.armor_resistance = 1.0 - (1.0 - player.armor_resistance) * (1.0 - float(stats.get("resist", 0.0)))
-		player.max_health += float(stats.get("hp", 0.0))
-		player.max_energy += float(stats.get("energy", 0.0))
-		player.buster_damage_multiplier *= float(stats.get("attack", 1.0))
-		player.charge_cost_multiplier *= float(stats.get("charge", 1.0))
-		player.dash_speed *= float(stats.get("dash", 1.0))
-		player.dash_cooldown *= float(stats.get("cooldown", 1.0))
-		player.salvage_multiplier *= float(stats.get("bolts", 1.0))
-		player.xp_pickup_multiplier *= float(stats.get("xp", 1.0))
-		player.healing_pickup_multiplier *= float(stats.get("healing", 1.0))
-	player.health = player.max_health
-	player.energy = player.max_energy
+	preload("res://scripts/equipment_stats.gd").apply(player, profile)
 
 func bind_boss_signals() -> void:
 	boss.health_changed.connect(func(current: float, maximum: float):

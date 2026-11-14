@@ -9,8 +9,7 @@ const WINDOW := preload("res://assets/hub/orbital_view.png")
 const STATIONS := [
 	{"x": -18.0, "name": "Save Game", "page": "Save Game", "color": Color("b465ff"), "prop": "save_terminal"},
 	{"x": -13.5, "name": "Settings", "page": "Settings", "color": Color("9cbbff"), "prop": "settings_terminal"},
-	{"x": -9.0, "name": "Fabrication", "page": "Fabrication", "color": Color("ffbd66"), "prop": "trader_bay"},
-	{"x": -4.5, "name": "Core Enhancement", "page": "Upgrades", "color": Color("ffc465"), "prop": "forge_bay"},
+	{"x": -4.5, "name": "Workshop", "page": "Fabrication", "color": Color("ffc465"), "prop": "forge_bay"},
 	{"x": 0.0, "name": "Deploy", "page": "Sector select", "color": Color("52edff"), "prop": "deploy_pad"},
 	{"x": 4.5, "name": "Storage", "page": "Storage", "color": Color("5ffcec"), "prop": "storage_bay"},
 	{"x": 9.0, "name": "Loadout", "page": "Loadout", "color": Color("f871ef"), "prop": "loadout_bay"},
@@ -53,8 +52,8 @@ func _ready() -> void:
 	prompt.no_depth_test = true
 	camera = Camera3D.new()
 	add_child(camera)
-	camera.position = Vector3(0, 2.43, 10.25)
-	camera.rotation_degrees.x = -2.8
+	camera.position = Vector3(0, 2.75, 10.6)
+	camera.rotation_degrees.x = -5.2
 	camera.fov = 59.0
 	camera.make_current()
 	build_hud()
@@ -159,6 +158,37 @@ func build_room() -> void:
 	panorama.material_override = view_finish
 	panorama.position = Vector3(1.0, 4.0, -12.0)
 	add_child(panorama)
+	var floor_finish := paint(Color("283954"), 0.0, 0.57)
+	floor_finish.roughness = 0.29
+	var inlay := paint(Color("41526d"), 0.0, 0.50)
+	var purple := paint(Color("c356ed"), 1.20, 0.12)
+	var strip := paint(Color("6ce7ff"), 1.38, 0.15)
+	box(self, Vector3(0, -0.25, 4.38), Vector3(43.0, 0.48, 7.3), metal)
+	box(self, Vector3(0, 5.66, 1.0), Vector3(43.5, 0.38, 12.2), metal)
+	box(self, Vector3(0, 0.29, -3.34), Vector3(42.0, 0.62, 0.50), frame)
+	box(self, Vector3(0, 0.59, -3.08), Vector3(41.5, 0.045, 0.058), purple)
+	for side in [-1, 1]:
+		box(self, Vector3(21.05 * side, 2.65, 1.10), Vector3(0.62, 5.45, 10.7), frame)
+		box(self, Vector3(20.67 * side, 2.72, 4.66), Vector3(0.08, 3.6, 0.15), strip)
+	for index in range(-4, 5):
+		var x := index * 4.5
+		for row in range(3):
+			var z := 2.95 + row * 1.32
+			box(self, Vector3(x - 1.07, -0.028, z), Vector3(2.06, 0.060, 1.27), floor_finish)
+			box(self, Vector3(x + 1.07, -0.028, z), Vector3(2.06, 0.060, 1.27), floor_finish)
+		box(self, Vector3(x, 0.009, 3.0), Vector3(3.85, 0.020, 0.040), inlay)
+		box(self, Vector3(x, 0.012, 4.45), Vector3(2.76, 0.021, 0.051), strip if index % 2 == 0 else purple)
+		box(self, Vector3(x + 2.21, 0.015, 4.66), Vector3(0.046, 0.012, 4.13), inlay)
+		var ribs := box(self, Vector3(x, 5.14, 0.99), Vector3(0.34, 0.50, 8.45), frame)
+		ribs.rotation_degrees.y = float(index % 2) * 7.0
+		box(self, Vector3(x, 4.88, 3.22), Vector3(0.105, 0.038, 1.16), strip if index % 2 == 0 else purple)
+		box(self, Vector3(x, 5.39, 3.0), Vector3(3.93, 0.12, 4.93), floor_finish)
+		var illumination := OmniLight3D.new()
+		illumination.position = Vector3(x, 3.35, 2.12)
+		illumination.light_color = Color("7aaeff") if index % 2 == 0 else Color("b462ee")
+		illumination.light_energy = 1.15
+		illumination.omni_range = 4.8
+		add_child(illumination)
 	for index in range(-4, 5):
 		var x := 4.5 * index
 		place_asset("deck_section", Vector3(x, 0.0, 0.0))
@@ -174,6 +204,8 @@ func build_room() -> void:
 		box(self, Vector3(x, -0.69, 2.075), Vector3(7.76, 0.065, 0.034), cyan)
 		box(self, Vector3(x, 4.73, -0.78), Vector3(7.7, 0.071, 0.075), cyan)
 		box(self, Vector3(x, -0.10, -3.52), Vector3(8.96, 0.28, 0.35), metal)
+	var trader_counter := place_asset("trader_bay", Vector3(-8.30, 0.0, -2.06))
+	trader_counter.set("caption", "WORKSHOP SUPPLIES")
 	place_asset("operations_banner", Vector3(0, 4.36, -1.95))
 	for x in [-10.8, 10.8]:
 		var sash := paint(Color("40235b"), 0.11, 0.35)
@@ -187,11 +219,12 @@ func build_room() -> void:
 		crest.position = Vector3(x, 3.76, -2.20)
 		add_child(crest)
 
-func place_asset(asset: String, position_on_deck: Vector3) -> void:
+func place_asset(asset: String, position_on_deck: Vector3) -> Node3D:
 	var scene := load("res://assets/hub/" + asset + ".tscn") as PackedScene
 	var instance := scene.instantiate() as Node3D
 	instance.position = position_on_deck
 	add_child(instance)
+	return instance
 
 func build_pad(station: Dictionary) -> void:
 	var at := Node3D.new()

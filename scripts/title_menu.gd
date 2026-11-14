@@ -39,6 +39,8 @@ var deploy_error := ""
 
 const CoopSetup := preload("res://scripts/coop_setup.gd")
 const Story := preload("res://scripts/rift_story.gd")
+const EquipmentDisplay := preload("res://scripts/equipment_display.gd")
+const EquipmentStats := preload("res://scripts/equipment_stats.gd")
 const UI := preload("res://scripts/rift_ui.gd")
 const PORTRAIT := preload("res://assets/ui/rx07_menu.png")
 const Catalog := preload("res://scripts/sector_catalog.gd")
@@ -48,6 +50,7 @@ const ManualSave := preload("res://scripts/manual_save_session.gd")
 const EquipmentBody := preload("res://scripts/equipment_body.gd")
 const EquipmentIcons := preload("res://scripts/equipment_icons.gd")
 
+var equipment_view := "Gear"
 var layout: VBoxContainer
 var page := "Title"
 
@@ -83,11 +86,20 @@ func show_page(next: String) -> void:
 	layout = UI.column(margins, 18)
 	var header := HBoxContainer.new()
 	layout.add_child(header)
-	var logo := UI.label(header, "RIFTCORE", 42, UI.CYAN)
-	logo.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var section := UI.label(header, "RIFTCORE STATION  /  " + page.to_upper(), 18, UI.MUTED)
-	section.autowrap_mode = TextServer.AUTOWRAP_OFF
+	if station_panel:
+		build_station_header(header)
+	else:
+		var logo := UI.label(header, "RIFTCORE", 42, UI.CYAN)
+		logo.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var section := UI.label(header, page.to_upper(), 18, UI.MUTED)
+		section.autowrap_mode = TextServer.AUTOWRAP_OFF
 	layout.add_child(HSeparator.new())
+	if station_panel and page in ["Fabrication", "Upgrades"]:
+		var workshop_tabs := HBoxContainer.new()
+		layout.add_child(workshop_tabs)
+		var fabrication := UI.button(workshop_tabs, "Blueprints", show_page.bind("Fabrication"), false, 35)
+		var enhancements := UI.button(workshop_tabs, "Core Enhancements", show_page.bind("Upgrades"), false, 35)
+		(fabrication if page == "Fabrication" else enhancements).add_theme_color_override("font_color", UI.CYAN)
 	var columns := HBoxContainer.new()
 	columns.add_theme_constant_override("separation", 20)
 	columns.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -155,6 +167,22 @@ func show_page(next: String) -> void:
 		back.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 		if get_viewport().gui_get_focus_owner() == null:
 			back.grab_focus()
+
+func build_station_header(header: HBoxContainer) -> void:
+	header.add_theme_constant_override("separation", 9)
+	var wordmark := TextureRect.new()
+	wordmark.texture = preload("res://assets/ui/riftcore-wordmark.svg")
+	wordmark.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	wordmark.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	wordmark.custom_minimum_size = Vector2(178, 44)
+	header.add_child(wordmark)
+	var station_name := page.to_upper()
+	if page in ["Fabrication", "Upgrades", "Craft Item"]:
+		station_name = "WORKSHOP"
+	var heading := UI.label(header, station_name, 25, UI.CYAN)
+	heading.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var stats := UI.label(header, "%d bolts   ·   %d core shards" % [profile.credits, profile.core_shards], 16, Color("ffd079"))
+	stats.autowrap_mode = TextServer.AUTOWRAP_OFF
 
 func open_station(next: String) -> void:
 	station_panel = true
@@ -682,25 +710,99 @@ func confirm_gear_purchase() -> void:
 	show_page("Fabrication")
 
 func build_loadout(columns: HBoxContainer) -> void:
-	var equipped := card(columns, 1.10)
-	UI.label(equipped, "RX-07 Loadout", 31, UI.CYAN)
-	var body := EquipmentBody.new()
-	equipped.add_child(body)
-	body.install(profile, inventory_slot, select_inventory_slot)
-	var equipped_id: String = profile.equipped_for(inventory_slot)
-	if not equipped_id.is_empty():
-		item_card(equipped, equipped_id)
-	if not run_unlocks.is_empty():
-		var rewards := PackedStringArray()
-		for id in run_unlocks:
-			var info := Catalog.weapon(String(id))
-			if not info.is_empty():
-				rewards.append(String(info.reward_name))
-		UI.label(equipped, "Run weapons   /   Q/E or RB/LB to cycle\n" + ", ".join(rewards), 15, UI.CYAN)
-	var presets := card(columns)
-	UI.label(presets, "Equipment Presets", 30, UI.CYAN)
-	UI.label(presets, "Record your equipped gear, then re-equip it here. Use Save Game to keep presets across launches.", 16, UI.MUTED)
-	var entries := scroll_entries(presets)
+	columns.add_theme_constant_override("separation", 12)
+	var sidebar := card(columns, 0.66)
+	UI.label(sidebar, "LOADOUT", 26, UI.CYAN)
+	UI.label(sidebar, "RX-07", 32)
+	UI.label(sidebar, "Operator Lv. %d   ·   Player Lv. %d" % [saved_level, profile.player_level()], 15, UI.MUTED)
+	for section in ["Gear", "Boss Abilities", "Presets"]:
+		var tab := UI.button(sidebar, section, open_equipment_view.bind(section), false, 36)
+		if section == equipment_view:
+			tab.grab_focus()
+
+	var display := EquipmentDisplay.new()
+	display.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	display.size_flags_stretch_ratio = 1.10
+	columns.add_child(display)
+
+	var equipped := card(columns, 0.90)
+	UI.label(equipped, "CURRENT LOADOUT", 24, UI.CYAN)
+	var equipped_rows := scroll_entries(equipped)
+	loadout_line(equipped_rows, "Buster Cannon", EquipmentIcons.icon("arm", "arm"))
+	loadout_line(equipped_rows, "Energy Blade", EquipmentIcons.icon("utility", "utility"))
+	for slot in Profile.GEAR_SLOTS:
+		var id: String = profile.equipped_for(slot)
+		var caption := String(Profile.GEAR_SLOTS[slot]) + "  /  "
+		caption += "Empty" if id.is_empty() else String(Profile.GEAR[id].name)
+		loadout_line(equipped_rows, caption, EquipmentIcons.icon(id if not id.is_empty() else slot, slot))
+
+	var details := card(columns, 1.52)
+	UI.label(details, "LOADOUT STATS", 25, UI.CYAN)
+	var operator := display.actor as RiftPlayer
+	EquipmentStats.apply(operator, profile)
+	var stats := GridContainer.new()
+	stats.columns = 2
+	stats.add_theme_constant_override("h_separation", 16)
+	stats.add_theme_constant_override("v_separation", 2)
+	details.add_child(stats)
+	for stat in [
+		["Buster", "%.1f" % operator.buster_power()],
+		["Blade", "%.1f" % (operator.buster_power() * operator.melee_multiplier)],
+		["HP / Energy", "%.0f  /  %.0f" % [operator.max_health, operator.max_energy]],
+		["Armor / Dash", "%.0f%%  /  %.1f m/s" % [operator.armor_resistance * 100.0, operator.dash_speed]],
+	]:
+		UI.label(stats, stat[0], 16, UI.MUTED).size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var reading := UI.label(stats, stat[1], 16, UI.WHITE)
+		reading.autowrap_mode = TextServer.AUTOWRAP_OFF
+		reading.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	details.add_child(HSeparator.new())
+	UI.label(details, equipment_view.to_upper(), 22, UI.CYAN)
+	var entries := scroll_entries(details)
+	match equipment_view:
+		"Gear":
+			if profile.gear.is_empty():
+				UI.label(entries, "Fabricate equipment to fill your loadout.", 17, UI.MUTED)
+			for id in Profile.GEAR:
+				if not profile.gear.has(id):
+					continue
+				var row := item_card(entries, id)
+				var action := "Stow" if profile.gear[id] == "equipped" else "Equip"
+				UI.button(row, action, change_loadout_gear.bind(id), false, 34)
+		"Boss Abilities":
+			if run_unlocks.is_empty():
+				UI.label(entries, "Defeat a sector boss to unlock its ability for this run.", 17, UI.MUTED)
+			for id in run_unlocks:
+				var info := Catalog.weapon(String(id))
+				if not info.is_empty():
+					loadout_line(entries, String(info.reward_name), EquipmentIcons.icon("core", "core"))
+		"Presets":
+			build_equipment_presets(entries)
+	if not inventory_status.is_empty():
+		UI.label(details, inventory_status, 15, UI.VIOLET)
+
+func open_equipment_view(section: String) -> void:
+	equipment_view = section
+	show_page("Loadout")
+
+func change_loadout_gear(id: String) -> void:
+	inventory_status = profile.move_gear(id)
+	show_page("Loadout")
+
+func loadout_line(parent: VBoxContainer, caption: String, icon: Texture2D) -> void:
+	var panel := UI.equipment_card(UI.CYAN)
+	parent.add_child(panel)
+	var row := HBoxContainer.new()
+	panel.add_child(row)
+	var image := TextureRect.new()
+	image.texture = icon
+	image.custom_minimum_size = Vector2(24, 24)
+	image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	image.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	row.add_child(image)
+	var item := UI.label(row, caption, 15)
+	item.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+
+func build_equipment_presets(entries: VBoxContainer) -> void:
 	for number in range(1, Profile.PRESET_COUNT + 1):
 		var panel := PanelContainer.new()
 		panel.add_theme_stylebox_override("panel", UI.frame(Color("0d2032"), Color("35566b"), 1))
@@ -729,13 +831,11 @@ func build_loadout(columns: HBoxContainer) -> void:
 			UI.label(entry, item_name if profile.gear.has(id) else item_name + "  /  Missing", 14, UI.WHITE).autowrap_mode = TextServer.AUTOWRAP_OFF
 		var actions := HBoxContainer.new()
 		row.add_child(actions)
-		var record := UI.button(actions, "Record Equipped", preset_action.bind(number, true))
+		var record := UI.button(actions, "Record", preset_action.bind(number, true), false, 34)
 		record.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		var apply := UI.button(actions, "Equip Preset", preset_action.bind(number, false))
+		var apply := UI.button(actions, "Equip", preset_action.bind(number, false), false, 34)
 		apply.disabled = not profile.loadouts.has(number)
 		apply.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	if not inventory_status.is_empty():
-		UI.label(presets, inventory_status, 16, UI.VIOLET)
 
 func preset_action(number: int, record: bool) -> void:
 	inventory_status = profile.record_loadout(number) if record else profile.apply_loadout(number)

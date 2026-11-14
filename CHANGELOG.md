@@ -2,6 +2,9 @@
 
 ## Game changes
 
+- The hub has a continuous floor, ceiling, and rear bulkhead. Deploy stays on its own pad. Workshop combines blueprints and Core Enhancements.
+- The Loadout pad opens a redesigned screen with a live RX-07 display, actual equipped stats, gear, boss abilities, and presets.
+
 - Fabrication puts RX-07 on the left and blueprints on the right, with clean item rows and readable rarity tags.
 - Menu buttons turn purple while highlighted and return to blue when you move on. The separate outline is gone. Analog-stick menu navigation responds sooner and repeats while held.
 
