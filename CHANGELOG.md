@@ -1,7 +1,8 @@
-# RIFTCORE Alpha 6.1.7
+# RIFTCORE Alpha 6.1.8
 
 - Hold the D-pad or left stick to move through long lists. Use the right stick to scroll without changing the selected item.
 - Equipment tiles use bright cyan and white focus markers so Epic items are easy to distinguish. Fixed missing icons for some blueprints.
+- Neon Factory’s miniboss room has clearer floor space. Its lift relay responds to shots without blocking movement.
 
 - All 20 acts received new routes, fewer crowded platforms, and more gaps, step-ups, and climbs. Ladders link each floor where a normal jump falls short.
 - Discover sealed salvage rooms. Buster shots reveal spreading cracks and break the barricade on the fifth hit.

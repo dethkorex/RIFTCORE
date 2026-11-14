@@ -77,9 +77,9 @@ height = 0.44
     node("WorldEnvironment",typ="WorldEnvironment",environment=s("Interior"))
     node("KeyLight",typ="DirectionalLight3D",rotation=v((-.56,-.30,0)),light_color="Color(0.79, 0.90, 1, 1)",light_energy="1.30",shadow_enabled="true")
     for folder in ["TERRAIN","DECOR","Actors","MARKERS"]: node(folder)
-    def deck(name,a,b,y,depth=1,drop=False):
+    def deck(name,a,b,y,depth=1,drop=False,thickness=1):
         span=b-a
-        asset(name,"TERRAIN","Floor",(a+b)/2,y,scale=(span/6,1,depth),
+        asset(name,"TERRAIN","Floor",(a+b)/2,y,scale=(span/6,thickness,depth),
               group=["factory_drop_through"] if drop else None)
     def decks(name,a,b,y,drop=False):
         i=0
@@ -147,9 +147,10 @@ height = 0.44
         node(name,"TERRAIN","Area3D",((left+right)/2,height,0),
              script=e("Pit"),width=right-left,tint="Color(1, 0.49, 0.19, 1)")
 
-    def relay(trigger,platform,x,y,mx,my,dy,lift=False,art="Bridge",operation=None,dx=0):
+    def relay(trigger,platform,x,y,mx,my,dy,lift=False,art="Bridge",operation=None,dx=0,projectile_only=False):
         asset(platform,"TERRAIN",art,mx,my)
         node(trigger,"TERRAIN","StaticBody3D",(x,y,0),group=["factory_shot_relay"],script=e("RelayCode"),
+            **({"collision_layer": 2, "collision_mask": 0} if projectile_only else {}),
             platform_path=f'NodePath("../{platform}")',travel=v((dx,dy,0)),operation=f'"{operation or ("FREIGHT LIFT" if lift else "DROP BRIDGE")}"',lift=str(lift).lower())
         path="TERRAIN/"+trigger
         asset("Art",path,"Relay",0,-.26,0)
@@ -210,11 +211,11 @@ height = 0.44
         for index,x in enumerate([gx+9,gx+22,gx+34]):
             asset("ReactorBank"+str(index),"DECOR","reactor",x,0,-2.1)
         if act == 1:
-            deck("SergeantEntryStep",gx+5,gx+9,1.85,drop=True)
+            deck("SergeantEntryStep",gx+5,gx+9,2.72,drop=True,thickness=.6)
             deck("SergeantSideShelf",gx+10.5,gx+17,3.45,drop=True)
-            deck("SergeantRecoveryIsland",gx+34,gx+41,2.25,drop=True)
-            relay("SergeantLiftRelay","SergeantEvadeLift",gx+24.0,1.05,gx+30.6,.02,3.65,
-                  True,operation="EVADE LIFT")
+            deck("SergeantRecoveryIsland",gx+34,gx+41,2.75,drop=True,thickness=.6)
+            relay("SergeantLiftRelay","SergeantEvadeLift",gx+24.0,1.98,gx+30.6,.02,3.65,
+                  True,operation="EVADE LIFT",projectile_only=True)
         else:
             asset("TitanWestHatch","TERRAIN","arena_hatch",gx+11,4.25,
                   deck_width=6.2,climb_height=4.25)

@@ -2404,23 +2404,25 @@ position = Vector3(454.0000, 0.0000, -2.1000)
 position = Vector3(466.0000, 0.0000, -2.1000)
 
 [node name="SergeantEntryStep" parent="TERRAIN" instance=ExtResource("Floor") groups=["factory_drop_through"]]
-position = Vector3(439.0000, 1.8500, 0.0000)
-scale = Vector3(0.6667, 1.0000, 1.0000)
+position = Vector3(439.0000, 2.7200, 0.0000)
+scale = Vector3(0.6667, 0.6000, 1.0000)
 
 [node name="SergeantSideShelf" parent="TERRAIN" instance=ExtResource("Floor") groups=["factory_drop_through"]]
 position = Vector3(445.7500, 3.4500, 0.0000)
 scale = Vector3(1.0833, 1.0000, 1.0000)
 
 [node name="SergeantRecoveryIsland" parent="TERRAIN" instance=ExtResource("Floor") groups=["factory_drop_through"]]
-position = Vector3(469.5000, 2.2500, 0.0000)
-scale = Vector3(1.1667, 1.0000, 1.0000)
+position = Vector3(469.5000, 2.7500, 0.0000)
+scale = Vector3(1.1667, 0.6000, 1.0000)
 
 [node name="SergeantEvadeLift" parent="TERRAIN" instance=ExtResource("Bridge")]
 position = Vector3(462.6000, 0.0200, 0.0000)
 
 [node name="SergeantLiftRelay" type="StaticBody3D" parent="TERRAIN" groups=["factory_shot_relay"]]
-position = Vector3(456.0000, 1.0500, 0.0000)
+position = Vector3(456.0000, 1.9800, 0.0000)
 script = ExtResource("RelayCode")
+collision_layer = 2
+collision_mask = 0
 platform_path = NodePath("../SergeantEvadeLift")
 travel = Vector3(0.0000, 3.6500, 0.0000)
 operation = "EVADE LIFT"
