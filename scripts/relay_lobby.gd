@@ -4,6 +4,7 @@ signal changed
 
 const Keys := preload("res://addons/GD-Sync/Scripts/KeyStore.gd")
 const Client := preload("res://addons/GD-Sync/MultiplayerClient.gd")
+const RelayEnums := preload("res://addons/GD-Sync/Scripts/Enums/Enums.gd")
 const Codes := "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 const CodeLength := 10
 const RELAY_UNAVAILABLE := "Online rooms are disabled in this build. The GD Sync relay has not been configured."
@@ -131,8 +132,12 @@ func _room_failed(lobby_name: String, _error: int) -> void:
 	var message := "Could not create a room. Try again." if pending == "host" else "Could not join this room. Check the code and ask your friend to keep the room open."
 	leave(message)
 
-func _connection_failed(_error: int) -> void:
-	if not pending.is_empty():
+func _connection_failed(error: int) -> void:
+	if pending.is_empty():
+		return
+	if error == RelayEnums.CONNECTION_FAILED.INVALID_PUBLIC_KEY:
+		leave("GD Sync rejected the relay configuration. Check the RIFTCORE playtest keys.")
+	else:
 		leave("Could not reach the online relay. Try again.")
 
 func _disconnected() -> void:

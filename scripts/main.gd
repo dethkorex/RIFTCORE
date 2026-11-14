@@ -62,11 +62,16 @@ var pause_menu: Control
 var editor_level: Node3D
 
 func _ready() -> void:
-	if "--verify-social" in OS.get_cmdline_user_args():
+	var arguments := OS.get_cmdline_user_args()
+	if "--verify-social" in arguments or "--verify-relay" in arguments:
 		configure_input()
 		profile.manual_only = true
 		show_main_menu()
-		verify_social.call_deferred()
+		var relay_check := arguments.find("--verify-relay")
+		if relay_check >= 0:
+			verify_live_relay.call_deferred(arguments.slice(relay_check + 1))
+		else:
+			verify_social.call_deferred()
 		return
 	editor_level = get_node_or_null("NeonFactoryEditable") as Node3D
 	if editor_level:
@@ -115,6 +120,73 @@ func verify_social() -> void:
 	RiftRelay.leave()
 	print("SOCIAL SMOKE PASS" if valid else "SOCIAL SMOKE FAIL")
 	get_tree().quit(0 if valid else 1)
+
+func verify_live_relay(arguments: PackedStringArray) -> void:
+	var host := arguments == PackedStringArray(["host"])
+	var guest := arguments.size() == 2 and arguments[0] == "join" and RiftRelay.valid_code(arguments[1])
+	if not host and not guest:
+		print("RELAY CHECK FAIL. Use host or join ROOM_CODE.")
+		get_tree().quit(1)
+		return
+	if not RiftRelay.available:
+		print("RELAY CHECK FAIL. ", RiftRelay.RELAY_UNAVAILABLE)
+		get_tree().quit(1)
+		return
+
+	open_home_hub()
+	home_hub.station_requested.emit("Social")
+	if host:
+		menu.relay_host.pressed.emit()
+	else:
+		menu.relay_code.text = arguments[1]
+		menu.relay_join.pressed.emit()
+	if not await wait_for_relay(func(): return not RiftRelay.connected_room.is_empty(), 35.0):
+		finish_relay_check(false)
+		return
+	if host:
+		print("RELAY ROOM CODE ", RiftRelay.connected_room)
+	var peer := RiftRelay.relay
+	if not await wait_for_relay(func(): return RiftRelay.room_size == 2, 75.0):
+		finish_relay_check(false)
+		return
+
+	# Exchange lobby data to verify both clients share more than a room name.
+	var platform := OS.get_name()
+	if host:
+		peer.lobby_set_data("rift_check_host", platform)
+		var joined := await wait_for_relay(func(): return peer.lobby_has_data("rift_check_guest"), 15.0)
+		if joined:
+			print("RELAY PEER ", peer.lobby_get_data("rift_check_guest"))
+			peer.lobby_set_data("rift_check_ack", true)
+			joined = await wait_for_relay(func(): return peer.lobby_get_data("rift_check_ack", false), 15.0)
+			if joined:
+				await get_tree().create_timer(3.0).timeout
+		finish_relay_check(joined)
+	else:
+		if not await wait_for_relay(func(): return peer.lobby_has_data("rift_check_host"), 15.0):
+			finish_relay_check(false)
+			return
+		print("RELAY PEER ", peer.lobby_get_data("rift_check_host"))
+		peer.lobby_set_data("rift_check_guest", platform)
+		finish_relay_check(await wait_for_relay(func(): return peer.lobby_get_data("rift_check_ack", false), 15.0))
+
+func wait_for_relay(condition: Callable, timeout: float) -> bool:
+	var deadline := Time.get_ticks_msec() + int(timeout * 1000)
+	while Time.get_ticks_msec() < deadline:
+		if condition.call():
+			return true
+		if RiftRelay.pending.is_empty() and RiftRelay.connected_room.is_empty():
+			return false
+		await get_tree().create_timer(0.1).timeout
+	return false
+
+func finish_relay_check(passed: bool) -> void:
+	if passed:
+		print("RELAY CHECK PASS ", OS.get_name())
+	else:
+		print("RELAY CHECK FAIL. ", RiftRelay.status)
+	RiftRelay.leave()
+	get_tree().quit(0 if passed else 1)
 
 func configure_input() -> void:
 	add_key_action("move_left", KEY_A)

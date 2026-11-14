@@ -27,4 +27,12 @@ Players create or join a private, two-player room using a shared code. The game 
 
 For a local relay test, the GD Sync project owner can supply the provider keys using `GDSYNC_PUBLIC_KEY` and `GDSYNC_PRIVATE_KEY`, or place them in the ignored `addons/GD-Sync/keys.cfg` on development machines. Export presets exclude that local config. The exported Windows and Arch Linux checks cover Social navigation, room code validation, and the unconfigured relay state. A live cross-platform relay test requires the same GD Sync project on both clients.
 
+### Live room check
+
+Enable GD Sync in the editor and enter a dedicated playtest key pair under Project → Tools → GD-Sync. The editor keeps the pair in the ignored config. The export also accepts both environment variables from its caller. Use the same playtest pair on both machines. The release workflow and editor export do not embed the credentials.
+
+1. Run the exported Windows game with `--headless -- --verify-relay host`. Add `--log-file PATH` before `--` to write the room code to a file.
+2. On Linux, run `./RIFTCORE --headless -- --verify-relay join ROOM_CODE` with the code printed by Windows.
+3. Both clients must print `RELAY CHECK PASS` after exchanging platform names through the live room. Run again with Linux hosting and Windows joining.
+
 The build reads the current release notes from CHANGELOG.md. GitHub uses them for the release description and the launcher displays them from update.json. Manually dispatched builds upload preview artifacts without changing the public update channel.

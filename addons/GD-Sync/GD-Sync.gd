@@ -40,7 +40,7 @@ var debugger = GDSyncProfiler.new()
 var export_plugin : EditorExportPlugin = GDSyncExportPlugin.new()
 
 func _enable_plugin() -> void:
-	add_autoload_singleton("GDSync", "res://addons/GD-Sync/MultiplayerClient.gd")
+	# RIFTCORE initializes the client on demand from RiftRelay.
 	
 	print_rich("[color=#408EAB]	- Please visit our website for more info (https://www.gd-sync.com)[/color]")
 	print_rich("[color=#408EAB]	- The plugin configuration menu can be found under Project > Tools > GD-Sync.[/color]")
@@ -74,7 +74,7 @@ func _enter_tree() -> void:
 	_check_for_updates_and_news()
 	_initialize_remote_call_validator()
 	add_debugger_plugin(debugger)
-	add_export_plugin(export_plugin)
+	# RIFTCORE supplies playtest credentials at runtime.
 
 func _exit_tree() -> void:
 	_disable_remote_call_validator()
@@ -85,7 +85,6 @@ func _exit_tree() -> void:
 		config_menu = null
 	
 	remove_debugger_plugin(debugger)
-	remove_export_plugin(export_plugin)
 
 func _relocate_api_keys() -> void:
 	KeyStore.ensure_gitignore()
