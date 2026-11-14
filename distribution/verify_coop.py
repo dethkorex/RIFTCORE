@@ -48,7 +48,7 @@ def verify(executable: Path) -> None:
             match = re.fullmatch(r"RELAY ROOM CODE ([A-Z0-9]{10})", line.strip())
             if match:
                 guest = launch("join", match[1])
-        output, _ = guest.communicate(timeout=55)
+        output, _ = guest.communicate(timeout=80)
         host.wait(timeout=20)
         reader.join(timeout=2)
         if guest.returncode or host.returncode or any(

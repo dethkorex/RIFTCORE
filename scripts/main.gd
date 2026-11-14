@@ -340,7 +340,7 @@ func verify_coop_mission(host: bool) -> void:
 		return
 	if not host:
 		RiftRelay.relay.lobby_set_data("coop_guest_moved", true)
-		var entered_act_two := await wait_for_relay(func(): return is_instance_valid(coop_mission) and coop_mission.act == 2 and not coop_mission.changing_act, 18.0)
+		var entered_act_two := await wait_for_relay(func(): return is_instance_valid(coop_mission) and coop_mission.act == 2 and not coop_mission.changing_act, 24.0)
 		if entered_act_two:
 			RiftRelay.relay.lobby_set_data("coop_guest_act_two", true)
 	else:
@@ -358,7 +358,7 @@ func verify_coop_mission(host: bool) -> void:
 		if not await clear_coop_test_boss(mission):
 			finish_relay_check(false)
 			return
-	var returned := await wait_for_relay(func(): return is_instance_valid(home_hub) and not RiftRelay.mission_active, 18.0)
+	var returned := await wait_for_relay(func(): return is_instance_valid(home_hub) and not RiftRelay.mission_active, 24.0)
 	var rewards := (profile.player_xp > previous_xp and profile.credits > previous_credits
 		and profile.blueprint_items.has("bp_01_00") and profile.gear == saved_gear
 		and profile.unlocked_sector >= 2)
@@ -386,7 +386,7 @@ func clear_coop_test_boss(mission: Node) -> bool:
 		return false
 	mission.operators[1].global_position = gate_position + Vector3(4.0, 1.0, 0.0)
 	mission.check_campaign_progress()
-	if not mission.boss_started or not await wait_for_relay(func(): return not mission.boss_intro_active, 8.0):
+	if not mission.boss_started or not await wait_for_relay(func(): return not mission.boss_intro_active, 14.0):
 		return false
 	mission.boss.take_damage(100000.0)
 	mission.operators[0].global_position = mission.exit_marker.global_position
@@ -1632,7 +1632,7 @@ func play_arena_intro() -> void:
 	player.cancel_charge()
 	player.velocity = Vector3.ZERO
 	player.facing = 1.0
-	player.invulnerable_time = maxf(player.invulnerable_time, 6.0)
+	player.invulnerable_time = maxf(player.invulnerable_time, 0.35)
 	player.set_physics_process(false)
 	player.model_root.rotation.y = PI * 0.5
 	var destination := player.global_position + Vector3.RIGHT * 1.75
@@ -1643,8 +1643,9 @@ func play_arena_intro() -> void:
 	player.play_character_animation("idle", true)
 	var cinematic := preload("res://scripts/boss_intro.gd").new()
 	game_root.add_child(cinematic)
-	await cinematic.play(camera_rig, boss, gate.global_position.y, factory_hud.boss_name, Color(Catalog.info(sector).color))
+	await cinematic.play(camera_rig, boss, gate.global_position.y, factory_hud.boss_name, Color(Catalog.info(sector).color), sector, act)
 	cinematic.queue_free()
+	player.invulnerable_time = 0.35
 	player.set_physics_process(true)
 	boss.target = player
 	boss.active = true

@@ -499,7 +499,7 @@ func play_boss_intro(track: int) -> void:
 	var cinematic := BossIntro.new()
 	stage.add_child(cinematic)
 	var title: String = Miniboss.TITLES[sector - 1] if act == 1 else Catalog.info(sector).boss
-	await cinematic.play(camera, boss, gate.global_position.y, title, Color(Catalog.info(sector).color))
+	await cinematic.play(camera, boss, gate.global_position.y, title, Color(Catalog.info(sector).color), sector, act)
 	cinematic.queue_free()
 	boss_intro_active = false
 	for index in operators.size():
