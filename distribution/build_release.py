@@ -51,20 +51,24 @@ def export(engine: Path, project: Path, preset: str, destination: Path, log: Pat
         raise RuntimeError(f"Export did not produce {destination}")
 
 
+def linux_payload(payload: Path, target: tarfile.TarFile, prefix: str = "") -> None:
+    for child in sorted(payload.rglob("*")):
+        if not child.is_file():
+            continue
+        info = target.gettarinfo(str(child), arcname=prefix + child.relative_to(payload).as_posix())
+        info.uid = info.gid = 0
+        info.uname = info.gname = ""
+        info.mode = 0o755 if child.name in {"RIFTCORE", "start-riftcore", "install.sh"} else 0o644
+        with child.open("rb") as src:
+            target.addfile(info, src)
+
+
 def linux_installer(payload: Path, out: Path) -> None:
     script = (DIST / "linux-installer.sh").read_bytes().replace(b"\r\n", b"\n")
     with out.open("wb") as dst:
         dst.write(script.rstrip(b"\n") + b"\n")
         with tarfile.open(fileobj=dst, mode="w:gz", compresslevel=6) as tar:
-            for child in sorted(payload.rglob("*")):
-                if not child.is_file():
-                    continue
-                info = tar.gettarinfo(str(child), arcname=child.relative_to(payload).as_posix())
-                info.uid = info.gid = 0
-                info.uname = info.gname = ""
-                info.mode = 0o755 if child.name == "RIFTCORE" else 0o644
-                with child.open("rb") as src:
-                    tar.addfile(info, src)
+            linux_payload(payload, tar)
     out.chmod(0o755)
 
 
@@ -126,7 +130,9 @@ def main() -> None:
             for file in LICENSES:
                 shutil.copy2(license_path / file, version / file)
             (payload / "updates.cfg").write_text(
-                f'[updates]\nrepository="{a.repo}"\nbundled_notes_tag="{a.tag}"\n', encoding="utf-8", newline="\n"
+                f'[updates]\nrepository="{a.repo}"\nbundled_notes_tag="{a.tag}"\n'
+                f'preview_channel={str(a.tag.endswith("-preview")).lower()}\n',
+                encoding="utf-8", newline="\n"
             )
             shutil.copy2(out / "PATCH_NOTES.md", payload / "PATCH_NOTES.md")
             game_zip = out / f"RIFTCORE-{platform}.zip"
@@ -141,7 +147,12 @@ def main() -> None:
                 if not a.skip_windows_installer:
                     windows_installer(payload, out / "RIFTCORE-Windows-x64-Setup.exe", nsis)
             else:
+                for source, target in [("start-linux.sh", "start-riftcore"), ("install-linux-folder.sh", "install.sh")]:
+                    script = (DIST / source).read_text(encoding="utf-8-sig")
+                    (payload / target).write_text(script, encoding="utf-8", newline="\n")
                 linux_installer(payload, out / "RIFTCORE-Linux-x64-Setup.run")
+                with tarfile.open(out / "RIFTCORE-Arch-Omarchy-x64.tar.gz", "w:gz", compresslevel=5) as tar:
+                    linux_payload(payload, tar, "RIFTCORE/")
     (out / "update.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
 
 

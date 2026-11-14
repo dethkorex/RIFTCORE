@@ -17,26 +17,9 @@ temp="$(mktemp -d)"
 trap 'rm -rf -- "$temp"' EXIT HUP INT TERM
 payload="$(awk '/^__RIFTCORE_PAYLOAD__$/ { print NR + 1; exit }' "$0")"
 tail -n "+$payload" "$0" | tar -xzf - -C "$temp"
-mkdir -p "$base/versions"
-cp "$temp/RIFTCORE" "$base/RIFTCORE"
-cp "$temp/updates.cfg" "$base/updates.cfg"
-cp "$temp/PATCH_NOTES.md" "$base/PATCH_NOTES.md"
-icons="${XDG_DATA_HOME:-$HOME/.local/share}/icons/hicolor/scalable/apps"
-mkdir -p "$icons"
-cp "$temp/riftcore-icon.svg" "$icons/riftcore.svg"
-chmod 755 "$base/RIFTCORE"
-for version in "$temp"/versions/v*; do
-  target="$base/versions/${version##*/}"
-  if [ ! -e "$target" ]; then mv "$version" "$target"; fi
-  chmod 755 "$target/RIFTCORE"
-done
-applications="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
-mkdir -p "$applications"
-desktop_exec="$(printf '%s' "$base/RIFTCORE" | sed 's/[\\`"$]/\\&/g; s/%/%%/g')"
-printf '[Desktop Entry]\nType=Application\nName=RIFTCORE\nComment=RIFTCORE play and updates\nIcon=riftcore\nExec="%s"\nTerminal=false\nCategories=Game;\n' "$desktop_exec" > "$applications/riftcore.desktop"
-printf 'RIFTCORE Installer 0.2 finished. Open the updater from your app menu or run: %s\n' "$base/RIFTCORE"
+sh "$temp/install.sh"
 if [ "$steam_shortcut" -eq 1 ]; then
-  printf 'In the Steam dialog, select: %s\n' "$base/RIFTCORE"
+  printf 'In the Steam dialog, select: %s\n' "$base/start-riftcore"
   if ! command -v xdg-open >/dev/null 2>&1 || ! xdg-open 'steam://AddNonSteamGame'; then
     printf '%s\n' 'Open Steam manually and select Games > Add a Non-Steam Game to My Library.'
   fi

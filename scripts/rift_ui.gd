@@ -8,6 +8,8 @@ const CYAN := Color("55e7ff")
 const MUTED := Color("9db4cc")
 const WHITE := Color("e7f2ff")
 const VIOLET := Color("bf82ff")
+const FOCUS_COLORS := [CYAN, VIOLET, Color("f9c65a"), Color("68f0bb"), Color("ff87db")]
+static var highlight_texture: ImageTexture
 
 static func frame(fill: Color, edge: Color, accent := 2) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
@@ -41,7 +43,7 @@ static func theme() -> Theme:
 	result.set_stylebox("normal", "Button", texture_frame("button_secondary", 30, Vector2(22, 8)))
 	result.set_stylebox("hover", "Button", texture_frame("button_primary", 31, Vector2(22, 8)))
 	result.set_stylebox("pressed", "Button", texture_frame("button_primary", 31, Vector2(22, 8)))
-	result.set_stylebox("focus", "Button", frame(Color.TRANSPARENT, CYAN, 4))
+	result.set_stylebox("focus", "Button", StyleBoxEmpty.new())
 	result.set_stylebox("disabled", "Button", texture_frame("button_disabled", 27, Vector2(22, 8)))
 	return result
 
@@ -54,6 +56,30 @@ static func label(parent: Node, value: String, font_size := 17, color := WHITE) 
 	item.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	parent.add_child(item)
 	return item
+
+static func style_button(item: Button, accent: Color) -> void:
+	if not highlight_texture:
+		var source := load(KIT + "button_primary.png") as Texture2D
+		var pixels := source.get_image()
+		pixels.convert(Image.FORMAT_RGBA8)
+		for y in pixels.get_height():
+			for x in pixels.get_width():
+				var pixel := pixels.get_pixel(x, y)
+				var value := pixel.v
+				pixels.set_pixel(x, y, Color(value, value, value, pixel.a))
+		highlight_texture = ImageTexture.create_from_image(pixels)
+	var active := texture_frame("button_primary", 31, Vector2(22, 8))
+	active.texture = highlight_texture
+	active.modulate_color = accent
+	var down := active.duplicate() as StyleBoxTexture
+	down.modulate_color = accent.darkened(0.22)
+	var inactive := item.get_theme_stylebox("normal")
+	item.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+	item.add_theme_stylebox_override("hover", active)
+	item.add_theme_stylebox_override("pressed", down)
+	item.add_theme_stylebox_override("hover_pressed", down)
+	item.focus_entered.connect(func(): item.add_theme_stylebox_override("normal", active))
+	item.focus_exited.connect(func(): item.add_theme_stylebox_override("normal", inactive))
 
 static func button(parent: Node, value: String, action: Callable, primary := false) -> Button:
 	var item := Button.new()
@@ -70,6 +96,7 @@ static func button(parent: Node, value: String, action: Callable, primary := fal
 		item.disabled = true
 		item.focus_mode = Control.FOCUS_NONE
 	parent.add_child(item)
+	style_button(item, FOCUS_COLORS[item.get_index() % FOCUS_COLORS.size()])
 	return item
 
 static func column(parent: Node, spacing := 12) -> VBoxContainer:

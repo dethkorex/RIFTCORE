@@ -2,6 +2,8 @@
 
 ## Game changes
 
+- Menu focus and hover now follow the button artwork and use distinct accent colors. Deployment cards keep their sector accent.
+
 - Aim and fire in either direction while climbing. Hold Up or Down to grab a ladder mid-dash. Step off at the top, or press Down + B on a one-way deck to drop through.
 - Explore a rebuilt Operations Station with separate trader, forge, storage, and loadout bays, a central Deploy pad, and an orbital panorama.
 - Menus and HUD use angular RIFTCORE UI frames, Barlow typography, and revised status displays.
@@ -13,6 +15,8 @@
 Online co-op missions and Steam invites are still in development. The full v0.5 overhaul has further campaign, visual, and competitive-mode work tracked in RIFTCORE_DEVELOPMENT.md.
 
 ## Installer and launcher 0.2
+
+- Added an Arch Linux and Omarchy tarball with native Wayland startup, an optional app-menu installer, and updates through the launcher.
 
 - New RIFTCORE icon and wordmark on the launcher, game executable, and installer.
 - The Linux installer adds a desktop entry for the updater. Windows and Linux keep using the same launcher to download and verify updates.

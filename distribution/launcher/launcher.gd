@@ -10,6 +10,7 @@ var repo := ""
 var installed := ""
 var next_tag := ""
 var bundled_notes := ""
+var preview_channel := false
 var download_asset: Dictionary = {}
 var status: Label
 var notes_title: Label
@@ -30,6 +31,7 @@ func _ready() -> void:
 	var config := ConfigFile.new()
 	if config.load(install_root.path_join("updates.cfg")) == OK:
 		repo = String(config.get_value("updates", "repository", ""))
+		preview_channel = config.get_value("updates", "preview_channel", false)
 	installed = newest_installed()
 	var notes_path := install_root.path_join("PATCH_NOTES.md")
 	if installed == config.get_value("updates", "bundled_notes_tag", "") and FileAccess.file_exists(notes_path):
@@ -154,10 +156,14 @@ func launcher_button(host: Container, title: String, fill: Color, accent: Color)
 	var button := Button.new()
 	button.text = title
 	button.custom_minimum_size = Vector2(180, 47)
-	button.add_theme_stylebox_override("normal", panel_style(fill, accent))
-	button.add_theme_stylebox_override("hover", panel_style(fill.lightened(0.18), accent))
+	var idle := panel_style(fill, accent)
+	var highlight := panel_style(fill.lerp(accent, 0.29), accent.lightened(0.28))
+	button.add_theme_stylebox_override("normal", idle)
+	button.add_theme_stylebox_override("hover", highlight)
+	button.focus_entered.connect(func(): button.add_theme_stylebox_override("normal", highlight))
+	button.focus_exited.connect(func(): button.add_theme_stylebox_override("normal", idle))
 	button.add_theme_stylebox_override("pressed", panel_style(fill.darkened(0.18), accent))
-	button.add_theme_stylebox_override("focus", panel_style(Color.TRANSPARENT, Color("f77cd5")))
+	button.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
 	button.add_theme_stylebox_override("disabled", panel_style(Color("101e32"), Color("35425a")))
 	host.add_child(button)
 	return button
@@ -197,11 +203,16 @@ func newest_installed() -> String:
 	return best
 
 func check_updates() -> void:
+	var release_tag := ""
+	if preview_channel:
+		release_tag = await find_preview_release()
 	var request := HTTPRequest.new()
 	request.timeout = 5.5
 	request.body_size_limit = 32768
 	add_child(request)
 	var url := "https://github.com/%s/releases/latest/download/update.json" % repo
+	if not release_tag.is_empty():
+		url = "https://github.com/%s/releases/download/%s/update.json" % [repo, release_tag]
 	if request.request(url) != OK:
 		request.queue_free()
 		show_fallback_notes("Patch notes are unavailable offline.")
@@ -214,6 +225,36 @@ func check_updates() -> void:
 		status.text = "Update server unavailable. You can still play installed."
 		return
 	apply_manifest(JSON.parse_string(response[3].get_string_from_utf8()))
+
+func find_preview_release() -> String:
+	var request := HTTPRequest.new()
+	request.timeout = 5.5
+	request.body_size_limit = 1024 * 1024
+	add_child(request)
+	var url := "https://api.github.com/repos/%s/releases?per_page=20" % repo
+	if request.request(url, ["Accept: application/vnd.github+json"]) != OK:
+		request.queue_free()
+		return ""
+	var response: Array = await request.request_completed
+	request.queue_free()
+	if response[0] != HTTPRequest.RESULT_SUCCESS or response[1] != 200:
+		return ""
+	return select_release(JSON.parse_string(response[3].get_string_from_utf8()))
+
+func select_release(releases: Variant) -> String:
+	var best := ""
+	if not releases is Array:
+		return best
+	for release in releases:
+		if not release is Dictionary or release.get("draft", false):
+			continue
+		var tag := String(release.get("tag_name", ""))
+		if not is_match(TAG_PATTERN, tag) or not compare_tags(tag, best):
+			continue
+		var assets = release.get("assets", [])
+		if assets is Array and assets.any(func(asset): return asset is Dictionary and asset.get("name", "") == "update.json"):
+			best = tag
+	return best
 
 func apply_manifest(info: Variant) -> void:
 	if not info is Dictionary or not info.get("assets", {}) is Dictionary:
@@ -345,7 +386,10 @@ func launch_game() -> void:
 	if installed.is_empty():
 		return
 	var executable := install_root.path_join("versions").path_join(installed).path_join(game_filename)
-	if OS.create_process(executable, [], false) <= 0:
+	var arguments := PackedStringArray()
+	if OS.get_name() == "Linux" and DisplayServer.get_name().to_lower() == "wayland":
+		arguments = PackedStringArray(["--display-driver", "wayland"])
+	if OS.create_process(executable, arguments, false) <= 0:
 		fail_update("The installed game could not launch.")
 	else:
 		get_tree().quit()

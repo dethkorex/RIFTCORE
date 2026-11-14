@@ -4,7 +4,7 @@ A 3D side-scrolling roguelike platformer inspired by Mega Man X. The campaign ha
 
 ## Play
 
-Use the [stable download](https://github.com/dethkorex/RIFTCORE/releases/latest) or try the [0.5 preview with Installer 0.2](https://github.com/dethkorex/RIFTCORE/releases/tag/v0.5.0-preview). Choose `RIFTCORE-Windows-x64-Setup.exe` for Windows or `RIFTCORE-Linux-x64-Setup.run` for Linux. These include the game runtime; players do not need Godot. On Linux, run `chmod +x RIFTCORE-Linux-x64-Setup.run` and then `./RIFTCORE-Linux-x64-Setup.run`.
+Use the [stable download](https://github.com/dethkorex/RIFTCORE/releases/latest) or try the [0.5 preview with Installer 0.2](https://github.com/dethkorex/RIFTCORE/releases/tag/v0.5.1-preview). Choose `RIFTCORE-Windows-x64-Setup.exe` for Windows or `RIFTCORE-Linux-x64-Setup.run` for Linux. These include the game runtime; players do not need Godot. On Linux, run `chmod +x RIFTCORE-Linux-x64-Setup.run` and then `./RIFTCORE-Linux-x64-Setup.run`.
 
 The installed launcher checks GitHub Releases. When an update is available, select **Update and play**. **Play installed** works offline. Updates verify the package SHA-256 and install next to the prior version, leaving user data in its normal Godot directory. The ZIP downloads are standalone portable games without the launcher.
 
@@ -62,3 +62,8 @@ Each sector's `assets/campaign/<sector>/terrain` folder has `climb_platform_left
 Push a stable tag such as `v0.3.0` to build and publish both installers through GitHub Actions. The update manifest and both game ZIPs are published together. See [distribution instructions](distribution/README.md), [art production notes](ART_NOTES.md), and [audio credits](assets/audio/CREDITS.md).
 
 Hold Up or Down while dashing into a climbable to grab it. On a one-way deck, press Down + B (controller) or S + Shift (keyboard) to drop through.
+
+
+### Arch Linux and Omarchy
+
+Download `RIFTCORE-Arch-Omarchy-x64.tar.gz` from the preview release. Extract it to a folder you can write to, then run `./start-riftcore` inside the extracted `RIFTCORE` folder. Run `./install.sh` there if you want an application-menu entry. The launcher downloads and verifies future preview or stable game updates. It uses native Wayland on Wayland desktops. Run `./start-riftcore --x11` to use Xwayland if needed.

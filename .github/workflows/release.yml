@@ -56,6 +56,24 @@ jobs:
           "$build" --headless --quit-after 100 --log-file "$RUNNER_TEMP/riftcore-smoke.log"
           ! grep -E 'SCRIPT ERROR:|Failed to load' "$RUNNER_TEMP/riftcore-smoke.log"
           test -s release-tools/artifacts/RIFTCORE-Windows-x64-Setup.exe
+      - name: Test portable and installed builds on Arch
+        run: |
+          docker run --rm -v "$PWD/release-tools/artifacts:/artifacts:ro" archlinux:latest sh -ec '
+            pacman -Syu --noconfirm ca-certificates mesa libglvnd libx11 libxrandr libxi libxcursor libxinerama libxkbcommon wayland
+            tar -xzf /artifacts/RIFTCORE-Arch-Omarchy-x64.tar.gz -C /tmp
+            cd /tmp/RIFTCORE
+            test -x start-riftcore
+            test -x install.sh
+            sh -n start-riftcore
+            ./start-riftcore --headless --quit-after 30 --log-file /tmp/launcher.log
+            export XDG_DATA_HOME="/tmp/riftcore user data"
+            ./install.sh
+            test -x "$XDG_DATA_HOME/riftcore/start-riftcore"
+            "$XDG_DATA_HOME/riftcore/start-riftcore" --headless --quit-after 30 --log-file /tmp/installed.log
+            build="$(find "$XDG_DATA_HOME/riftcore/versions" -name RIFTCORE -type f)"
+            "$build" --headless --quit-after 60 --log-file /tmp/game.log
+            ! grep -E "SCRIPT ERROR:|Failed to load" /tmp/launcher.log /tmp/installed.log /tmp/game.log
+          '
       - uses: actions/upload-artifact@v4
         with:
           name: riftcore-playtest
