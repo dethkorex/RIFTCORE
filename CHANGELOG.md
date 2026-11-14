@@ -1,4 +1,11 @@
-# RIFTCORE Alpha 6.0.3 — Fractured Connections
+# RIFTCORE Alpha 6.0.4 — Fractured Connections
+
+## Alpha 6.0.4
+
+- Materials drop as orange MAT orbs. Blueprints drop as cyan BP orbs.
+- Defeating a sector boss spawns a cache. Walk up to open it for bonus materials and a chance at one of three boss-exclusive blueprints per sector. Higher difficulty improves the odds. NOVA Archive lists the exclusive drops after your first clear.
+- Stabilized Equipment navigation between the hologram sockets, filters and item grid. Fixed text wrapping and layout overflow in smaller windows.
+- Update all players to Alpha 6.0.4 before joining a party. The new boss cache and its pickups are synchronized across players.
 
 ## Alpha 6.0.3
 

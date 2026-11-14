@@ -13,6 +13,7 @@ const Details := preload("res://scripts/sector_details.gd")
 const Loading := preload("res://scripts/act_loading_screen.gd")
 const Equipment := preload("res://scripts/equipment_stats.gd")
 const Materials := preload("res://scripts/fabrication_catalog.gd")
+const BossCache := preload("res://scripts/boss_loot_cache.gd")
 const INPUTS := [&"jump", &"dash", &"crouch", &"crouch_stick", &"shoot", &"melee", &"climb_down", &"swap_weapon", &"previous_suit", &"quick_0", &"quick_1", &"quick_2", &"quick_3"]
 const INPUT_SUSPENDED := 1 << 30
 const PauseMenu := preload("res://scripts/coop_pause_menu.gd")
@@ -77,6 +78,9 @@ var security_defeated := 0
 var lives_lost := 0
 var team_materials: Dictionary = {}
 var extracted_results: Dictionary = {}
+var boss_cache: BossCache
+var cache_opened := false
+var cache_pickups: Array[Area3D] = []
 var loot_rng := RandomNumberGenerator.new()
 var rewards_delivered := false
 var blueprint_count := 0
@@ -115,6 +119,8 @@ func _ready() -> void:
 	peer.expose_func(receive_state)
 	peer.expose_func(receive_operators)
 	peer.expose_func(receive_challenge_results)
+	peer.expose_func(receive_cache_open)
+	peer.expose_func(receive_cache_pickup)
 	peer.expose_func(receive_shot)
 	peer.expose_func(receive_outcome)
 	peer.expose_func(receive_act)
@@ -172,6 +178,8 @@ func load_stage() -> void:
 	resetting_arena = false
 	entrance_open = false
 	boss_defeated = false
+	cache_opened = false
+	cache_pickups.clear()
 	checkpoint = Vector3.ZERO
 	last_boss_health = -1.0
 	last_gate_open = false
@@ -379,14 +387,48 @@ func on_boss_defeated() -> void:
 		if operator.has_meta("coop_down"):
 			operator.lives = maxi(1, operator.lives)
 			restore_operator.call_deferred(operator, gate.global_position + Vector3(3.0, 1.0, 0.0))
-	award_shared((35 if act == 1 else 80) + sector * 8, (60 if act == 1 else 100) + sector * 8, "miniboss" if act == 1 else "boss")
+	award_shared((35 if act == 1 else 80) + sector * 8, (60 if act == 1 else 100) + sector * 8, "miniboss" if act == 1 else "")
 	if act == 2:
+		create_boss_cache()
 		var reward: String = Catalog.info(sector).reward
 		if not active_weapon_ids.has(reward):
 			active_weapon_ids.append(reward)
 		for operator in operators:
 			operator.unlock_sector_weapon(reward)
 	update_doors()
+
+func create_boss_cache() -> void:
+	var actors := stage.get_node("Actors") as Node3D
+	boss_cache = BossCache.new()
+	boss_cache.authoritative = host
+	boss_cache.position = actors.to_local(Vector3(boss_position.x, gate.global_position.y + 0.52, 0.0))
+	actors.add_child.call_deferred(boss_cache)
+	if host:
+		boss_cache.opened.connect(func():
+			cache_opened = true
+			var rewards := BossCache.roll_loot(sector, Difficulty.LOOT[mode])
+			var at := boss_cache.global_position
+			cache_pickups = BossCache.spill(actors, at, rewards)
+			peer.call_func(receive_cache_open, at, rewards)
+			for index in cache_pickups.size():
+				cache_pickups[index].collected.connect(func(): peer.call_func(receive_cache_pickup, index))
+		)
+
+func receive_cache_open(at: Vector3, rewards: Dictionary) -> void:
+	if host or act != 2 or peer.get_sender_id() != peer.get_host():
+		return
+	cache_opened = true
+	if is_instance_valid(boss_cache) and boss_cache.is_inside_tree():
+		boss_cache.finish_open()
+	elif is_instance_valid(boss_cache):
+		boss_cache.queue_free()
+	var actors := stage.get_node("Actors") as Node3D
+	cache_pickups = BossCache.spill(actors, at, rewards)
+
+func receive_cache_pickup(index: int) -> void:
+	if not host and act == 2 and peer.get_sender_id() == peer.get_host() and index >= 0 and index < cache_pickups.size():
+		if is_instance_valid(cache_pickups[index]):
+			cache_pickups[index].queue_free()
 
 func update_doors() -> void:
 	var opened := boss_defeated or entrance_open and not boss_started
@@ -750,6 +792,8 @@ func receive_state(remote_act: int, security: PackedFloat32Array, arena: Array, 
 			last_boss_health = boss.health
 			boss.health_changed.emit(boss.health, boss.max_health)
 	boss_started = arena[3]
+	if act == 2 and arena[4] and not cache_opened and not boss_defeated and not is_instance_valid(boss_cache):
+		create_boss_cache()
 	boss_defeated = arena[4]
 	if is_instance_valid(boss):
 		boss.visible = boss_started and not boss_defeated

@@ -494,9 +494,9 @@ func show_sector_loot(entries: VBoxContainer) -> void:
 		var boost: float = Difficulty.LOOT[index]
 		var lines := PackedStringArray()
 		for rarity in Profile.RARITY_NAMES.size():
-			var chance := 100.0 * float(Blueprints.RATES.boss[rarity]) * (1.0 + (boost - 1.0) * (0.5 + 0.25 * rarity))
+			var chance := 100.0 * float(Blueprints.RATES.boss_cache[rarity]) * (1.0 + (boost - 1.0) * (0.5 + 0.25 * rarity))
 			lines.append("%s %.2f%%" % [Profile.RARITY_NAMES[rarity], chance])
-		odds.text = "Boss blueprint chances\n" + "  /  ".join(lines) + "\nBoss Fracture Crystal: %.1f%%" % (22.0 * boost)
+		odds.text = "Boss cache blueprint chances\n" + "  /  ".join(lines) + "\nCache Fracture Crystal: %.1f%%" % (22.0 * boost)
 	mode.item_selected.connect(refresh)
 	refresh.call(0)
 	UI.label(entries, "Materials", 21, UI.CYAN)
@@ -505,7 +505,12 @@ func show_sector_loot(entries: VBoxContainer) -> void:
 	UI.label(entries, "Blueprints", 21, UI.CYAN)
 	for id in Profile.GEAR:
 		var item: Dictionary = Profile.GEAR[id]
-		if item.get("sector", 0) == archive_sector:
+		if item.get("sector", 0) == archive_sector and not item.get("boss_only", false):
+			UI.label(entries, item.name + "  ·  " + Profile.RARITY_NAMES[item.rarity], 16, Profile.RARITY_COLORS[item.rarity])
+	UI.label(entries, "Boss Cache Exclusives", 21, UI.CYAN)
+	for id in Profile.GEAR:
+		var item: Dictionary = Profile.GEAR[id]
+		if item.get("sector", 0) == archive_sector and item.get("boss_only", false):
 			UI.label(entries, item.name + "  ·  " + Profile.RARITY_NAMES[item.rarity], 16, Profile.RARITY_COLORS[item.rarity])
 
 func build_social(columns: HBoxContainer) -> void:
@@ -1486,10 +1491,15 @@ func build_storage(columns: HBoxContainer) -> void:
 		var tab := UI.button(tabs, section, open_equipment_view.bind(section), false, 35)
 		if section == equipment_view:
 			tab.add_theme_color_override("font_color", UI.CYAN)
-			tab.grab_focus()
+			if not Profile.GEAR_SLOTS.has(storage_filter):
+				tab.grab_focus()
 	match equipment_view:
 		"Gear":
-			build_storage_grid(equipment)
+			var first_filter := build_storage_grid(equipment)
+			for socket in ["core", "arm"]:
+				var button: Button = body.buttons[socket]
+				button.focus_neighbor_right = button.get_path_to(first_filter)
+			first_filter.focus_neighbor_left = first_filter.get_path_to(body.buttons.core)
 		"Boss Abilities":
 			build_boss_abilities(equipment)
 
@@ -1522,23 +1532,28 @@ func storage_items() -> Dictionary:
 				"rarity": item.rarity, "detail": "Used to fabricate equipment." if material else item.detail, "badge": "×%d" % quantity}
 	return items
 
-func build_storage_grid(parent: VBoxContainer) -> void:
+func build_storage_grid(parent: VBoxContainer) -> Button:
 	var toolbar := HBoxContainer.new()
 	parent.add_child(toolbar)
-	UI.label(toolbar, "LB / RB   Filter items", 14, UI.MUTED)
+	UI.label(toolbar, "LB / RB   Filter items", 14, UI.MUTED).autowrap_mode = TextServer.AUTOWRAP_OFF
 	var capacity := UI.label(toolbar, "%d / %d stowed" % [profile.stored_count(), profile.storage_capacity()], 17, Color("ffd079"))
+	capacity.autowrap_mode = TextServer.AUTOWRAP_OFF
 	capacity.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	capacity.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	capacity.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	var filters := GridContainer.new()
 	filters.columns = 3
+	filters.add_theme_constant_override("h_separation", 5)
+	filters.add_theme_constant_override("v_separation", 4)
 	parent.add_child(filters)
+	var category_tabs: Array[Button] = []
 	for category in STORAGE_FILTERS:
 		var tab := UI.button(filters, category, select_storage_filter.bind(category), false, 32)
 		tab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		tab.icon = EquipmentIcons.icon(STORAGE_FILTERS[category], STORAGE_FILTERS[category])
 		tab.expand_icon = true
 		tab.add_theme_constant_override("icon_max_width", 16)
+		category_tabs.append(tab)
 		if storage_filter == category:
 			tab.add_theme_color_override("font_color", UI.CYAN)
 			tab.grab_focus()
@@ -1546,8 +1561,9 @@ func build_storage_grid(parent: VBoxContainer) -> void:
 		UI.label(parent, "%s socket" % Profile.GEAR_SLOTS[storage_filter], 15, UI.CYAN)
 
 	var entries := scroll_entries(parent)
+	entries.get_parent().custom_minimum_size.y = UI.ITEM_SIZE + UI.ITEM_GAP
 	var grid := GridContainer.new()
-	grid.columns = 7
+	grid.columns = 3
 	grid.add_theme_constant_override("h_separation", UI.ITEM_GAP)
 	grid.add_theme_constant_override("v_separation", UI.ITEM_GAP)
 	entries.add_child(grid)
@@ -1592,12 +1608,20 @@ func build_storage_grid(parent: VBoxContainer) -> void:
 	else:
 		var id: String = focused_item if tiles.has(focused_item) else tiles.keys()[0]
 		reveal.call(id)
-		tiles[id].grab_focus()
+		if not Profile.GEAR_SLOTS.has(storage_filter):
+			tiles[id].grab_focus()
+		var first_item: Button = tiles.values()[0]
+		for tab in category_tabs.slice(3):
+			tab.focus_neighbor_bottom = tab.get_path_to(first_item)
+		first_item.focus_neighbor_top = first_item.get_path_to(category_tabs[3])
 		var fit := func():
-			grid.columns = clampi(floori((entries.size.x + UI.ITEM_GAP) / (UI.ITEM_SIZE + UI.ITEM_GAP)), 1, 9)
-		entries.resized.connect(fit)
+			var scroll := entries.get_parent() as ScrollContainer
+			var usable := scroll.size.x - scroll.get_v_scroll_bar().get_combined_minimum_size().x
+			grid.columns = clampi(floori((usable + UI.ITEM_GAP) / (UI.ITEM_SIZE + UI.ITEM_GAP)), 1, 9)
+		entries.get_parent().resized.connect(fit)
 		fit.call_deferred()
 	build_quick_assignments(parent)
+	return category_tabs[0]
 
 func select_storage_filter(category: String) -> void:
 	storage_filter = category
@@ -1644,6 +1668,7 @@ func add_stat_group(parent: VBoxContainer, category: String, values: String) -> 
 	var row := HBoxContainer.new()
 	parent.add_child(row)
 	var title := UI.label(row, category, 16, UI.MUTED)
+	title.autowrap_mode = TextServer.AUTOWRAP_OFF
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var reading := UI.label(row, values, 16, UI.WHITE)
 	reading.autowrap_mode = TextServer.AUTOWRAP_OFF

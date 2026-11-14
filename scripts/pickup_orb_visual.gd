@@ -1,7 +1,7 @@
 @tool
 extends Node3D
 
-enum Mark { PLUS, LIGHTNING, XP, NONE }
+enum Mark { PLUS, LIGHTNING, XP, NONE, MATERIAL, BLUEPRINT }
 
 @export var tint := Color("52ff80")
 @export var mark := Mark.PLUS
@@ -33,6 +33,10 @@ func _ready() -> void:
 			add_lightning()
 		Mark.XP:
 			add_text("XP", Color.BLACK, 0.00205)
+		Mark.MATERIAL:
+			add_text("MAT", Color("fff3e4"), 0.0016)
+		Mark.BLUEPRINT:
+			add_text("BP", Color("e9faff"), 0.0020)
 
 func _process(_delta: float) -> void:
 	if Engine.is_editor_hint() or not facing_camera:

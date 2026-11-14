@@ -8,6 +8,7 @@ const UI := preload("res://scripts/rift_ui.gd")
 const FactoryHUD := preload("res://scripts/factory_hud.gd")
 const Catalog := preload("res://scripts/sector_catalog.gd")
 const Difficulty := preload("res://scripts/mission_difficulty.gd")
+const BossCache := preload("res://scripts/boss_loot_cache.gd")
 const Miniboss := preload("res://scripts/sector_miniboss.gd")
 const ActLoadingScreen := preload("res://scripts/act_loading_screen.gd")
 const SectorDetails := preload("res://scripts/sector_details.gd")
@@ -1064,7 +1065,14 @@ func bind_boss_signals() -> void:
 		profile.core_shards += shards
 		factory_hud.core_shards = profile.core_shards
 		mission_stats.shards += shards
-		Drop.roll_at(game_root.get_node("Actors"), boss.global_position + Vector3.UP * 0.25, sector, "boss" if act == 2 else "miniboss")
+		var actors := game_root.get_node("Actors") as Node3D
+		if act == 2:
+			var cache := BossCache.new()
+			cache.position = actors.to_local(Vector3(boss_spawn.x, gate.global_position.y + 0.52, 0.0))
+			actors.add_child.call_deferred(cache)
+			cache.opened.connect(func(): BossCache.spill(actors, cache.global_position, BossCache.roll_loot(sector, Difficulty.LOOT[mission_difficulty])))
+		else:
+			Drop.roll_at(actors, boss.global_position + Vector3.UP * 0.25, sector, "miniboss")
 		open_factory_gate()
 		var info := Catalog.info(sector)
 		for minion in get_tree().get_nodes_in_group(&"arena_minions"):

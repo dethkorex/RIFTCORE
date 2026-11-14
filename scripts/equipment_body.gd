@@ -79,19 +79,29 @@ func install(data, active: String, action: Callable, workshop := false) -> void:
 			button.grab_focus()
 	resized.connect(place_sockets)
 	if action.is_valid():
-		for index in order.size():
-			var button: Button = buttons[order[index]]
-			button.focus_neighbor_top = button.get_path_to(buttons[order[posmod(index - 1, order.size())]])
-			button.focus_neighbor_bottom = button.get_path_to(buttons[order[(index + 1) % order.size()]])
+		for side in [["visor", "frame", "utility"], ["core", "arm"]]:
+			for index in side.size():
+				var button: Button = buttons[side[index]]
+				if index > 0:
+					button.focus_neighbor_top = button.get_path_to(buttons[side[index - 1]])
+				if index < side.size() - 1:
+					button.focus_neighbor_bottom = button.get_path_to(buttons[side[index + 1]])
+		buttons.visor.focus_neighbor_right = buttons.visor.get_path_to(buttons.core)
+		buttons.frame.focus_neighbor_right = buttons.frame.get_path_to(buttons.core)
+		buttons.utility.focus_neighbor_right = buttons.utility.get_path_to(buttons.arm)
+		buttons.core.focus_neighbor_left = buttons.core.get_path_to(buttons.frame)
+		buttons.arm.focus_neighbor_left = buttons.arm.get_path_to(buttons.utility)
 	place_sockets.call_deferred()
 
 func place_sockets() -> void:
 	for slot in buttons:
 		var button: Button = buttons[slot]
 		var socket: Dictionary = SOCKETS[slot]
-		var wide := minf(size.x * 0.34, 168.0)
-		button.size = Vector2(wide, 55.0)
-		button.position = Vector2(9.0 if socket.left else size.x - wide - 9.0, size.y * float(socket.row) - 27.0)
+		var wide := minf(size.x * 0.35, 168.0)
+		button.custom_minimum_size.x = 0.0
+		button.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		button.size = Vector2(wide, 50.0)
+		button.position = Vector2(9.0 if socket.left else size.x - wide - 9.0, size.y * float(socket.row) - button.size.y * 0.5)
 	queue_redraw()
 
 func _draw() -> void:
@@ -107,7 +117,7 @@ func _draw() -> void:
 		var socket: Dictionary = SOCKETS[slot]
 		var button: Button = buttons[slot]
 		var joint: Vector2 = socket.joint * size
-		var edge := button.position + Vector2(button.size.x if socket.left else 0.0, 27.0)
+		var edge := button.position + Vector2(button.size.x if socket.left else 0.0, button.size.y * 0.5)
 		var color: Color = ICONS.COLORS[slot]
 		if selected != slot:
 			color = color.darkened(0.34)
