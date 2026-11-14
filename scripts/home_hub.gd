@@ -158,6 +158,8 @@ func play_station_story(lines: Array) -> void:
 	box.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
 	box.offset_left = -408
 	box.offset_right = 408
+	box.anchor_top = 0.80
+	box.anchor_bottom = 0.80
 	box.offset_top = -197
 	box.offset_bottom = -23
 	var row := HBoxContainer.new()
@@ -177,7 +179,12 @@ func play_station_story(lines: Array) -> void:
 	var speaker := UI.label(pane, "", 23, UI.CYAN)
 	var speech := UI.label(pane, "", 22)
 	speech.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	var next := UI.button(pane, "Continue", func(): pass, true, 43)
+	var reader := preload("res://scripts/dialogue_typewriter.gd").new()
+	story.add_child(reader)
+	reader.body = speech
+	var next := UI.button(pane, "Next", reader.advance, true, 36)
+	reader.next = next
+	UI.label(pane, "START  Skip dialogue", 14, UI.MUTED)
 	var pilot := AtlasTexture.new()
 	pilot.atlas = RX07
 	var source := RX07.get_size()
@@ -185,13 +192,13 @@ func play_station_story(lines: Array) -> void:
 	for index in lines.size():
 		var line: Array = lines[index]
 		speaker.text = line[0]
-		speech.text = line[1]
 		var guide: bool = line[0] == "NOVA"
 		portrait.texture = NOVA if guide else pilot
 		speaker.add_theme_color_override("font_color", UI.VIOLET if guide else UI.CYAN)
-		next.text = "Continue" if index < lines.size() - 1 else "Back to Station"
-		next.grab_focus()
-		await next.pressed
+		next.text = "Next" if index < lines.size() - 1 else "Back to Station"
+		await reader.show_line(line[1])
+		if reader.skipped:
+			break
 	story.hide()
 	story.queue_free()
 
@@ -228,13 +235,18 @@ func _process(delta: float) -> void:
 		var pad := pads[index]
 		var active := index == current_station
 		var glow: StandardMaterial3D = pad.glow
-		glow.emission_energy_multiplier = move_toward(glow.emission_energy_multiplier, 2.2 if active else 0.37, delta * 7.2)
+		glow.emission_energy_multiplier = move_toward(glow.emission_energy_multiplier, 4.8 if active else 0.37, delta * 13.0)
 		var beam: MeshInstance3D = pad.beam
 		beam.visible = active
+		var pulse: MeshInstance3D = pad.pulse
+		pulse.visible = active
 		if active:
-			beam.scale.y = 1.0 + sin(Time.get_ticks_msec() * 0.005) * 0.08
+			beam.scale.y = 1.0 + sin(Time.get_ticks_msec() * 0.005) * 0.045
+			var wave := fposmod(Time.get_ticks_msec() * 0.00082, 1.0)
+			pulse.scale = Vector3(1.03 + wave * 0.60, 1.0, 1.03 + wave * 0.60)
+			pulse.transparency = wave * 0.92
 		var lamp: OmniLight3D = pad.light
-		lamp.light_energy = move_toward(lamp.light_energy, 1.75 if active else 0.0, delta * 7.0)
+		lamp.light_energy = move_toward(lamp.light_energy, 3.6 if active else 0.0, delta * 13.0)
 
 func update_partner(id: int, x: float, facing: float, animation: String, display_name: String) -> void:
 	if not partners.has(id):
@@ -456,21 +468,29 @@ func build_pad(station: Dictionary) -> void:
 	var beacon := CylinderMesh.new()
 	beacon.top_radius = 0.97
 	beacon.bottom_radius = 0.69
-	beacon.height = 2.25
+	beacon.height = 2.65
 	beacon.radial_segments = 24
 	var beam_finish := ShaderMaterial.new()
 	beam_finish.shader = preload("res://assets/ui/hub_pad_light.gdshader")
 	beam_finish.set_shader_parameter("tint", tint)
-	var beam := part(at, beacon, Vector3(0, 1.23, 0), beam_finish)
+	var beam := part(at, beacon, Vector3(0, 1.52, 0), beam_finish)
 	beam.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	beam.hide()
+	var aura := TorusMesh.new()
+	aura.inner_radius = 0.82
+	aura.outer_radius = 0.90
+	var edge := paint(tint.lerp(Color.WHITE, 0.55), 3.5)
+	edge.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	var pulse := part(at, aura, Vector3(0, 0.28, 0), edge)
+	pulse.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	pulse.hide()
 	var lamp := OmniLight3D.new()
-	lamp.position = Vector3(0, 0.53, 0.58)
+	lamp.position = Vector3(0, 0.84, 0.58)
 	lamp.light_color = tint
 	lamp.light_energy = 0.0
-	lamp.omni_range = 2.9
+	lamp.omni_range = 3.8
 	at.add_child(lamp)
-	pads.append({"glow": glow, "beam": beam, "light": lamp})
+	pads.append({"glow": glow, "beam": beam, "light": lamp, "pulse": pulse})
 
 func build_hud() -> void:
 	hud_layer = CanvasLayer.new()

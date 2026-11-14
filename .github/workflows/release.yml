@@ -72,6 +72,7 @@ jobs:
           unzip -q release-tools/artifacts/RIFTCORE-linux-x64.zip -d "$base"
           chmod +x "$base/RIFTCORE"
           python3 distribution/verify_coop.py "$base/RIFTCORE"
+          python3 distribution/verify_coop.py "$base/RIFTCORE" jungle
       - name: Test portable and installed builds on Arch
         run: |
           docker run --rm -v "$PWD/release-tools/artifacts:/artifacts:ro" archlinux:latest sh -ec '
@@ -146,7 +147,11 @@ jobs:
 
       - name: Play the packaged Windows co-op mission
         shell: pwsh
-        run: python distribution/verify_coop.py game/RIFTCORE.exe
+        run: |
+          python distribution/verify_coop.py game/RIFTCORE.exe
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python distribution/verify_coop.py game/RIFTCORE.exe jungle
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Verify launcher self-replacement on Windows
         shell: pwsh
         run: |

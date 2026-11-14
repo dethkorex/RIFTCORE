@@ -229,7 +229,7 @@ func execute(move: String) -> void:
 func fire(at: Vector3, aim: Vector3, power: float, speed: float, heavy := false) -> void:
 	var shot := RiftProjectile.new()
 	shot.collision_layer = 0
-	shot.collision_mask = 1
+	shot.collision_mask = 1 | 128
 	shot.damage = power
 	shot.speed = speed
 	shot.lifetime = 3.2

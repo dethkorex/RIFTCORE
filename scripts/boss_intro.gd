@@ -28,7 +28,7 @@ const BOSS_LINES := [
 	"I can hear every version of you that failed to reach me.",
 ]
 
-func play(rig: SideCameraRig, boss: Node3D, floor_y: float, title: String, tint: Color, sector: int, act: int) -> void:
+func play(rig: SideCameraRig, boss: Node3D, floor_y: float, title: String, tint: Color, sector: int, act: int, online := false) -> void:
 	var camera := rig.get_node("Camera3D") as Camera3D
 	var gameplay_camera := camera.transform
 	var landing := boss.global_position
@@ -96,7 +96,7 @@ func play(rig: SideCameraRig, boss: Node3D, floor_y: float, title: String, tint:
 	name_reveal.tween_property(label, "modulate:a", 0.0, 0.33)
 	await name_reveal.finished
 	var portrait := await capture_portrait(camera, head, height)
-	await play_dialogue(layer, title, tint, sector, act, portrait)
+	await play_dialogue(layer, title, tint, sector, act, portrait, online)
 
 	var target := rig.target
 	var position := target.global_position if is_instance_valid(target) else landing
@@ -138,14 +138,16 @@ func capture_portrait(camera: Camera3D, head: Vector3, height: float) -> Texture
 	var crop := Rect2i(Vector2i(point * factor) - Vector2i(span, span) / 2, Vector2i(span, span))
 	return ImageTexture.create_from_image(frame.get_region(crop.intersection(Rect2i(Vector2i.ZERO, frame.get_size()))))
 
-func play_dialogue(layer: CanvasLayer, title: String, tint: Color, sector: int, act: int, boss_image: Texture2D) -> void:
+func play_dialogue(layer: CanvasLayer, title: String, tint: Color, sector: int, act: int, boss_image: Texture2D, online: bool) -> void:
 	var screen := MarginContainer.new()
 	screen.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	layer.add_child(screen)
 	screen.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
 	screen.offset_left = -416
 	screen.offset_right = 416
-	screen.offset_top = -154
+	screen.anchor_top = 0.80
+	screen.anchor_bottom = 0.80
+	screen.offset_top = -146
 	screen.offset_bottom = -21
 	var box := HBoxContainer.new()
 	box.add_theme_constant_override("separation", 12)
@@ -165,16 +167,28 @@ func play_dialogue(layer: CanvasLayer, title: String, tint: Color, sector: int, 
 	var line := UI.label(dialogue, "", 22, UI.WHITE)
 	var boss_panel := portrait_panel(box, boss_image, tint.lightened(0.3))
 	var index := clampi(sector - 1, 0, BOSS_LINES.size() - 1)
-	line.text = MINIBOSS_LINES[index] if act == 1 else BOSS_LINES[index]
+	var reader := preload("res://scripts/dialogue_typewriter.gd").new()
+	layer.add_child(reader)
+	reader.body = line
+	reader.next = UI.button(dialogue, "Next", reader.advance, true, 36)
+	UI.label(dialogue, "START  Skip dialogue", 14, UI.MUTED)
+	reader.add_to_group(&"boss_dialogue")
 	operator_panel.modulate.a = 0.52
-	await get_tree().create_timer(2.35, false).timeout
-	speaker.text = "RX-07"
-	speaker.add_theme_color_override("font_color", UI.CYAN)
-	line.text = "I need through. It is your call how this ends." if act == 1 else ("Then you know what comes next." if sector == BOSS_LINES.size() else "I have a sector to clear. Stand down.")
-	boss_panel.modulate.a = 0.52
-	operator_panel.modulate.a = 1.0
-	await get_tree().create_timer(2.15, false).timeout
+	var automatic := online or DisplayServer.get_name() == "headless"
+	var started_at := Time.get_ticks_msec()
+	await reader.show_line(MINIBOSS_LINES[index] if act == 1 else BOSS_LINES[index], automatic)
+	if not reader.skipped:
+		speaker.text = "RX-07"
+		speaker.add_theme_color_override("font_color", UI.CYAN)
+		boss_panel.modulate.a = 0.52
+		operator_panel.modulate.a = 1.0
+		reader.next.text = "Begin Fight"
+		await reader.show_line("I need through. It is your call how this ends." if act == 1 else ("Then you know what comes next." if sector == BOSS_LINES.size() else "I have a sector to clear. Stand down."), automatic)
+	var skipped := bool(reader.skipped)
+	reader.queue_free()
 	screen.queue_free()
+	if online and skipped:
+		await get_tree().create_timer(maxf(0.0, 6.8 - (Time.get_ticks_msec() - started_at) * 0.001), false).timeout
 
 func portrait_panel(row: HBoxContainer, portrait: Texture2D, tint: Color) -> PanelContainer:
 	var panel := PanelContainer.new()

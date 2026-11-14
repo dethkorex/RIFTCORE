@@ -263,7 +263,7 @@ func pulse(zone: Vector3, power: float, delay: float) -> void:
 func fire(at: Vector3, direction: Vector3, power: float, speed: float, drill := false) -> void:
 	var shot := RiftProjectile.new()
 	shot.collision_layer = 0
-	shot.collision_mask = 1
+	shot.collision_mask = 1 | 128
 	shot.damage = power
 	shot.speed = speed
 	shot.lifetime = 3.0

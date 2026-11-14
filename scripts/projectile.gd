@@ -85,6 +85,10 @@ func _physics_process(delta: float) -> void:
 func _on_body_entered(body: Node) -> void:
 	if spent:
 		return
+	if body.has_method("hit_by_projectile") and body.hit_by_projectile(self):
+		spent = true
+		impact()
+		return
 	if body.has_method("take_damage") and body.get("faction") != owner_faction:
 		if struck.has(body.get_instance_id()):
 			return

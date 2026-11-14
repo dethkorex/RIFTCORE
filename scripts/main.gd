@@ -90,7 +90,8 @@ func _ready() -> void:
 		or is_instance_valid(pause_menu) and pause_menu.is_visible_in_tree()
 		or is_instance_valid(coop_mission) and coop_mission.is_pause_open()
 		or is_instance_valid(home_hub) and (home_hub.is_pause_open() or home_hub.has_dialogue())
-		or is_instance_valid(invite_overlay) and invite_overlay.visible)
+		or is_instance_valid(invite_overlay) and invite_overlay.visible
+		or not get_tree().get_nodes_in_group(&"boss_dialogue").is_empty())
 	add_child(pointer)
 	RiftRelay.invite_received.connect(show_friend_invite)
 	var arguments := OS.get_cmdline_user_args()
@@ -226,6 +227,9 @@ func verify_social() -> void:
 
 func verify_live_relay(arguments: PackedStringArray) -> void:
 	var mission_test := arguments.has("mission")
+	var smoke_sector := 2 if arguments.has("jungle") else 1
+	if smoke_sector == 2:
+		arguments = arguments.slice(0, arguments.size() - 1)
 	if mission_test:
 		arguments = arguments.slice(0, arguments.size() - 1)
 	var host := arguments == PackedStringArray(["host"])
@@ -259,7 +263,7 @@ func verify_live_relay(arguments: PackedStringArray) -> void:
 		return
 
 	if mission_test:
-		await verify_coop_mission(host)
+		await verify_coop_mission(host, smoke_sector)
 		return
 
 	# Exchange lobby data to verify both clients share more than a room name.
@@ -282,13 +286,16 @@ func verify_live_relay(arguments: PackedStringArray) -> void:
 		peer.lobby_set_data("rift_check_guest", platform)
 		finish_relay_check(await wait_for_relay(func(): return peer.lobby_get_data("rift_check_ack", false), 15.0))
 
-func verify_coop_mission(host: bool) -> void:
+func verify_coop_mission(host: bool, smoke_sector: int) -> void:
+	profile.unlocked_sector = smoke_sector
+	RiftRelay.unlocked_sector = smoke_sector
 	if host:
 		menu.leave_page()
 	else:
 		await get_tree().create_timer(0.8).timeout
 	var previous_credits: int = profile.credits
 	var previous_xp: int = profile.player_xp
+	var reward_blueprint := "bp_%02d_00" % smoke_sector
 	profile.gear["impact_liner" if host else "pulse_lens"] = "stored"
 	var saved_gear: Dictionary = profile.gear.duplicate(true)
 	if not host:
@@ -314,7 +321,7 @@ func verify_coop_mission(host: bool) -> void:
 			print("Campaign check failed blueprint handoff")
 			finish_relay_check(false)
 			return
-		RiftRelay.deploy()
+		RiftRelay.deploy(smoke_sector)
 	if not await wait_for_relay(func(): return is_instance_valid(coop_mission), 15.0):
 		finish_relay_check(false)
 		return
@@ -322,7 +329,7 @@ func verify_coop_mission(host: bool) -> void:
 	var local_index := 0 if host else 1
 	var local_operator: RiftPlayer = mission.operators[local_index]
 	var spawn_x := local_operator.position.x
-	if mission.camera.target != local_operator or not is_equal_approx(local_operator.damage_taken_scale, 1.25) or not mission.personal_hud.coop or not mission.personal_hud.is_visible_in_tree():
+	if mission.camera.target != local_operator or not is_equal_approx(local_operator.damage_taken_scale, mission.difficulty) or not mission.personal_hud.coop or not mission.personal_hud.is_visible_in_tree():
 		print("Campaign check failed local camera or HUD")
 		finish_relay_check(false)
 		return
@@ -338,11 +345,18 @@ func verify_coop_mission(host: bool) -> void:
 		print("Campaign check failed to move operator ", local_index)
 		finish_relay_check(false)
 		return
+	if smoke_sector == 2 and not await verify_jungle_coop_crossing(local_operator, mission, "NurseryThorns"):
+		print("Campaign check failed at the Nursery Thorns")
+		finish_relay_check(false)
+		return
 	if not host:
 		RiftRelay.relay.lobby_set_data("coop_guest_moved", true)
 		var entered_act_two := await wait_for_relay(func(): return is_instance_valid(coop_mission) and coop_mission.act == 2 and not coop_mission.changing_act, 24.0)
 		if entered_act_two:
-			RiftRelay.relay.lobby_set_data("coop_guest_act_two", true)
+			var jungle_passed := true
+			if smoke_sector == 2:
+				jungle_passed = await verify_jungle_coop_crossing(mission.operators[local_index], mission, "ViaductThorns")
+			RiftRelay.relay.lobby_set_data("coop_guest_act_two", jungle_passed)
 	else:
 		if not await wait_for_relay(func(): return RiftRelay.relay.lobby_get_data("coop_guest_moved", false), 10.0):
 			finish_relay_check(false)
@@ -350,24 +364,71 @@ func verify_coop_mission(host: bool) -> void:
 		if not await clear_coop_test_boss(mission):
 			finish_relay_check(false)
 			return
-		if not await wait_for_relay(func(): return is_instance_valid(mission) and mission.act == 2 and not mission.changing_act and RiftRelay.relay.lobby_get_data("coop_guest_act_two", false), 15.0):
+		if not await wait_for_relay(func(): return is_instance_valid(mission) and mission.act == 2 and not mission.changing_act, 20.0):
 			print("Campaign check failed to enter Act II")
 			finish_relay_check(false)
 			return
-		mission.team_blueprints.append("bp_01_00")
+		if smoke_sector == 2 and not await verify_jungle_coop_crossing(mission.operators[local_index], mission, "ViaductThorns"):
+			print("Campaign check failed at the Vine Viaduct")
+			finish_relay_check(false)
+			return
+		if not await wait_for_relay(func(): return RiftRelay.relay.lobby_get_data("coop_guest_act_two", false), 20.0):
+			print("Campaign check failed to confirm the guest entered Act II")
+			finish_relay_check(false)
+			return
+		mission.team_blueprints.append(reward_blueprint)
 		if not await clear_coop_test_boss(mission):
 			finish_relay_check(false)
 			return
 	var returned := await wait_for_relay(func(): return is_instance_valid(home_hub) and not RiftRelay.mission_active, 24.0)
 	var rewards := (profile.player_xp > previous_xp and profile.credits > previous_credits
-		and profile.blueprint_items.has("bp_01_00") and profile.gear == saved_gear
-		and profile.unlocked_sector >= 2)
+		and profile.blueprint_items.has(reward_blueprint) and profile.gear == saved_gear
+		and profile.unlocked_sector >= smoke_sector + 1)
 	if not host and returned and rewards:
 		RiftRelay.relay.lobby_set_data("coop_guest_returned", true)
 		await get_tree().create_timer(1.5).timeout
 	if host and returned and rewards:
 		returned = await wait_for_relay(func(): return RiftRelay.relay.lobby_get_data("coop_guest_returned", false), 8.0)
 	finish_relay_check(returned and rewards)
+
+func verify_jungle_coop_crossing(operator: RiftPlayer, mission: Node, pit_name: String) -> bool:
+	var pit := mission.stage.find_child(pit_name, true, false) as Area3D
+	if pit == null:
+		return false
+	# Only the authority can reset the approach. Drive the local crossing with
+	# real movement input once the same start is visible on the guest.
+	var room := pit.get_parent() as Node3D
+	var height := float(room.get_meta("entry_y"))
+	var edge := pit.global_position.x - float(pit.get("width")) * 0.5
+	var landing := pit.global_position.x + float(pit.get("width")) * 0.5
+	if mission.host:
+		if not await wait_for_relay(func(): return RiftRelay.relay.lobby_get_data("coop_approach_ready", "") == pit_name, 10.0):
+			print("JUNGLE CROSSING ", pit_name, " guest did not confirm approach")
+			return false
+		for player in mission.operators:
+			player.invulnerable_time = 8.0
+			player.global_position = Vector3(edge - 2.8, height + 0.93, 0)
+			player.velocity = Vector3.ZERO
+		RiftRelay.relay.lobby_set_data("coop_approach_started", pit_name)
+	else:
+		RiftRelay.relay.lobby_set_data("coop_approach_ready", pit_name)
+	if not await wait_for_relay(func(): return RiftRelay.relay.lobby_get_data("coop_approach_started", "") == pit_name and absf(operator.global_position.x - edge + 2.8) < 2.0, 10.0):
+		print("JUNGLE CROSSING ", pit_name, " did not receive approach position ", operator.global_position)
+		return false
+	Input.action_press("move_right")
+	var at_lip := await wait_for_relay(func(): return operator.global_position.x >= edge - 0.80, 2.0)
+	if at_lip:
+		Input.action_press("jump")
+		if pit_name == "ViaductThorns":
+			await get_tree().create_timer(0.23).timeout
+			Input.action_press("dash")
+	var crossed := at_lip and await wait_for_relay(func(): return operator.global_position.x > landing + 0.45 and operator.health > 0.0 and operator.is_on_floor(), 3.5)
+	Input.action_release("move_right")
+	Input.action_release("jump")
+	Input.action_release("dash")
+	print("JUNGLE CROSSING ", pit_name, " ", crossed)
+	return crossed
+
 
 func clear_coop_test_boss(mission: Node) -> bool:
 	var gate_position: Vector3 = mission.gate.global_position
@@ -386,7 +447,7 @@ func clear_coop_test_boss(mission: Node) -> bool:
 		return false
 	mission.operators[1].global_position = gate_position + Vector3(4.0, 1.0, 0.0)
 	mission.check_campaign_progress()
-	if not mission.boss_started or not await wait_for_relay(func(): return not mission.boss_intro_active, 14.0):
+	if not mission.boss_started or not await wait_for_relay(func(): return not mission.boss_intro_active, 17.0):
 		return false
 	mission.boss.take_damage(100000.0)
 	mission.operators[0].global_position = mission.exit_marker.global_position
@@ -766,7 +827,7 @@ func deploy_selected_sector(number: int, selected_difficulty := 0) -> void:
 		save.set_value("checkpoint", "at_start", true)
 		save.set_value("checkpoint", "sector_deaths", 0)
 		save.set_value("checkpoint", "life_taken", false)
-		for key in ["manual_combat_snapshot", "health", "energy", "equipped"]:
+		for key in ["manual_combat_snapshot", "health", "energy", "equipped", "factory_caches", "factory_bridge_lowered", "interior_relays"]:
 			if save.has_section_key("checkpoint", key):
 				save.erase_section_key("checkpoint", key)
 		if write_checkpoint(save) != OK:
@@ -885,6 +946,19 @@ func load_game(show_deployment := true) -> void:
 	player.credits = maxi(int(save.get_value("checkpoint", "credits", 0)), 0)
 	player.salvage = save.get_value("checkpoint", "salvage", {})
 	player.recovered_blueprints = save.get_value("checkpoint", "blueprints", {})
+	var restored_relays: Array = save.get_value("checkpoint", "interior_relays", [])
+	for relay in get_tree().get_nodes_in_group(&"factory_shot_relay"):
+		if not game_root.is_ancestor_of(relay):
+			continue
+		var path := String(game_root.get_path_to(relay))
+		var legacy_bridge := path == "TERRAIN/DropBridgeRelay" and bool(save.get_value("checkpoint", "factory_bridge_lowered", false))
+		if path in restored_relays or legacy_bridge:
+			relay.restore_bridge()
+	player.set_meta("factory_caches", save.get_value("checkpoint", "factory_caches", []))
+	for chest_name in player.get_meta("factory_caches"):
+		var chest := game_root.get_node_or_null(NodePath("TERRAIN/" + String(chest_name)))
+		if chest and chest.is_in_group(&"factory_salvage_chest"):
+			chest.queue_free()
 	mission_stats = {"seconds": 0.0, "kills": 0, "operator_xp": 0, "player_xp": 0, "shards": 0}
 	mission_stats.merge(save.get_value("checkpoint", "mission_stats", {}), true)
 	player.credits_changed.emit(player.credits)
@@ -923,7 +997,7 @@ func load_checkpoint_location(save: ConfigFile) -> void:
 	checkpoint_reached = true
 	checkpoint_spawn = checkpoint.global_position + Vector3.UP * 0.95
 	var saved_spawn = save.get_value("checkpoint", "spawn", checkpoint_spawn)
-	if saved_spawn is Vector3 and saved_spawn.distance_to(checkpoint_spawn) < 3.0:
+	if not game_root.has_meta("interior_layout") and saved_spawn is Vector3 and saved_spawn.distance_to(checkpoint_spawn) < 3.0:
 		checkpoint_spawn = saved_spawn
 	player.global_position = checkpoint_spawn
 	camera_rig.global_position.x = checkpoint_spawn.x
@@ -1290,6 +1364,12 @@ func save_checkpoint(manual_combat_snapshot := false) -> void:
 	save.set_value("checkpoint", "lives", player.lives)
 	save.set_value("checkpoint", "sector_deaths", sector_deaths)
 	save.set_value("checkpoint", "life_taken", life_taken)
+	save.set_value("checkpoint", "factory_caches", player.get_meta("factory_caches", []))
+	var active_relays: Array[String] = []
+	for relay in get_tree().get_nodes_in_group(&"factory_shot_relay"):
+		if game_root.is_ancestor_of(relay) and relay.triggered and not relay.lift:
+			active_relays.append(String(game_root.get_path_to(relay)))
+	save.set_value("checkpoint", "interior_relays", active_relays)
 	if manual_combat_snapshot:
 		save.set_value("checkpoint", "manual_combat_snapshot", true)
 		save.set_value("checkpoint", "health", player.health)

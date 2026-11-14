@@ -15,9 +15,9 @@ enum Kind { ICE, WATER, WIND, LOW_GRAVITY, VENT, ELECTRIC, UPDRAFT, MUTATION, SO
 @export var period := 4.2
 @export var offset := 0.0
 @export var power := 20.0
+@export var terrain_strength := 1.0
 @export var burnable_spore_pod := false
 var clock := 0.0
-var damage_timer := 0.0
 var effect: Node3D
 var surface: ShaderMaterial
 var indicators: StandardMaterial3D
@@ -25,6 +25,11 @@ var particles: CPUParticles3D
 var arc: MeshInstance3D
 var arc_frame := -1
 var pod: SporePod
+var warning_strip: MeshInstance3D
+var warning_finish: ShaderMaterial
+var warning_light: OmniLight3D
+var next_hit_by_body: Dictionary = {}
+var phase_time: Callable
 
 func _ready() -> void:
 	collision_layer = 0
@@ -41,8 +46,10 @@ func _ready() -> void:
 	add_child(effect)
 	if kind <= Kind.LOW_GRAVITY:
 		add_to_group("terrain_modifier")
+	if kind <= Kind.LOW_GRAVITY or kind == Kind.UPDRAFT:
+		set_collision_mask_value(7, true)
 	build_visuals()
-	if not Engine.is_editor_hint() and kind > Kind.LOW_GRAVITY:
+	if not Engine.is_editor_hint():
 		update_visuals(0.0, false)
 
 func build_visuals() -> void:
@@ -50,7 +57,8 @@ func build_visuals() -> void:
 		pod = SporePod.new()
 		effect.add_child(pod)
 		pod.build(tint)
-		pod.burned.connect(func(): set_physics_process(false))
+		pod.burned.connect(shut_down)
+		build_warning()
 		return
 	match kind:
 		Kind.ICE, Kind.CORRUPTION, Kind.WATER:
@@ -63,6 +71,30 @@ func build_visuals() -> void:
 		build_press()
 	if kind != Kind.ICE and kind != Kind.PRESS:
 		build_particles()
+	if kind > Kind.LOW_GRAVITY:
+		build_warning()
+
+func build_warning() -> void:
+	var area := PlaneMesh.new()
+	area.size = Vector2(dimensions.x, dimensions.z)
+	warning_finish = ShaderMaterial.new()
+	warning_finish.shader = preload("res://assets/vfx/biome_warning.gdshader")
+	warning_finish.set_shader_parameter("tint", tint)
+	warning_strip = mesh_part(self, area, warning_finish, Vector3(0, 0.074 - dimensions.y * 0.5, 0))
+	warning_strip.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	warning_strip.hide()
+	warning_light = OmniLight3D.new()
+	warning_light.position = Vector3(0, 0.65 - dimensions.y * 0.5, 0.45)
+	warning_light.omni_range = maxf(3.3, dimensions.x * 0.75)
+	warning_light.light_color = tint
+	warning_light.hide()
+	add_child(warning_light)
+
+func shut_down() -> void:
+	set_physics_process(false)
+	if warning_strip:
+		warning_strip.hide()
+		warning_light.hide()
 
 func build_surface() -> void:
 	var plane := PlaneMesh.new()
@@ -115,14 +147,14 @@ func build_press() -> void:
 func build_arcs() -> void:
 	arc = MeshInstance3D.new()
 	arc.name = "Discharge"
-	var lightning := RiftProjectile.light_paint(tint.lerp(Color.WHITE, 0.55), 2.5)
+	var lightning := RiftProjectile.light_paint(tint.lerp(Color.WHITE, 0.55), 4.5)
 	lightning.cull_mode = BaseMaterial3D.CULL_DISABLED
 	arc.material_override = lightning
 	arc.mesh = ImmediateMesh.new()
 	arc.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	effect.add_child(arc)
-	for i in range(3):
-		var x := (i - 1) * dimensions.x * 0.30
+	for i in range(4):
+		var x := (i - 1.5) * dimensions.x * 0.23
 		var glow := Sprite3D.new()
 		glow.texture = preload("res://assets/vfx/kenney/light_01.png")
 		glow.modulate = Color(tint, 0.55)
@@ -140,14 +172,14 @@ func draw_arcs() -> void:
 	var mesh := arc.mesh as ImmediateMesh
 	mesh.clear_surfaces()
 	mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLES)
-	for i in range(3):
-		var x := (i - 1) * dimensions.x * 0.30
+	for i in range(4):
+		var x := (i - 1.5) * dimensions.x * 0.23
 		var tip := Vector3(x, 0.07, -0.07 + i * 0.10)
 		for segment in range(1, 7):
 			var progress := segment / 6.0
 			var bend := sin(frame * 13.1 + i * 4.3 + segment * 7.17)
 			var next := Vector3(x + bend * dimensions.x * 0.095, progress * dimensions.y * 0.96, tip.z)
-			var edge := Vector3(0.046 * (1.10 - progress * 0.67), 0, 0)
+			var edge := Vector3(0.085 * (1.10 - progress * 0.67), 0, 0)
 			for vertex in [tip - edge, next - edge, tip + edge, tip + edge, next - edge, next + edge]:
 				mesh.surface_add_vertex(vertex)
 			tip = next
@@ -155,7 +187,7 @@ func draw_arcs() -> void:
 
 func build_particles() -> void:
 	particles = CPUParticles3D.new()
-	particles.amount = clampi(roundi(dimensions.x * 4.0), 12, 36)
+	particles.amount = clampi(roundi(dimensions.x * 7.0), 23, 55)
 	particles.lifetime = 1.25
 	particles.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
 	var ambient := kind in [Kind.WATER, Kind.WIND, Kind.LOW_GRAVITY]
@@ -175,7 +207,7 @@ func build_particles() -> void:
 	fade.colors = PackedColorArray([Color(tint, 0), Color(tint.lightened(0.46), 0.91), Color(tint, 0.63), Color(tint, 0)])
 	particles.color_ramp = fade
 	var sprite := QuadMesh.new()
-	sprite.size = Vector2(0.91, 1.06) if kind in [Kind.VENT, Kind.MUTATION, Kind.UPDRAFT] else Vector2(0.24, 0.48)
+	sprite.size = Vector2(1.50, 1.44) if kind in [Kind.VENT, Kind.MUTATION, Kind.UPDRAFT] else Vector2(0.35, 0.70)
 	var material := StandardMaterial3D.new()
 	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
@@ -200,12 +232,20 @@ func update_visuals(phase: float, live: bool) -> void:
 	var nearby := camera != null and absf(camera.global_position.x - global_position.x) < 33.0
 	if pod:
 		pod.update_pressure(charge, nearby and live)
+	var warning := phase >= 0.42 and phase < 0.65
+	if warning_strip:
+		warning_strip.visible = nearby and (warning or live)
+		warning_light.visible = warning_strip.visible
+		if warning_strip.visible:
+			warning_finish.set_shader_parameter("live", live)
+			warning_light.light_color = tint if live else Color("ffba4e")
+			warning_light.light_energy = 2.45 if live else 0.7 + charge * 0.8
 	if indicators:
-		indicators.emission_energy_multiplier = 0.32 + charge * 3.0
+		indicators.emission_energy_multiplier = 0.48 + charge * 4.0
 	if surface:
-		surface.set_shader_parameter("activity", charge)
+		surface.set_shader_parameter("activity", 0.70 if kind < Kind.VENT else charge)
 	if particles:
-		particles.emitting = nearby and live
+		particles.emitting = nearby and (live or kind < Kind.VENT)
 	if arc:
 		arc.visible = nearby and live
 		for child in effect.get_children():
@@ -217,22 +257,26 @@ func update_visuals(phase: float, live: bool) -> void:
 		effect.position.y = lerpf(dimensions.y * 0.67, -dimensions.y * 0.22, smoothstep(0.51, 0.67, phase) * (1.0 - smoothstep(0.90, 1.0, phase)))
 
 func _physics_process(delta: float) -> void:
-	if Engine.is_editor_hint() or kind <= Kind.LOW_GRAVITY:
+	if Engine.is_editor_hint():
 		return
-	clock = fposmod(clock + delta, maxf(period, 2.4))
-	var phase := clock / maxf(period, 2.4)
-	var live := phase >= 0.65 and phase <= 0.90
+	var length := maxf(period, 2.4)
+	clock = fposmod(float(phase_time.call()) + offset if phase_time.is_valid() else clock + delta, length)
+	var phase := clock / length
+	var live := kind >= Kind.VENT and phase >= 0.65 and phase <= 0.90
 	update_visuals(phase, live)
-	damage_timer = maxf(0.0, damage_timer - delta)
-	if not live or damage_timer > 0.0:
+	if not live:
+		next_hit_by_body.clear()
 		return
 	for body in get_overlapping_bodies():
-		if not body is RiftPlayer:
+		if not body is RiftPlayer or body.health <= 0.0 or (body.local_prediction and kind != Kind.UPDRAFT):
+			continue
+		var id: int = body.get_instance_id()
+		if clock < float(next_hit_by_body.get(id, 0.0)):
 			continue
 		if kind == Kind.UPDRAFT:
-			body.velocity.y = maxf(body.velocity.y, 11.3)
+			body.velocity.y = maxf(body.velocity.y, 13.2)
 			body.air_dash_available = true
-			damage_timer = 0.42
+			next_hit_by_body[id] = clock + 0.42
 		else:
 			body.take_projectile_damage(power)
-			damage_timer = 0.62
+			next_hit_by_body[id] = clock + 0.62

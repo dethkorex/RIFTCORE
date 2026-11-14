@@ -52,6 +52,7 @@ const WALK_SPEED_FRACTION := 0.42
 @export var air_reverse_acceleration := 105.0
 @export var jump_velocity := 12.5
 @export var gravity := 28.0
+@export var pit_floor_y := -3.4
 @export var fall_gravity_multiplier := 1.42
 @export var max_fall_speed := 21.0
 @export var coyote_duration := 0.12
@@ -467,14 +468,19 @@ func simulate_movement(delta: float) -> void:
 		if not local_prediction and is_instance_valid(collider) and collider.has_method("damage_on_contact"):
 			collider.damage_on_contact(self)
 	update_character_visuals(axis)
-	if not local_prediction and global_position.y < -3.4:
-		health = 0.0
-		cancel_charge()
-		health_changed.emit(health, max_health)
-		set_physics_process(false)
-		collision_layer = 0
-		hide()
-		fell_into_pit.emit()
+	if not local_prediction and global_position.y < pit_floor_y:
+		die_in_pit()
+
+func die_in_pit() -> void:
+	if health <= 0.0:
+		return
+	health = 0.0
+	cancel_charge()
+	health_changed.emit(health, max_health)
+	set_physics_process(false)
+	set_deferred("collision_layer", 0)
+	hide()
+	fell_into_pit.emit()
 
 func apply_ceiling_rebound(incoming: Vector3) -> void:
 	if incoming.y <= 0.0:
@@ -523,13 +529,13 @@ func environment_control() -> Vector4:
 		if not zone.get_overlapping_bodies().has(self):
 			continue
 		match int(zone.kind):
-			0: result.x = 0.24
+			0: result.x = 0.24 / zone.terrain_strength
 			1:
 				result.y = 0.46
 				result.w = 1.0
-				result.z += zone.direction * 13.0
-			2: result.z += zone.direction * 27.0
-			3: result.y = 0.47
+				result.z += zone.direction * 13.0 * zone.terrain_strength
+			2: result.z += zone.direction * 27.0 * zone.terrain_strength
+			3: result.y = 0.47 / zone.terrain_strength
 	return result
 
 func grounded() -> bool:
@@ -956,7 +962,7 @@ func shoot(charged := false, pose_held := false) -> void:
 
 func launch_buster(muzzle: Vector3, direction: Vector3, charged: bool, magma: bool, power: float, tint := Color.TRANSPARENT, weapon_id := "") -> void:
 	var projectile := RiftProjectile.new()
-	projectile.collision_mask = 3 | 8 if magma else 3
+	projectile.collision_mask = 3 | 16 | (8 if magma else 0)
 	get_tree().current_scene.add_child(projectile)
 	projectile.global_position = muzzle
 	projectile.damage = power * (buster_damage_multiplier if magma or not weapon_id.is_empty() else 1.0)

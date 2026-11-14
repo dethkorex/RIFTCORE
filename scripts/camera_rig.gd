@@ -4,6 +4,7 @@ extends Node3D
 @export var damping := 7.0
 @export var gameplay_distance := 7.43
 @export var look_ahead := 1.25
+@export var minimum_follow_y := 0.85
 var target: RiftPlayer
 var min_x := -18.0
 var max_x := 38.0
@@ -24,6 +25,6 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	if not target: return
-	var desired := Vector3(clampf(target.global_position.x + target.facing * look_ahead, min_x, max_x), maxf(0.85, target.global_position.y + 0.35), 0.0)
+	var desired := Vector3(clampf(target.global_position.x + target.facing * look_ahead, min_x, max_x), maxf(minimum_follow_y, target.global_position.y + 0.35), 0.0)
 	global_position = global_position.lerp(desired, 1.0 - exp(-damping * delta))
 

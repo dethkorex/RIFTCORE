@@ -18,6 +18,8 @@ func install(level: Node3D, target: Node3D, number: int, act_number: int) -> voi
 	tint = ATTACK_FX.tint_for(sector)
 	trim_scene = load("res://assets/campaign/%s/terrain/sector_trim.tscn" % CATALOG.info(sector).id)
 	level.add_child(self)
+	if level.has_meta("interior_layout"):
+		return
 	for deck in level.get_node("TERRAIN").get_children():
 		if deck is Node3D:
 			fit_platform(deck)

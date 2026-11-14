@@ -1,0 +1,13 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://assets/neon_factory/interiors/deck.glb" id="Art"]
+
+[sub_resource type="BoxShape3D" id="Shape"]
+size = Vector3(6, 0.84, 4.8)
+
+[node name="interior_deck" type="StaticBody3D"]
+[node name="Art" parent="." instance=ExtResource("Art")]
+
+[node name="Collider" type="CollisionShape3D" parent="."]
+position = Vector3(0, -0.42, 0)
+shape = SubResource("Shape")

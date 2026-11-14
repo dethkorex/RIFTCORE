@@ -184,7 +184,7 @@ func _physics_process(delta: float) -> void:
 			var flex := sin(gait_phase + (0.0 if diagonal else PI)) * 0.34 if striding else 0.0
 			gait_joints[i].rotation.x = lerpf(gait_joints[i].rotation.x, flex, 0.47)
 		robot.position.y = lerpf(robot.position.y, absf(sin(gait_phase)) * 0.04 if striding else 0.0, 0.34)
-	if global_position.y < -4.0:
+	if global_position.y < lower_death_limit():
 		take_damage(max_health)
 		return
 	for index in range(get_slide_collision_count()):
@@ -250,14 +250,18 @@ func spawn_pickup(scene: PackedScene, at: Vector3, temporary: bool, experience :
 	pickup.position = host.to_local(at)
 	host.add_child.call_deferred(pickup)
 
+func lower_death_limit() -> float:
+	var stage := get_parent_node_3d().get_parent_node_3d()
+	return float(stage.get_meta("pit_floor_y", -3.4)) - 0.6 if stage else -4.0
+
 func find_drop_anchor() -> Dictionary:
-	if global_position.y < -2.8 and is_instance_valid(last_support):
+	if global_position.y < lower_death_limit() + 1.2 and is_instance_valid(last_support):
 		return {"position": last_support.to_global(last_ground_local), "body": last_support}
 	var origin := global_position
 	var casts: Array[Vector3] = []
 	for distance in [0.0, -1.15, 1.15, -2.30, 2.30, -3.45, 3.45]:
-		casts.append(Vector3(origin.x + distance, maxf(origin.y + 0.30, 0.95), 0.0))
-	casts.append(Vector3(patrol_center, maxf(home_height + 0.85, 1.25), 0.0))
+		casts.append(Vector3(origin.x + distance, origin.y + 0.30, 0.0))
+	casts.append(Vector3(patrol_center, home_height + 0.85, 0.0))
 	var exclusions: Array[RID] = [get_rid()]
 	if is_instance_valid(target):
 		exclusions.append(target.get_rid())
@@ -284,12 +288,12 @@ func _on_died() -> void:
 		spawn_pickup(XP_ORB, drop_position, false, roundi(XP_REWARDS[variant] * sector_experience_scale), anchor.body)
 		var host := anchor.body as Node3D if is_instance_valid(anchor.body) else get_parent_node_3d()
 		preload("res://scripts/material_pickup.gd").roll_at(host, drop_position + Vector3(0.42, 0.1, 0), sector_number, "elite" if variant == Variant.HEAVY else "enemy")
-		if global_position.y > -3.0 and randf() < drop_chance:
+		if global_position.y > lower_death_limit() + 1.0 and randf() < drop_chance:
 			var pool := LARGE_DROPS if randf() < 0.2 else SMALL_DROPS
 			spawn_pickup(pool.pick_random(), drop_position + Vector3.FORWARD * 0.25, true, 0, anchor.body)
 	set_physics_process(false)
 	set_deferred("collision_layer", 0)
-	if global_position.y <= -3.0:
+	if global_position.y <= lower_death_limit() + 1.0:
 		queue_free()
 		return
 	RiftAudio.play_effect(&"enemy_break")

@@ -10,11 +10,12 @@ import time
 from pathlib import Path
 
 
-def verify(executable: Path) -> None:
+def verify(executable: Path, sector: str = "") -> None:
     encoding = "utf-8" if os.name != "nt" else None
     def launch(*arguments: str) -> subprocess.Popen:
         return subprocess.Popen(
-            [str(executable), "--headless", "--", "--verify-relay", *arguments, "mission"],
+            [str(executable), "--headless", "--", "--verify-relay", *arguments, "mission",
+             *(["jungle"] if sector == "jungle" else [])],
             cwd=executable.parent,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
@@ -48,7 +49,7 @@ def verify(executable: Path) -> None:
             match = re.fullmatch(r"RELAY ROOM CODE ([A-Z0-9]{10})", line.strip())
             if match:
                 guest = launch("join", match[1])
-        output, _ = guest.communicate(timeout=80)
+        output, _ = guest.communicate(timeout=115 if sector == "jungle" else 80)
         host.wait(timeout=20)
         reader.join(timeout=2)
         if guest.returncode or host.returncode or any(
@@ -56,7 +57,15 @@ def verify(executable: Path) -> None:
         ):
             print(output)
             raise RuntimeError("Co-op mission did not pass on both clients.")
-        print("Live party join, names, independent cameras and controls, guest combat, shared rewards and return passed.")
+        if sector == "jungle":
+            for result in (output, "".join(lines)):
+                if result.count("JUNGLE CROSSING") != 2 or " false" in "\n".join(
+                    line for line in result.splitlines() if line.startswith("JUNGLE CROSSING")
+                ):
+                    raise RuntimeError("A client did not cross both Jungle jumps.")
+            print("Both live clients crossed the Jungle jumps and completed both acts.")
+        else:
+            print("Live party join, names, independent cameras and controls, shared rewards and return passed.")
     finally:
         for process in (host, guest):
             if process is not None and process.poll() is None:
@@ -68,4 +77,4 @@ def verify(executable: Path) -> None:
 
 
 if __name__ == "__main__":
-    verify(Path(sys.argv[1]).resolve())
+    verify(Path(sys.argv[1]).resolve(), sys.argv[2] if len(sys.argv) > 2 else "")

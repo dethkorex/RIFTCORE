@@ -21,6 +21,8 @@ const PauseMenu := preload("res://scripts/coop_pause_menu.gd")
 const TICK := 0.05
 const INPUT_INTERVAL := 1.0 / 30.0
 const MAX_SNAPSHOT_LEAD := 0.10
+# Terrain movement fields can see the guest prediction body. Combat and pickups use layer 1.
+const PREDICTION_LAYER := 1 << 6
 const DIFFICULTY_PER_GUEST := 0.25
 const XP_BONUS := 1.5
 const Blueprints := preload("res://scripts/blueprint_catalog.gd")
@@ -49,6 +51,8 @@ var checkpoint := Vector3.ZERO
 var resetting_arena := false
 var boss_position := Vector3.ZERO
 var stage_props: Array[NodePath] = []
+var factory_trap_clock := 0.0
+var factory_relays: Array[Node3D] = []
 var moving_platforms: Array[AnimatableBody3D] = []
 var props_consumed: Array[int] = []
 var last_gate_open := false
@@ -175,6 +179,8 @@ func load_stage() -> void:
 	enemy_rotation.clear()
 	nameplates.clear()
 	stage_props.clear()
+	factory_relays.clear()
+	factory_trap_clock = 0.0
 	moving_platforms.clear()
 	props_consumed.clear()
 	boss_started = false
@@ -210,6 +216,7 @@ func load_stage() -> void:
 		var loadout = local_profile if index == local_index else remote.get("profile", Profile.new())
 		if host:
 			operator.quick_profile = loadout
+		operator.pit_floor_y = first.pit_floor_y
 		operator.remote_input = host and index != local_index
 		operator.set_controls_suspended(remote.get("suspended", false) if operator.remote_input else is_pause_open() and index == local_index)
 		operator.damage_taken_scale = difficulty
@@ -227,8 +234,8 @@ func load_stage() -> void:
 		operator.set_physics_process(host or index == local_index)
 		if not host:
 			operator.set_process(false)
-			operator.collision_layer = 0
 			operator.local_prediction = index == local_index
+			operator.collision_layer = PREDICTION_LAYER if operator.local_prediction else 0
 			if index != local_index:
 				operator.collision_mask = 0
 		else:
@@ -289,12 +296,22 @@ func load_stage() -> void:
 		var beacon := stage.get_node_or_null(path_name)
 		if beacon and host:
 			beacon.activated.connect(func(at: Vector3): checkpoint = at)
+	for node in get_tree().get_nodes_in_group(&"factory_shot_relay"):
+		if stage.is_ancestor_of(node):
+			factory_relays.append(node)
 	for node in stage.find_children("*", "Area3D", true, false):
-		if node.scene_file_path.begins_with("res://assets/pickups/"):
+		if node.is_in_group(&"factory_interior_trap") or node.get_script() == preload("res://scripts/biome_zone.gd"):
+			node.phase_time = func(): return factory_trap_clock
+		if node.scene_file_path.begins_with("res://assets/pickups/") or node.is_in_group(&"factory_salvage_chest"):
 			stage_props.append(stage.get_path_to(node))
+	for platform in get_tree().get_nodes_in_group(&"factory_one_way"):
+		if stage.is_ancestor_of(platform) and platform.get_script() == preload("res://scripts/phase_platform.gd"):
+			platform.phase_time = func(): return factory_trap_clock
 	for platform in stage.find_children("*", "AnimatableBody3D", true, false):
 		moving_platforms.append(platform)
 		if not host:
+			# Guests need the replicated platform collider for local movement prediction.
+			platform.disable_mode = CollisionObject3D.DISABLE_MODE_KEEP_ACTIVE
 			platform.process_mode = Node.PROCESS_MODE_DISABLED
 	stage.get_node("ForgeHallDoor").target = first
 	Details.new().install(stage, first, sector, act)
@@ -499,7 +516,7 @@ func play_boss_intro(track: int) -> void:
 	var cinematic := BossIntro.new()
 	stage.add_child(cinematic)
 	var title: String = Miniboss.TITLES[sector - 1] if act == 1 else Catalog.info(sector).boss
-	await cinematic.play(camera, boss, gate.global_position.y, title, Color(Catalog.info(sector).color), sector, act)
+	await cinematic.play(camera, boss, gate.global_position.y, title, Color(Catalog.info(sector).color), sector, act, true)
 	cinematic.queue_free()
 	boss_intro_active = false
 	for index in operators.size():
@@ -668,6 +685,7 @@ func _physics_process(delta: float) -> void:
 		if boss_intro_active or changing_act or not outcome.is_empty():
 			return
 	clock += delta
+	factory_trap_clock += delta
 	var interval := TICK if host else INPUT_INTERVAL
 	var responsive_input := not host and (not pressed.is_empty() or not released.is_empty() or get_player_axis().distance_to(last_sent_axis) >= 0.15)
 	if clock < interval and not responsive_input:
@@ -794,7 +812,7 @@ func broadcast_state() -> void:
 	var platform_positions: Array[Vector3] = []
 	for platform in moving_platforms:
 		platform_positions.append(platform.position)
-	var boss_state := [Vector3.ZERO, Vector3.ZERO, 0.0, boss_started, boss_defeated, gate.get_node("Door").position.y, platform_positions, entrance_open, checkpoint]
+	var boss_state := [Vector3.ZERO, Vector3.ZERO, 0.0, boss_started, boss_defeated, gate.get_node("Door").position.y, platform_positions, entrance_open, checkpoint, factory_trap_clock]
 	if is_instance_valid(boss):
 		boss_state[0] = boss.global_position
 		boss_state[1] = boss.rotation
@@ -839,6 +857,7 @@ func receive_state(remote_act: int, security: PackedFloat32Array, arena: Array, 
 	else:
 		room_status.text = "Enter the boss room together." if entrance_open else "Everyone must reach the boss door."
 	gate.get_node("Door").position.y = arena[5]
+	gate.get_node("Blocker/CollisionShape3D").set_deferred("disabled", boss_defeated or entrance_open and not boss_started)
 	if arena[8] != remote_checkpoint:
 		remote_checkpoint = arena[8]
 		for path_name in ["TERRAIN/MidpointCheckpoint", "TERRAIN/ForgeHallCheckpoint"]:
@@ -847,8 +866,13 @@ func receive_state(remote_act: int, security: PackedFloat32Array, arena: Array, 
 				beacon.get_node("Status").text = "CHECKPOINT ACTIVE"
 	for index in mini(moving_platforms.size(), arena[6].size()):
 		moving_platforms[index].position = arena[6][index]
+	if arena.size() > 9:
+		factory_trap_clock = float(arena[9])
+	for receiver in factory_relays:
+		receiver.reflect_motion()
 	if boss_defeated:
 		stage.get_node("ExitBarrier").hide()
+		stage.get_node("ExitBarrier/CollisionShape3D").set_deferred("disabled", true)
 	for index in consumed:
 		if index >= 0 and index < stage_props.size():
 			var prop := stage.get_node_or_null(stage_props[index])
