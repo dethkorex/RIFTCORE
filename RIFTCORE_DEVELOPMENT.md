@@ -1,6 +1,6 @@
 # RIFTCORE v0.5 — Fractured Connections
 
-Status: in development. Baseline checkpoint: 970d50a. No v0.5 release tag.
+Status: in development. Baseline checkpoint: 970d50a. The playable v0.5.0-preview release is available separately from the stable update channel.
 
 ## Phase 1 audit
 

@@ -2,7 +2,7 @@ extends Control
 
 const MAX_PACKAGE := 512 * 1024 * 1024
 const REPO_PATTERN := "^[A-Za-z0-9][A-Za-z0-9-]{0,38}/[A-Za-z0-9_.-]{1,90}$"
-const TAG_PATTERN := "^v[0-9]{1,5}[.][0-9]{1,5}[.][0-9]{1,5}$"
+const TAG_PATTERN := "^v[0-9]{1,5}[.][0-9]{1,5}[.][0-9]{1,5}(-preview)?$"
 const HASH_PATTERN := "^[0-9a-f]{64}$"
 
 var install_root := ""
@@ -173,14 +173,14 @@ func is_match(pattern: String, value: String) -> bool:
 func compare_tags(a: String, b: String) -> bool:
 	if b.is_empty():
 		return true
-	var left := a.substr(1).split(".")
-	var right := b.substr(1).split(".")
+	var left := a.trim_suffix("-preview").substr(1).split(".")
+	var right := b.trim_suffix("-preview").substr(1).split(".")
 	for i in range(3):
 		var n := int(left[i])
 		var m := int(right[i])
 		if n != m:
 			return n > m
-	return false
+	return not a.ends_with("-preview") and b.ends_with("-preview")
 
 func newest_installed() -> String:
 	var best := ""

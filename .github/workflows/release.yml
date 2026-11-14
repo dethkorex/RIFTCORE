@@ -4,11 +4,12 @@ on:
   push:
     tags:
       - 'v*.*.*'
+      - 'v*.*.*-preview'
   workflow_dispatch:
     inputs:
       preview_tag:
         description: Version shown in preview build artifacts
-        default: v0.4.99
+        default: v0.5.0
         required: true
 
 permissions:
@@ -60,13 +61,13 @@ jobs:
           name: riftcore-playtest
           path: release-tools/artifacts/*
       - name: Publish tagged preview
-        if: github.ref_type == 'tag' && github.ref_name == 'v0.4.99'
+        if: github.ref_type == 'tag' && endsWith(github.ref_name, '-preview')
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.ref_name }}
-        run: gh release create "$RELEASE_TAG" release-tools/artifacts/RIFTCORE-*-Setup.* release-tools/artifacts/PATCH_NOTES.md --verify-tag --notes-file release-tools/artifacts/PATCH_NOTES.md --title "RIFTCORE 0.5 Preview and Installer 0.2" --prerelease --latest=false
+        run: gh release create "$RELEASE_TAG" release-tools/artifacts/* --verify-tag --notes-file release-tools/artifacts/PATCH_NOTES.md --title "RIFTCORE 0.5 Preview and Installer 0.2" --prerelease --latest=false
       - name: Publish tagged release
-        if: github.ref_type == 'tag' && github.ref_name != 'v0.4.99'
+        if: github.ref_type == 'tag' && !endsWith(github.ref_name, '-preview')
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.ref_name }}

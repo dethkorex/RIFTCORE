@@ -91,8 +91,8 @@ def main() -> None:
     cli.add_argument("--tag", default="v0.1.0")
     cli.add_argument("--repo", default="")
     a = cli.parse_args()
-    if not re.fullmatch(r"v[0-9]{1,5}\.[0-9]{1,5}\.[0-9]{1,5}", a.tag):
-        cli.error("tag must be vMAJOR.MINOR.PATCH")
+    if not re.fullmatch(r"v[0-9]{1,5}\.[0-9]{1,5}\.[0-9]{1,5}(?:-preview)?", a.tag):
+        cli.error("tag must be vMAJOR.MINOR.PATCH with an optional -preview suffix")
     if a.repo and not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9-]{0,38}/[A-Za-z0-9_.-]{1,90}", a.repo):
         cli.error("repo must be owner/name")
     engine, templates, nsis, work, out, license_path = map(Path.resolve,
