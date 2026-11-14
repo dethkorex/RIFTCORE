@@ -559,11 +559,8 @@ func sector_card(entries: GridContainer, number: int, state: String) -> Button:
 	var refresh := func():
 		var highlight := choice.is_hovered() or choice.has_focus()
 		art.modulate = Color.WHITE if highlight else Color(0.71, 0.78, 0.88)
-		var border := UI.frame(Color.TRANSPARENT, accent if highlight else Color("416178"), 2 if highlight else 1)
-		if highlight:
-			border.shadow_color = Color(accent, 0.48)
-			border.shadow_size = 4
-		outline.add_theme_stylebox_override("panel", border)
+		title.modulate = UI.VIOLET if highlight else Color.WHITE
+		outline.add_theme_stylebox_override("panel", UI.frame(Color.TRANSPARENT, Color("416178"), 1))
 	choice.mouse_entered.connect(refresh)
 	choice.mouse_exited.connect(refresh)
 	choice.focus_entered.connect(refresh)

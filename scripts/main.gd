@@ -66,6 +66,7 @@ func _ready() -> void:
 		editor_level.visible = false
 	configure_input()
 	RiftSettings.configure_bindings()
+	add_child(preload("res://scripts/menu_stick.gd").new())
 	if get_tree().has_meta(&"riftcore_save_session"):
 		save_session = get_tree().get_meta(&"riftcore_save_session")
 	if save_session:
@@ -126,10 +127,6 @@ func configure_input() -> void:
 	add_joy_button("ui_down", JOY_BUTTON_DPAD_DOWN)
 	add_joy_button("ui_left", JOY_BUTTON_DPAD_LEFT)
 	add_joy_button("ui_right", JOY_BUTTON_DPAD_RIGHT)
-	add_joy_action("ui_up", JOY_AXIS_LEFT_Y, -1.0)
-	add_joy_action("ui_down", JOY_AXIS_LEFT_Y, 1.0)
-	add_joy_action("ui_left", JOY_AXIS_LEFT_X, -1.0)
-	add_joy_action("ui_right", JOY_AXIS_LEFT_X, 1.0)
 
 func add_key_action(action: StringName, keycode: Key) -> void:
 	if not InputMap.has_action(action): InputMap.add_action(action)

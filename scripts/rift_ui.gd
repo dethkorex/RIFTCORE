@@ -8,7 +8,6 @@ const CYAN := Color("55e7ff")
 const MUTED := Color("9db4cc")
 const WHITE := Color("e7f2ff")
 const VIOLET := Color("bf82ff")
-const FOCUS_COLORS := [CYAN, VIOLET, Color("f9c65a"), Color("68f0bb"), Color("ff87db")]
 static var highlight_texture: ImageTexture
 
 static func frame(fill: Color, edge: Color, accent := 2) -> StyleBoxFlat:
@@ -57,7 +56,7 @@ static func label(parent: Node, value: String, font_size := 17, color := WHITE) 
 	parent.add_child(item)
 	return item
 
-static func style_button(item: Button, accent: Color) -> void:
+static func style_button(item: Button) -> void:
 	if not highlight_texture:
 		var source := load(KIT + "button_primary.png") as Texture2D
 		var pixels := source.get_image()
@@ -70,14 +69,18 @@ static func style_button(item: Button, accent: Color) -> void:
 		highlight_texture = ImageTexture.create_from_image(pixels)
 	var active := texture_frame("button_primary", 31, Vector2(22, 8))
 	active.texture = highlight_texture
-	active.modulate_color = accent
+	active.modulate_color = VIOLET
 	var down := active.duplicate() as StyleBoxTexture
-	down.modulate_color = accent.darkened(0.22)
+	down.modulate_color = VIOLET.darkened(0.22)
 	var inactive := item.get_theme_stylebox("normal")
 	item.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
 	item.add_theme_stylebox_override("hover", active)
 	item.add_theme_stylebox_override("pressed", down)
 	item.add_theme_stylebox_override("hover_pressed", down)
+	item.mouse_entered.connect(func():
+		if not item.disabled and item.focus_mode != Control.FOCUS_NONE:
+			item.grab_focus()
+	)
 	item.focus_entered.connect(func(): item.add_theme_stylebox_override("normal", active))
 	item.focus_exited.connect(func(): item.add_theme_stylebox_override("normal", inactive))
 
@@ -86,7 +89,7 @@ static func button(parent: Node, value: String, action: Callable, primary := fal
 	item.text = value
 	item.custom_minimum_size.y = 44
 	if primary:
-		item.add_theme_stylebox_override("normal", texture_frame("button_primary", 31, Vector2(22, 8)))
+		item.add_theme_color_override("font_color", WHITE)
 	if action.is_valid():
 		item.pressed.connect(func(): RiftAudio.play_effect(&"menu_confirm"))
 		item.mouse_entered.connect(func(): RiftAudio.play_effect(&"menu_move"))
@@ -96,7 +99,7 @@ static func button(parent: Node, value: String, action: Callable, primary := fal
 		item.disabled = true
 		item.focus_mode = Control.FOCUS_NONE
 	parent.add_child(item)
-	style_button(item, FOCUS_COLORS[item.get_index() % FOCUS_COLORS.size()])
+	style_button(item)
 	return item
 
 static func column(parent: Node, spacing := 12) -> VBoxContainer:

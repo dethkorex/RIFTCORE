@@ -12,6 +12,7 @@ for file in RIFTCORE start-riftcore updates.cfg PATCH_NOTES.md; do
 done
 chmod 755 "$base/RIFTCORE" "$base/start-riftcore"
 for source in "$here"/versions/*; do
+  [ -d "$source" ] || continue
   version=${source##*/}
   if [ ! -f "$base/versions/$version/RIFTCORE" ] || [ ! -f "$base/versions/$version/RIFTCORE.pck" ]; then
     cp -R "$source" "$base/versions/"

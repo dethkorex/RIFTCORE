@@ -18,12 +18,12 @@ func _ready() -> void:
 		mode.add_item("%d × %d" % [resolution.x, resolution.y])
 	mode.select(RiftSettings.resolution_index)
 	display.add_child(mode)
-	UI.style_button(mode, UI.CYAN)
+	UI.style_button(mode)
 	var fullscreen := CheckButton.new()
 	fullscreen.text = "Fullscreen"
 	fullscreen.button_pressed = RiftSettings.fullscreen
 	display.add_child(fullscreen)
-	UI.style_button(fullscreen, UI.VIOLET)
+	UI.style_button(fullscreen)
 	mode.item_selected.connect(func(index: int): RiftSettings.set_display(index, fullscreen.button_pressed))
 	fullscreen.toggled.connect(func(on: bool): RiftSettings.set_display(mode.selected, on))
 	for bus_name in ["Master", "Music", "SFX"]:
@@ -48,7 +48,7 @@ func _ready() -> void:
 	toggle.text = "Remap controls  ›"
 	toggle.custom_minimum_size.y = 42
 	add_child(toggle)
-	UI.style_button(toggle, UI.VIOLET)
+	UI.style_button(toggle)
 	note = Label.new()
 	note.add_theme_font_size_override("font_size", 14)
 	note.text = "Set display, audio, and controls."
@@ -77,13 +77,13 @@ func _ready() -> void:
 			bind.custom_minimum_size = Vector2(108, 35)
 			bind.text = RiftSettings.binding_label(action, device)
 			grid.add_child(bind)
-			UI.style_button(bind, UI.CYAN if device == "key" else UI.VIOLET)
+			UI.style_button(bind)
 			slots[action + ":" + device] = bind
 			bind.pressed.connect(begin_capture.bind(action, device))
 	var restore := Button.new()
 	restore.text = "Reset bindings"
 	grid.add_child(restore)
-	UI.style_button(restore, Color("f9c65a"))
+	UI.style_button(restore)
 	restore.pressed.connect(func():
 		RiftSettings.reset_bindings()
 		refresh()

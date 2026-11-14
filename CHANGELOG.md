@@ -2,7 +2,7 @@
 
 ## Game changes
 
-- Menu focus and hover now follow the button artwork and use distinct accent colors. Deployment cards keep their sector accent.
+- Menu buttons turn purple while highlighted and return to blue when you move on. The separate outline is gone. Analog-stick menu navigation responds sooner and repeats while held.
 
 - Aim and fire in either direction while climbing. Hold Up or Down to grab a ladder mid-dash. Step off at the top, or press Down + B on a one-way deck to drop through.
 - Explore a rebuilt Operations Station with separate trader, forge, storage, and loadout bays, a central Deploy pad, and an orbital panorama.
