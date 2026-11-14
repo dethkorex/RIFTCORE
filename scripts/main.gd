@@ -542,6 +542,7 @@ func select_save_slot(number: int, fresh: bool, operator_name := "") -> void:
 	profile = selected.profile
 	if fresh:
 		profile.operator_name = profile.clean_operator_name(operator_name)
+	RiftSettings.remember_operator_name(profile.operator_name)
 	get_tree().set_meta(&"riftcore_save_session", selected)
 	open_home_hub()
 

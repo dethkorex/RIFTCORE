@@ -2,6 +2,7 @@
 
 ## Alpha 6.0.2
 
+- New Game prefills the most recently used player name. You can edit it before choosing a save slot.
 - Co-op Pause opens a personal menu in missions and at Operations Station. Your partner can keep playing, and your operator can still take damage during a mission. Leaving the party requires confirmation.
 - The mission pause menu shows live operator stats, equipped gear, D-pad quick slots, and inventory. Level-ups and active buffs update the readout. The Co-op Setup Guide is available under Social.
 - Reduced co-op state packet size, improved guest input delivery, and smoothed the remote player's movement. Both players need Alpha 6.0.2 to join the same room.

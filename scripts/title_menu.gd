@@ -629,7 +629,7 @@ func refresh_online_room() -> void:
 
 func open_slot_picker(mode: String) -> void:
 	slot_error = ""
-	new_operator_name = ""
+	new_operator_name = RiftSettings.last_operator_name if mode == "New Game" else ""
 	show_page(mode)
 
 func build_save_slots(columns: HBoxContainer, fresh: bool) -> void:

@@ -14,6 +14,7 @@ var resolution_index := 2
 var fullscreen := true
 var show_hub_tips := true
 var seen_hub_tips := PackedStringArray()
+var last_operator_name := ""
 var defaults: Dictionary = {}
 var bindings: Dictionary = {}
 
@@ -27,11 +28,13 @@ func _ready() -> void:
 
 func restore() -> void:
 	var data := ConfigFile.new()
+	last_operator_name = ""
 	if data.load(path) == OK:
 		for bus_name in volumes:
 			volumes[bus_name] = clampf(float(data.get_value("audio", bus_name, volumes[bus_name])), 0.0, 1.0)
 		resolution_index = clampi(int(data.get_value("video", "resolution", resolution_index)), 0, MODES.size() - 1)
 		fullscreen = bool(data.get_value("video", "fullscreen", fullscreen))
+		last_operator_name = str(data.get_value("player", "last_operator_name", "")).left(20)
 		show_hub_tips = bool(data.get_value("tutorial", "enabled", true))
 		var seen: Variant = data.get_value("tutorial", "seen_stations", PackedStringArray())
 		if seen is PackedStringArray:
@@ -53,7 +56,15 @@ func save() -> Error:
 	data.set_value("controls", "bindings", bindings)
 	data.set_value("tutorial", "enabled", show_hub_tips)
 	data.set_value("tutorial", "seen_stations", seen_hub_tips)
+	data.set_value("player", "last_operator_name", last_operator_name)
 	return data.save(path)
+
+func remember_operator_name(operator_name: String) -> void:
+	if last_operator_name != operator_name:
+		last_operator_name = operator_name
+		var result := save()
+		if result != OK:
+			push_warning("Could not remember the player name (%s)." % error_string(result))
 
 func apply_volume(bus_name: String) -> void:
 	var index := AudioServer.get_bus_index(bus_name)
