@@ -62,6 +62,8 @@ var pause_menu: Control
 var editor_level: Node3D
 var coop_mission: Node3D
 var coop_join_loading: CanvasLayer
+var active_controller := -1
+var controller_disconnected := false
 
 func _ready() -> void:
 	if not OS.has_feature("editor") and DisplayServer.get_name() != "headless":
@@ -75,6 +77,7 @@ func _ready() -> void:
 			get_tree().quit()
 			return
 	add_build_version()
+	Input.joy_connection_changed.connect(on_joy_connection_changed)
 	var pointer := preload("res://scripts/menu_pointer.gd").new()
 	pointer.name = "MenuPointer"
 	pointer.menu_open = func(): return (is_instance_valid(menu) and menu.is_visible_in_tree()
@@ -789,6 +792,10 @@ func build_pause_menu() -> void:
 	var stack := overlay(true)
 	UI.label(stack, "PAUSED", 36, UI.CYAN)
 	UI.label(stack, "%s / Act %d" % [Catalog.info(sector).title, act], 17, UI.MUTED)
+	if controller_disconnected:
+		UI.label(stack, "Controller disconnected", 17, UI.VIOLET)
+		pause_menu.pause_action = Callable()
+		pause_menu.back_action = Callable()
 	UI.button(stack, "Resume", toggle_pause, true).grab_focus()
 	if save_session:
 		UI.button(stack, "Save Game", show_pause_save)
@@ -1508,6 +1515,25 @@ func _on_health_changed(current: float, maximum: float) -> void:
 func _on_player_died() -> void:
 	_on_pit_fall()
 
+func _input(event: InputEvent) -> void:
+	if event is InputEventJoypadButton and event.pressed:
+		active_controller = event.device
+	elif event is InputEventJoypadMotion and absf(event.axis_value) > 0.35:
+		active_controller = event.device
+	elif (event is InputEventKey and event.pressed and not event.echo) or (event is InputEventMouseButton and event.pressed):
+		active_controller = -1
+
+func on_joy_connection_changed(device: int, connected: bool) -> void:
+	if connected or device != active_controller:
+		return
+	active_controller = -1
+	if not is_instance_valid(game_root) or not is_instance_valid(player) or not is_instance_valid(hud):
+		return
+	if get_tree().paused or RiftRelay.mission_active or is_instance_valid(coop_mission) or sector_complete:
+		return
+	controller_disconnected = true
+	toggle_pause()
+
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("pause") and game_root and not sector_complete and not advancing_act and not arena_intro and not suit_reveal_active and player.visible:
 		toggle_pause()
@@ -1522,6 +1548,7 @@ func toggle_pause() -> void:
 		RiftAudio.play_effect(&"menu_confirm")
 		build_pause_menu()
 	elif pause_menu:
+		controller_disconnected = false
 		player.resume_input_guard = 0.12
 		for action in RiftSettings.ACTIONS.keys() + ["crouch_stick"]:
 			Input.action_release(action)
