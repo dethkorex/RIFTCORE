@@ -64,6 +64,11 @@ var coop_mission: Node3D
 var coop_join_loading: CanvasLayer
 
 func _ready() -> void:
+	var pointer := preload("res://scripts/menu_pointer.gd").new()
+	pointer.name = "MenuPointer"
+	pointer.menu_open = func(): return (is_instance_valid(menu) and menu.is_visible_in_tree()
+		or is_instance_valid(pause_menu) and pause_menu.is_visible_in_tree())
+	add_child(pointer)
 	var arguments := OS.get_cmdline_user_args()
 	if "--verify-social" in arguments or "--verify-relay" in arguments:
 		configure_input()
