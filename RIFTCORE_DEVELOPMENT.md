@@ -9,7 +9,7 @@ Status: in development. Baseline checkpoint: 970d50a. The playable v0.5.0-previe
 - Progression: XP belongs to a run checkpoint. Three manual slots store inventory, workshop ranks, challenge rewards and an optional deployment. A finalized death invalidates the on-disk deployment.
 - Nexus: walkable station with deployment, storage, equipment presets, shop, workshop, challenge log and settings. Shop and workshop currently use bolts.
 - Combat: themed enemies and boss variants already exist. Preserve their bodies and use shared drop hooks.
-- Distribution: Windows/Linux installers and GitHub updater. The game uses GD Sync for online rooms and Neon Factory Defense.
+- Distribution: Windows/Linux installers and GitHub updater. The game uses GD Sync for online rooms and campaign co-op.
 - Art references: local RIFTCORE UI guide, contact sheet and compact ZIP were located in Downloads.
 - Existing suites: sector_progression and campaign_progression. Add coverage for slot migration and new v0.5 rules.
 
@@ -22,7 +22,7 @@ Status: in development. Baseline checkpoint: 970d50a. The playable v0.5.0-previe
 | 3 Fabrication/materials | Enemy, cargo and boss salvage, recipes and storage integrated |
 | 4 Core Shards | Six permanent upgrade paths integrated |
 | 5 Story | Briefings, archive and endings integrated. Intro scene and additional milestone dialogue pending |
-| 6 Steam co-op | Online rooms and the host-simulated Neon Factory Defense mission are implemented. Campaign synchronization and live Steam invite testing are pending |
+| 6 Steam co-op | Online rooms and the host-simulated campaign co-op mission are implemented. Live Steam invite testing is pending |
 | 7 Expanded levels | Pending |
 | 8 Puzzles | Pending |
 | 9 Procedural rooms | Pending |

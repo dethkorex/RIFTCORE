@@ -23,6 +23,7 @@ signal life_picked_up
 var lives := 3
 var buster_damage_multiplier := 1.0
 var armor_resistance := 0.0
+var damage_taken_scale := 1.0
 var charge_cost_multiplier := 1.0
 var salvage_multiplier := 1.0
 var xp_pickup_multiplier := 1.0
@@ -276,6 +277,7 @@ func build_visuals() -> void:
 	core.omni_range = 3.5
 	add_child(core)
 
+var coop_xp_pickup: Callable
 var remote_input := false
 var remote_axis := Vector2.ZERO
 var remote_held: Dictionary = {}
@@ -1142,7 +1144,7 @@ static func defense_for_experience(total: int) -> float:
 	return minf(0.25, (level_for_experience(total) - 1) * 0.02)
 
 func mitigate_damage(amount: float) -> float:
-	return amount * (1.0 - defense_for_experience(experience)) * (1.0 - armor_resistance)
+	return amount * damage_taken_scale * (1.0 - defense_for_experience(experience)) * (1.0 - armor_resistance)
 
 func take_damage(amount: float, source_position := Vector3.ZERO) -> void:
 	var before := health

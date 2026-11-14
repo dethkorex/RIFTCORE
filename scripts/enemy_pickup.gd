@@ -67,7 +67,11 @@ func _collect(body: Node3D) -> void:
 			player.credits += roundi((30.0 if large else 10.0) * player.salvage_multiplier)
 			player.credits_changed.emit(player.credits)
 		Kind.XP:
-			player.gain_experience(roundi((xp_amount if xp_amount > 0 else (50 if large else 10)) * player.xp_pickup_multiplier))
+			var xp := roundi((xp_amount if xp_amount > 0 else (50 if large else 10)) * player.xp_pickup_multiplier)
+			if player.coop_xp_pickup.is_valid():
+				player.coop_xp_pickup.call(xp)
+			else:
+				player.gain_experience(xp)
 		Kind.LIFE:
 			player.add_life()
 	queue_free()

@@ -140,7 +140,7 @@ func show_page(next: String) -> void:
 			portrait(card(columns))
 		"Sector select":
 			build_sector(columns)
-		"Level select":
+		"Level select", "Co-op Sectors":
 			build_level_select(columns)
 		"New run":
 			var confirmation := card(columns)
@@ -227,6 +227,9 @@ func leave_page() -> void:
 	if page == "Social" and not RiftRelay.pending.is_empty():
 		RiftRelay.leave()
 	if station_panel:
+		if page == "Co-op Sectors":
+			show_page("Social")
+			return
 		if page == "Craft Item":
 			show_page("Fabrication")
 			return
@@ -419,7 +422,7 @@ func build_social(columns: HBoxContainer) -> void:
 func build_online_room(columns: HBoxContainer) -> void:
 	var form := card(columns, 1.35)
 	UI.label(form, "CO-OP ROOM", 27, UI.CYAN)
-	UI.label(form, "Both players join the room. The host then starts Neon Factory Defense.", 18, UI.MUTED)
+	UI.label(form, "With both players connected, the leader chooses a campaign sector.", 18, UI.MUTED)
 	relay_host = UI.button(form, "Create Room", RiftRelay.host_room, true)
 	var join_row := HBoxContainer.new()
 	join_row.add_theme_constant_override("separation", 12)
@@ -437,7 +440,7 @@ func build_online_room(columns: HBoxContainer) -> void:
 	)
 	relay_join = UI.button(join_row, "Join Room", func(): RiftRelay.join_room(relay_code.text))
 	relay_status = UI.label(form, "", 18, UI.CYAN)
-	relay_deploy = UI.button(form, "Deploy Co-op", RiftRelay.deploy, true)
+	relay_deploy = UI.button(form, "Choose Co-op Sector", show_page.bind("Co-op Sectors"), true)
 	relay_copy = UI.button(form, "Copy Room Code", func(): DisplayServer.clipboard_set(RiftRelay.connected_room))
 	relay_leave = UI.button(form, "Leave Room", func(): RiftRelay.leave())
 	UI.button(form, "Co-op Setup Guide", show_page.bind("Co-op Setup Guide"))
@@ -629,8 +632,9 @@ func build_sector(columns: HBoxContainer) -> void:
 
 func build_level_select(columns: HBoxContainer) -> void:
 	var panel := card(columns)
-	UI.label(panel, "Level Select", 34, UI.CYAN)
-	UI.label(panel, "Choose a sector unlocked in this run. Changing sectors starts at Act I with your current gear and remaining lives.", 18, UI.MUTED)
+	var cooperative := page == "Co-op Sectors"
+	UI.label(panel, "Co-op Campaign" if cooperative else "Level Select", 34, UI.CYAN)
+	UI.label(panel, "The leader selects a sector. Complete both acts together to unlock the next sector." if cooperative else "Choose a sector unlocked in this run. Changing sectors starts at Act I with your current gear and remaining lives.", 18, UI.MUTED)
 	if not deploy_error.is_empty():
 		UI.label(panel, deploy_error, 17, Color("ff9e95"))
 	var scroll := ScrollContainer.new()
@@ -645,8 +649,9 @@ func build_level_select(columns: HBoxContainer) -> void:
 	entries.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(entries)
 	var choices: Array[Button] = []
-	for number in range(1, mini(run_cleared_through + 1, Catalog.SECTORS.size()) + 1):
-		var state := "Current deployment" if number == saved_sector else ("Cleared" if number <= run_cleared_through else "Unlocked")
+	var last_sector := RiftRelay.unlocked_sector if cooperative else run_cleared_through + 1
+	for number in range(1, mini(last_sector, Catalog.SECTORS.size()) + 1):
+		var state := "Act I → Act II" if cooperative else ("Current deployment" if number == saved_sector else ("Cleared" if number <= run_cleared_through else "Unlocked"))
 		var choice := sector_card(entries, number, state)
 		choices.append(choice)
 		if number == saved_sector:

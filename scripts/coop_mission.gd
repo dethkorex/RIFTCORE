@@ -1,13 +1,16 @@
 extends Node3D
 
 signal exit_requested
-signal rewards_earned(xp: int, bolts: int, blueprints: Array)
+signal rewards_earned(xp: int, bolts: int, blueprints: Array, sector: int)
 
 const PLAYER := preload("res://scenes/actors/riftcore_player.tscn")
-const FLOOR := preload("res://assets/neon_factory/floor_panel_a.tscn")
 const UI := preload("res://scripts/rift_ui.gd")
+const Catalog := preload("res://scripts/sector_catalog.gd")
+const Miniboss := preload("res://scripts/sector_miniboss.gd")
+const Details := preload("res://scripts/sector_details.gd")
+const Loading := preload("res://scripts/act_loading_screen.gd")
+const Equipment := preload("res://scripts/equipment_stats.gd")
 const INPUTS := [&"jump", &"dash", &"crouch", &"crouch_stick", &"shoot", &"melee", &"climb_down", &"swap_weapon", &"previous_suit"]
-const ENEMY_POSITIONS := [10.0, 16.0, 23.0, 30.0, 36.0]
 const TICK := 0.05
 const DIFFICULTY := 2.5
 const XP_BONUS := 1.5
@@ -15,6 +18,34 @@ const Blueprints := preload("res://scripts/blueprint_catalog.gd")
 const Profile := preload("res://scripts/rogue_profile.gd")
 
 var host := false
+var sector := 1
+var act := 1
+var local_profile
+var relay_owner: Node
+var stage: Node3D
+var boss: Combatant
+var gate: Node3D
+var exit_marker: Marker3D
+var boss_started := false
+var entrance_open := false
+var boss_defeated := false
+var changing_act := false
+var checkpoint := Vector3.ZERO
+var resetting_arena := false
+var boss_position := Vector3.ZERO
+var stage_props: Array[NodePath] = []
+var moving_platforms: Array[AnimatableBody3D] = []
+var props_consumed: Array[int] = []
+var projectiles_seen: Dictionary = {}
+var last_gate_open := false
+var active_weapon_ids: Array = []
+var remote_gear: Dictionary = {}
+var remote_upgrades: Dictionary = {}
+var remote_loadout_received := false
+var stage_title: Label
+var return_timer: Timer
+var last_boss_health := -1.0
+var remote_checkpoint := Vector3.ZERO
 var peer: Node
 var operators: Array[RiftPlayer] = []
 var enemies: Array[WalkerBot] = []
@@ -43,29 +74,105 @@ var enemy_targets: Array = []
 func _ready() -> void:
 	peer = RiftRelay.relay
 	loot_rng.randomize()
+	for number in range(1, sector):
+		active_weapon_ids.append(Catalog.info(number).reward)
 	peer.expose_func(receive_input)
 	peer.expose_func(receive_state)
 	peer.expose_func(receive_shot)
 	peer.expose_func(receive_outcome)
-	build_arena()
+	peer.expose_func(receive_act)
+	peer.expose_func(receive_loadout)
+	load_stage()
+	build_hud()
+	if not host:
+		peer.call_func_on(peer.get_host(), receive_loadout, local_profile.gear, local_profile.owned)
+
+func receive_loadout(gear: Dictionary, upgrades: Dictionary) -> void:
+	if not host or remote_loadout_received or not peer.lobby_get_all_clients().has(peer.get_sender_id()) or peer.get_sender_id() == peer.get_client_id() or gear.size() > 160:
+		return
+	remote_loadout_received = true
+	remote_gear.clear()
+	var slots := {}
+	for id in gear:
+		if id is String and Profile.GEAR.has(id) and gear[id] == "equipped":
+			var slot: String = Profile.GEAR[id].slot
+			if not slots.has(slot):
+				slots[slot] = true
+				remote_gear[id] = "equipped"
+	for enhancement in Profile.UPGRADES:
+		remote_upgrades[enhancement.id] = clampi(int(upgrades.get(enhancement.id, 0)), 0, 2)
+	var guest_profile = Profile.new()
+	guest_profile.owned = remote_upgrades.duplicate()
+	guest_profile.gear = remote_gear.duplicate()
+	Equipment.apply(operators[1], guest_profile)
+
+func load_stage() -> void:
+	var previous := []
+	for operator in operators:
+		previous.append([operator.health, operator.energy, operator.lives, operator.equipped_suit()])
+	if is_instance_valid(stage):
+		remove_child(stage)
+		stage.queue_free()
+	for shot in get_tree().get_nodes_in_group(&"rift_projectile"):
+		shot.queue_free()
+	operators.clear()
+	enemies.clear()
+	targets.clear()
+	enemy_targets.clear()
+	nameplates.clear()
+	stage_props.clear()
+	moving_platforms.clear()
+	props_consumed.clear()
+	projectiles_seen.clear()
+	boss_started = false
+	resetting_arena = false
+	entrance_open = false
+	boss_defeated = false
+	checkpoint = Vector3.ZERO
+	last_boss_health = -1.0
+	last_gate_open = false
+	remote_checkpoint = Vector3.ZERO
+	var info := Catalog.info(sector)
+	var path: String = info.level if act == 1 else "res://scenes/levels/%s_act_2.tscn" % info.id
+	var packed := load(path) as PackedScene
+	stage = packed.instantiate() as Node3D
+	add_child(stage)
+	var actors := stage.get_node("Actors")
+	var first := actors.get_node("RiftcoreMecha") as RiftPlayer
+	var second := PLAYER.instantiate() as RiftPlayer
+	second.name = "PartnerOperator"
+	second.position = first.position + Vector3(0.85, 0.05, 0)
+	actors.add_child(second)
+	first.add_collision_exception_with(second)
+	second.add_collision_exception_with(first)
 	for index in 2:
-		var operator := PLAYER.instantiate() as RiftPlayer
-		operator.name = "Operator%d" % index
-		operator.position = Vector3(1.0 + index * 1.4, 1.12, 0)
+		var operator: RiftPlayer = [first, second][index]
 		operator.remote_input = host and index == 1
-		add_child(operator)
+		operator.damage_taken_scale = DIFFICULTY
+		var loadout = local_profile if index == (0 if host else 1) else Profile.new()
+		if host and index == 1:
+			loadout.gear = remote_gear.duplicate()
+			loadout.owned = remote_upgrades.duplicate()
+		Equipment.apply(operator, loadout)
+		for id in active_weapon_ids:
+			operator.unlock_sector_weapon(id)
+		operator.gain_experience(team_xp, false)
+		if not previous.is_empty():
+			operator.health = clampf(previous[index][0], 1.0, operator.max_health)
+			operator.energy = minf(previous[index][1], operator.max_energy)
+			operator.lives = previous[index][2]
+			if operator.lives <= 0:
+				operator.lives = 1
+			operator.equip_sector_weapon(previous[index][3])
 		operator.set_physics_process(host)
 		if not host:
 			operator.set_process(false)
 			operator.collision_layer = 0
 			operator.collision_mask = 0
 		else:
-			operator.fell_into_pit.connect(operator.take_damage.bind(10000.0))
-			operator.shot_fired.connect(send_shot)
-			operator.died.connect(func():
-				operator.hide()
-				operator.set_deferred("collision_layer", 0)
-			)
+			operator.coop_xp_pickup = award_pickup_xp
+			operator.fell_into_pit.connect(respawn_operator.bind(operator))
+			operator.died.connect(respawn_operator.bind(operator))
 		operators.append(operator)
 		var plate := Label3D.new()
 		plate.position.y = 1.48
@@ -78,65 +185,227 @@ func _ready() -> void:
 		operator.add_child(plate)
 		nameplates.append(plate)
 		targets.append([])
-	for index in ENEMY_POSITIONS.size():
-		var enemy := WalkerBot.new()
-		enemy.name = "Security%d" % index
-		enemy.variant = [WalkerBot.Variant.SCOUT, WalkerBot.Variant.TURRET, WalkerBot.Variant.HEAVY, WalkerBot.Variant.FLYER, WalkerBot.Variant.QUAD][index]
-		enemy.position = Vector3(ENEMY_POSITIONS[index], 2.4 if index == 3 else 1.1, 0)
+	for node in get_tree().get_nodes_in_group(&"level_enemies"):
+		if not stage.is_ancestor_of(node) or not node is WalkerBot:
+			continue
+		var enemy := node as WalkerBot
 		enemy.mission_enemy = true
-		if host:
-			enemy.shot_fired.connect(send_shot)
-		enemy.add_to_group(&"damageable_enemies")
-		add_child(enemy)
-		enemy.scale_for_sector(1)
-		enemy.max_health *= DIFFICULTY
-		enemy.health = enemy.max_health
-		enemy.sector_damage_scale *= DIFFICULTY
-		enemy.health_changed.emit(enemy.health, enemy.max_health)
+		enemy.scale_for_sector(sector, act)
+		scale_opponent(enemy)
 		if host:
 			enemy.died.connect(earn_security_rewards.bind(enemy.variant))
-		if not host:
-			enemy.set_process(false)
-			enemy.set_physics_process(false)
-			enemy.collision_layer = 0
-			enemy.collision_mask = 0
+		else:
+			disable_replica(enemy)
 		enemies.append(enemy)
 		enemy_targets.append([])
-	camera = SideCameraRig.new()
+	gate = stage.get_node("Gate")
+	exit_marker = stage.get_node("MARKERS/RoomExit")
+	boss = actors.get_node(info.boss_node) as Combatant
+	boss_position = boss.position
+	if act == 1:
+		actors.remove_child(boss)
+		boss.queue_free()
+		var guard := Miniboss.new()
+		guard.name = "SectorMiniboss"
+		guard.configure(sector, Color(info.color), info.weak, gate.global_position, stage.get_node("ExitBarrier").global_position.x)
+		guard.position = Vector3(boss_position.x, gate.position.y + guard.chassis_height, 0.0)
+		actors.add_child(guard)
+		boss = guard
+	scale_opponent(boss)
+	boss.hide()
+	if host:
+		boss.died.connect(on_boss_defeated)
+	else:
+		disable_replica(boss)
+	var level_camera := stage.get_node("CameraRig") as SideCameraRig
+	camera = level_camera
 	camera.target = operators[0 if host else 1]
-	camera.min_x = 0.0
-	camera.max_x = 42.0
-	add_child(camera)
-	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	build_hud()
+	var bounds := stage.get_node("MARKERS/CameraBounds")
+	camera.min_x = bounds.get_meta("min_x")
+	camera.max_x = bounds.get_meta("max_x")
+	camera.global_position = camera.target.global_position + Vector3.UP * 0.35
+	for path_name in ["TERRAIN/MidpointCheckpoint", "TERRAIN/ForgeHallCheckpoint"]:
+		var beacon := stage.get_node_or_null(path_name)
+		if beacon and host:
+			beacon.activated.connect(func(at: Vector3): checkpoint = at)
+	for node in stage.find_children("*", "Area3D", true, false):
+		if node.scene_file_path.begins_with("res://assets/pickups/"):
+			stage_props.append(stage.get_path_to(node))
+	for platform in stage.find_children("*", "AnimatableBody3D", true, false):
+		moving_platforms.append(platform)
+		if not host:
+			platform.process_mode = Node.PROCESS_MODE_DISABLED
+	stage.get_node("ForgeHallDoor").target = first
+	Details.new().install(stage, first, sector, act)
+	if stage_title:
+		update_hud_title()
 
-func build_arena() -> void:
-	var world := WorldEnvironment.new()
-	world.environment = Environment.new()
-	world.environment.background_mode = Environment.BG_COLOR
-	world.environment.background_color = Color("091527")
-	world.environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	world.environment.ambient_light_color = Color("91bde8")
-	world.environment.ambient_light_energy = 0.9
-	add_child(world)
-	var light := DirectionalLight3D.new()
-	light.rotation_degrees = Vector3(-31, -22, 0)
-	light.light_energy = 1.1
-	add_child(light)
-	var panorama := Sprite3D.new()
-	panorama.texture = preload("res://assets/neon_factory/factory_panorama.png")
-	panorama.pixel_size = 0.038
-	panorama.position = Vector3(20, 12, -13)
-	add_child(panorama)
-	for index in range(-2, 23):
-		var floor_tile := FLOOR.instantiate() as Node3D
-		floor_tile.position.x = index * 2.0
-		add_child(floor_tile)
-	for index in range(3):
-		for column in range(2):
-			var ledge := FLOOR.instantiate() as Node3D
-			ledge.position = Vector3(9 + index * 10.0 + column * 2.0, 2.65 + (index % 2) * 0.65, 0)
-			add_child(ledge)
+func scale_opponent(enemy: Combatant) -> void:
+	enemy.max_health *= DIFFICULTY
+	enemy.health = enemy.max_health
+	enemy.health_changed.emit(enemy.health, enemy.max_health)
+
+func disable_replica(body: Combatant) -> void:
+	body.set_process(false)
+	body.set_physics_process(false)
+	body.collision_layer = 0
+	body.collision_mask = 0
+
+func respawn_operator(operator: RiftPlayer) -> void:
+	if operator.has_meta("coop_down") or not outcome.is_empty() or changing_act:
+		return
+	operator.set_meta("coop_down", true)
+	operator.lives -= 1
+	operator.health = 0.0
+	operator.hide()
+	operator.cancel_charge()
+	operator.set_physics_process(false)
+	operator.set_deferred("collision_layer", 0)
+	if boss_started and not boss_defeated:
+		if nearest_operator(gate.global_position) == null and not resetting_arena:
+			resetting_arena = true
+			reset_coop_arena.call_deferred()
+		return
+	await get_tree().create_timer(1.2).timeout
+	if is_instance_valid(operator) and not changing_act and outcome.is_empty() and operator.has_meta("coop_down"):
+		restore_operator(operator, respawn_point())
+
+func respawn_point() -> Vector3:
+	return stage.get_node("MARKERS/PlayerSpawn").global_position if checkpoint == Vector3.ZERO else checkpoint
+
+func restore_operator(operator: RiftPlayer, at: Vector3) -> void:
+	if operator.lives <= 0 or not operator.has_meta("coop_down"):
+		return
+	operator.global_position = at
+	operator.health = operator.max_health
+	operator.velocity = Vector3.ZERO
+	operator.invulnerable_time = 1.4
+	operator.collision_layer = 1
+	operator.remove_meta("coop_down")
+	operator.show()
+	operator.set_physics_process(true)
+
+func reset_coop_arena() -> void:
+	await get_tree().create_timer(1.2).timeout
+	if not outcome.is_empty() or changing_act:
+		resetting_arena = false
+		return
+	for shot in get_tree().get_nodes_in_group(&"rift_projectile"):
+		shot.queue_free()
+	for minion in get_tree().get_nodes_in_group(&"arena_minions"):
+		minion.queue_free()
+	var actors := stage.get_node("Actors")
+	boss.active = false
+	actors.remove_child(boss)
+	boss.queue_free()
+	var info := Catalog.info(sector)
+	if act == 1:
+		var guard := Miniboss.new()
+		guard.name = "SectorMiniboss"
+		guard.configure(sector, Color(info.color), info.weak, gate.global_position, stage.get_node("ExitBarrier").global_position.x)
+		guard.position = Vector3(boss_position.x, gate.position.y + guard.chassis_height, 0.0)
+		boss = guard
+	else:
+		var packed := load(info.boss_scene) as PackedScene
+		boss = packed.instantiate() as Combatant
+		boss.name = info.boss_node
+		boss.position = boss_position
+	actors.add_child(boss)
+	scale_opponent(boss)
+	boss.hide()
+	boss.died.connect(on_boss_defeated)
+	boss_started = false
+	entrance_open = false
+	resetting_arena = false
+	update_doors()
+	for operator in operators:
+		restore_operator(operator, respawn_point())
+
+func on_boss_defeated() -> void:
+	boss_defeated = true
+	for operator in operators:
+		if operator.has_meta("coop_down"):
+			operator.lives = maxi(1, operator.lives)
+			restore_operator.call_deferred(operator, gate.global_position + Vector3(3.0, 1.0, 0.0))
+	award_shared((35 if act == 1 else 80) + sector * 8, (60 if act == 1 else 100) + sector * 8, "miniboss" if act == 1 else "boss")
+	if act == 2:
+		var reward: String = Catalog.info(sector).reward
+		if not active_weapon_ids.has(reward):
+			active_weapon_ids.append(reward)
+		for operator in operators:
+			operator.unlock_sector_weapon(reward)
+	update_doors()
+
+func update_doors() -> void:
+	var opened := boss_defeated or entrance_open and not boss_started
+	if opened != last_gate_open:
+		last_gate_open = opened
+		var door := gate.get_node("Door") as Node3D
+		door.position.y = 4.2 if opened else 0.0
+		gate.get_node("Blocker/CollisionShape3D").set_deferred("disabled", opened)
+	if boss_defeated:
+		var barrier := stage.get_node("ExitBarrier")
+		if barrier.visible:
+			barrier.hide()
+			barrier.get_node("CollisionShape3D").set_deferred("disabled", true)
+
+func check_campaign_progress() -> void:
+	var hall := stage.get_node("ForgeHallDoor") as Node3D
+	hall.target = nearest_operator(hall.global_position)
+	var entry := gate.global_position
+	if not boss_started:
+		if not entrance_open and operators.all(func(operator): return operator.health > 0.0 and absf(operator.global_position.x - entry.x) <= 4.0 and absf(operator.global_position.y - entry.y) <= 3.4):
+			entrance_open = true
+		if entrance_open and operators.all(func(operator): return operator.health > 0.0 and operator.global_position.x >= entry.x + 1.35):
+			boss_started = true
+			boss.show()
+			boss.active = true
+			boss.target = nearest_operator(boss.global_position)
+	update_doors()
+	if not boss_defeated and not boss_started:
+		room_status.text = "Both operators must reach the boss door." if not entrance_open else "Enter the boss room together."
+	elif not boss_defeated:
+		room_status.text = "%s  •  %d / %d HP" % [Miniboss.TITLES[sector - 1] if act == 1 else Catalog.info(sector).boss, boss.health, boss.max_health]
+	if boss_defeated and not changing_act:
+		room_status.text = "Enter the Act II gate." if act == 1 else "Reach the extraction pad."
+	if not boss_defeated or changing_act:
+		return
+	for operator in operators:
+		if operator.health > 0.0 and operator.global_position.distance_to(exit_marker.global_position) <= 1.65:
+			if act == 1:
+				changing_act = true
+				peer.call_func(receive_act, 2, team_xp, team_bolts, active_weapon_ids)
+				change_act.call_deferred(2)
+			else:
+				award_shared(65 + sector * 12, 160 + (sector - 1) * 25, "")
+				peer.call_func(receive_outcome, true, team_xp, team_bolts, team_blueprints)
+				finish_mission(true, team_xp, team_bolts, team_blueprints)
+			return
+
+func receive_act(next: int, xp: int, bolts: int, weapons: Array) -> void:
+	if not host and not changing_act and act == 1 and next == 2 and peer.get_sender_id() == peer.get_host():
+		changing_act = true
+		team_xp = xp
+		team_bolts = bolts
+		active_weapon_ids = weapons
+		change_act.call_deferred(next)
+
+func change_act(next: int) -> void:
+	var loading := Loading.new()
+	add_child(loading)
+	loading.show_loading(Catalog.info(sector).title)
+	for operator in operators:
+		operator.set_physics_process(false)
+	await get_tree().create_timer(0.5).timeout
+	act = next
+	load_stage()
+	loading.begin()
+	await get_tree().create_timer(0.5).timeout
+	loading.fade_out()
+	changing_act = false
+
+func update_hud_title() -> void:
+	stage_title.text = "%s  /  ACT %s" % [Catalog.info(sector).title.to_upper(), "I" if act == 1 else "II"]
 
 func build_hud() -> void:
 	var layer := CanvasLayer.new()
@@ -146,7 +415,8 @@ func build_hud() -> void:
 	panel.position = Vector2(22, 18)
 	layer.add_child(panel)
 	var content := UI.column(panel, 5)
-	UI.label(content, "NEON FACTORY DEFENSE", 27, UI.CYAN)
+	stage_title = UI.label(content, "", 27, UI.CYAN)
+	update_hud_title()
 	stats = UI.label(content, "", 16)
 	partner_status = UI.label(content, "", 16, UI.CYAN)
 	room_status = UI.label(content, "2.5× enemy health and damage  /  1.5× shared XP", 16, UI.MUTED)
@@ -158,7 +428,7 @@ func get_player_axis() -> Vector2:
 	return Vector2(Input.get_axis("move_left", "move_right"), Input.get_axis("climb_down", "climb_up"))
 
 func _physics_process(delta: float) -> void:
-	if not outcome.is_empty() or not RiftRelay.mission_active:
+	if not outcome.is_empty() or changing_act or not RiftRelay.mission_active:
 		return
 	if not host:
 		for action in INPUTS:
@@ -174,6 +444,23 @@ func _physics_process(delta: float) -> void:
 		for enemy in enemies:
 			if is_instance_valid(enemy):
 				enemy.target = nearest_operator(enemy.global_position)
+		for operator in operators:
+			if operator.credits > 0:
+				award_shared(0, operator.credits, "")
+				operator.credits = 0
+			for blueprint in operator.recovered_blueprints:
+				if not team_blueprints.has(blueprint):
+					team_blueprints.append(blueprint)
+			operator.recovered_blueprints.clear()
+		if is_instance_valid(boss) and boss_started:
+			boss.target = nearest_operator(boss.global_position)
+		for shot in get_tree().get_nodes_in_group(&"rift_projectile"):
+			if not projectiles_seen.has(shot.get_instance_id()):
+				projectiles_seen[shot.get_instance_id()] = true
+				send_shot(shot)
+		check_campaign_progress()
+		if changing_act or not outcome.is_empty():
+			return
 	clock += delta
 	if clock < TICK:
 		return
@@ -236,15 +523,23 @@ func clear_edges(operator: RiftPlayer) -> void:
 	operator.remote_pressed.clear()
 	operator.remote_released.clear()
 
+func award_pickup_xp(amount: int) -> void:
+	award_shared(amount, 0, "")
+
 func earn_security_rewards(variant: int) -> void:
+	var base: int = WalkerBot.XP_REWARDS[variant]
+	award_shared(base + (sector - 1) * 2, 12 + floori(base * 0.5), "elite" if variant == WalkerBot.Variant.HEAVY else "enemy")
+
+func award_shared(base_xp: int, bolts: int, source: String) -> void:
 	if not outcome.is_empty():
 		return
-	var xp := roundi(WalkerBot.XP_REWARDS[variant] * XP_BONUS)
+	var xp := roundi(base_xp * XP_BONUS)
 	team_xp += xp
-	team_bolts += 12 + floori(WalkerBot.XP_REWARDS[variant] * 0.5)
-	var blueprint := Blueprints.roll(1, "elite" if variant == WalkerBot.Variant.HEAVY else "enemy", loot_rng)
-	if not blueprint.is_empty() and not team_blueprints.has(blueprint):
-		team_blueprints.append(blueprint)
+	team_bolts += bolts
+	if not source.is_empty():
+		var blueprint := Blueprints.roll(sector, source, loot_rng)
+		if not blueprint.is_empty() and not team_blueprints.has(blueprint):
+			team_blueprints.append(blueprint)
 	for operator in operators:
 		if operator.health > 0.0:
 			operator.gain_experience(xp)
@@ -252,24 +547,67 @@ func earn_security_rewards(variant: int) -> void:
 func broadcast_state() -> void:
 	var players := []
 	var security := []
-	var active := 0
+	props_consumed.clear()
 	for operator in operators:
-		players.append([operator.global_position, operator.model_root.rotation, operator.health, operator.energy, operator.current_animation, operator.facing])
+		players.append([operator.global_position, operator.model_root.rotation, operator.health, operator.energy, operator.current_animation, operator.facing, operator.equipped_suit(), operator.lives])
 	for enemy in enemies:
 		if is_instance_valid(enemy) and enemy.health > 0:
 			security.append([enemy.global_position, enemy.robot.rotation, enemy.health])
-			active += 1
 		else:
 			security.append([])
-	peer.call_func_unreliable(receive_state, players, security, team_xp, team_bolts, team_blueprints.size())
-	if active == 0 or nearest_operator(Vector3.ZERO) == null:
-		var success := active == 0
-		peer.call_func(receive_outcome, success, team_xp, team_bolts, team_blueprints)
-		finish_mission(success, team_xp, team_bolts, team_blueprints)
+	for index in stage_props.size():
+		if not stage.has_node(stage_props[index]):
+			props_consumed.append(index)
+	var platform_positions: Array[Vector3] = []
+	for platform in moving_platforms:
+		platform_positions.append(platform.position)
+	var boss_state := [Vector3.ZERO, Vector3.ZERO, 0.0, boss_started, boss_defeated, gate.get_node("Door").position.y, platform_positions, entrance_open, checkpoint]
+	if is_instance_valid(boss):
+		boss_state[0] = boss.global_position
+		boss_state[1] = boss.rotation
+		boss_state[2] = boss.health
+	peer.call_func_unreliable(receive_state, act, players, security, boss_state, props_consumed, team_xp, team_bolts, team_blueprints.size())
+	if (not boss_started and operators.any(func(operator): return operator.lives <= 0)) or (boss_started and operators.all(func(operator): return operator.health <= 0.0) and operators.any(func(operator): return operator.lives <= 0)):
+		peer.call_func(receive_outcome, false, 0, 0, [])
+		finish_mission(false, 0, 0, [])
 
-func receive_state(players: Array, security: Array, xp: int, bolts: int, blueprints_found: int) -> void:
-	if host or not outcome.is_empty() or peer.get_sender_id() != peer.get_host() or players.size() != 2 or security.size() != enemies.size():
+func receive_state(remote_act: int, players: Array, security: Array, arena: Array, consumed: Array, xp: int, bolts: int, blueprints_found: int) -> void:
+	if host or changing_act or remote_act != act or not outcome.is_empty() or peer.get_sender_id() != peer.get_host() or players.size() != 2 or security.size() != enemies.size():
 		return
+	if is_instance_valid(boss):
+		boss.global_position = arena[0]
+		boss.rotation = arena[1]
+		boss.health = arena[2]
+		if last_boss_health != boss.health:
+			last_boss_health = boss.health
+			boss.health_changed.emit(boss.health, boss.max_health)
+	boss_started = arena[3]
+	boss_defeated = arena[4]
+	if is_instance_valid(boss):
+		boss.visible = boss_started and not boss_defeated
+	if boss_defeated:
+		room_status.text = "Enter the Act II gate." if act == 1 else "Reach the extraction pad."
+	elif boss_started:
+		room_status.text = "%s  •  %d / %d HP" % [Miniboss.TITLES[sector - 1] if act == 1 else Catalog.info(sector).boss, arena[2], boss.max_health]
+	else:
+		room_status.text = "Enter the boss room together." if entrance_open else "Both operators must reach the boss door."
+	gate.get_node("Door").position.y = arena[5]
+	entrance_open = arena[7]
+	if arena[8] != remote_checkpoint:
+		remote_checkpoint = arena[8]
+		for path_name in ["TERRAIN/MidpointCheckpoint", "TERRAIN/ForgeHallCheckpoint"]:
+			var beacon := stage.get_node_or_null(path_name) as Node3D
+			if beacon and beacon.global_position.distance_to(remote_checkpoint - Vector3.UP * 0.88) < 0.15:
+				beacon.get_node("Status").text = "CHECKPOINT ACTIVE"
+	for index in mini(moving_platforms.size(), arena[6].size()):
+		moving_platforms[index].position = arena[6][index]
+	if boss_defeated:
+		stage.get_node("ExitBarrier").hide()
+	for index in consumed:
+		if index >= 0 and index < stage_props.size():
+			var prop := stage.get_node_or_null(stage_props[index])
+			if prop:
+				prop.hide()
 	team_xp = xp
 	team_bolts = bolts
 	blueprint_count = blueprints_found
@@ -290,6 +628,12 @@ func _process(delta: float) -> void:
 			operator.energy = data[3]
 			operator.play_character_animation(data[4])
 			operator.facing = data[5]
+			operator.lives = data[7]
+			if operator.equipped_suit() != data[6]:
+				if String(data[6]).is_empty():
+					operator.equip_sector_weapon("")
+				else:
+					operator.unlock_sector_weapon(data[6])
 			operator.visible = operator.health > 0
 			operator.experience = team_xp
 		for index in enemies.size():
@@ -317,7 +661,11 @@ func _process(delta: float) -> void:
 	var offset := partner.global_position.x - local.global_position.x
 	var view := camera.get_node("Camera3D") as Camera3D
 	var on_screen := get_viewport().get_visible_rect().has_point(view.unproject_position(partner.global_position))
-	if partner.health <= 0.0:
+	if local.health <= 0.0 and boss_started and not boss_defeated:
+		partner_status.text = "Down  /  waiting for %s to finish the fight" % partner_name
+	elif local.health <= 0.0:
+		partner_status.text = "Out of lives" if local.lives <= 0 else "Respawning at checkpoint"
+	elif partner.health <= 0.0:
 		partner_status.text = "%s is down" % partner_name
 	elif on_screen:
 		partner_status.text = "%s is nearby" % partner_name
@@ -346,21 +694,21 @@ func receive_outcome(success: bool, xp: int, bolts: int, blueprints: Array) -> v
 func finish_mission(success: bool, xp: int, bolts: int, blueprints: Array) -> void:
 	if not outcome.is_empty():
 		return
-	var message := "Mission failed. Both operators are down."
+	var message := "Mission failed. The team is out of retries."
 	if success:
 		var unlocked: Array[String] = []
 		for id in blueprints:
-			if id is String and Profile.GEAR.has(id) and Profile.GEAR[id].get("sector", 0) == 1 and not unlocked.has(id):
+			if id is String and Profile.GEAR.has(id) and Profile.GEAR[id].get("sector", 0) == sector and not unlocked.has(id):
 				unlocked.append(id)
-		xp = clampi(xp, 0, 250)
-		bolts = clampi(bolts, 0, 250)
+		xp = clampi(xp, 0, 10000)
+		bolts = clampi(bolts, 0, 10000)
 		team_xp = xp
 		team_bolts = bolts
 		blueprint_count = unlocked.size()
 		message = "Mission complete. Each player earned %d XP, %d bolts and %d blueprints." % [xp, bolts, unlocked.size()]
 		if not rewards_delivered:
 			rewards_delivered = true
-			rewards_earned.emit(xp, bolts, unlocked)
+			rewards_earned.emit(xp, bolts, unlocked, sector)
 	outcome = message
 	room_status.text = message
 	if success:
@@ -368,6 +716,12 @@ func finish_mission(success: bool, xp: int, bolts: int, blueprints: Array) -> vo
 	return_button.text = "Return Together" if host else "Leave Mission"
 	return_button.focus_mode = Control.FOCUS_ALL
 	return_button.grab_focus()
+	if success and host:
+		return_timer = Timer.new()
+		return_timer.one_shot = true
+		add_child(return_timer)
+		return_timer.timeout.connect(relay_owner.return_to_station)
+		return_timer.start(4.0)
 	for operator in operators:
 		operator.set_physics_process(false)
 	for enemy in enemies:

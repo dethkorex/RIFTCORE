@@ -1,7 +1,7 @@
 extends Node
 
 signal changed
-signal deploy_requested(host: bool)
+signal deploy_requested(host: bool, sector: int)
 signal partner_moved(x: float, facing: float, animation: String, display_name: String)
 signal guest_joined
 signal mission_returned
@@ -24,6 +24,7 @@ var available := false
 var pending_invite := 0
 var mission_active := false
 var local_name := "RX-07"
+var unlocked_sector := 1
 
 var relay: Node
 var request_timeout: Timer
@@ -54,8 +55,8 @@ func _initialize_client() -> void:
 	relay.lobby_joined.connect(_room_joined)
 	relay.lobby_join_failed.connect(_room_failed)
 	relay.steam_join_request.connect(func(lobby_name: String, has_password: bool):
-		if not has_password and lobby_name.begins_with("riftcore-coop-v1-"):
-			join_room(lobby_name.trim_prefix("riftcore-coop-v1-"))
+		if not has_password and lobby_name.begins_with("riftcore-coop-v2-"):
+			join_room(lobby_name.trim_prefix("riftcore-coop-v2-"))
 	)
 	relay.client_joined.connect(_players_changed)
 	relay.client_left.connect(_peer_left)
@@ -185,18 +186,18 @@ func _players_changed(_client_id: int) -> void:
 func can_deploy() -> bool:
 	return not mission_active and room_size == 2 and is_instance_valid(relay) and relay.is_host()
 
-func deploy() -> void:
-	if not can_deploy():
+func deploy(sector := 1) -> void:
+	if not can_deploy() or sector < 1 or sector > unlocked_sector:
 		return
 	mission_active = true
-	relay.call_func(_receive_deploy)
-	deploy_requested.emit(true)
+	relay.call_func(_receive_deploy, sector)
+	deploy_requested.emit(true, sector)
 
-func _receive_deploy() -> void:
-	if mission_active or connected_room.is_empty() or relay.get_sender_id() != relay.get_host():
+func _receive_deploy(sector: int) -> void:
+	if mission_active or connected_room.is_empty() or sector < 1 or sector > 10 or relay.get_sender_id() != relay.get_host():
 		return
 	mission_active = true
-	deploy_requested.emit(false)
+	deploy_requested.emit(false, sector)
 
 func send_station_position(x: float, facing: float, animation: String) -> void:
 	if room_size == 2 and not mission_active and is_instance_valid(relay):
@@ -249,7 +250,7 @@ func leave(message := "Create a room or enter a friend’s room code.") -> void:
 		mission_disconnected.emit(message)
 
 func _room_name() -> String:
-	return "riftcore-coop-v1-" + room_code
+	return "riftcore-coop-v2-" + room_code
 
 func _update(message: String) -> void:
 	status = message

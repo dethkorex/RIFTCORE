@@ -7,10 +7,9 @@
 
 - Social shows Steam IDs with Copy ID and Save actions, accepts numeric friend codes and profile links, and distinguishes your Steam connection from each friend’s presence.
 
-- Play Neon Factory Defense with a friend. Create or join a room in Social, then the host selects Deploy Co-op. Both players fight the same security units and see the same mission result.
+- Play all ten campaign sectors with a friend. The leader chooses a sector, the party clears both acts and their bosses, and both players return to the same hub after extraction. Every co-op miniboss and boss door waits for both players. A player who falls outside a boss fight respawns independently. In the arena, a downed player waits until the boss falls or the team wipes.
 - Explore Operations Station together after joining a room. Only the room leader can deploy or return the group. Inventories, equipment, and station menus remain personal.
 - Co-op enemies have 2.5× health and damage. Both players receive the full shared reward, including 1.5× XP, bolts, and any blueprint discoveries. Use the System pad to save earned rewards.
-- Online co-op covers Neon Factory Defense. Campaign progression stays in solo play.
 
 - Online rooms use the RIFTCORE relay configuration included in the game. Social no longer asks players to enter keys.
 
@@ -43,7 +42,7 @@
 - Read sector briefings and recovered guardian memories in the NOVA Archive. The final extraction scene has two possible endings.
 - The Co-op Setup Guide is available from Social and Pause. Builds without relay configuration show a status in Social and disable Create Room and Join Room.
 
-Live room connections and Steam invitations require service configuration. The campaign remains available in solo play. The full v0.5 overhaul has further campaign, visual, and competitive-mode work tracked in RIFTCORE_DEVELOPMENT.md.
+Live room connections and Steam invitations require service configuration. Room codes work independently of Steam. The full v0.5 overhaul has further campaign, visual, and competitive-mode work tracked in RIFTCORE_DEVELOPMENT.md.
 
 ## Installer and launcher 0.2
 
