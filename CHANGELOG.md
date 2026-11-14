@@ -15,7 +15,7 @@
 
 - Tilt the left stick lightly to walk. Push it farther to run in the station and during missions.
 
-- Moving or clicking the mouse draws a visible pointer in the game menus, including Settings and Pause.
+- Moving or clicking the mouse shows an angular cyan pointer in menus. Click the player name, Steam contact, or room code to place the caret and type or paste.
 - Quick Invite opens a room automatically for Steam friends playing RIFTCORE. Removed the redundant trader display from the station.
 - Two live Windows clients can create a GD Sync room, join, and exchange data when configured.
 

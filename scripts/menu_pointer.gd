@@ -5,6 +5,7 @@ var pointer := Control.new()
 var pointer_position := Vector2.ZERO
 var mouse_inside := true
 var using_pointer := false
+var over_text := false
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -38,6 +39,11 @@ func refresh_pointer() -> void:
 		and mouse_inside and get_viewport().get_visible_rect().has_point(pointer_position))
 	pointer.position = pointer_position
 	if should_draw:
+		var hovered := get_viewport().gui_get_hovered_control()
+		var text_cursor: bool = hovered is LineEdit and hovered.editable
+		if text_cursor != over_text:
+			over_text = text_cursor
+			pointer.queue_redraw()
 		pointer.show()
 		if Input.mouse_mode != Input.MOUSE_MODE_HIDDEN:
 			Input.mouse_mode = Input.MOUSE_MODE_HIDDEN
@@ -54,10 +60,25 @@ func _exit_tree() -> void:
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 
 func draw_pointer() -> void:
-	var points := PackedVector2Array([
-		Vector2(0, 0), Vector2(2, 24), Vector2(8, 18), Vector2(13, 28),
-		Vector2(17, 26), Vector2(12, 16), Vector2(21, 16),
+	var edge := Color("72edff")
+	var shadow := Color("06111f")
+	if over_text:
+		var caps := PackedVector2Array([
+			Vector2(-4, -8), Vector2(4, -8), Vector2(0, -8),
+			Vector2(0, 8), Vector2(-4, 8), Vector2(4, 8),
+		])
+		pointer.draw_multiline(caps, shadow, 4.0, true)
+		pointer.draw_multiline(caps, edge, 2.0, true)
+		return
+
+	var outline := PackedVector2Array([
+		Vector2(0, 0), Vector2(22, 13), Vector2(13, 15),
+		Vector2(18, 24), Vector2(13, 27), Vector2(8, 18), Vector2(2, 24),
 	])
-	pointer.draw_colored_polygon(points, Color("e7f8ff"))
-	points.append(points[0])
-	pointer.draw_polyline(points, Color("102940"), 2.0, true)
+	pointer.draw_colored_polygon(outline, shadow)
+	outline.append(outline[0])
+	pointer.draw_polyline(outline, shadow, 4.0, true)
+	pointer.draw_polyline(outline, edge, 1.5, true)
+	pointer.draw_colored_polygon(PackedVector2Array([
+		Vector2(3, 5), Vector2(16, 12), Vector2(8, 13), Vector2(4, 18),
+	]), Color("dcefff"))

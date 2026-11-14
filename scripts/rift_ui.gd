@@ -79,6 +79,14 @@ static func theme() -> Theme:
 	result.set_stylebox("pressed", "Button", texture_frame("button_primary", 31, Vector2(16, 6)))
 	result.set_stylebox("focus", "Button", StyleBoxEmpty.new())
 	result.set_stylebox("disabled", "Button", texture_frame("button_disabled", 27, Vector2(16, 6)))
+	var text_idle := frame(Color("0c192b"), Color("3b6384"), 1)
+	var text_focus := text_idle.duplicate() as StyleBoxFlat
+	text_focus.draw_center = false
+	text_focus.border_color = VIOLET
+	result.set_stylebox("normal", "LineEdit", text_idle)
+	result.set_stylebox("focus", "LineEdit", text_focus)
+	result.set_stylebox("read_only", "LineEdit", frame(Color("0b1421"), Color("354257"), 1))
+	result.set_color("caret_color", "LineEdit", CYAN)
 	return result
 
 static func label(parent: Node, value: String, font_size := 16, color := WHITE) -> Label:

@@ -456,7 +456,7 @@ func refresh_online_room() -> void:
 	relay_host.disabled = not RiftRelay.available or joined or requesting
 	relay_join.disabled = relay_host.disabled
 	relay_paste.disabled = relay_join.disabled
-	relay_code.editable = not relay_join.disabled
+	relay_code.editable = not joined and not requesting
 	relay_deploy.visible = RiftRelay.can_deploy()
 	relay_copy.visible = joined
 	relay_leave.visible = joined or requesting
