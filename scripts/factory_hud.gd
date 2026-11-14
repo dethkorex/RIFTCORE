@@ -37,6 +37,45 @@ var boss_name := "FORGE TITAN"
 var boss_tint := Color("ff8c36")
 var exit_task := "REACH THE FACTORY EXIT"
 
+func show_quick_slots(profile) -> void:
+	var row := HBoxContainer.new()
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_theme_constant_override("separation", 5)
+	add_child(row)
+	row.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
+	row.offset_left = -110
+	row.offset_right = 110
+	row.offset_top = -73
+	row.offset_bottom = -15
+	var icons := preload("res://scripts/equipment_icons.gd")
+	for index in 4:
+		var panel := PanelContainer.new()
+		panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		panel.custom_minimum_size = Vector2(51, 56)
+		panel.add_theme_stylebox_override("panel", UI.frame(Color("0b1b32"), UI.CYAN, 1))
+		row.add_child(panel)
+		var stack := UI.column(panel, 0)
+		var slot: Dictionary = profile.quick_slots[index]
+		var id := String(slot.get("id", ""))
+		var key: String = ["↑", "←", "→", "↓"][index] if not Input.get_connected_joypads().is_empty() else str(index + 1)
+		var count := UI.label(stack, key, 14, UI.CYAN)
+		count.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		if profile.stock.has(id):
+			var icon := TextureRect.new()
+			icon.texture = icons.icon(profile.stock[id].icon, profile.stock[id].icon)
+			icon.custom_minimum_size = Vector2(23, 23)
+			icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			stack.add_child(icon)
+		var quantity := UI.label(stack, str(slot.get("count", 0)), 14)
+		quantity.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		if profile.has_signal("quick_changed"):
+			profile.quick_changed.connect(func():
+				if is_instance_valid(quantity):
+					quantity.text = str(profile.quick_slots[index].get("count", 0))
+			)
+
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	resized.connect(queue_redraw)

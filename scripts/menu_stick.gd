@@ -26,6 +26,7 @@ func _input(event: InputEvent) -> void:
 		reset_stick()
 		device = event.device
 	stick[event.axis] = event.axis_value
+	get_tree().call_group(&"menu_pointer", &"observe_controller", event)
 	viewport.set_input_as_handled()
 	var next := stick_direction(RELEASE if not direction.is_empty() else ENGAGE)
 	if next != direction:

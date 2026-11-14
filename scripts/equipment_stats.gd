@@ -18,20 +18,26 @@ static func apply(operator: RiftPlayer, profile) -> void:
 	if dash_rank > 0:
 		operator.dash_speed *= 1.20 if dash_rank == 2 else 1.10
 		operator.dash_cooldown *= 0.68 if dash_rank == 2 else 0.85
+	for item in profile.enhancements:
+		if profile.rank(item.id) > 0:
+			apply_modifiers(operator, item.stats)
 	for slot in profile.GEAR_SLOTS:
 		var id: String = profile.equipped_for(slot)
-		if id.is_empty():
-			continue
-		var stats: Dictionary = profile.GEAR[id].stats
-		operator.armor_resistance = 1.0 - (1.0 - operator.armor_resistance) * (1.0 - float(stats.get("resist", 0.0)))
-		operator.max_health += float(stats.get("hp", 0.0))
-		operator.max_energy += float(stats.get("energy", 0.0))
-		operator.buster_damage_multiplier *= float(stats.get("attack", 1.0))
-		operator.charge_cost_multiplier *= float(stats.get("charge", 1.0))
-		operator.dash_speed *= float(stats.get("dash", 1.0))
-		operator.dash_cooldown *= float(stats.get("cooldown", 1.0))
-		operator.salvage_multiplier *= float(stats.get("bolts", 1.0))
-		operator.xp_pickup_multiplier *= float(stats.get("xp", 1.0))
-		operator.healing_pickup_multiplier *= float(stats.get("healing", 1.0))
+		if not id.is_empty():
+			apply_modifiers(operator, profile.GEAR[id].stats)
 	operator.health = operator.max_health
 	operator.energy = operator.max_energy
+
+static func apply_modifiers(operator: RiftPlayer, stats: Dictionary) -> void:
+	operator.armor_resistance = 1.0 - (1.0 - operator.armor_resistance) * (1.0 - float(stats.get("resist", 0.0)))
+	operator.max_health += float(stats.get("hp", 0.0))
+	operator.max_energy += float(stats.get("energy", 0.0))
+	operator.buster_damage_multiplier *= float(stats.get("attack", 1.0))
+	operator.charge_cost_multiplier *= float(stats.get("charge", 1.0))
+	operator.move_speed *= float(stats.get("speed", 1.0))
+	operator.dash_speed *= float(stats.get("dash", 1.0))
+	operator.dash_cooldown *= float(stats.get("cooldown", 1.0))
+	operator.salvage_multiplier *= float(stats.get("bolts", 1.0))
+	operator.xp_pickup_multiplier *= float(stats.get("xp", 1.0))
+	operator.healing_pickup_multiplier *= float(stats.get("healing", 1.0))
+	operator.armor_resistance = minf(operator.armor_resistance, 0.68)

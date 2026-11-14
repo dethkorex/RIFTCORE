@@ -1,13 +1,21 @@
-# RIFTCORE 5.9.2 — Fractured Connections
+# RIFTCORE Alpha 6.0 — Fractured Connections
 
-## 5.9.2
+## Alpha 6.0
+
+- Added 50 Core Enhancements across five sockets and 50 Shop products, including existing crafting materials, recovery supplies and temporary buffs.
+- Renamed Blueprints to Crafting. Recovered blueprints go to Storage → Inventory after extraction. Learn them there to unlock recipes. Previously learned recipes carry forward.
+- Assign four square quick slots from Inventory. Use the D-pad or keyboard 1–4 in a mission. Quick stacks hold five and inventory stacks hold 100.
+- Made midair ladder grabs more forgiving. The menu cursor hides on controller input and returns on mouse movement or click.
+- Unified the game and launcher under the Barlow Condensed font family.
+- Moved Social next to Deploy. Start or join a group from Deploy or Social. Add recent teammates in Friends and compare seasonal best sector times on the Leaderboard. Friends’ times sync when you group together.
+- Storage now handles equipping, swapping, and stowing gear. The separate Loadout station has been removed. Storage shows live DMG, DEF, ENG, HP, and SPD, and keeps access to boss abilities and saved gear presets.
 
 - Launcher 0.2 now supports verified self-updates. Game updates keep one previous build and remove older, unmodified game packages to free disk space. Saves are unaffected.
 - Added **Update Game** to Settings. Check releases and read patch notes in the game. From the title screen, install and restart without opening the launcher.
 - Reorganized Settings into Display & Audio, Controls, and Update Game. The binding list scrolls independently.
 - Fixed update installs that hit incomplete version folders. Updates verify the download and report the specific extraction, permission, or activation error when installation fails.
 - Restored the personal HUD in co-op and moved mission and partner information to the right.
-- Reduced guest movement delay with immediate local movement and faster input updates. The host still decides combat, damage and rewards. Both players need 5.9.2 to join the same room.
+- Reduced guest movement delay with immediate local movement and faster input updates. The host still decides combat, damage and rewards. Both players need Alpha 6.0 to join the same room.
 - Offline missions pause when the controller being used disconnects. Resume manually after reconnecting or switching input.
 - Empty save slots start immediately, and Load Game only appears when there is a save to load.
 - Added the game version in small text at the bottom right and removed the overlapping hub prompt frame.

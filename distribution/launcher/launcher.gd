@@ -117,7 +117,7 @@ func relaunched_arguments() -> PackedStringArray:
 
 func build_ui() -> void:
 	var font_theme := Theme.new()
-	font_theme.default_font = preload("res://branding/Barlow-Medium.ttf")
+	font_theme.default_font = preload("res://branding/BarlowCondensed-Medium.ttf")
 	theme = font_theme
 	var shade := ColorRect.new()
 	shade.color = Color("091526")

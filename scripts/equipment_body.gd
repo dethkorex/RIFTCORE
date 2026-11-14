@@ -51,18 +51,17 @@ func install(data, active: String, action: Callable, workshop := false) -> void:
 	view.add_child(camera)
 	camera.position = Vector3(0, 0.88, 4.0)
 	camera.make_current()
-	var order := ["visor", "frame", "core", "arm", "utility"] if not workshop else ["frame", "core", "utility"]
+	var order := ["visor", "frame", "core", "arm", "utility"]
 	for slot in order:
 		var id: String = profile.equipped_for(slot) if profile and not workshop else ""
 		var name: String = PROFILE.GEAR_SLOTS[slot]
 		var detail := "Empty" if id.is_empty() else String(PROFILE.GEAR[id].name)
 		if workshop:
-			var ranks := PackedStringArray()
-			for upgrade in PROFILE.UPGRADES:
-				if PROFILE.UPGRADE_SLOTS[upgrade.id] == slot:
-					var rank: int = profile.rank(upgrade.id) if profile else 0
-					ranks.append(["—", "I", "II"][rank])
-			detail = "Rank " + "  /  ".join(ranks)
+			var count := 0
+			for upgrade in profile.all_upgrades():
+				if String(upgrade.get("slot", PROFILE.UPGRADE_SLOTS.get(upgrade.id, ""))) == slot and profile.rank(upgrade.id) > 0:
+					count += 1
+			detail = "%d installed" % count
 		var button := UI.button(self, name + "\n" + detail, action.bind(slot), slot == selected)
 		button.icon = ICONS.icon(slot if id.is_empty() else id, slot)
 		button.expand_icon = true

@@ -11,7 +11,7 @@ const Miniboss := preload("res://scripts/sector_miniboss.gd")
 const Details := preload("res://scripts/sector_details.gd")
 const Loading := preload("res://scripts/act_loading_screen.gd")
 const Equipment := preload("res://scripts/equipment_stats.gd")
-const INPUTS := [&"jump", &"dash", &"crouch", &"crouch_stick", &"shoot", &"melee", &"climb_down", &"swap_weapon", &"previous_suit"]
+const INPUTS := [&"jump", &"dash", &"crouch", &"crouch_stick", &"shoot", &"melee", &"climb_down", &"swap_weapon", &"previous_suit", &"quick_0", &"quick_1", &"quick_2", &"quick_3"]
 const TICK := 0.05
 const INPUT_INTERVAL := 1.0 / 30.0
 const DIFFICULTY := 2.5
@@ -43,6 +43,7 @@ var last_gate_open := false
 var active_weapon_ids: Array = []
 var remote_gear: Dictionary = {}
 var remote_upgrades: Dictionary = {}
+var remote_inventory = Profile.new()
 var remote_loadout_received := false
 var stage_title: Label
 var personal_hud: Control
@@ -63,6 +64,7 @@ var clock := 0.0
 var guest_timeout := 0.0
 var outcome := ""
 var team_xp := 0
+var sector_seconds := 0.0
 var team_bolts := 0
 var team_blueprints: Array = []
 var loot_rng := RandomNumberGenerator.new()
@@ -94,12 +96,18 @@ func _ready() -> void:
 	load_stage()
 	build_hud()
 	if not host:
-		peer.call_func_on(peer.get_host(), receive_loadout, local_profile.gear, local_profile.owned)
+		peer.call_func_on(peer.get_host(), receive_loadout, local_profile.gear, local_profile.owned, local_profile.quick_slots)
 
-func receive_loadout(gear: Dictionary, upgrades: Dictionary) -> void:
+func receive_loadout(gear: Dictionary, upgrades: Dictionary, quick: Array) -> void:
 	if not host or remote_loadout_received or not peer.lobby_get_all_clients().has(peer.get_sender_id()) or peer.get_sender_id() == peer.get_client_id() or gear.size() > 160:
 		return
 	remote_loadout_received = true
+	remote_inventory.manual_only = true
+	for index in mini(quick.size(), 4):
+		if quick[index] is Dictionary:
+			var id := String(quick[index].get("id", ""))
+			if Profile.stock.has(id) and not Profile.stock[id].has("material"):
+				remote_inventory.quick_slots[index] = {"id": id, "count": clampi(int(quick[index].get("count", 0)), 0, Profile.QUICK_MAX)}
 	remote_gear.clear()
 	var slots := {}
 	for id in gear:
@@ -108,7 +116,7 @@ func receive_loadout(gear: Dictionary, upgrades: Dictionary) -> void:
 			if not slots.has(slot):
 				slots[slot] = true
 				remote_gear[id] = "equipped"
-	for enhancement in Profile.UPGRADES:
+	for enhancement in local_profile.all_upgrades():
 		remote_upgrades[enhancement.id] = clampi(int(upgrades.get(enhancement.id, 0)), 0, 2)
 	var guest_profile = Profile.new()
 	guest_profile.owned = remote_upgrades.duplicate()
@@ -156,6 +164,8 @@ func load_stage() -> void:
 	second.add_collision_exception_with(first)
 	for index in 2:
 		var operator: RiftPlayer = [first, second][index]
+		if host:
+			operator.quick_profile = local_profile if index == 0 else remote_inventory
 		operator.remote_input = host and index == 1
 		operator.damage_taken_scale = DIFFICULTY
 		var loadout = local_profile if index == (0 if host else 1) else Profile.new()
@@ -391,7 +401,7 @@ func check_campaign_progress() -> void:
 				change_act.call_deferred(2)
 			else:
 				award_shared(65 + sector * 12, 160 + (sector - 1) * 25, "")
-				peer.call_func(receive_outcome, true, team_xp, team_bolts, team_blueprints)
+				peer.call_func(receive_outcome, true, team_xp, team_bolts, team_blueprints, sector_seconds)
 				finish_mission(true, team_xp, team_bolts, team_blueprints)
 			return
 
@@ -428,6 +438,7 @@ func build_hud() -> void:
 	personal_hud.player_level = local_profile.player_level()
 	layer.add_child(personal_hud)
 	personal_hud.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	personal_hud.show_quick_slots(local_profile)
 	var panel := PanelContainer.new()
 	panel.theme = UI.theme()
 	layer.add_child(panel)
@@ -485,6 +496,7 @@ func _physics_process(delta: float) -> void:
 			if Input.is_action_just_released(action):
 				released[action] = true
 	else:
+		sector_seconds += delta
 		guest_timeout -= delta
 		if guest_timeout <= 0.0:
 			operators[1].remote_axis = Vector2.ZERO
@@ -601,7 +613,7 @@ func broadcast_state() -> void:
 	var security := []
 	props_consumed.clear()
 	for operator in operators:
-		players.append([operator.global_position, operator.model_root.rotation, operator.health, operator.energy, operator.current_animation, operator.facing, operator.equipped_suit(), operator.lives, operator.max_health, operator.max_energy, operator.velocity, operator.fire_lock, operator.charge_held, operator.melee_lock])
+		players.append([operator.global_position, operator.model_root.rotation, operator.health, operator.energy, operator.current_animation, operator.facing, operator.equipped_suit(), operator.lives, operator.max_health, operator.max_energy, operator.velocity, operator.fire_lock, operator.charge_held, operator.melee_lock, operator.quick_profile.quick_slots if operator.quick_profile else []])
 	for enemy in enemies:
 		if is_instance_valid(enemy) and enemy.health > 0:
 			security.append([enemy.global_position, enemy.robot.rotation, enemy.health])
@@ -621,7 +633,7 @@ func broadcast_state() -> void:
 	state_sequence += 1
 	peer.call_func_unreliable(receive_state, act, players, security, boss_state, props_consumed, team_xp, team_bolts, team_blueprints.size(), state_sequence)
 	if (not boss_started and operators.any(func(operator): return operator.lives <= 0)) or (boss_started and operators.all(func(operator): return operator.health <= 0.0) and operators.any(func(operator): return operator.lives <= 0)):
-		peer.call_func(receive_outcome, false, 0, 0, [])
+		peer.call_func(receive_outcome, false, 0, 0, [], 0.0)
 		finish_mission(false, 0, 0, [])
 
 func receive_state(remote_act: int, players: Array, security: Array, arena: Array, consumed: Array, xp: int, bolts: int, blueprints_found: int, sequence: int) -> void:
@@ -693,6 +705,13 @@ func _process(delta: float) -> void:
 				operator.fire_lock = data[11]
 				operator.charge_held = data[12]
 				operator.melee_lock = data[13]
+				if data[14].size() == 4:
+					for slot in 4:
+						var actual: Dictionary = data[14][slot]
+						var local: Dictionary = local_profile.quick_slots[slot]
+						if not local.is_empty() and actual.get("id") == local.id and local.count > actual.count:
+							local.count = actual.count
+							local_profile.quick_changed.emit()
 			operator.health = data[2]
 			operator.energy = data[3]
 			operator.max_health = data[8]
@@ -757,8 +776,9 @@ func receive_shot(at: Vector3, direction: Vector3, speed: float, tint: Color, ch
 	shot.global_position = at
 	shot.setup(direction, faction, tint, false, charged, magma)
 
-func receive_outcome(success: bool, xp: int, bolts: int, blueprints: Array) -> void:
+func receive_outcome(success: bool, xp: int, bolts: int, blueprints: Array, duration: float) -> void:
 	if not host and peer.get_sender_id() == peer.get_host():
+		sector_seconds = duration
 		finish_mission(success, xp, bolts, blueprints)
 
 func finish_mission(success: bool, xp: int, bolts: int, blueprints: Array) -> void:
@@ -766,6 +786,8 @@ func finish_mission(success: bool, xp: int, bolts: int, blueprints: Array) -> vo
 		return
 	var message := "Mission failed. The team is out of retries."
 	if success:
+		if not OS.get_cmdline_user_args().has("--verify-relay") and is_finite(sector_seconds):
+			RiftSocial.record_clear(sector, sector_seconds)
 		var unlocked: Array[String] = []
 		for id in blueprints:
 			if id is String and Profile.GEAR.has(id) and Profile.GEAR[id].get("sector", 0) == sector and not unlocked.has(id):

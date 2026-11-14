@@ -1,7 +1,7 @@
 extends RefCounted
 
 const DISPLAY := preload("res://assets/ui/fonts/BarlowCondensed-ExtraBoldItalic.ttf")
-const BODY := preload("res://assets/ui/fonts/Barlow-Medium.ttf")
+const BODY := preload("res://assets/ui/fonts/BarlowCondensed-Medium.ttf")
 const KIT := "res://assets/ui/riftcore_kit/"
 
 const CYAN := Color("55e7ff")
@@ -155,7 +155,7 @@ static func button(parent: Node, value: String, action: Callable, primary := fal
 		style_button(item)
 	return item
 
-static func item_tile(parent: GridContainer, icon: Texture2D, rarity: Color, rarity_index: int, caption: String, action: Callable) -> Button:
+static func item_tile(parent: Container, icon: Texture2D, rarity: Color, rarity_index: int, caption: String, action: Callable) -> Button:
 	var tile := button(parent, "", action, false, ITEM_SIZE, false)
 	tile.custom_minimum_size = Vector2(ITEM_SIZE, ITEM_SIZE)
 	tile.icon = icon

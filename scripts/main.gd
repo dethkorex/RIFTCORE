@@ -121,7 +121,13 @@ func add_build_version() -> void:
 	var layer := CanvasLayer.new()
 	layer.layer = 190
 	add_child(layer)
-	var label := UI.label(layer, "v%s" % ProjectSettings.get_setting("application/config/version"), 15, UI.MUTED)
+	var version := String(ProjectSettings.get_setting("application/config/version"))
+	var metadata := "res://assets/update_channel.json"
+	if FileAccess.file_exists(metadata):
+		var release: Variant = JSON.parse_string(FileAccess.get_file_as_string(metadata))
+		if release is Dictionary:
+			version = String(release.get("tag", version)).trim_prefix("v").trim_suffix("-preview")
+	var label := UI.label(layer, "Alpha %s" % (version.trim_suffix(".0") if version.ends_with(".0.0") else version), 15, UI.MUTED)
 	label.add_theme_color_override("font_shadow_color", Color("050a16"))
 	label.add_theme_constant_override("shadow_offset_y", 1)
 	label.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
@@ -137,7 +143,9 @@ func verify_social() -> void:
 		func(button): return button.text == "Online Room")
 	open_home_hub()
 	home_hub.station_requested.emit("Social")
-	valid = valid and menu.page == "Social" and is_instance_valid(menu.relay_host)
+	valid = valid and menu.page == "Social"
+	menu.show_page("Party")
+	valid = valid and is_instance_valid(menu.relay_host)
 	if not valid:
 		print("SOCIAL SMOKE FAIL")
 		get_tree().quit(1)
@@ -179,6 +187,7 @@ func verify_live_relay(arguments: PackedStringArray) -> void:
 	profile.operator_name = "Leader RX" if host else "Guest RX"
 	open_home_hub()
 	home_hub.station_requested.emit("Social")
+	menu.show_page("Party")
 	if host:
 		menu.relay_host.pressed.emit()
 	else:
@@ -249,17 +258,11 @@ func verify_coop_mission(host: bool) -> void:
 		print("Campaign check failed local camera or HUD")
 		finish_relay_check(false)
 		return
-	if not host:
-		RiftRelay.relay.set_artificial_latency(200)
+	if not host and (not local_operator.local_prediction or not local_operator.is_physics_processing()):
+		print("Campaign check failed guest input prediction")
+		finish_relay_check(false)
+		return
 	Input.action_press("move_right")
-	if not host:
-		await get_tree().create_timer(0.15).timeout
-		if local_operator.position.x <= spawn_x + 0.12:
-			Input.action_release("move_right")
-			print("Campaign check failed immediate local movement with simulated latency")
-			finish_relay_check(false)
-			return
-		RiftRelay.relay.set_artificial_latency(0)
 	await get_tree().create_timer(0.4).timeout
 	Input.action_release("move_right")
 	var moved := await wait_for_relay(func(): return is_instance_valid(local_operator) and local_operator.position.x > spawn_x + 0.5, 6.0)
@@ -289,7 +292,7 @@ func verify_coop_mission(host: bool) -> void:
 			return
 	var returned := await wait_for_relay(func(): return is_instance_valid(home_hub) and not RiftRelay.mission_active, 18.0)
 	var rewards := (profile.player_xp > previous_xp and profile.credits > previous_credits
-		and profile.blueprints.has("bp_01_00") and profile.gear == saved_gear
+		and profile.blueprint_items.has("bp_01_00") and profile.gear == saved_gear
 		and profile.unlocked_sector >= 2)
 	if not host and returned and rewards:
 		RiftRelay.relay.lobby_set_data("coop_guest_returned", true)
@@ -351,8 +354,6 @@ func configure_input() -> void:
 		add_key_action("climb_up", key)
 	for key in [KEY_S, KEY_DOWN]:
 		add_key_action("climb_down", key)
-	add_joy_button("climb_up", JOY_BUTTON_DPAD_UP)
-	add_joy_button("climb_down", JOY_BUTTON_DPAD_DOWN)
 	add_joy_action("climb_up", JOY_AXIS_LEFT_Y, -1.0)
 	add_joy_action("climb_down", JOY_AXIS_LEFT_Y, 1.0)
 	InputMap.action_set_deadzone("climb_up", 0.42)
@@ -375,7 +376,6 @@ func configure_input() -> void:
 	add_joy_button("swap_weapon", JOY_BUTTON_RIGHT_SHOULDER)
 	add_joy_button("previous_suit", JOY_BUTTON_LEFT_SHOULDER)
 	add_joy_button("melee", JOY_BUTTON_Y)
-	add_joy_button("crouch", JOY_BUTTON_DPAD_DOWN)
 	add_joy_action("crouch_stick", JOY_AXIS_LEFT_Y, 1.0)
 	InputMap.action_set_deadzone("crouch_stick", 0.65)
 	add_joy_button("pause", JOY_BUTTON_START)
@@ -385,6 +385,9 @@ func configure_input() -> void:
 	add_joy_button("ui_down", JOY_BUTTON_DPAD_DOWN)
 	add_joy_button("ui_left", JOY_BUTTON_DPAD_LEFT)
 	add_joy_button("ui_right", JOY_BUTTON_DPAD_RIGHT)
+	for index in 4:
+		add_key_action("quick_%d" % index, [KEY_1, KEY_2, KEY_3, KEY_4][index])
+		add_joy_button("quick_%d" % index, [JOY_BUTTON_DPAD_UP, JOY_BUTTON_DPAD_LEFT, JOY_BUTTON_DPAD_RIGHT, JOY_BUTTON_DPAD_DOWN][index])
 
 func add_key_action(action: StringName, keycode: Key) -> void:
 	if not InputMap.has_action(action): InputMap.add_action(action)
@@ -483,7 +486,7 @@ func bank_coop_rewards(xp: int, bolts: int, blueprints: Array, number: int) -> v
 		if not profile.endings.has(ending):
 			profile.endings.append(ending)
 	for id in blueprints:
-		profile.blueprints[id] = true
+		profile.collect_blueprint(id)
 
 func close_coop_mission(message: String) -> void:
 	if not is_instance_valid(coop_mission):
@@ -497,6 +500,7 @@ func close_coop_mission(message: String) -> void:
 	RiftAudio.play_music(false)
 	if RiftRelay.connected_room.is_empty():
 		home_hub.station_requested.emit("Social")
+		menu.show_page("Party")
 		menu.relay_status.text = message
 
 func refresh_menu_save() -> void:
@@ -584,8 +588,6 @@ func open_home_hub() -> void:
 	add_child(home_hub)
 	home_hub.set_bank(profile.credits, profile.core_shards, profile.player_level())
 	home_hub.station_requested.connect(func(page: String):
-		if page == "Sector select" and not RiftRelay.connected_room.is_empty():
-			page = "Co-op Sectors" if RiftRelay.can_deploy() else "Social"
 		home_hub.set_panel_open(true)
 		menu.process_mode = Node.PROCESS_MODE_INHERIT
 		menu.open_station(page)
@@ -876,6 +878,7 @@ func build_level() -> void:
 		add_child(game_root)
 	player = game_root.get_node("Actors/RiftcoreMecha") as RiftPlayer
 	player.experience = 0
+	player.quick_profile = profile
 	player_collision_layer = player.collision_layer
 	deployed_spawn = player.global_position
 	apply_permanent_upgrades()
@@ -1042,6 +1045,7 @@ func build_hud() -> void:
 	factory_hud.boss_tint = Color(Catalog.info(sector).color)
 	hud.add_child(factory_hud)
 	factory_hud.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	factory_hud.show_quick_slots(profile)
 	factory_hud.remaining = remaining_enemies
 	factory_hud.lives = player.lives
 	factory_hud.reserve_lives = profile.reserve_lives
@@ -1296,6 +1300,7 @@ func _process(delta: float) -> void:
 			advance_to_act_two.call_deferred()
 		return
 	sector_complete = true
+	RiftSocial.record_clear(sector, mission_stats.seconds)
 	award_mission_xp(65 + sector * 12)
 	var replay := sector <= run_cleared_through
 	run_cleared_through = maxi(run_cleared_through, sector)
@@ -1303,8 +1308,7 @@ func _process(delta: float) -> void:
 	var recovered := player.salvage.duplicate()
 	var recovered_blueprints: Array[String] = []
 	for id in player.recovered_blueprints:
-		if profile.GEAR.has(id) and not profile.blueprints.has(id):
-			profile.blueprints[id] = true
+		if profile.collect_blueprint(id):
 			recovered_blueprints.append(profile.GEAR[id].name)
 	profile.deposit_materials(recovered)
 	player.salvage.clear()

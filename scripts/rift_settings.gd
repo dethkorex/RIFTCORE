@@ -6,6 +6,7 @@ const ACTIONS := {
 	"crouch": "Crouch", "climb_up": "Climb up", "climb_down": "Climb down",
 	"dash": "Dash", "shoot": "Buster", "melee": "Sword", "swap_weapon": "Next suit", "previous_suit": "Previous suit", "pause": "Pause",
 }
+const QUICK_DEFAULTS := [JOY_BUTTON_DPAD_UP, JOY_BUTTON_DPAD_LEFT, JOY_BUTTON_DPAD_RIGHT, JOY_BUTTON_DPAD_DOWN]
 const AXES := ["move_left", "move_right", "climb_up", "climb_down", "crouch"]
 var path := "user://riftcore_settings.cfg"
 var volumes := {"Master": 1.0, "Music": 0.85, "SFX": 1.0}
@@ -135,6 +136,8 @@ func from_data(data: Dictionary) -> InputEvent:
 	return null
 
 func set_binding(action: String, event: InputEvent, device: String) -> String:
+	if event is InputEventJoypadButton and event.button_index in QUICK_DEFAULTS:
+		return "D-pad directions are reserved for quick items."
 	if not ACTIONS.has(action) or device_of(event) != device:
 		return "Choose a %s input." % ("keyboard" if device == "key" else "controller")
 	if event is InputEventJoypadMotion and not action in AXES:
@@ -167,7 +170,7 @@ func apply_bindings() -> void:
 			if not data is Dictionary:
 				continue
 			var event := from_data(data)
-			if not event:
+			if not event or (event is InputEventJoypadButton and event.button_index in QUICK_DEFAULTS):
 				continue
 			for old in InputMap.action_get_events(action):
 				if device_of(old) == device:

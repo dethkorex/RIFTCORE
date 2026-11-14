@@ -20,7 +20,7 @@ func _draw() -> void:
 		draw_circle(nodes[i], 22.0 if i == selected else 17.0, Color(0.02,0.06,0.14,1))
 		draw_arc(nodes[i], 22.0 if i == selected else 17.0, 0, TAU, 6, color, 3.0)
 		var glyph: String = ["S", "X", "+", "U", "E", "?", "B"][i]
-		draw_string(preload("res://assets/ui/fonts/Barlow-Medium.ttf"), nodes[i] + Vector2(-6,6), glyph, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, color)
+		draw_string(preload("res://assets/ui/fonts/BarlowCondensed-Medium.ttf"), nodes[i] + Vector2(-6,6), glyph, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, color)
 
 func _gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed:

@@ -7,14 +7,14 @@ const UI := preload("res://scripts/rift_ui.gd")
 const AVATAR := preload("res://scenes/actors/riftcore_player.tscn")
 const WINDOW := preload("res://assets/hub/orbital_view.png")
 const STATIONS := [
-	{"x": -18.0, "name": "Social", "page": "Social", "color": Color("b883ff"), "prop": "save_terminal"},
-	{"x": -12.0, "name": "System", "page": "Save Game", "color": Color("9cbbff"), "prop": "settings_terminal"},
+	{"x": -13.5, "name": "NOVA Archive", "page": "Collection", "color": Color("81ffe8"), "prop": "archive_terminal"},
+	{"x": -9.0, "name": "System", "page": "Save Game", "color": Color("9cbbff"), "prop": "settings_terminal"},
 	{"x": -4.5, "name": "Workshop", "page": "Fabrication", "color": Color("ffc465"), "prop": "forge_bay"},
 	{"x": 0.0, "name": "Deploy", "page": "Sector select", "color": Color("52edff"), "prop": "deploy_pad"},
-	{"x": 4.5, "name": "Storage", "page": "Storage", "color": Color("5ffcec"), "prop": "storage_bay"},
-	{"x": 9.0, "name": "Loadout", "page": "Loadout", "color": Color("f871ef"), "prop": "loadout_bay"},
+	{"x": 4.5, "name": "Social", "page": "Social", "color": Color("b883ff"), "prop": "save_terminal"},
+	{"x": 9.0, "name": "Storage", "page": "Storage", "color": Color("5ffcec"), "prop": "storage_bay"},
 	{"x": 13.5, "name": "Challenges", "page": "Challenges", "color": Color("bd8cff"), "prop": "challenge_terminal"},
-	{"x": 18.0, "name": "NOVA Archive", "page": "Collection", "color": Color("81ffe8"), "prop": "archive_terminal"},
+	{"x": -18.0, "name": "Shop", "page": "Shop", "color": Color("ffd076"), "prop": "storage_bay"},
 ]
 
 var avatar: RiftPlayer
@@ -282,6 +282,9 @@ func build_pad(station: Dictionary) -> void:
 	var terminal := place_asset(station.prop, Vector3(station.x, 0, 0 if deployment else -1.84))
 	if station.name == "System":
 		terminal.set("caption", "SYSTEM / SAVE")
+	elif station.name == "Shop":
+		terminal.set("caption", "SHOP / SUPPLIES")
+		terminal.set("accent", station.color)
 	elif station.name == "Social":
 		terminal.set("caption", "SOCIAL")
 		terminal.set("icon", "icon_person")

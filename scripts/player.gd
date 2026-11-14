@@ -280,6 +280,24 @@ func build_visuals() -> void:
 var coop_xp_pickup: Callable
 var remote_input := false
 var local_prediction := false
+var supplies := {}
+var quick_profile
+
+func apply_supply(item: Dictionary) -> void:
+	var healing := int(item.get("hp", 0))
+	if healing > 0:
+		health = minf(max_health, health + healing)
+		health_changed.emit(health, max_health)
+	if item.get("energy", 0) > 0:
+		restore_energy(item.energy)
+	if item.has("stat"):
+		supplies[item.stat] = Vector2(item.gain, item.duration)
+	RiftAudio.play_effect(&"pickup")
+
+func supply_bonus(stat: String) -> float:
+	var active: Vector2 = supplies.get(stat, Vector2.ZERO)
+	return active.x if active.y > 0.0 else 0.0
+
 var remote_axis := Vector2.ZERO
 var remote_held: Dictionary = {}
 var remote_pressed: Dictionary = {}
@@ -300,6 +318,17 @@ func action_released(action: StringName) -> bool:
 	return remote_released.has(action) if remote_input else Input.is_action_just_released(action)
 
 func _physics_process(delta: float) -> void:
+	if not local_prediction and quick_profile != null and health > 0.0:
+		for index in 4:
+			if action_pressed(StringName("quick_%d" % index)):
+				quick_profile.consume_quick(index, self)
+	for stat in supplies.keys():
+		var effect: Vector2 = supplies[stat]
+		effect.y -= delta
+		if effect.y <= 0.0:
+			supplies.erase(stat)
+		else:
+			supplies[stat] = effect
 	simulate_movement(delta)
 	remote_pressed.clear()
 	remote_released.clear()
@@ -375,7 +404,7 @@ func simulate_movement(delta: float) -> void:
 		elif not is_on_floor() and absf(axis) < 0.08:
 			accel = air_braking
 		if contact_recoil <= 0.0 and wall_launch_lock <= 0.0:
-			velocity.x = move_toward(velocity.x, 0.0 if crouching else locomotion_speed(axis, move_speed), accel * delta)
+			velocity.x = move_toward(velocity.x, 0.0 if crouching else locomotion_speed(axis, move_speed * (1.0 + supply_bonus("speed"))), accel * delta)
 		if not is_on_floor():
 			var gravity_scale := fall_gravity_multiplier if velocity.y < 0.0 else 1.0
 			velocity.y = maxf(-max_fall_speed * clampf(terrain.y * 1.4, 0.36, 1.0), velocity.y - gravity * gravity_scale * terrain.y * delta)
@@ -571,10 +600,11 @@ func update_ladder(delta: float, axis: float) -> bool:
 	if not is_instance_valid(ladder):
 		var dash_grab := dash_left > 0.0
 		var wall_intent := wall_grace > 0.0 and (axis * wall_side > 0.14 or action_pressed("jump"))
-		var diagonal_air_input := not is_on_floor() and absf(axis) >= 0.50
-		if not dash_grab and (wall_intent or diagonal_air_input or wall_launch_lock > 0.0):
+		var aerial := not is_on_floor()
+		if not dash_grab and (action_pressed("jump") or wall_launch_lock > 0.0 or (wall_intent and absf(vertical) < 0.70)):
 			return false
-		if absf(vertical) < 0.35 or ladder_lock > 0.0 or contact_recoil > 0.0:
+		var climb_threshold := 0.30 if dash_grab or aerial else 0.35
+		if absf(vertical) < climb_threshold or ladder_lock > 0.0 or contact_recoil > 0.0:
 			return false
 		for candidate in get_tree().get_nodes_in_group(&"factory_ladder"):
 			if not candidate.is_visible_in_tree():
@@ -588,9 +618,9 @@ func update_ladder(delta: float, axis: float) -> bool:
 				var near_top := absf(offset.y - rise - standing_capsule.height * 0.5) < 0.16
 				if not near_top or not action_pressed("climb_down") or absf(axis) > 0.35:
 					continue
-			var reach := float(candidate.get_meta("hatch_landing_distance")) + 0.13 if hatch_descent else 0.63
-			var next_offset_x := offset.x + velocity.x * delta
-			var crosses_ladder := dash_grab and minf(offset.x, next_offset_x) < reach and maxf(offset.x, next_offset_x) > -reach
+			var reach := float(candidate.get_meta("hatch_landing_distance")) + 0.13 if hatch_descent else (0.90 if aerial or dash_grab else 0.63)
+			var next_offset_x := offset.x + velocity.x * minf(delta + 0.04, 0.075)
+			var crosses_ladder := not hatch_descent and (dash_grab or aerial) and minf(offset.x, next_offset_x) < reach and maxf(offset.x, next_offset_x) > -reach
 			if (absf(offset.x) < reach or crosses_ladder) and offset.y > minimum and offset.y < rise + (1.05 if hatch_descent else (0.93 if vertical < 0.0 else 0.82)):
 				ladder = candidate
 				ladder_exit = false
@@ -800,7 +830,7 @@ func level_damage_scale() -> float:
 	return 1.0 + (level_for_experience(experience) - 1) * damage_gain_per_level
 
 func buster_power() -> float:
-	return base_buster_damage * level_damage_scale() * buster_damage_multiplier
+	return base_buster_damage * level_damage_scale() * buster_damage_multiplier * (1.0 + supply_bonus("attack"))
 
 func charged_shot_cost() -> float:
 	var base := 36.0 if magma_active else (30.0 if thorn_active or not special_weapon.is_empty() else charge_energy_cost)
@@ -1152,7 +1182,7 @@ static func defense_for_experience(total: int) -> float:
 	return minf(0.25, (level_for_experience(total) - 1) * 0.02)
 
 func mitigate_damage(amount: float) -> float:
-	return amount * damage_taken_scale * (1.0 - defense_for_experience(experience)) * (1.0 - armor_resistance)
+	return amount * damage_taken_scale * (1.0 - defense_for_experience(experience)) * (1.0 - armor_resistance) * (1.0 - supply_bonus("defense"))
 
 func take_damage(amount: float, source_position := Vector3.ZERO) -> void:
 	var before := health

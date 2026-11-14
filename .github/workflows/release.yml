@@ -195,7 +195,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.ref_name }}
-        run: gh release create --repo "${{ github.repository }}" "$RELEASE_TAG" release-tools/artifacts/* --verify-tag --notes-file release-tools/artifacts/PATCH_NOTES.md --title "RIFTCORE ${RELEASE_TAG#v} and Installer 0.2" --prerelease --latest=false
+        run: |
+          title="RIFTCORE ${RELEASE_TAG#v} and Installer 0.2"
+          if [ "$RELEASE_TAG" = "v6.0.0-preview" ]; then title="RIFTCORE Alpha 6.0 and Installer 0.2"; fi
+          gh release create --repo "${{ github.repository }}" "$RELEASE_TAG" release-tools/artifacts/* --verify-tag --notes-file release-tools/artifacts/PATCH_NOTES.md --title "$title" --prerelease --latest=false
       - name: Publish tagged release
         if: github.ref_type == 'tag' && !endsWith(github.ref_name, '-preview')
         env:

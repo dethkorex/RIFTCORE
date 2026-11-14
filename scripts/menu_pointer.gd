@@ -5,10 +5,13 @@ var pointer := Control.new()
 var pointer_position := Vector2.ZERO
 var mouse_inside := true
 var using_pointer := false
+var using_controller := false
+var owns_mouse_mode := false
 var over_text := false
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	add_to_group(&"menu_pointer")
 	var overlay := CanvasLayer.new()
 	overlay.layer = 200
 	add_child(overlay)
@@ -25,18 +28,30 @@ func _ready() -> void:
 func _input(event: InputEvent) -> void:
 	if not menu_open.is_valid() or not menu_open.call():
 		return
-	if event is InputEventMouse:
+	if (event is InputEventJoypadButton and event.pressed) or event is InputEventJoypadMotion:
+		observe_controller(event)
+	elif event is InputEventMouseButton or (event is InputEventMouseMotion and (not using_controller or not event.relative.is_zero_approx())):
+		using_controller = false
 		mouse_inside = true
 		pointer_position = event.position
 		using_pointer = true
 		refresh_pointer()
 
+func observe_controller(event: InputEvent) -> void:
+	if not menu_open.is_valid() or not menu_open.call():
+		return
+	if event is InputEventJoypadMotion and absf(event.axis_value) <= 0.28:
+		return
+	using_pointer = false
+	using_controller = true
+	refresh_pointer()
+
 func _process(_delta: float) -> void:
 	refresh_pointer()
 
 func refresh_pointer() -> void:
-	var should_draw: bool = (menu_open.is_valid() and menu_open.call() and using_pointer
-		and mouse_inside and get_viewport().get_visible_rect().has_point(pointer_position))
+	var opened: bool = menu_open.is_valid() and menu_open.call()
+	var should_draw := opened and using_pointer and mouse_inside and get_viewport().get_visible_rect().has_point(pointer_position)
 	pointer.position = pointer_position
 	if should_draw:
 		var hovered := get_viewport().gui_get_hovered_control()
@@ -44,11 +59,14 @@ func refresh_pointer() -> void:
 		if text_cursor != over_text:
 			over_text = text_cursor
 			pointer.queue_redraw()
-		pointer.show()
+	pointer.visible = should_draw
+	var should_hide := should_draw or (opened and using_controller and mouse_inside and get_window().has_focus())
+	if should_hide:
+		owns_mouse_mode = true
 		if Input.mouse_mode != Input.MOUSE_MODE_HIDDEN:
 			Input.mouse_mode = Input.MOUSE_MODE_HIDDEN
-	elif pointer.visible:
-		pointer.hide()
+	elif owns_mouse_mode:
+		owns_mouse_mode = false
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 
 func stop_pointer() -> void:
@@ -56,7 +74,7 @@ func stop_pointer() -> void:
 	refresh_pointer()
 
 func _exit_tree() -> void:
-	if pointer.visible:
+	if owns_mouse_mode:
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 
 func draw_pointer() -> void:

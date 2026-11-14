@@ -13,7 +13,7 @@ const Client := preload("res://addons/GD-Sync/MultiplayerClient.gd")
 const RelayEnums := preload("res://addons/GD-Sync/Scripts/Enums/Enums.gd")
 const Codes := "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 const CodeLength := 10
-const ROOM_PREFIX := "riftcore-coop-v3-"
+const ROOM_PREFIX := "riftcore-coop-v4-"
 const RELAY_UNAVAILABLE := "Online rooms are unavailable. Solo play is available."
 
 var status := "Create a room or enter a friend’s room code."
@@ -150,6 +150,7 @@ func _room_joined(lobby_name: String) -> void:
 	relay.expose_func(_receive_deploy, RelayEnums.EXPOSE_PERMISSION.HOST)
 	relay.expose_func(_receive_return, RelayEnums.EXPOSE_PERMISSION.HOST)
 	relay.expose_func(_receive_partner_position)
+	relay.expose_func(_receive_sector_records)
 	var joined_as_guest := pending == "join"
 	connected_room = room_code
 	pending = ""
@@ -183,6 +184,22 @@ func _players_changed(_client_id: int) -> void:
 		return
 	room_size = relay.lobby_get_player_count()
 	_update("%d / 2 players connected" % room_size)
+	if room_size == 2 and not mission_active:
+		share_sector_records.call_deferred()
+
+func share_sector_records() -> void:
+	if room_size == 2 and is_instance_valid(relay):
+		relay.call_func(_receive_sector_records, RiftSocial.get_records(), local_name)
+
+func _receive_sector_records(payload: Dictionary, alias: String) -> void:
+	var sender: int = relay.get_sender_id()
+	if room_size == 2 and sender != relay.get_client_id() and relay.lobby_get_all_clients().has(sender):
+		if connected_room.is_empty():
+			return
+		var new_player: bool = not RiftSocial.recent_players.has(String(payload.get("id", "")))
+		RiftSocial.receive_records(payload, Profile.clean_operator_name(alias))
+		if new_player and RiftSocial.recent_players.has(String(payload.get("id", ""))):
+			share_sector_records.call_deferred()
 
 func can_deploy() -> bool:
 	return not mission_active and room_size == 2 and is_instance_valid(relay) and relay.is_host()
