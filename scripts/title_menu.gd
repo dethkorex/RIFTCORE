@@ -14,6 +14,12 @@ var developer_session := false
 var replace_slot := 0
 var slot_error := ""
 var save_status: Label
+var relay_status: Label
+var relay_code: LineEdit
+var relay_host: Button
+var relay_join: Button
+var relay_copy: Button
+var relay_leave: Button
 
 var can_load := false
 var saved_sector := 1
@@ -31,9 +37,12 @@ var shop_item := ""
 var station_panel := false
 var deploy_error := ""
 
+const CoopSetup := preload("res://scripts/coop_setup.gd")
+const Story := preload("res://scripts/rift_story.gd")
 const UI := preload("res://scripts/rift_ui.gd")
 const PORTRAIT := preload("res://assets/ui/rx07_menu.png")
 const Catalog := preload("res://scripts/sector_catalog.gd")
+const Materials := preload("res://scripts/fabrication_catalog.gd")
 const Profile := preload("res://scripts/rogue_profile.gd")
 const ManualSave := preload("res://scripts/manual_save_session.gd")
 const EquipmentBody := preload("res://scripts/equipment_body.gd")
@@ -45,6 +54,7 @@ var page := "Title"
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	theme = UI.theme()
+	RiftRelay.changed.connect(refresh_online_room)
 	show_page("Title")
 
 func show_page(next: String) -> void:
@@ -115,14 +125,19 @@ func show_page(next: String) -> void:
 			build_loadout(columns)
 		"Upgrades":
 			build_workshop(columns)
-		"Item shop", "Storage":
-			build_equipment_station(columns, next == "Item shop")
-		"Purchase Item":
+		"Fabrication", "Storage":
+			build_equipment_station(columns, next == "Fabrication")
+		"Craft Item":
 			build_purchase(columns)
 		"Collection":
-			build_info(columns, "Field guide", "Neon Factory security includes scouts, quad walkers, heavy units, turrets, and flying drones.\n\nGreen + orbs restore health, blue lightning orbs restore energy, purple XP orbs grant experience, and gold orbs add currency for upgrades. Shoot cargo carriers to release their crates.")
+			build_archive(columns)
 		"Challenges":
 			build_challenges(columns)
+		"Online Room":
+			build_online_room(columns)
+		"Co-op Setup Guide":
+			CoopSetup.build(card(columns, 1.75), leave_page)
+			portrait(card(columns))
 		"Settings":
 			var form := card(columns, 2.0)
 			UI.label(form, "Audio and display", 28, UI.CYAN)
@@ -130,12 +145,12 @@ func show_page(next: String) -> void:
 			UI.label(form, "Default keyboard  /  A–D move · S crouch · W/S ladder · Space jump · J fire · K slash · Shift dash\nDefault controller  /  Left stick move · Down crouch · Up/Down ladder · A jump · X fire · Y slash · B dash · Start pause\nHold fire to charge, then release. Charged shots use 30 energy.", 16, UI.MUTED)
 			var art := card(columns)
 			portrait(art)
-	if page != "Title":
+	if page not in ["Title", "Co-op Setup Guide"]:
 		var back_title := "Back to Title"
 		if station_panel:
 			back_title = "Back to Deployment" if page in ["Level select", "New run"] else "Back to Station"
-			if page == "Purchase Item":
-				back_title = "Back to Item Shop"
+			if page == "Craft Item":
+				back_title = "Back to Fabrication"
 		var back := UI.button(layout, back_title, leave_page)
 		back.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 		if get_viewport().gui_get_focus_owner() == null:
@@ -150,9 +165,14 @@ func open_station(next: String) -> void:
 	show_page(next)
 
 func leave_page() -> void:
+	if page == "Co-op Setup Guide":
+		show_page("Online Room")
+		return
+	if page == "Online Room":
+		RiftRelay.leave()
 	if station_panel:
-		if page == "Purchase Item":
-			show_page("Item shop")
+		if page == "Craft Item":
+			show_page("Fabrication")
 			return
 		if page in ["Level select", "New run"]:
 			show_page("Sector select")
@@ -222,6 +242,7 @@ func build_start_screen() -> void:
 		buttons.append(UI.button(stack, label, func(): hub_requested.emit(), true))
 	buttons.append(UI.button(stack, "New Game", open_slot_picker.bind("New Game"), buttons.is_empty()))
 	buttons.append(UI.button(stack, "Load Game", open_slot_picker.bind("Load Game")))
+	buttons.append(UI.button(stack, "Online Room", show_page.bind("Online Room")))
 	buttons.append(UI.button(stack, "Settings", show_page.bind("Settings")))
 	buttons.append(UI.button(stack, "Quit Game", get_tree().quit))
 	for i in range(buttons.size()):
@@ -233,6 +254,72 @@ func build_start_screen() -> void:
 		button.focus_neighbor_bottom = button.get_path_to(buttons[(i + 1) % buttons.size()])
 	UI.label(stack, "RX-07    //    SYSTEM READY", 13, UI.MUTED)
 	buttons[0].grab_focus()
+
+func build_archive(columns: HBoxContainer) -> void:
+	var archive := card(columns, 1.65)
+	UI.label(archive, "NOVA Archive", 32, UI.CYAN)
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	archive.add_child(scroll)
+	var records := UI.column(scroll, 14)
+	records.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	UI.label(records, Story.INTRO, 18)
+	UI.label(records, "MEMORY FRAGMENTS   /   %d OF %d" % [profile.memories.size() if profile else 0, Story.MEMORIES.size()], 19, UI.CYAN)
+	if profile:
+		for index in range(1, Story.MEMORIES.size() + 1):
+			if profile.memories.has(index):
+				UI.label(records, Story.MEMORIES[index - 1], 17)
+		for ending in profile.endings:
+			UI.label(records, Story.ending(ending == "secret"), 17, UI.MUTED)
+	var guide := card(columns)
+	UI.label(guide, "Field Guide", 28, UI.CYAN)
+	UI.label(guide, "Green restores health. Blue restores energy. Purple orbs award XP. Gold adds bolts.", 17)
+	UI.label(guide, "Pink salvage drops carry materials for Fabrication. Extract to bank them.", 17, UI.MUTED)
+	UI.label(guide, "Shoot cargo carriers to release their crates.", 17, UI.MUTED)
+
+func build_online_room(columns: HBoxContainer) -> void:
+	var form := card(columns, 1.35)
+	UI.label(form, "Online Room Preview", 34, UI.CYAN)
+	UI.label(form, "Share a room code to connect with a friend. Co-op deployment is still in development.", 18, UI.MUTED)
+	relay_host = UI.button(form, "Create Room", RiftRelay.host_room, true)
+	var join_row := HBoxContainer.new()
+	join_row.add_theme_constant_override("separation", 12)
+	form.add_child(join_row)
+	relay_code = LineEdit.new()
+	relay_code.placeholder_text = "Friend’s room code"
+	relay_code.max_length = 14
+	relay_code.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	relay_code.text_submitted.connect(RiftRelay.join_room)
+	join_row.add_child(relay_code)
+	relay_join = UI.button(join_row, "Join Room", func(): RiftRelay.join_room(relay_code.text))
+	relay_status = UI.label(form, "", 18, UI.CYAN)
+	relay_copy = UI.button(form, "Copy Room Code", func(): DisplayServer.clipboard_set(RiftRelay.connected_room))
+	relay_leave = UI.button(form, "Leave Room", func(): RiftRelay.leave())
+	UI.button(form, "Co-op Setup Guide", show_page.bind("Co-op Setup Guide"))
+	portrait(card(columns))
+	refresh_online_room()
+	relay_host.grab_focus()
+
+func refresh_online_room() -> void:
+	if page != "Online Room" or not is_instance_valid(relay_status):
+		return
+	var joined := not RiftRelay.connected_room.is_empty()
+	var requesting := not RiftRelay.pending.is_empty()
+	relay_host.disabled = joined or requesting
+	relay_join.disabled = joined or requesting
+	relay_code.editable = not joined and not requesting
+	relay_copy.visible = joined
+	relay_leave.visible = joined or requesting
+	relay_leave.text = "Leave Room" if joined else "Cancel Connection"
+	relay_status.text = "%s   /   Code %s" % [RiftRelay.status, RiftRelay.connected_room] if joined else RiftRelay.status
+	if joined:
+		relay_copy.grab_focus()
+	elif requesting or get_viewport().gui_get_focus_owner() == relay_leave:
+		if requesting:
+			relay_leave.grab_focus()
+		else:
+			relay_host.grab_focus()
 
 func open_slot_picker(mode: String) -> void:
 	slot_error = ""
@@ -286,8 +373,8 @@ func build_workshop(columns: HBoxContainer) -> void:
 	fitting.add_child(body)
 	body.install(profile, inventory_slot, select_inventory_slot, true)
 	var store := card(columns, 1.08)
-	UI.label(store, "Permanent Upgrades", 32, UI.CYAN)
-	UI.label(store, "BANK  /  %04d BOLTS" % (profile.credits if profile else 0), 17, Color("ffd079"))
+	UI.label(store, "Core Enhancement", 32, UI.CYAN)
+	UI.label(store, "%d CORE SHARDS   /   PLAYER LV. %d" % [profile.core_shards, profile.player_level()], 17, Color("ffd079"))
 	if profile:
 		for upgrade in profile.UPGRADES:
 			if Profile.UPGRADE_SLOTS[upgrade.id] != inventory_slot:
@@ -295,9 +382,9 @@ func build_workshop(columns: HBoxContainer) -> void:
 			var installed: int = profile.rank(upgrade.id)
 			var maxed := installed == 2
 			var price: int = 0 if maxed else upgrade.prices[installed]
-			var enabled: bool = not maxed and profile.credits >= price
+			var enabled: bool = not maxed and profile.core_shards >= price and profile.player_level() >= profile.enhancement_level(upgrade.id, installed)
 			var next := "I" if installed == 0 else "II"
-			var text := "%s %s   ·   %s" % [upgrade.name, next, "Installed" if maxed else "%d bolts" % price]
+			var text := "%s %s   ·   %s" % [upgrade.name, next, "Installed" if maxed else "%d shards  /  Lv. %d" % [price, profile.enhancement_level(upgrade.id, installed)]]
 			UI.label(store, String(upgrade.effects[mini(installed, 1)]), 15, UI.MUTED)
 			var purchase := UI.button(store, text, purchase_upgrade.bind(upgrade.id) if enabled else Callable(), enabled)
 			purchase.icon = EquipmentIcons.icon(inventory_slot, inventory_slot)
@@ -364,6 +451,7 @@ func build_sector(columns: HBoxContainer) -> void:
 	var sector_title: String = Catalog.info(saved_sector if can_load else 1).title
 	UI.label(route, "%s  /  Act %s" % [sector_title, "II" if can_load and saved_act == 2 else "I"], 23, UI.WHITE)
 	route.add_child(HSeparator.new())
+	UI.label(route, "NOVA  /  " + Story.briefing(saved_sector if can_load else 1), 18, UI.MUTED)
 	if can_load:
 		UI.label(route, "RX-07  /  Level %d" % saved_level, 17, UI.MUTED)
 		UI.button(route, "Continue run  ›" if at_sector_start else "Resume checkpoint  ›", func(): load_requested.emit(), true).grab_focus()
@@ -485,11 +573,11 @@ func build_equipment_station(columns: HBoxContainer, shopping: bool) -> void:
 		slots.add_child(body)
 		body.install(profile, inventory_slot, select_inventory_slot)
 		UI.label(slots, "Equipped gear is lost when a run ends in death.", 16, UI.MUTED)
-		UI.label(list, "Item Shop  /  " + String(Profile.GEAR_SLOTS[inventory_slot]), 33, UI.CYAN)
-		UI.label(list, "%04d BOLTS" % profile.credits, 18, Color("ffd079"))
-		UI.label(list, "Purchases go to Storage.", 17, UI.MUTED)
+		UI.label(list, "Fabrication  /  " + String(Profile.GEAR_SLOTS[inventory_slot]), 33, UI.CYAN)
+		UI.label(list, "PLAYER LV. %d" % profile.player_level(), 18, Color("ffd079"))
+		UI.label(list, "Review a blueprint to check its materials.", 17, UI.MUTED)
 	else:
-		UI.label(list, "Storage", 33, UI.CYAN)
+		UI.label(list, "Storage   %d / %d" % [profile.stored_count(), profile.storage_capacity()], 33, UI.CYAN)
 		UI.label(list, "Stowed gear survives defeat. Equipping an item stows the previous one automatically.", 17, UI.MUTED)
 		portrait(card(columns, 0.82))
 	var entries := scroll_entries(list)
@@ -503,17 +591,17 @@ func build_equipment_station(columns: HBoxContainer, shopping: bool) -> void:
 		var row := item_card(entries, id)
 		if shopping:
 			var header := row.get_child(0) as HBoxContainer
-			var action := UI.button(header, "%d bolts  ›" % item.price if state.is_empty() else "Owned", inspect_shop_item.bind(id) if state.is_empty() else Callable())
+			var action := UI.button(header, ("Blueprint  ›" if profile.player_level() >= Profile.recipe_level(id) else "Locked  /  Lv. %d" % Profile.recipe_level(id)) if state.is_empty() else "Owned", inspect_shop_item.bind(id) if state.is_empty() else Callable())
 			action.custom_minimum_size.y = 34
 			action.add_theme_font_size_override("font_size", 15)
-			action.tooltip_text = "Review purchase" if state.is_empty() else "Available in Storage"
+			action.tooltip_text = "Inspect blueprint" if state.is_empty() else "Available in Storage"
 			if id == shop_item and not action.disabled:
 				action.grab_focus()
 		else:
 			var action := "Stow" if state == "equipped" else "Equip"
 			UI.button(row, action, move_stored_gear.bind(id))
 	if shown == 0:
-		UI.label(entries, "No items in storage. Visit the Item Shop.", 17, UI.MUTED)
+		UI.label(entries, "No items in storage. Visit the Fabrication.", 17, UI.MUTED)
 	if not inventory_status.is_empty():
 		UI.label(list, inventory_status, 17, UI.VIOLET)
 
@@ -565,26 +653,28 @@ func move_stored_gear(id: String) -> void:
 
 func inspect_shop_item(id: String) -> void:
 	shop_item = id
-	show_page("Purchase Item")
+	show_page("Craft Item")
 
 func build_purchase(columns: HBoxContainer) -> void:
 	var form := card(columns, 1.12)
-	var item: Dictionary = Profile.GEAR[shop_item]
-	UI.label(form, "Review Purchase", 32, UI.CYAN)
+	UI.label(form, "Review Blueprint", 32, UI.CYAN)
 	item_card(form, shop_item)
-	UI.label(form, "Bank   %d bolts     /     Cost   %d bolts" % [profile.credits, item.price], 18, Color("ffd079"))
-	var enough: bool = profile.credits >= item.price
-	if enough:
-		UI.label(form, "%d bolts after purchase. The item goes to Storage." % (profile.credits - item.price), 17, UI.MUTED)
-	else:
-		UI.label(form, "You need %d more bolts." % (item.price - profile.credits), 17, UI.VIOLET)
-	UI.button(form, "Buy for %d bolts" % item.price, confirm_gear_purchase if enough else Callable(), enough)
-	UI.button(form, "Cancel Purchase", show_page.bind("Item shop")).grab_focus()
+	UI.label(form, "PLAYER LEVEL  %d / %d" % [profile.player_level(), Profile.recipe_level(shop_item)], 17, UI.CYAN)
+	var bill: Dictionary = profile.recipe_materials(shop_item)
+	for material in bill:
+		var available := int(profile.materials.get(material, 0))
+		UI.label(form, "%s  %d / %d" % [Materials.label(material), available, bill[material]], 17,
+			UI.WHITE if available >= int(bill[material]) else UI.VIOLET)
+	var restriction: String = profile.craft_limit(shop_item)
+	if not restriction.is_empty():
+		UI.label(form, restriction, 17, UI.VIOLET)
+	UI.button(form, "Fabricate", confirm_gear_purchase if restriction.is_empty() else Callable(), true)
+	UI.button(form, "Cancel", show_page.bind("Fabrication")).grab_focus()
 	portrait(card(columns))
 
 func confirm_gear_purchase() -> void:
-	inventory_status = profile.buy_gear(shop_item)
-	show_page("Item shop")
+	inventory_status = profile.craft(shop_item)
+	show_page("Fabrication")
 
 func build_loadout(columns: HBoxContainer) -> void:
 	var equipped := card(columns, 1.10)

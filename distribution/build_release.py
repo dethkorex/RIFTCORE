@@ -73,6 +73,7 @@ def windows_installer(payload: Path, out: Path, nsis: Path) -> None:
         raise RuntimeError("Windows installer compiler not found")
     switch = "/D" if sys.platform == "win32" else "-D"
     subprocess.run([str(nsis), switch + "PAYLOAD=" + str(payload), switch + "OUTPUT=" + str(out),
+                    switch + "BRAND_ICO=" + str(payload / "riftcore.ico"),
                     str(DIST / "windows-installer.nsi")], check=True, timeout=240)
     if not out.is_file():
         raise RuntimeError("NSIS did not produce an installer")
@@ -99,15 +100,26 @@ def main() -> None:
     work.mkdir(parents=True, exist_ok=True)
     out.mkdir(parents=True, exist_ok=True)
     launcher = DIST / "launcher"
+    icon = launcher / "branding" / "riftcore-icon.svg"
+    icon_cache = work / "riftcore.ico"
+    godot(engine, launcher, work / "branding.log", "--script", str(DIST / "make_brand_icon.gd"), "--", str(icon), str(icon_cache))
     godot(engine, ROOT, work / "game-import.log", "--editor", "--import")
     godot(engine, launcher, work / "launcher-import.log", "--editor", "--import")
-    manifest = {"tag": a.tag, "assets": {}}
+    notes = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8-sig").strip()
+    if len(notes.encode("utf-8")) > 14000:
+        raise ValueError("Release notes exceed the launcher manifest budget")
+    manifest = {"tag": a.tag, "assets": {}, "notes": notes}
+    (out / "PATCH_NOTES.md").write_text(notes + "\n", encoding="utf-8")
     with local_templates(ROOT / "export_presets.cfg", templates), local_templates(launcher / "export_presets.cfg", templates):
         for platform, (preset, binary, _) in ENGINE_ASSETS.items():
             payload = work / platform / "install"
             version = payload / "versions" / a.tag
             export(engine, ROOT, preset, version / binary, work / f"{platform}-game.log")
             export(engine, launcher, preset, payload / binary, work / f"{platform}-launcher.log")
+            if platform == "windows-x64":
+                shutil.copy2(icon_cache, payload / "riftcore.ico")
+            else:
+                shutil.copy2(icon, payload / "riftcore-icon.svg")
             if platform == "linux-x64":
                 (version / binary).chmod(0o755)
                 (payload / binary).chmod(0o755)

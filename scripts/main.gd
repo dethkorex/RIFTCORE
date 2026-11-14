@@ -1,5 +1,9 @@
 extends Node
 
+const CoopSetup := preload("res://scripts/coop_setup.gd")
+const Materials := preload("res://scripts/fabrication_catalog.gd")
+const Story := preload("res://scripts/rift_story.gd")
+const Drop := preload("res://scripts/material_pickup.gd")
 const UI := preload("res://scripts/rift_ui.gd")
 const FactoryHUD := preload("res://scripts/factory_hud.gd")
 const Catalog := preload("res://scripts/sector_catalog.gd")
@@ -391,11 +395,12 @@ func load_game(show_deployment := true) -> void:
 	var at_start := bool(save.get_value("checkpoint", "at_start", false))
 	if not at_start:
 		load_checkpoint_location(save)
-	player.gain_experience(clampi(int(save.get_value("checkpoint", "experience", 0)), 0, 1000000))
+	player.gain_experience(clampi(int(save.get_value("checkpoint", "experience", 0)), 0, 1000000), false)
 	player.health = player.max_health
 	player.restore_energy(player.max_energy)
 	player.health_changed.emit(player.health, player.max_health)
 	player.credits = maxi(int(save.get_value("checkpoint", "credits", 0)), 0)
+	player.salvage = save.get_value("checkpoint", "salvage", {})
 	player.credits_changed.emit(player.credits)
 	player.lives = saved_lives
 	player.lives_changed.emit(player.lives)
@@ -446,6 +451,7 @@ func build_pause_menu() -> void:
 		UI.button(stack, "Save Game", show_pause_save)
 	UI.button(stack, "Restart run", restart_run)
 	UI.button(stack, "Settings", show_pause_settings)
+	UI.button(stack, "Co-op Setup Guide", show_pause_coop_setup)
 	UI.button(stack, "Return to title", show_exit_confirmation)
 
 func show_pause_save() -> void:
@@ -482,6 +488,12 @@ func overlay() -> VBoxContainer:
 	panel.custom_minimum_size.x = 460
 	center.add_child(panel)
 	return UI.column(panel, 12)
+
+func show_pause_coop_setup() -> void:
+	var stack := overlay()
+	stack.get_parent().custom_minimum_size.x = 650
+	pause_menu.back_action = build_pause_menu
+	CoopSetup.build(stack, build_pause_menu)
 
 func show_pause_settings() -> void:
 	var stack := overlay()
@@ -627,6 +639,9 @@ func bind_boss_signals() -> void:
 	)
 	boss.died.connect(func():
 		boss_defeated = true
+		profile.award_player_xp((35 if act == 1 else 80) + sector * 8)
+		profile.core_shards += 1 + sector + (3 if act == 2 else 0)
+		Drop.roll_at(game_root.get_node("Actors"), boss.global_position + Vector3.UP * 0.25, sector, "boss" if act == 2 else "miniboss")
 		open_factory_gate()
 		var info := Catalog.info(sector)
 		for minion in get_tree().get_nodes_in_group(&"arena_minions"):
@@ -634,6 +649,8 @@ func bind_boss_signals() -> void:
 		var message := "MINIBOSS DOWN  /  ACT 2 OPEN"
 		var reveal := false
 		if act == 2:
+			if sector <= Story.MEMORIES.size() and not profile.memories.has(sector):
+				profile.memories.append(sector)
 			var reward: String = info.reward
 			var first_unlock := not run_weapons.has(reward)
 			reveal = first_unlock
@@ -707,6 +724,13 @@ func build_hud() -> void:
 		factory_hud.queue_redraw()
 	)
 	player.experience_changed.connect(factory_hud.set_experience)
+	player.salvage_collected.connect(func(drop: Dictionary):
+		var recovered: Array[String] = []
+		for id in drop:
+			recovered.append("%s +%d" % [Materials.label(id), drop[id]])
+		factory_hud.announce("SALVAGE  /  " + "  ·  ".join(recovered), Color("ff8ada"))
+	)
+	player.experience_earned.connect(func(amount: int): profile.award_player_xp(maxi(1, amount / 3)))
 	player.weapon_changed.connect(func(weapon: String):
 		var id := player.equipped_suit()
 		var data := Catalog.weapon(id)
@@ -747,6 +771,7 @@ func save_checkpoint(manual_combat_snapshot := false) -> void:
 	save.set_value("checkpoint", "station", checkpoint_station)
 	save.set_value("checkpoint", "experience", int(player.experience))
 	save.set_value("checkpoint", "credits", player.credits)
+	save.set_value("checkpoint", "salvage", player.salvage)
 	save.set_value("checkpoint", "lives", player.lives)
 	save.set_value("checkpoint", "sector_deaths", sector_deaths)
 	save.set_value("checkpoint", "life_taken", life_taken)
@@ -824,6 +849,7 @@ func _on_pit_fall() -> void:
 
 func expire_run_on_death() -> void:
 	bank_run_credits()
+	profile.unlocked_sector = 1
 	clear_checkpoint()
 	if save_session:
 		var error := save_session.invalidate_defeated_run()
@@ -918,9 +944,14 @@ func _process(_delta: float) -> void:
 			advance_to_act_two.call_deferred()
 		return
 	sector_complete = true
+	profile.award_player_xp(65 + sector * 12)
 	var replay := sector <= run_cleared_through
 	run_cleared_through = maxi(run_cleared_through, sector)
 	var bonus := 160 + 25 * (sector - 1)
+	var recovered_types := player.salvage.size()
+	profile.deposit_materials(player.salvage)
+	player.salvage.clear()
+	profile.core_shards += 4 + sector
 	bank_run_credits(bonus)
 	var final_sector := sector >= Catalog.SECTORS.size()
 	var tiers: Array[int] = [1]
@@ -947,8 +978,18 @@ func _process(_delta: float) -> void:
 	var stack := overlay()
 	UI.label(stack, "CAMPAIGN COMPLETE" if final_sector else "SECTOR COMPLETE", 36, UI.CYAN)
 	UI.label(stack, Catalog.info(sector).title, 20)
+	if final_sector:
+		var recovered_all := profile.memories.size() == Story.MEMORIES.size()
+		var ending_id := "secret" if recovered_all else "standard"
+		if not profile.endings.has(ending_id):
+			profile.endings.append(ending_id)
+			profile.save()
+		UI.label(stack, Story.ending(recovered_all), 17, UI.MUTED)
+	elif profile.memories.has(sector):
+		UI.label(stack, "Memory fragment recovered  /  %d of %d" % [profile.memories.size(), Story.MEMORIES.size()], 16, UI.MUTED)
 	UI.label(stack, "Bolts earned  %d + %d clear bonus" % [player.credits, bonus], 17, Color("ffcd61"))
-	UI.label(stack, "XP collected  %d" % player.experience, 17, Color("ab72ff"))
+	UI.label(stack, "Operator XP  %d   /   Player Lv. %d" % [player.experience, profile.player_level()], 17, Color("ab72ff"))
+	UI.label(stack, "%d material types recovered   /   %d Core Shards banked" % [recovered_types, profile.core_shards], 16, UI.CYAN)
 	if not reward.is_empty():
 		UI.label(stack, "Challenges  /  +%d banked bolts  ·  +%d reserve %s" % [reward.credits, reward.lives, "life" if reward.lives == 1 else "lives"], 17, Color("ffe28e"))
 	UI.button(stack, "Return to Station", return_to_command_deck, true).grab_focus()
@@ -984,6 +1025,7 @@ func advance_to_act_two() -> void:
 	save.set_value("checkpoint", "weapons", run_weapons.keys())
 	save.set_value("checkpoint", "experience", player.experience)
 	save.set_value("checkpoint", "credits", player.credits)
+	save.set_value("checkpoint", "salvage", player.salvage)
 	save.set_value("checkpoint", "lives", player.lives)
 	save.set_value("checkpoint", "sector_deaths", sector_deaths)
 	save.set_value("checkpoint", "health", player.health)

@@ -8,14 +8,16 @@ const CHALLENGES := [
 ]
 
 const UPGRADES := [
-	{"id": "armor", "name": "Ceramic Armor", "prices": [1500, 2800], "effects": ["+12 starting HP", "+28 starting HP and 10% damage resistance"]},
-	{"id": "capacitor", "name": "Flux Capacitor", "prices": [1950, 3400], "effects": ["+15 starting energy", "+32 starting energy and 20% cheaper charged shots"]},
-	{"id": "buster", "name": "Buster Overdrive", "prices": [2550, 4100], "effects": ["+15% Buster and saber damage", "+32% Buster and saber damage"]},
-	{"id": "dash", "name": "Vector Drive", "prices": [3100, 4700], "effects": ["+10% dash speed and 15% shorter cooldown", "+20% dash speed and 32% shorter cooldown"]},
+	{"id": "armor", "name": "Ceramic Armor", "prices": [15, 28], "effects": ["+12 starting HP", "+28 starting HP and 10% damage resistance"]},
+	{"id": "capacitor", "name": "Flux Capacitor", "prices": [19, 34], "effects": ["+15 starting energy", "+32 starting energy and 20% cheaper charged shots"]},
+	{"id": "buster", "name": "Buster Overdrive", "prices": [25, 41], "effects": ["+15% Buster and saber damage", "+32% Buster and saber damage"]},
+	{"id": "dash", "name": "Vector Drive", "prices": [31, 47], "effects": ["+10% dash speed and 15% shorter cooldown", "+20% dash speed and 32% shorter cooldown"]},
+	{"id": "storage", "name": "Storage Expansion", "prices": [20, 36], "effects": ["+7 storage positions", "+14 storage positions"]},
+	{"id": "fabrication", "name": "Fabrication Efficiency", "prices": [20, 36], "effects": ["20% scrap discount", "40% scrap discount"]},
 ]
 
 const GEAR_SLOTS := {"frame": "Frame", "core": "Core", "utility": "Utility", "visor": "Visor", "arm": "Arm Module"}
-const UPGRADE_SLOTS := {"armor": "frame", "capacitor": "core", "buster": "core", "dash": "utility"}
+const UPGRADE_SLOTS := {"armor": "frame", "capacitor": "core", "buster": "core", "dash": "utility", "storage": "utility", "fabrication": "core"}
 const RARITY_NAMES := ["Common", "Rare", "Epic", "Legendary"]
 const RARITY_COLORS := [Color("b5c9de"), Color("68c9ff"), Color("d0a0ff"), Color("ffca68")]
 const PRESET_COUNT := 3
@@ -58,6 +60,16 @@ const GEAR := {
 }
 
 var path := "user://riftcore_profile.cfg"
+const Materials := preload("res://scripts/fabrication_catalog.gd")
+const PLAYER_LEVEL_CAP := 50
+const Story := preload("res://scripts/rift_story.gd")
+var memories: Array[int] = []
+var endings: Array[String] = []
+var materials: Dictionary = {}
+var core_shards := 0
+const COSMETICS := {"Standard": Color("55e7ff"), "Magenta": Color("ff67ce"), "Gold": Color("ffd069")}
+var player_xp := 0
+var cosmetic := "Standard"
 var credits := 0
 var owned: Dictionary = {}
 var unlocked_sector := 1
@@ -73,12 +85,46 @@ func restore() -> void:
 		return
 	decode_from(data)
 
+func player_level() -> int:
+	return mini(PLAYER_LEVEL_CAP, RiftPlayer.level_for_experience(player_xp))
+
+func award_player_xp(amount: int) -> void:
+	player_xp = mini(RiftPlayer.experience_threshold(PLAYER_LEVEL_CAP), player_xp + maxi(amount, 0))
+
+func cosmetic_level(id: String) -> int:
+	return {"Standard": 1, "Magenta": 8, "Gold": 25}.get(id, PLAYER_LEVEL_CAP + 1)
+
+func storage_capacity() -> int:
+	return 12 + floori(player_level() / 5.0) + rank("storage") * 7
+
 func decode_from(data: ConfigFile) -> void:
+	materials.clear()
+	memories.clear()
+	for index in range(1, Story.MEMORIES.size() + 1):
+		if data.get_value("archive", "fragment_%d" % index, false):
+			memories.append(index)
+	endings.clear()
+	for ending in ["standard", "secret"]:
+		if data.get_value("archive", ending, false):
+			endings.append(ending)
+	var saved_materials = data.get_value("profile", "materials", {})
+	if saved_materials is Dictionary:
+		for id in saved_materials:
+			materials[id] = maxi(0, int(saved_materials[id]))
+	var legacy_bolts := maxi(0, int(data.get_value("profile", "credits", 0)))
+	core_shards = maxi(0, int(data.get_value("profile", "core_shards", legacy_bolts / 100)))
+	# Legacy slots retain their original bolt balance and get a one-time scrap grant.
+	if not data.has_section_key("profile", "materials"):
+		materials["scrap"] = legacy_bolts / 50
+	player_xp = 0
+	award_player_xp(int(data.get_value("profile", "player_xp", 0)))
+	var skin := String(data.get_value("profile", "cosmetic", "Standard"))
+	cosmetic = skin if player_level() >= cosmetic_level(skin) else "Standard"
 	credits = maxi(0, int(data.get_value("profile", "credits", 0)))
 	unlocked_sector = clampi(int(data.get_value("profile", "unlocked_sector", 1)), 1, Catalog.SECTORS.size())
 	reserve_lives = maxi(0, int(data.get_value("profile", "reserve_lives", 0)))
 	completed_challenges.clear()
-	for sector in range(1, unlocked_sector + 1):
+	for sector in range(1, Catalog.SECTORS.size() + 1):
 		for tier in range(CHALLENGES.size()):
 			var id := challenge_key(sector, tier)
 			if bool(data.get_value("challenges", id, false)):
@@ -89,7 +135,7 @@ func decode_from(data: ConfigFile) -> void:
 		var state := String(data.get_value("equipment", id, ""))
 		if state == "equipped" and not equipped_for(GEAR[id].slot).is_empty():
 			state = "stored"
-		if state in ["stored", "equipped"]:
+		if state in ["stored", "equipped", "carried"]:
 			gear[id] = state
 	for upgrade in UPGRADES:
 		var id: String = upgrade.id
@@ -115,7 +161,15 @@ func save() -> Error:
 	return data.save(path)
 
 func encode_into(data: ConfigFile) -> void:
+	for index in memories:
+		data.set_value("archive", "fragment_%d" % index, true)
+	for ending in endings:
+		data.set_value("archive", ending, true)
 	data.set_value("profile", "credits", credits)
+	data.set_value("profile", "player_xp", player_xp)
+	data.set_value("profile", "cosmetic", cosmetic)
+	data.set_value("profile", "materials", materials)
+	data.set_value("profile", "core_shards", core_shards)
 	data.set_value("profile", "unlocked_sector", unlocked_sector)
 	data.set_value("profile", "reserve_lives", reserve_lives)
 	for id in owned:
@@ -162,19 +216,60 @@ func equipped_for(slot: String) -> String:
 			return id
 	return ""
 
-func buy_gear(id: String) -> String:
-	if not GEAR.has(id) or gear.has(id):
-		return "You already own this item."
-	var item: Dictionary = GEAR[id]
-	if credits < int(item.price):
-		return "Not enough banked bolts."
-	credits -= int(item.price)
+static func recipe_level(id: String) -> int:
+	var index := GEAR.keys().find(id)
+	var rarity := int(GEAR[id].rarity)
+	return [1, 5, 15, 30][rarity] + (index % 5 if rarity > 0 else 0)
+
+func recipe_materials(id: String) -> Dictionary:
+	var index := GEAR.keys().find(id)
+	var rarity := int(GEAR[id].rarity)
+	var bill := {"scrap": ceili((4 + rarity * 4) * (1.0 - rank("fabrication") * 0.2)),
+		["components", "circuits", "cells"][index % 3]: 2 + rarity * 2}
+	if rarity > 0:
+		bill[Materials.sector_key(index % 10 + 1)] = rarity
+	if rarity >= 2:
+		bill["core"] = rarity - 1
+	if rarity == 3:
+		bill["legendary"] = 1
+	return bill
+
+func stored_count() -> int:
+	return gear.values().count("stored")
+
+func craft_limit(id: String) -> String:
+	if gear.has(id):
+		return "Blueprint already fabricated."
+	if player_level() < recipe_level(id):
+		return "Requires Player Level %d." % recipe_level(id)
+	if stored_count() >= storage_capacity():
+		return "Storage is full."
+	var bill := recipe_materials(id)
+	for material in bill:
+		if int(materials.get(material, 0)) < int(bill[material]):
+			return "Missing fabrication materials."
+	return ""
+
+func craft(id: String) -> String:
+	if not GEAR.has(id):
+		return "Unknown blueprint."
+	var restriction := craft_limit(id)
+	if not restriction.is_empty():
+		return restriction
+	var previous := materials.duplicate()
+	var bill := recipe_materials(id)
+	for material in bill:
+		materials[material] -= bill[material]
 	gear[id] = "stored"
 	if save() != OK:
-		credits += int(item.price)
+		materials = previous
 		gear.erase(id)
-		return "Could not save the purchase."
-	return "%s moved to Storage." % item.name
+		return "Could not fabricate item."
+	return "%s fabricated and sent to Storage." % GEAR[id].name
+
+func deposit_materials(recovered: Dictionary) -> void:
+	for id in recovered:
+		materials[id] = int(materials.get(id, 0)) + int(recovered[id])
 
 func move_gear(id: String) -> String:
 	if not gear.has(id):
@@ -182,6 +277,8 @@ func move_gear(id: String) -> String:
 	var previous := gear.duplicate()
 	var item: Dictionary = GEAR[id]
 	if gear[id] == "equipped":
+		if stored_count() >= storage_capacity():
+			return "Storage is full."
 		gear[id] = "stored"
 	else:
 		var old := equipped_for(item.slot)
@@ -196,7 +293,7 @@ func move_gear(id: String) -> String:
 func lose_equipped_gear() -> void:
 	var previous := gear.duplicate()
 	for id in gear.keys():
-		if gear[id] == "equipped":
+		if gear[id] in ["equipped", "carried"]:
 			gear.erase(id)
 	if gear.size() != previous.size() and save() != OK:
 		gear = previous
@@ -233,16 +330,19 @@ func complete_challenges(sector: int, tiers: Array[int]) -> Dictionary:
 	var previous_sector := unlocked_sector
 	unlocked_sector = maxi(unlocked_sector, sector)
 	credits += payment
+	var shards := earned.size() * (3 + sector)
+	core_shards += shards
 	reserve_lives += earned.size()
 	if save() != OK:
 		credits -= payment
+		core_shards -= shards
 		reserve_lives -= earned.size()
 		unlocked_sector = previous_sector
 		for id in earned:
 			completed_challenges.erase(id)
 		push_warning("Could not save challenge rewards.")
 		return {}
-	return {"credits": payment, "lives": earned.size()}
+	return {"credits": payment, "shards": shards, "lives": earned.size()}
 
 func use_reserve_life() -> bool:
 	if reserve_lives <= 0:
@@ -266,6 +366,9 @@ func deposit(amount: int) -> Error:
 func rank(id: String) -> int:
 	return clampi(int(owned.get(id, 0)), 0, 2)
 
+func enhancement_level(id: String, current: int) -> int:
+	return (5 if id in ["storage", "fabrication"] else 1) + current * 8
+
 func buy(id: String) -> String:
 	for item in UPGRADES:
 		if item.id != id:
@@ -274,12 +377,14 @@ func buy(id: String) -> String:
 		if current >= item.prices.size():
 			return "Maximum rank installed."
 		var price: int = item.prices[current]
-		if credits < price:
-			return "Not enough banked bolts."
-		credits -= price
+		if player_level() < enhancement_level(id, current):
+			return "Player level too low for this rank."
+		if core_shards < price:
+			return "Not enough Core Shards."
+		core_shards -= price
 		owned[id] = current + 1
 		if save() != OK:
-			credits += price
+			core_shards += price
 			if current == 0:
 				owned.erase(id)
 			else:

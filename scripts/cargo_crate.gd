@@ -1,6 +1,7 @@
 extends CharacterBody3D
 
 var reward: PackedScene
+var sector := 1
 
 func _ready() -> void:
 	collision_layer = 0
@@ -27,6 +28,7 @@ func _physics_process(delta: float) -> void:
 		break_open()
 
 func break_open() -> void:
+	preload("res://scripts/material_pickup.gd").roll_at(get_parent_node_3d(), global_position, sector, "container")
 	if reward:
 		var pickup := reward.instantiate() as Area3D
 		pickup.position = position + Vector3.UP * 0.15

@@ -11,6 +11,8 @@ var installed := ""
 var next_tag := ""
 var download_asset: Dictionary = {}
 var status: Label
+var notes_title: Label
+var notes_body: RichTextLabel
 var update: Button
 var play: Button
 var progress: ProgressBar
@@ -33,54 +35,122 @@ func _ready() -> void:
 		check_updates()
 	else:
 		status.text = "Installed build %s  /  no release channel configured." % installed
+		show_notes(installed, "No release channel is configured for this installation.")
 
 func build_ui() -> void:
 	var shade := ColorRect.new()
-	shade.color = Color("081528")
+	shade.color = Color("091526")
 	add_child(shade)
 	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	var margins := MarginContainer.new()
 	add_child(margins)
 	margins.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	for side in ["left", "top", "right", "bottom"]:
-		margins.add_theme_constant_override("margin_" + side, 36)
+		margins.add_theme_constant_override("margin_" + side, 28)
 	var stack := VBoxContainer.new()
-	stack.add_theme_constant_override("separation", 17)
+	stack.add_theme_constant_override("separation", 14)
 	margins.add_child(stack)
-	var logo := Label.new()
-	logo.text = "RIFTCORE"
-	logo.add_theme_color_override("font_color", Color("58eaff"))
-	logo.add_theme_font_size_override("font_size", 47)
-	stack.add_child(logo)
-	var sub := Label.new()
-	sub.text = "ROGUE PROTOCOL   /   PLAYTEST LAUNCHER"
-	sub.add_theme_color_override("font_color", Color("ad8af0"))
-	stack.add_child(sub)
+	var header := HBoxContainer.new()
+	header.add_theme_constant_override("separation", 14)
+	stack.add_child(header)
+	add_brand_art(header, preload("res://branding/riftcore-icon.svg"), Vector2(92, 92))
+	add_brand_art(header, preload("res://branding/riftcore-wordmark.svg"), Vector2(400, 82))
+	var version := Label.new()
+	version.text = "INSTALLER  0.2"
+	version.add_theme_color_override("font_color", Color("ff78cb"))
+	stack.add_child(version)
+	stack.add_child(HSeparator.new())
 	status = Label.new()
 	status.text = "Checking for updates…"
 	status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	status.custom_minimum_size.y = 53
+	status.add_theme_color_override("font_color", Color("bfd8eb"))
 	stack.add_child(status)
 	progress = ProgressBar.new()
+	progress.custom_minimum_size.y = 20
+	progress.add_theme_stylebox_override("fill", panel_style(Color("1db7d4"), Color("74efff")))
 	progress.hide()
 	stack.add_child(progress)
 	var actions := HBoxContainer.new()
 	actions.add_theme_constant_override("separation", 12)
 	stack.add_child(actions)
-	play = Button.new()
-	play.text = "Play installed"
-	play.custom_minimum_size = Vector2(160, 49)
+	play = launcher_button(actions, "Play installed", Color("21324b"), Color("637d99"))
 	play.disabled = installed.is_empty()
 	play.pressed.connect(launch_game)
-	actions.add_child(play)
-	update = Button.new()
-	update.text = "Update and play"
-	update.custom_minimum_size = Vector2(180, 49)
+	update = launcher_button(actions, "Update and play", Color("103b50"), Color("47e8ff"))
 	update.disabled = true
 	update.pressed.connect(apply_update)
-	actions.add_child(update)
+	var panel := PanelContainer.new()
+	panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	panel.add_theme_stylebox_override("panel", panel_style(Color("101e32"), Color("365d79")))
+	stack.add_child(panel)
+	var note_stack := VBoxContainer.new()
+	note_stack.add_theme_constant_override("separation", 6)
+	panel.add_child(note_stack)
+	notes_title = Label.new()
+	notes_title.add_theme_color_override("font_color", Color("47e8ff"))
+	note_stack.add_child(notes_title)
+	notes_body = RichTextLabel.new()
+	notes_body.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	notes_body.focus_mode = Control.FOCUS_ALL
+	notes_body.bbcode_enabled = false
+	notes_body.selection_enabled = true
+	note_stack.add_child(notes_body)
+	show_notes(installed, "Patch notes will appear after the release check.")
 	if not play.disabled:
 		play.grab_focus()
+
+func show_notes(tag: String, notes: String) -> void:
+	notes_title.text = "PATCH NOTES  /  " + tag if not tag.is_empty() else "PATCH NOTES"
+	notes_body.clear()
+	if notes.strip_edges().is_empty():
+		notes_body.add_text("No patch notes were published for this build.")
+		return
+	for line in notes.split("\n"):
+		if line.begins_with("# "):
+			continue
+		if line.begins_with("## "):
+			notes_body.push_bold()
+			notes_body.push_color(Color("8eeaff"))
+			notes_body.add_text(line.substr(3))
+			notes_body.pop()
+			notes_body.pop()
+		elif line.begins_with("- "):
+			notes_body.add_text("• " + line.substr(2))
+		else:
+			notes_body.add_text(line)
+		notes_body.newline()
+	notes_body.scroll_to_line(0)
+
+func add_brand_art(host: Container, art: Texture2D, dimensions: Vector2) -> void:
+	var picture := TextureRect.new()
+	picture.texture = art
+	picture.custom_minimum_size = dimensions
+	picture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	picture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	host.add_child(picture)
+
+func panel_style(fill: Color, border: Color) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = fill
+	style.border_color = border
+	style.set_border_width_all(1)
+	style.border_width_left = 3
+	style.corner_radius_top_right = 8
+	style.corner_radius_bottom_left = 8
+	return style
+
+func launcher_button(host: Container, title: String, fill: Color, accent: Color) -> Button:
+	var button := Button.new()
+	button.text = title
+	button.custom_minimum_size = Vector2(180, 47)
+	button.add_theme_stylebox_override("normal", panel_style(fill, accent))
+	button.add_theme_stylebox_override("hover", panel_style(fill.lightened(0.18), accent))
+	button.add_theme_stylebox_override("pressed", panel_style(fill.darkened(0.18), accent))
+	button.add_theme_stylebox_override("focus", panel_style(Color.TRANSPARENT, Color("f77cd5")))
+	button.add_theme_stylebox_override("disabled", panel_style(Color("101e32"), Color("35425a")))
+	host.add_child(button)
+	return button
 
 func _process(_delta: float) -> void:
 	if busy and is_instance_valid(transfer) and not download_asset.is_empty():
@@ -124,19 +194,24 @@ func check_updates() -> void:
 	var url := "https://github.com/%s/releases/latest/download/update.json" % repo
 	if request.request(url) != OK:
 		request.queue_free()
+		show_notes(installed, "Patch notes are unavailable offline.")
 		status.text = "Update check unavailable. You can still play installed."
 		return
 	var response: Array = await request.request_completed
 	request.queue_free()
 	if response[0] != HTTPRequest.RESULT_SUCCESS or response[1] != 200:
+		show_notes(installed, "Patch notes are unavailable offline.")
 		status.text = "Update server unavailable. You can still play installed."
 		return
-	var info = JSON.parse_string(response[3].get_string_from_utf8())
+	apply_manifest(JSON.parse_string(response[3].get_string_from_utf8()))
+
+func apply_manifest(info: Variant) -> void:
 	if not info is Dictionary or not info.get("assets", {}) is Dictionary:
 		status.text = "Invalid release manifest."
 		return
 	var tag := String(info.get("tag", ""))
-	var entry = info.assets.get(target_platform)
+	var assets: Dictionary = info.get("assets", {})
+	var entry = assets.get(target_platform)
 	if not is_match(TAG_PATTERN, tag) or not entry is Dictionary:
 		status.text = "This release does not match your platform."
 		return
@@ -145,6 +220,8 @@ func check_updates() -> void:
 	if entry.get("file", "") != name or bytes < 1 or bytes > MAX_PACKAGE or not is_match(HASH_PATTERN, String(entry.get("sha256", ""))):
 		status.text = "Invalid release package details."
 		return
+	var latest_notes = info.get("notes", "")
+	show_notes(tag, latest_notes if latest_notes is String else "")
 	if not compare_tags(tag, installed):
 		status.text = "%s is up to date." % installed
 		return

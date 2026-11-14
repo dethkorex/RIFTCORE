@@ -11,13 +11,13 @@ const REACTOR := preload("res://assets/campaign/props/sci-reactor.glb")
 const STATIONS := [
 	{"x": -18.0, "name": "Save Game", "page": "Save Game", "color": Color("f18da9")},
 	{"x": -13.5, "name": "Settings", "page": "Settings", "color": Color("a5a9ff")},
-	{"x": -9.0, "name": "Item Shop", "page": "Item shop", "color": Color("f2ac85")},
-	{"x": -4.5, "name": "Workshop", "page": "Upgrades", "color": Color("ffc971")},
+	{"x": -9.0, "name": "Fabrication", "page": "Fabrication", "color": Color("f2ac85")},
+	{"x": -4.5, "name": "Core Enhancement", "page": "Upgrades", "color": Color("ffc971")},
 	{"x": 0.0, "name": "Deploy", "page": "Sector select", "color": Color("5dffdc")},
 	{"x": 4.5, "name": "Storage", "page": "Storage", "color": Color("86ecc8")},
 	{"x": 9.0, "name": "Loadout", "page": "Loadout", "color": Color("72d1ff")},
 	{"x": 13.5, "name": "Challenges", "page": "Challenges", "color": Color("d2a0ff")},
-	{"x": 18.0, "name": "Field Guide", "page": "Collection", "color": Color("a3eca4")},
+	{"x": 18.0, "name": "NOVA Archive", "page": "Collection", "color": Color("a3eca4")},
 ]
 
 var avatar: RiftPlayer

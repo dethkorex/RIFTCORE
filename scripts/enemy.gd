@@ -277,6 +277,8 @@ func _on_died() -> void:
 	var anchor := find_drop_anchor()
 	var drop_position: Vector3 = anchor.position
 	spawn_pickup(XP_ORB, drop_position, false, roundi(XP_REWARDS[variant] * sector_experience_scale), anchor.body)
+	var host := anchor.body as Node3D if is_instance_valid(anchor.body) else get_parent_node_3d()
+	preload("res://scripts/material_pickup.gd").roll_at(host, drop_position + Vector3(0.42, 0.1, 0), sector_number, "elite" if variant == Variant.HEAVY else "enemy")
 	if global_position.y > -3.0 and randf() < drop_chance:
 		var pool := LARGE_DROPS if randf() < 0.2 else SMALL_DROPS
 		spawn_pickup(pool.pick_random(), drop_position + Vector3.FORWARD * 0.25, true, 0, anchor.body)

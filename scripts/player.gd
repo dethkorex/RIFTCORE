@@ -6,6 +6,8 @@ const PACK_VFX := preload("res://scripts/pack_combat_vfx.gd")
 signal energy_changed(current: float, maximum: float)
 signal credits_changed(total: int)
 signal experience_changed(total: int)
+signal experience_earned(amount: int)
+signal salvage_collected(drop: Dictionary)
 
 const START_HEALTH := 80.0
 const START_ENERGY := 75.0
@@ -68,6 +70,7 @@ var facing := 1.0
 var energy := START_ENERGY
 var max_energy := START_ENERGY
 var credits := 0
+var salvage: Dictionary = {}
 var experience := 0
 var coyote := 0.0
 var jump_buffer := 0.0
@@ -609,7 +612,7 @@ static func experience_threshold(level: int) -> int:
 static func level_for_experience(total: float) -> int:
 	return 1 + floori((sqrt(3600.0 + 80.0 * maxf(total, 0.0)) - 60.0) / 40.0)
 
-func gain_experience(amount: int) -> void:
+func gain_experience(amount: int, earned := true) -> void:
 	var previous_level := level_for_experience(experience)
 	experience += amount
 	var gained_levels := level_for_experience(experience) - previous_level
@@ -620,6 +623,13 @@ func gain_experience(amount: int) -> void:
 		health_changed.emit(health, max_health)
 		energy_changed.emit(energy, max_energy)
 	experience_changed.emit(experience)
+	if earned and amount > 0:
+		experience_earned.emit(amount)
+
+func collect_salvage(drop: Dictionary) -> void:
+	for id in drop:
+		salvage[id] = int(salvage.get(id, 0)) + int(drop[id])
+	salvage_collected.emit(drop)
 
 func add_life() -> void:
 	if lives >= 5:

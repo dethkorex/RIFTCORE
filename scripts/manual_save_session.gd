@@ -2,7 +2,7 @@ extends RefCounted
 
 const Profile := preload("res://scripts/rogue_profile.gd")
 const SLOT_COUNT := 3
-const FORMAT := 1
+const FORMAT := 2
 
 static var slot_directory := "user://riftcore_manual_v1"
 
@@ -19,7 +19,7 @@ static func read_slot(number: int) -> ConfigFile:
 	if number < 1 or number > SLOT_COUNT:
 		return null
 	var data := ConfigFile.new()
-	if data.load(slot_path(number)) != OK or data.get_value("slot", "format", 0) != FORMAT:
+	if data.load(slot_path(number)) != OK or int(data.get_value("slot", "format", 0)) not in [1, FORMAT]:
 		return null
 	return data
 
@@ -55,8 +55,16 @@ func invalidate_defeated_run() -> Error:
 		return OK
 	if data.has_section("checkpoint"):
 		data.erase_section("checkpoint")
+	data.set_value("profile", "unlocked_sector", 1)
+	data.set_value("profile", "player_xp", profile.player_xp)
+	data.set_value("profile", "core_shards", profile.core_shards)
+	data.set_value("profile", "reserve_lives", profile.reserve_lives)
+	for index in profile.memories:
+		data.set_value("archive", "fragment_%d" % index, true)
+	for ending in profile.endings:
+		data.set_value("archive", ending, true)
 	for id in Profile.GEAR:
-		if profile.gear.get(id) == "equipped" and data.has_section_key("equipment", id):
+		if profile.gear.get(id) in ["equipped", "carried"] and data.has_section_key("equipment", id):
 			data.erase_section_key("equipment", id)
 		elif data.get_value("equipment", id, "") == "equipped":
 			data.set_value("equipment", id, "stored")

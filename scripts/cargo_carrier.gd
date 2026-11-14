@@ -37,6 +37,7 @@ func _physics_process(delta: float) -> void:
 func drop_crate() -> void:
 	var crate := Crate.new()
 	crate.reward = reward
+	crate.sector = int(get_tree().current_scene.get("sector")) if get_tree().current_scene and "sector" in get_tree().current_scene else 1
 	if adaptive_supply:
 		var need_energy := is_instance_valid(supply_target) and supply_target.health / supply_target.max_health > 0.8
 		crate.reward = preload("res://assets/pickups/energy_large.tscn") if need_energy else preload("res://assets/pickups/health_large.tscn")
