@@ -125,7 +125,10 @@ def main() -> None:
                 (payload / binary).chmod(0o755)
             for file in LICENSES:
                 shutil.copy2(license_path / file, version / file)
-            (payload / "updates.cfg").write_text(f'[updates]\nrepository="{a.repo}"\n', encoding="utf-8", newline="\n")
+            (payload / "updates.cfg").write_text(
+                f'[updates]\nrepository="{a.repo}"\nbundled_notes_tag="{a.tag}"\n', encoding="utf-8", newline="\n"
+            )
+            shutil.copy2(out / "PATCH_NOTES.md", payload / "PATCH_NOTES.md")
             game_zip = out / f"RIFTCORE-{platform}.zip"
             with zipfile.ZipFile(game_zip, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=5) as archive:
                 for name in [binary, "RIFTCORE.pck", *LICENSES]:

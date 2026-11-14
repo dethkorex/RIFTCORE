@@ -40,4 +40,3 @@ func run() -> void:
 func check(passed: bool, message: String) -> bool:
 	print("PASS " if passed else "FAIL ", message)
 	return passed
-

@@ -52,4 +52,3 @@ func run() -> void:
 		failures += int(not correct)
 		await frames(20)
 	quit(failures)
-

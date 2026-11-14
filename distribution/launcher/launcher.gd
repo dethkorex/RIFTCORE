@@ -9,6 +9,7 @@ var install_root := ""
 var repo := ""
 var installed := ""
 var next_tag := ""
+var bundled_notes := ""
 var download_asset: Dictionary = {}
 var status: Label
 var notes_title: Label
@@ -30,12 +31,15 @@ func _ready() -> void:
 	if config.load(install_root.path_join("updates.cfg")) == OK:
 		repo = String(config.get_value("updates", "repository", ""))
 	installed = newest_installed()
+	var notes_path := install_root.path_join("PATCH_NOTES.md")
+	if installed == config.get_value("updates", "bundled_notes_tag", "") and FileAccess.file_exists(notes_path):
+		bundled_notes = FileAccess.get_file_as_string(notes_path)
 	build_ui()
 	if is_match(REPO_PATTERN, repo):
 		check_updates()
 	else:
 		status.text = "Installed build %s  /  no release channel configured." % installed
-		show_notes(installed, "No release channel is configured for this installation.")
+		show_fallback_notes("No release channel is configured for this installation.")
 
 func build_ui() -> void:
 	var shade := ColorRect.new()
@@ -96,9 +100,12 @@ func build_ui() -> void:
 	notes_body.bbcode_enabled = false
 	notes_body.selection_enabled = true
 	note_stack.add_child(notes_body)
-	show_notes(installed, "Patch notes will appear after the release check.")
+	show_fallback_notes("Patch notes will appear after the release check.")
 	if not play.disabled:
 		play.grab_focus()
+
+func show_fallback_notes(message: String) -> void:
+	show_notes(installed, bundled_notes if not bundled_notes.is_empty() else message)
 
 func show_notes(tag: String, notes: String) -> void:
 	notes_title.text = "PATCH NOTES  /  " + tag if not tag.is_empty() else "PATCH NOTES"
@@ -194,13 +201,13 @@ func check_updates() -> void:
 	var url := "https://github.com/%s/releases/latest/download/update.json" % repo
 	if request.request(url) != OK:
 		request.queue_free()
-		show_notes(installed, "Patch notes are unavailable offline.")
+		show_fallback_notes("Patch notes are unavailable offline.")
 		status.text = "Update check unavailable. You can still play installed."
 		return
 	var response: Array = await request.request_completed
 	request.queue_free()
 	if response[0] != HTTPRequest.RESULT_SUCCESS or response[1] != 200:
-		show_notes(installed, "Patch notes are unavailable offline.")
+		show_fallback_notes("Patch notes are unavailable offline.")
 		status.text = "Update server unavailable. You can still play installed."
 		return
 	apply_manifest(JSON.parse_string(response[3].get_string_from_utf8()))
@@ -220,8 +227,14 @@ func apply_manifest(info: Variant) -> void:
 	if entry.get("file", "") != name or bytes < 1 or bytes > MAX_PACKAGE or not is_match(HASH_PATTERN, String(entry.get("sha256", ""))):
 		status.text = "Invalid release package details."
 		return
+	if not installed.is_empty() and compare_tags(installed, tag):
+		status.text = "%s is newer than the public release." % installed
+		return
 	var latest_notes = info.get("notes", "")
-	show_notes(tag, latest_notes if latest_notes is String else "")
+	if latest_notes is String and not latest_notes.is_empty():
+		show_notes(tag, latest_notes)
+	else:
+		show_fallback_notes("No patch notes were published for this build.")
 	if not compare_tags(tag, installed):
 		status.text = "%s is up to date." % installed
 		return

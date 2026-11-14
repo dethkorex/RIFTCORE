@@ -36,4 +36,3 @@ func _initialize() -> void:
 		file.store_buffer(chunk)
 	file.close()
 	quit()
-
