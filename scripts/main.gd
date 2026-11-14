@@ -219,9 +219,10 @@ func verify_coop_mission(host: bool) -> void:
 			RiftRelay.relay.lobby_set_data("coop_guest_saw_movement", true)
 		var won := await wait_for_relay(func(): return is_instance_valid(mission) and mission.outcome.begins_with("Mission complete"), 16.0)
 		won = won and verify_coop_rewards(previous_xp, previous_credits, saved_gear)
+		var returned := false
 		if won:
 			RiftRelay.relay.lobby_set_data("coop_guest_saw_completion", true)
-			var returned := await wait_for_relay(func(): return is_instance_valid(home_hub) and not RiftRelay.mission_active, 10.0)
+			returned = await wait_for_relay(func(): return is_instance_valid(home_hub) and not RiftRelay.mission_active, 10.0)
 		if returned:
 			RiftRelay.relay.lobby_set_data("coop_guest_returned", true)
 			await get_tree().create_timer(1.0).timeout
