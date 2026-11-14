@@ -87,6 +87,19 @@ def windows_installer(payload: Path, out: Path, nsis: Path) -> None:
         raise RuntimeError("NSIS did not produce an installer")
 
 
+def package_legacy_migration(out: Path, payload: Path, version: Path, platform: str, binary: str) -> dict:
+    zip_path = out / f"RIFTCORE-{platform}.zip"
+    with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=5) as archive:
+        archive.write(payload / binary, arcname=binary)
+        # The legacy updater requires this entry. The launcher uses its embedded pack.
+        archive.writestr("RIFTCORE.pck", b"RIFTCORE Launcher 0.2 migration\n")
+        for name in LICENSES:
+            archive.write(version / name, arcname=name)
+    with zip_path.open("rb") as handle:
+        checksum = hashlib.file_digest(handle, "sha256").hexdigest()
+    return {"file": zip_path.name, "size": zip_path.stat().st_size, "sha256": checksum}
+
+
 def main() -> None:
     cli = argparse.ArgumentParser()
     cli.add_argument("--engine", type=Path, required=True)
@@ -116,6 +129,10 @@ def main() -> None:
     notes = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8-sig").strip()
     if len(notes.encode("utf-8")) > 14000:
         raise ValueError("Release notes exceed the launcher manifest budget")
+    migration_dir = out.parent / "legacy-migration"
+    migration_dir.mkdir(exist_ok=True)
+    migration_notes = "Update and play upgrades Launcher 0.1 in place, then opens Launcher 0.2 and checks the playtest channel. Existing saves, game versions and shortcuts are retained."
+    migration = {"tag": "v0.4.100", "assets": {}, "notes": migration_notes}
     manifest = {"tag": a.tag, "assets": {}, "notes": notes}
     (out / "PATCH_NOTES.md").write_text(notes + "\n", encoding="utf-8")
     with local_templates(ROOT / "export_presets.cfg", templates), local_templates(launcher / "export_presets.cfg", templates):
@@ -140,6 +157,7 @@ def main() -> None:
             )
             shutil.copy2(out / "PATCH_NOTES.md", payload / "PATCH_NOTES.md")
             shutil.copy2(ROOT / "addons/godotsteam/license.md", version / "GODOTSTEAM_LICENSE.md")
+            migration["assets"][platform] = package_legacy_migration(migration_dir, payload, version, platform, binary)
             game_zip = out / f"RIFTCORE-{platform}.zip"
             with zipfile.ZipFile(game_zip, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=5) as archive:
                 for name in [binary, "RIFTCORE.pck", *LICENSES, "GODOTSTEAM_LICENSE.md", *STEAM_RUNTIME[platform]]:
@@ -158,6 +176,8 @@ def main() -> None:
                 linux_installer(payload, out / "RIFTCORE-Linux-x64-Setup.run")
                 with tarfile.open(out / "RIFTCORE-Arch-Omarchy-x64.tar.gz", "w:gz", compresslevel=5) as tar:
                     linux_payload(payload, tar, "RIFTCORE/")
+    (migration_dir / "update.json").write_text(json.dumps(migration, indent=2) + "\n", encoding="utf-8")
+    (migration_dir / "PATCH_NOTES.md").write_text(migration_notes + "\n", encoding="utf-8")
     (out / "update.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
 
 

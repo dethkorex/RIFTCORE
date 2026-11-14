@@ -22,7 +22,6 @@ func run() -> void:
 	var hub = game.home_hub
 	check(hub.pads.size() == 8 and hub.prompt.visible and hub.current_station == 3, "Hub opens at the Deploy bay")
 	check(hub.get_node("OperationsBanner/Geometry").get_child_count() > 4, "Modular signage builds")
-	check(hub.get_node("TraderBay/Geometry").get_child_count() > hub.get_node("SettingsTerminal/Geometry").get_child_count(), "Trader bay has its own fitted props")
 	if DisplayServer.get_name() != "headless" and not OS.get_cmdline_user_args().is_empty():
 		await RenderingServer.frame_post_draw
 		root.get_texture().get_image().save_png(OS.get_cmdline_user_args()[0])

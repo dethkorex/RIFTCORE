@@ -78,6 +78,23 @@ jobs:
             grep -F "SOCIAL SMOKE PASS" /tmp/game.log
             ! grep -E "SCRIPT ERROR:|Failed to load" /tmp/launcher.log /tmp/native.log /tmp/installed.log /tmp/game.log
           '
+      - name: Verify the Launcher 0.1 migration on Linux
+        run: |
+          base="$(mktemp -d)"
+          mkdir -p "$base/versions/v0.4.100"
+          unzip -q release-tools/legacy-migration/RIFTCORE-linux-x64.zip -d "$base/versions/v0.4.100"
+          printf '#!/bin/sh\nexit 0\n' > "$base/RIFTCORE"
+          printf '[updates]\nrepository=""\n' > "$base/updates.cfg"
+          printf 'preserved\n' > "$base/save-marker"
+          chmod +x "$base/RIFTCORE" "$base/versions/v0.4.100/RIFTCORE"
+          "$base/versions/v0.4.100/RIFTCORE" --headless --quit-after 300
+          cmp "$base/RIFTCORE" "$base/versions/v0.4.100/RIFTCORE"
+          grep -qx preserved "$base/save-marker"
+          grep -q 'preview_channel=true' "$base/updates.cfg"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: riftcore-legacy-migration
+          path: release-tools/legacy-migration/*
       - uses: actions/upload-artifact@v4
         with:
           name: riftcore-playtest
@@ -98,6 +115,26 @@ jobs:
           $run = Start-Process -FilePath $game -ArgumentList @('--headless','--quit-after','120','--log-file',('"' + $log + '"'),'--','--verify-social') -Wait -PassThru
           Get-Content -LiteralPath $log
           if ($run.ExitCode -ne 0 -or !(Select-String -LiteralPath $log -Pattern 'SOCIAL SMOKE PASS' -Quiet)) { exit 1 }
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: riftcore-legacy-migration
+          path: migration
+      - name: Verify the Launcher 0.1 migration on Windows
+        shell: pwsh
+        run: |
+          $base = Join-Path $PWD 'legacy install'
+          $version = Join-Path $base 'versions/v0.4.100'
+          Expand-Archive migration/RIFTCORE-windows-x64.zip -DestinationPath $version
+          $target = Join-Path $base 'RIFTCORE.exe'
+          $bridge = Join-Path $version 'RIFTCORE.exe'
+          Copy-Item (Join-Path $PWD 'game/RIFTCORE.exe') $target
+          Set-Content (Join-Path $base 'updates.cfg') "[updates]`nrepository=`"`""
+          Set-Content (Join-Path $base 'save-marker') 'preserved'
+          $run = Start-Process -FilePath $bridge -ArgumentList @('--headless','--quit-after','600') -Wait -PassThru
+          if ($run.ExitCode -ne 0 -or (Get-FileHash $target).Hash -ne (Get-FileHash $bridge).Hash) { exit 1 }
+          if ((Get-Content (Join-Path $base 'save-marker')) -ne 'preserved') { exit 1 }
+          if (!(Select-String -LiteralPath (Join-Path $base 'updates.cfg') -Pattern 'preview_channel=true' -Quiet)) { exit 1 }
 
   publish:
     if: github.ref_type == 'tag'
@@ -122,3 +159,17 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.ref_name }}
         run: gh release create --repo "${{ github.repository }}" "$RELEASE_TAG" release-tools/artifacts/* --verify-tag --notes-file release-tools/artifacts/PATCH_NOTES.md --latest
+
+      - uses: actions/download-artifact@v4
+        if: github.ref_name == 'v0.5.6-preview'
+        with:
+          name: riftcore-legacy-migration
+          path: release-tools/legacy-migration
+      - name: Publish the Launcher 0.1 migration on the original update channel
+        if: github.ref_name == 'v0.5.6-preview'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create --repo "${{ github.repository }}" v0.4.100 release-tools/legacy-migration/* \
+            --target "${{ github.sha }}" --notes-file release-tools/legacy-migration/PATCH_NOTES.md \
+            --title "RIFTCORE Launcher 0.2 migration" --latest

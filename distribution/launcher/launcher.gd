@@ -3,6 +3,7 @@ extends Control
 const MAX_PACKAGE := 512 * 1024 * 1024
 const REPO_PATTERN := "^[A-Za-z0-9][A-Za-z0-9-]{0,38}/[A-Za-z0-9_.-]{1,90}$"
 const TAG_PATTERN := "^v[0-9]{1,5}[.][0-9]{1,5}[.][0-9]{1,5}(-preview)?$"
+const LEGACY_MIGRATION_TAG := "v0.4.100"
 const HASH_PATTERN := "^[0-9a-f]{64}$"
 
 var install_root := ""
@@ -22,8 +23,10 @@ var transfer: HTTPRequest
 var busy := false
 var target_platform := ""
 var game_filename := ""
+var resume_upgrade := false
 
 func _ready() -> void:
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	var root_arg := OS.get_cmdline_user_args()
 	install_root = root_arg[0] if OS.has_feature("editor") and not root_arg.is_empty() else OS.get_executable_path().get_base_dir()
 	target_platform = "windows-x64" if OS.get_name() == "Windows" else "linux-x64"
@@ -32,6 +35,14 @@ func _ready() -> void:
 	if config.load(install_root.path_join("updates.cfg")) == OK:
 		repo = String(config.get_value("updates", "repository", ""))
 		preview_channel = config.get_value("updates", "preview_channel", false)
+	resume_upgrade = root_arg.has("--resume-upgrade")
+	if OS.get_executable_path().get_base_dir().get_file() == LEGACY_MIGRATION_TAG:
+		var bridge_root := install_root.get_base_dir().get_base_dir()
+		if install_root.get_base_dir().get_file() == "versions" and FileAccess.file_exists(bridge_root.path_join("updates.cfg")):
+			install_root = bridge_root
+			build_ui()
+			migrate_launcher.call_deferred()
+			return
 	installed = newest_installed()
 	var notes_path := install_root.path_join("PATCH_NOTES.md")
 	if installed == config.get_value("updates", "bundled_notes_tag", "") and FileAccess.file_exists(notes_path):
@@ -42,6 +53,53 @@ func _ready() -> void:
 	else:
 		status.text = "Installed build %s  /  no release channel configured." % installed
 		show_fallback_notes("No release channel is configured for this installation.")
+
+func migrate_launcher() -> void:
+	status.text = "Upgrading the RIFTCORE launcher…"
+	var target := install_root.path_join(game_filename)
+	var staged := target + ".upgrade"
+	var backup := target + ".previous"
+	if DirAccess.copy_absolute(OS.get_executable_path(), staged, 493) != OK:
+		status.text = "Could not stage the launcher update. Reopen the launcher to retry."
+		return
+	var moved := false
+	for attempt in 60:
+		if DirAccess.rename_absolute(target, backup) == OK:
+			moved = true
+			break
+		await get_tree().create_timer(0.1).timeout
+	if not moved:
+		status.text = "Close any other RIFTCORE launcher windows, then retry the update."
+		return
+	if DirAccess.rename_absolute(staged, target) != OK:
+		DirAccess.rename_absolute(backup, target)
+		status.text = "Could not replace the launcher. Reopen it to retry."
+		return
+	var config := ConfigFile.new()
+	var config_path := install_root.path_join("updates.cfg")
+	if config.load(config_path) != OK:
+		DirAccess.remove_absolute(target)
+		DirAccess.rename_absolute(backup, target)
+		status.text = "The installed update settings could not be read."
+		return
+	config.set_value("updates", "preview_channel", true)
+	if config.save(config_path) != OK:
+		DirAccess.remove_absolute(target)
+		DirAccess.rename_absolute(backup, target)
+		status.text = "The update settings could not be saved. Check the installation permissions."
+		return
+	if OS.create_process(target, relaunched_arguments()) <= 0:
+		DirAccess.remove_absolute(target)
+		DirAccess.rename_absolute(backup, target)
+		status.text = "The launcher could not restart. Reopen it to retry."
+		return
+	DirAccess.remove_absolute(backup)
+	get_tree().quit()
+
+func relaunched_arguments() -> PackedStringArray:
+	if DisplayServer.get_name() == "headless":
+		return PackedStringArray(["--headless", "--quit-after", "60"])
+	return PackedStringArray(["--", "--resume-upgrade"])
 
 func build_ui() -> void:
 	var font_theme := Theme.new()
@@ -196,7 +254,7 @@ func newest_installed() -> String:
 	if dir == null:
 		return best
 	for tag in dir.get_directories():
-		if not is_match(TAG_PATTERN, tag):
+		if tag == LEGACY_MIGRATION_TAG or not is_match(TAG_PATTERN, tag):
 			continue
 		var folder := versions.path_join(tag)
 		if FileAccess.file_exists(folder.path_join(game_filename)) and FileAccess.file_exists(folder.path_join("RIFTCORE.pck")) and compare_tags(tag, best):
@@ -263,6 +321,10 @@ func apply_manifest(info: Variant) -> void:
 		return
 	var tag := String(info.get("tag", ""))
 	var assets: Dictionary = info.get("assets", {})
+	if tag == LEGACY_MIGRATION_TAG:
+		show_fallback_notes("The launcher migration is complete. Game updates are available on the preview channel.")
+		status.text = "Play your installed game or check again when the preview channel is available."
+		return
 	var entry = assets.get(target_platform)
 	if not is_match(TAG_PATTERN, tag) or not entry is Dictionary:
 		status.text = "This release does not match your platform."
@@ -287,6 +349,9 @@ func apply_manifest(info: Variant) -> void:
 	download_asset = {"file": name, "size": bytes, "sha256": String(entry.sha256)}
 	status.text = "%s is available. Installed: %s." % [tag, installed if not installed.is_empty() else "none"]
 	update.disabled = false
+	if resume_upgrade:
+		resume_upgrade = false
+		apply_update()
 
 func apply_update() -> void:
 	if busy or next_tag.is_empty():

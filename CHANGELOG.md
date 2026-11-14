@@ -2,6 +2,10 @@
 
 ## Game changes
 
+- The cursor is visible on the title screen, inside the station, and when paused.
+- Quick Invite opens a room automatically for Steam friends playing RIFTCORE. Removed the redundant trader display from the station.
+- Two live Windows clients can create a GD Sync room, join, and exchange data when configured.
+
 - Mouse hover and keyboard focus work independently. Settings opens with keyboard focus on its first control, remapping has a clickable cancel button, and the hub interaction prompt supports mouse clicks.
 - More blueprint and gear tiles fit on screen, with distinct part icons and tighter menu spacing.
 
@@ -30,7 +34,7 @@ Live room connections and Steam invitations require service configuration. Share
 ## Installer and launcher 0.2
 
 - On Linux, add the native executable named RIFTCORE to Steam and leave Proton disabled. The launcher now defaults to Wayland with X11 fallback.
-- Install this launcher once to update to builds that include the Steam runtime.
+- Launcher 0.1 receives an in-place upgrade to 0.2 through its existing Update and Play button. The upgraded launcher then checks the preview channel.
 
 - Added an Arch Linux and Omarchy tarball with native Wayland startup, an optional app-menu installer, and updates through the launcher.
 

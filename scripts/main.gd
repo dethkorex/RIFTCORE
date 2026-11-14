@@ -342,6 +342,7 @@ func write_checkpoint(data: ConfigFile) -> Error:
 	return OK
 
 func open_home_hub() -> void:
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	if is_instance_valid(home_hub):
 		return
 	refresh_menu_save()
@@ -572,6 +573,7 @@ func show_pause_save() -> void:
 	UI.button(stack, "Back to Pause", build_pause_menu)
 
 func overlay(sidebar := false) -> VBoxContainer:
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	if is_instance_valid(pause_menu):
 		pause_menu.get_parent().remove_child(pause_menu)
 		pause_menu.queue_free()

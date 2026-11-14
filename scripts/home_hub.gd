@@ -208,8 +208,6 @@ func build_room() -> void:
 		box(self, Vector3(x, -0.69, 2.075), Vector3(7.76, 0.065, 0.034), cyan)
 		box(self, Vector3(x, 4.73, -0.78), Vector3(7.7, 0.071, 0.075), cyan)
 		box(self, Vector3(x, -0.10, -3.52), Vector3(8.96, 0.28, 0.35), metal)
-	var trader_counter := place_asset("trader_bay", Vector3(-8.30, 0.0, -2.06))
-	trader_counter.set("caption", "WORKSHOP SUPPLIES")
 	place_asset("operations_banner", Vector3(0, 4.36, -1.95))
 	for x in [-10.8, 10.8]:
 		var sash := paint(Color("40235b"), 0.11, 0.35)

@@ -8,14 +8,19 @@
 
 config_version=5
 
+[GD-Sync]
+
+version="1.0.2"
+uniqueUsername=true
+
 [application]
-config/icon="res://assets/ui/riftcore-icon.svg"
-config/windows_native_icon="res://assets/ui/riftcore.ico"
 
 config/name="RIFTCORE: Rogue Protocol"
 config/version="0.5.6"
 run/main_scene="res://scenes/main.tscn"
 config/features=PackedStringArray("4.7")
+config/icon="res://assets/ui/riftcore-icon.svg"
+config/windows_native_icon="res://assets/ui/riftcore.ico"
 
 [autoload]
 
@@ -26,13 +31,12 @@ RiftSocial="*res://scripts/steam_social.gd"
 
 [display]
 
-display_server/driver.linuxbsd="wayland"
-
 window/size/viewport_width=1280
 window/size/viewport_height=720
 window/size/window_width_override=1920
 window/size/window_height_override=1080
 window/stretch/mode="canvas_items"
+display_server/driver.linuxbsd="wayland"
 
 [editor_plugins]
 

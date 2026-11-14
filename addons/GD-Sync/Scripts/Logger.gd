@@ -55,7 +55,7 @@ func _ready() -> void:
 	logging_enabled = OS.is_debug_build()
 	set_process(logging_enabled)
 	
-	if OS.has_feature("editor"):
+	if OS.has_feature("editor") and EngineDebugger.is_active():
 		debugger_singleton = Engine.get_singleton("EngineDebugger")
 		debugger_singleton.register_message_capture("gdsyncprofiler", _capture)
 		debugger_singleton.send_message("gdsyncprofiler:gamestart", [])

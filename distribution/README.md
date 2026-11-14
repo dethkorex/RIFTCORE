@@ -21,6 +21,8 @@ The installed launcher is the entry point for local play and GitHub updates on W
 
 The PNG frames inside the Windows ICO come from the transparent RIFTCORE SVG. Game and launcher exports embed that ICO, and the installer uses it for the setup executable and Start menu shortcut.
 
+Launcher 0.1 accepts only numeric tags and an exact four-file archive. Its Update and Play button receives the one-time `v0.4.100` migration, replaces the launcher at the original path, and installs the latest preview. Existing game versions are retained for offline play. The normal preview ZIP still includes the Steam runtime.
+
 ## Online room preview
 
 Players create or join a private, two-player room using a shared code. The game uses GD Sync's hosted relay for this flow. Open the Social pad in Operations Station. A Steam library shortcut starts the launcher. Live rooms need a configured GD Sync project. Steam presence and invites also require a RIFTCORE Steam App ID. Shared campaign gameplay is under development. Solo play starts independently of the relay.
@@ -29,7 +31,7 @@ For a local relay test, the GD Sync project owner can supply the provider keys u
 
 ### Live room check
 
-Enable GD Sync in the editor and enter a dedicated playtest key pair under Project → Tools → GD-Sync. The editor keeps the pair in the ignored config. The export also accepts both environment variables from its caller. Use the same playtest pair on both machines. The release workflow and editor export do not embed the credentials.
+Enable GD Sync in the editor and enter a dedicated playtest key pair under Project → Tools → GD-Sync. The editor keeps the pair in the ignored config. In a distributed playtest build, use Social → Configure Playtest to save the pair on that machine. The export also accepts both environment variables from its caller. Use the same playtest pair on both machines. The release workflow and editor export do not embed the credentials.
 
 1. Run the exported Windows game with `--headless -- --verify-relay host`. Add `--log-file PATH` before `--` to write the room code to a file.
 2. On Linux, run `./RIFTCORE --headless -- --verify-relay join ROOM_CODE` with the code printed by Windows.

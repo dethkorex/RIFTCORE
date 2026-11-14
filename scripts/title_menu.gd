@@ -18,6 +18,7 @@ var relay_status: Label
 var relay_code: LineEdit
 var relay_host: Button
 var relay_join: Button
+var relay_paste: Button
 var relay_copy: Button
 var relay_leave: Button
 var steam_invite_buttons: Array[Button] = []
@@ -64,6 +65,7 @@ func _ready() -> void:
 	show_page("Title")
 
 func show_page(next: String) -> void:
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	if next == "Hub":
 		hub_requested.emit()
 		return
@@ -339,7 +341,8 @@ func build_social(columns: HBoxContainer) -> void:
 	RiftSocial.connect_steam()
 	RiftRelay.listen_for_steam_invites()
 	var list := card(columns, 1.2)
-	UI.label(list, "STEAM FRIENDS", 30, UI.CYAN)
+	UI.label(list, "SOCIAL  /  STEAM FRIENDS", 30, UI.CYAN)
+	UI.label(list, "Quick Invite opens a room automatically for friends playing RIFTCORE.", 15, UI.MUTED)
 	UI.label(list, RiftSocial.message, 16, UI.MUTED)
 	var rows := scroll_entries(list)
 	for friend in RiftSocial.contacts():
@@ -349,8 +352,8 @@ func build_social(columns: HBoxContainer) -> void:
 		var label := UI.label(row, "%s  /  %s" % [friend.name, friend.status], 16, tint)
 		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		UI.button(row, "Profile", RiftSocial.open_profile.bind(friend.id), false, 34)
-		if friend.priority <= 1:
-			var invite := UI.button(row, "Invite", RiftRelay.invite_friend.bind(int(friend.id)), false, 34)
+		if friend.priority == 0:
+			var invite := UI.button(row, "Quick Invite", RiftRelay.invite_friend.bind(int(friend.id)), false, 34)
 			steam_invite_buttons.append(invite)
 		if friend.saved:
 			UI.button(row, "Remove", func():
@@ -402,17 +405,39 @@ func build_online_room(columns: HBoxContainer) -> void:
 	relay_code.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	relay_code.text_submitted.connect(RiftRelay.join_room)
 	join_row.add_child(relay_code)
+	relay_paste = UI.button(join_row, "Paste Code", func():
+		relay_code.text = DisplayServer.clipboard_get().strip_edges().left(relay_code.max_length)
+		relay_code.grab_focus()
+		relay_code.caret_column = relay_code.text.length()
+	)
 	relay_join = UI.button(join_row, "Join Room", func(): RiftRelay.join_room(relay_code.text))
 	relay_status = UI.label(form, "", 18, UI.CYAN)
 	relay_copy = UI.button(form, "Copy Room Code", func(): DisplayServer.clipboard_set(RiftRelay.connected_room))
 	relay_leave = UI.button(form, "Leave Room", func(): RiftRelay.leave())
-	var guide := UI.button(form, "Co-op Setup Guide", show_page.bind("Co-op Setup Guide"))
-	portrait(card(columns))
+	if not RiftRelay.available:
+		var setup := UI.column(form, 5)
+		setup.hide()
+		var configure := UI.button(form, "Configure Playtest", func(): setup.show(), true)
+		var public_key := LineEdit.new()
+		public_key.placeholder_text = "GD Sync public key"
+		public_key.secret = true
+		setup.add_child(public_key)
+		var private_key := LineEdit.new()
+		private_key.placeholder_text = "GD Sync private key"
+		private_key.secret = true
+		setup.add_child(private_key)
+		var feedback := UI.label(setup, "", 14, UI.MUTED)
+		UI.button(setup, "Enable Online Rooms", func():
+			if RiftRelay.configure_playtest(public_key.text, private_key.text) == OK:
+				show_page("Social")
+			else:
+				feedback.text = "Enter both playtest keys. Verify the game can write to its settings folder."
+		, false, 34)
+		configure.grab_focus()
+	UI.button(form, "Co-op Setup Guide", show_page.bind("Co-op Setup Guide"))
 	refresh_online_room()
 	if RiftRelay.available:
 		relay_host.grab_focus()
-	else:
-		guide.grab_focus()
 
 func refresh_online_room() -> void:
 	if page != "Social" or not is_instance_valid(relay_status):
@@ -421,12 +446,13 @@ func refresh_online_room() -> void:
 	var requesting := not RiftRelay.pending.is_empty()
 	relay_host.disabled = not RiftRelay.available or joined or requesting
 	relay_join.disabled = relay_host.disabled
+	relay_paste.disabled = relay_join.disabled
 	relay_code.editable = not relay_join.disabled
 	relay_copy.visible = joined
 	relay_leave.visible = joined or requesting
 	relay_leave.text = "Leave Room" if joined else "Cancel Connection"
 	for invite in steam_invite_buttons:
-		invite.disabled = not joined or RiftRelay.room_size >= 2
+		invite.disabled = not RiftRelay.available or requesting or RiftRelay.pending_invite != 0 or RiftRelay.room_size >= 2
 	relay_status.text = "%s   /   Code %s" % [RiftRelay.status, RiftRelay.connected_room] if joined else RiftRelay.status
 	if joined:
 		relay_copy.grab_focus()

@@ -7,7 +7,7 @@ const Client := preload("res://addons/GD-Sync/MultiplayerClient.gd")
 const RelayEnums := preload("res://addons/GD-Sync/Scripts/Enums/Enums.gd")
 const Codes := "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 const CodeLength := 10
-const RELAY_UNAVAILABLE := "Online rooms are disabled in this build. The GD Sync relay has not been configured."
+const RELAY_UNAVAILABLE := "Online rooms need GD Sync playtest keys. Choose Configure Playtest."
 
 var status := "Create a room or enter a friend’s room code."
 var connected_room := ""
@@ -15,6 +15,7 @@ var pending := ""
 var room_code := ""
 var room_size := 0
 var available := false
+var pending_invite := 0
 
 var relay: Node
 var request_timeout: Timer
@@ -28,6 +29,18 @@ func _ready() -> void:
 	request_timeout.wait_time = 30.0
 	request_timeout.timeout.connect(func(): leave("The connection timed out. Try again."))
 	add_child(request_timeout)
+
+func configure_playtest(public_key: String, private_key: String) -> Error:
+	if available or public_key.strip_edges().is_empty() or private_key.strip_edges().is_empty():
+		return ERR_INVALID_PARAMETER
+	var config := ConfigFile.new()
+	config.set_value(Keys.KEYS_SECTION, Keys.PUBLIC_ENTRY, public_key.strip_edges())
+	config.set_value(Keys.KEYS_SECTION, Keys.PRIVATE_ENTRY, private_key.strip_edges())
+	var result := config.save(Keys.USER_KEYS_PATH)
+	if result == OK:
+		available = Keys.has_keys()
+		status = "Create a room or enter a friend’s room code."
+	return result
 
 func _initialize_client() -> void:
 	if is_instance_valid(relay):
@@ -74,17 +87,30 @@ func listen_for_steam_invites() -> void:
 		_initialize_client()
 
 func invite_friend(steam_id: int) -> void:
-	if connected_room.is_empty() or not RiftSocial.ready_to_query:
+	if not available or not RiftSocial.ready_to_query or not RiftSocial.steam.loggedOn():
 		return
-	if room_size >= 2:
-		_update("Your room is full.")
+	if room_size >= 2 or pending_invite != 0 or not pending.is_empty():
 		return
-	var lobby: int = relay._steam.steam_lobby_id
-	if lobby == 0:
-		_update("Steam invite is unavailable. You can share your room code.")
-		return
-	var sent: bool = RiftSocial.steam.inviteUserToLobby(lobby, steam_id)
-	_update("Steam invitation sent." if sent else "Steam couldn't send the invite. You can share your room code.")
+	pending_invite = steam_id
+	if connected_room.is_empty():
+		host_room()
+	else:
+		_send_pending_invite.call_deferred()
+
+func _send_pending_invite() -> void:
+	var recipient := pending_invite
+	for attempt in 40:
+		if pending_invite != recipient or connected_room.is_empty():
+			return
+		var lobby: int = relay._steam.steam_lobby_id
+		if lobby != 0:
+			var sent: bool = RiftSocial.steam.inviteUserToLobby(lobby, recipient)
+			pending_invite = 0
+			_update("Steam invitation sent." if sent else "Steam couldn't send the invite. You can share your room code.")
+			return
+		await get_tree().create_timer(0.25).timeout
+	pending_invite = 0
+	_update("Steam didn't open an invite lobby. You can share your room code.")
 
 func valid_code(code: String) -> bool:
 	if code.length() != CodeLength:
@@ -106,6 +132,7 @@ func _open(operation: String, code: String) -> void:
 	relay.start_multiplayer()
 
 func _request_room() -> void:
+	relay.player_set_username("RX-%s" % Crypto.new().generate_random_bytes(6).hex_encode())
 	match pending:
 		"host":
 			_update("Creating your room…")
@@ -125,12 +152,14 @@ func _room_joined(lobby_name: String) -> void:
 	connected_room = room_code
 	pending = ""
 	_players_changed(0)
+	if pending_invite != 0:
+		_send_pending_invite.call_deferred()
 
-func _room_failed(lobby_name: String, _error: int) -> void:
+func _room_failed(lobby_name: String, error: int) -> void:
 	if pending.is_empty() or lobby_name != _room_name():
 		return
 	var message := "Could not create a room. Try again." if pending == "host" else "Could not join this room. Check the code and ask your friend to keep the room open."
-	leave(message)
+	leave("%s (GD Sync code %d)" % [message, error])
 
 func _connection_failed(error: int) -> void:
 	if pending.is_empty():
@@ -155,6 +184,7 @@ func leave(message := "Create a room or enter a friend’s room code.") -> void:
 	var disconnect := not pending.is_empty() or was_joined
 	pending = ""
 	connected_room = ""
+	pending_invite = 0
 	room_code = ""
 	room_size = 0
 	request_timeout.stop()
