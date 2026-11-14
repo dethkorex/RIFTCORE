@@ -414,26 +414,6 @@ func build_online_room(columns: HBoxContainer) -> void:
 	relay_status = UI.label(form, "", 18, UI.CYAN)
 	relay_copy = UI.button(form, "Copy Room Code", func(): DisplayServer.clipboard_set(RiftRelay.connected_room))
 	relay_leave = UI.button(form, "Leave Room", func(): RiftRelay.leave())
-	if not RiftRelay.available:
-		var setup := UI.column(form, 5)
-		setup.hide()
-		var configure := UI.button(form, "Configure Playtest", func(): setup.show(), true)
-		var public_key := LineEdit.new()
-		public_key.placeholder_text = "GD Sync public key"
-		public_key.secret = true
-		setup.add_child(public_key)
-		var private_key := LineEdit.new()
-		private_key.placeholder_text = "GD Sync private key"
-		private_key.secret = true
-		setup.add_child(private_key)
-		var feedback := UI.label(setup, "", 14, UI.MUTED)
-		UI.button(setup, "Enable Online Rooms", func():
-			if RiftRelay.configure_playtest(public_key.text, private_key.text) == OK:
-				show_page("Social")
-			else:
-				feedback.text = "Enter both playtest keys. Verify the game can write to its settings folder."
-		, false, 34)
-		configure.grab_focus()
 	UI.button(form, "Co-op Setup Guide", show_page.bind("Co-op Setup Guide"))
 	refresh_online_room()
 	if RiftRelay.available:

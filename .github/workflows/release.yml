@@ -40,7 +40,13 @@ jobs:
           REF_NAME: ${{ github.ref_name }}
           RELEASE_REPO: ${{ github.repository }}
           PREVIEW_TAG: ${{ inputs.preview_tag }}
+          GDSYNC_PUBLIC_KEY: ${{ secrets.GDSYNC_PUBLIC_KEY }}
+          GDSYNC_PRIVATE_KEY: ${{ secrets.GDSYNC_PRIVATE_KEY }}
         run: |
+          if [ -z "$GDSYNC_PUBLIC_KEY" ] || [ -z "$GDSYNC_PRIVATE_KEY" ]; then
+            echo 'The RIFTCORE relay keys are missing from the release configuration.'
+            exit 1
+          fi
           tag="$PREVIEW_TAG"
           if [ "$REF_TYPE" = tag ]; then tag="$REF_NAME"; fi
           python3 distribution/build_release.py --engine release-tools/Godot_v4.7.2-stable_linux.x86_64             --templates release-tools/templates --licenses release-tools --nsis /usr/bin/makensis             --work release-tools/build --out release-tools/artifacts --tag "$tag" --repo "$RELEASE_REPO"
@@ -74,7 +80,7 @@ jobs:
             grep -F "Exec=\"$XDG_DATA_HOME/riftcore/RIFTCORE\"" "$XDG_DATA_HOME/applications/riftcore.desktop"
             "$XDG_DATA_HOME/riftcore/start-riftcore" --headless --quit-after 30 --log-file /tmp/installed.log
             build="$(find "$XDG_DATA_HOME/riftcore/versions" -name RIFTCORE -type f)"
-            "$build" --headless --quit-after 60 --log-file /tmp/game.log -- --verify-social
+            "$build" --headless --quit-after 60 --log-file /tmp/game.log -- --verify-social --require-relay
             grep -F "SOCIAL SMOKE PASS" /tmp/game.log
             ! grep -E "SCRIPT ERROR:|Failed to load" /tmp/launcher.log /tmp/native.log /tmp/installed.log /tmp/game.log
           '
@@ -112,7 +118,7 @@ jobs:
           Expand-Archive RIFTCORE-windows-x64.zip -DestinationPath game
           $game = Join-Path $PWD 'game/RIFTCORE.exe'
           $log = Join-Path $PWD 'windows-social.log'
-          $run = Start-Process -FilePath $game -ArgumentList @('--headless','--quit-after','120','--log-file',('"' + $log + '"'),'--','--verify-social') -Wait -PassThru
+          $run = Start-Process -FilePath $game -ArgumentList @('--headless','--quit-after','120','--log-file',('"' + $log + '"'),'--','--verify-social','--require-relay') -Wait -PassThru
           Get-Content -LiteralPath $log
           if ($run.ExitCode -ne 0 -or !(Select-String -LiteralPath $log -Pattern 'SOCIAL SMOKE PASS' -Quiet)) { exit 1 }
 

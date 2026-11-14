@@ -2,6 +2,8 @@
 
 ## Game changes
 
+- Online rooms use the RIFTCORE relay configuration included in the game. Social no longer asks players to enter keys.
+
 - Tilt the left stick lightly to walk. Push it farther to run in the station and during missions.
 
 - Moving or clicking the mouse restores the cursor in menus, the station, and the launcher.

@@ -27,11 +27,9 @@ Launcher 0.1 accepts only numeric tags and an exact four-file archive. Its Updat
 
 Players create or join a private, two-player room using a shared code. The game uses GD Sync's hosted relay for this flow. Open the Social pad in Operations Station. A Steam library shortcut starts the launcher. Live rooms need a configured GD Sync project. Steam presence and invites also require a RIFTCORE Steam App ID. Shared campaign gameplay is under development. Solo play starts independently of the relay.
 
-For a local relay test, the GD Sync project owner can supply the provider keys using `GDSYNC_PUBLIC_KEY` and `GDSYNC_PRIVATE_KEY`, or place them in the ignored `addons/GD-Sync/keys.cfg` on development machines. Export presets exclude that local config. The exported Windows and Arch Linux checks cover Social navigation, room code validation, and the unconfigured relay state. A live cross-platform relay test requires the same GD Sync project on both clients.
+The release workflow supplies the game’s GD Sync project keys from GitHub Actions secrets, and Godot’s GD Sync export plugin includes them in both game packages. Players can open Social and create or join a room immediately. Editor testing uses Project → Tools → GD-Sync or the `GDSYNC_PUBLIC_KEY` and `GDSYNC_PRIVATE_KEY` environment variables. The editor config is ignored by Git. Use a dedicated game key pair for distribution because exported resources can be read by players.
 
 ### Live room check
-
-Enable GD Sync in the editor and enter a dedicated playtest key pair under Project → Tools → GD-Sync. The editor keeps the pair in the ignored config. In a distributed playtest build, use Social → Configure Playtest to save the pair on that machine. The export also accepts both environment variables from its caller. Use the same playtest pair on both machines. The release workflow and editor export do not embed the credentials.
 
 1. Run the exported Windows game with `--headless -- --verify-relay host`. Add `--log-file PATH` before `--` to write the room code to a file.
 2. On Linux, run `./RIFTCORE --headless -- --verify-relay join ROOM_CODE` with the code printed by Windows.

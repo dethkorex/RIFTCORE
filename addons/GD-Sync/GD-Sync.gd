@@ -74,7 +74,7 @@ func _enter_tree() -> void:
 	_check_for_updates_and_news()
 	_initialize_remote_call_validator()
 	add_debugger_plugin(debugger)
-	# RIFTCORE supplies playtest credentials at runtime.
+	add_export_plugin(export_plugin)
 
 func _exit_tree() -> void:
 	_disable_remote_call_validator()
@@ -85,6 +85,7 @@ func _exit_tree() -> void:
 		config_menu = null
 	
 	remove_debugger_plugin(debugger)
+	remove_export_plugin(export_plugin)
 
 func _relocate_api_keys() -> void:
 	KeyStore.ensure_gitignore()

@@ -107,8 +107,13 @@ func verify_social() -> void:
 		print("SOCIAL SMOKE FAIL")
 		get_tree().quit(1)
 		return
+	if "--require-relay" in OS.get_cmdline_user_args():
+		valid = (valid and RiftRelay.available
+			and not menu.relay_host.disabled and not menu.relay_join.disabled
+			and not menu.relay_paste.disabled and menu.relay_code.editable
+			and FileAccess.file_exists("res://addons/GD-Sync/keys.cfg"))
 	if not RiftRelay.available:
-		valid = menu.relay_host.disabled and menu.relay_join.disabled and not menu.relay_code.editable
+		valid = valid and menu.relay_host.disabled and menu.relay_join.disabled and not menu.relay_code.editable
 		valid = valid and menu.relay_status.text == RiftRelay.RELAY_UNAVAILABLE
 	RiftRelay.join_room("invalid!")
 	valid = valid and RiftRelay.status.begins_with("Enter the ten-character")

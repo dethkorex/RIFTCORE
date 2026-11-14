@@ -25,7 +25,6 @@ extends RefCounted
 #ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 #SUCH DAMAGE.
 
-const USER_KEYS_PATH := "user://riftcore_relay.cfg"
 const KEYS_PATH : String = "res://addons/GD-Sync/keys.cfg"
 const KEYS_SECTION : String = "keys"
 const PUBLIC_ENTRY : String = "publicKey"
@@ -45,9 +44,6 @@ static func load_keys() -> Dictionary:
 	var keys : Dictionary = {"PublicKey" : "", "PrivateKey" : ""}
 	var config : ConfigFile = ConfigFile.new()
 	if config.load(KEYS_PATH) == OK or config.load(_os(KEYS_PATH)) == OK:
-		keys["PublicKey"] = str(config.get_value(KEYS_SECTION, PUBLIC_ENTRY, ""))
-		keys["PrivateKey"] = str(config.get_value(KEYS_SECTION, PRIVATE_ENTRY, ""))
-	if keys["PublicKey"].is_empty() and keys["PrivateKey"].is_empty() and config.load(USER_KEYS_PATH) == OK:
 		keys["PublicKey"] = str(config.get_value(KEYS_SECTION, PUBLIC_ENTRY, ""))
 		keys["PrivateKey"] = str(config.get_value(KEYS_SECTION, PRIVATE_ENTRY, ""))
 	if keys["PublicKey"].is_empty():

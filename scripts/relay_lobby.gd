@@ -7,7 +7,7 @@ const Client := preload("res://addons/GD-Sync/MultiplayerClient.gd")
 const RelayEnums := preload("res://addons/GD-Sync/Scripts/Enums/Enums.gd")
 const Codes := "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 const CodeLength := 10
-const RELAY_UNAVAILABLE := "Online rooms need GD Sync playtest keys. Choose Configure Playtest."
+const RELAY_UNAVAILABLE := "Online rooms are unavailable. Solo play is available."
 
 var status := "Create a room or enter a friend’s room code."
 var connected_room := ""
@@ -29,18 +29,6 @@ func _ready() -> void:
 	request_timeout.wait_time = 30.0
 	request_timeout.timeout.connect(func(): leave("The connection timed out. Try again."))
 	add_child(request_timeout)
-
-func configure_playtest(public_key: String, private_key: String) -> Error:
-	if available or public_key.strip_edges().is_empty() or private_key.strip_edges().is_empty():
-		return ERR_INVALID_PARAMETER
-	var config := ConfigFile.new()
-	config.set_value(Keys.KEYS_SECTION, Keys.PUBLIC_ENTRY, public_key.strip_edges())
-	config.set_value(Keys.KEYS_SECTION, Keys.PRIVATE_ENTRY, private_key.strip_edges())
-	var result := config.save(Keys.USER_KEYS_PATH)
-	if result == OK:
-		available = Keys.has_keys()
-		status = "Create a room or enter a friend’s room code."
-	return result
 
 func _initialize_client() -> void:
 	if is_instance_valid(relay):
