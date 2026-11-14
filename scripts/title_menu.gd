@@ -569,9 +569,10 @@ func sector_card(entries: GridContainer, number: int, state: String) -> Button:
 	return choice
 
 func build_equipment_station(columns: HBoxContainer, shopping: bool) -> void:
-	var list := card(columns, 1.20)
+	var list: VBoxContainer
 	if shopping:
 		var slots := card(columns)
+		list = card(columns, 1.2)
 		UI.label(slots, "RX-07 Equipment", 29, UI.CYAN)
 		var body := EquipmentBody.new()
 		slots.add_child(body)
@@ -581,6 +582,7 @@ func build_equipment_station(columns: HBoxContainer, shopping: bool) -> void:
 		UI.label(list, "PLAYER LV. %d" % profile.player_level(), 18, Color("ffd079"))
 		UI.label(list, "Review a blueprint to check its materials.", 17, UI.MUTED)
 	else:
+		list = card(columns, 1.20)
 		UI.label(list, "Storage   %d / %d" % [profile.stored_count(), profile.storage_capacity()], 33, UI.CYAN)
 		UI.label(list, "Stowed gear survives defeat. Equipping an item stows the previous one automatically.", 17, UI.MUTED)
 		portrait(card(columns, 0.82))
@@ -595,8 +597,7 @@ func build_equipment_station(columns: HBoxContainer, shopping: bool) -> void:
 		var row := item_card(entries, id)
 		if shopping:
 			var header := row.get_child(0) as HBoxContainer
-			var action := UI.button(header, ("Blueprint  ›" if profile.player_level() >= Profile.recipe_level(id) else "Locked  /  Lv. %d" % Profile.recipe_level(id)) if state.is_empty() else "Owned", inspect_shop_item.bind(id) if state.is_empty() else Callable())
-			action.custom_minimum_size.y = 34
+			var action := UI.button(header, ("Blueprint  ›" if profile.player_level() >= Profile.recipe_level(id) else "Locked  /  Lv. %d" % Profile.recipe_level(id)) if state.is_empty() else "Owned", inspect_shop_item.bind(id) if state.is_empty() else Callable(), false, 36.0)
 			action.add_theme_font_size_override("font_size", 15)
 			action.tooltip_text = "Inspect blueprint" if state.is_empty() else "Available in Storage"
 			if id == shop_item and not action.disabled:
@@ -623,13 +624,12 @@ func scroll_entries(parent: VBoxContainer) -> VBoxContainer:
 func item_card(parent: VBoxContainer, id: String) -> VBoxContainer:
 	var item: Dictionary = Profile.GEAR[id]
 	var tint: Color = Profile.RARITY_COLORS[item.rarity]
-	var panel := PanelContainer.new()
-	var rarity_frames := ["item_slot_common", "item_slot_rare", "item_slot_epic", "item_slot_legendary"]
-	panel.add_theme_stylebox_override("panel", UI.texture_frame(rarity_frames[item.rarity], 24, Vector2(18, 12)))
+	var panel := UI.equipment_card(tint)
 	parent.add_child(panel)
 	var stack := UI.column(panel, 6)
 	var head := HBoxContainer.new()
 	stack.add_child(head)
+	head.add_theme_constant_override("separation", 9)
 	var icon := TextureRect.new()
 	icon.texture = EquipmentIcons.icon(id, item.slot)
 	icon.custom_minimum_size = Vector2(34, 34)

@@ -8,7 +8,7 @@ const CYAN := Color("55e7ff")
 const MUTED := Color("9db4cc")
 const WHITE := Color("e7f2ff")
 const VIOLET := Color("bf82ff")
-static var highlight_texture: ImageTexture
+static var button_texture: ImageTexture
 
 static func frame(fill: Color, edge: Color, accent := 2) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
@@ -31,6 +31,39 @@ static func texture_frame(name: String, corner: float, padding: Vector2) -> Styl
 		style.set_texture_margin(side, corner)
 		style.set_content_margin(side, padding.x if side in [SIDE_LEFT, SIDE_RIGHT] else padding.y)
 	return style
+
+static func equipment_card(tint: Color) -> PanelContainer:
+	var panel := PanelContainer.new()
+	var frame_owner := Control.new()
+	frame_owner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.add_child(frame_owner)
+	frame_owner.draw.connect(func():
+		var width := frame_owner.size.x
+		var height := frame_owner.size.y
+		var corner := 14.0
+		var points := PackedVector2Array([
+			Vector2(corner, 1), Vector2(width - corner, 1),
+			Vector2(width - 1, corner), Vector2(width - 1, height - corner),
+			Vector2(width - corner, height - 1), Vector2(corner, height - 1),
+			Vector2(1, height - corner), Vector2(1, corner),
+		])
+		frame_owner.draw_colored_polygon(points, Color("102038"))
+		points.append(points[0])
+		frame_owner.draw_polyline(points, tint.darkened(0.32), 1.6, true)
+		frame_owner.draw_line(Vector2(corner + 5, 4), Vector2(83, 4), tint, 2.0, true)
+		frame_owner.draw_line(Vector2(width - 59, height - 4), Vector2(width - corner - 5, height - 4), tint, 2.0, true)
+	)
+	frame_owner.resized.connect(frame_owner.queue_redraw)
+	var spacing := StyleBoxEmpty.new()
+	spacing.content_margin_top = 9
+	spacing.content_margin_bottom = 9
+	spacing.content_margin_left = 14
+	spacing.content_margin_right = 14
+	panel.add_theme_stylebox_override("panel", spacing)
+	# The artwork fills the panel while the other children retain content margins.
+	panel.fit_child_in_rect(frame_owner, Rect2(Vector2.ZERO, panel.size))
+	panel.sort_children.connect(func(): panel.fit_child_in_rect(frame_owner, Rect2(Vector2.ZERO, panel.size)))
+	return panel
 
 static func theme() -> Theme:
 	var result := Theme.new()
@@ -57,7 +90,13 @@ static func label(parent: Node, value: String, font_size := 17, color := WHITE) 
 	return item
 
 static func style_button(item: Button) -> void:
-	if not highlight_texture:
+	if item.custom_minimum_size.y < 40:
+		var compact := frame(Color("12253d"), Color("3b6384"))
+		var compact_active := frame(Color("34244f"), VIOLET)
+		var compact_pressed := frame(Color("251936"), VIOLET.darkened(0.2))
+		set_button_states(item, compact, compact_active, compact_pressed)
+		return
+	if not button_texture:
 		var source := load(KIT + "button_primary.png") as Texture2D
 		var pixels := source.get_image()
 		pixels.convert(Image.FORMAT_RGBA8)
@@ -66,13 +105,20 @@ static func style_button(item: Button) -> void:
 				var pixel := pixels.get_pixel(x, y)
 				var value := pixel.v
 				pixels.set_pixel(x, y, Color(value, value, value, pixel.a))
-		highlight_texture = ImageTexture.create_from_image(pixels)
+		button_texture = ImageTexture.create_from_image(pixels)
 	var active := texture_frame("button_primary", 31, Vector2(22, 8))
-	active.texture = highlight_texture
+	active.texture = button_texture
+	active.set_texture_margin(SIDE_TOP, 19)
+	active.set_texture_margin(SIDE_BOTTOM, 19)
 	active.modulate_color = VIOLET
+	var idle := active.duplicate() as StyleBoxTexture
+	idle.modulate_color = Color("5a9ac7")
 	var down := active.duplicate() as StyleBoxTexture
 	down.modulate_color = VIOLET.darkened(0.22)
-	var inactive := item.get_theme_stylebox("normal")
+	set_button_states(item, idle, active, down)
+
+static func set_button_states(item: Button, inactive: StyleBox, active: StyleBox, down: StyleBox) -> void:
+	item.add_theme_stylebox_override("normal", inactive)
 	item.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
 	item.add_theme_stylebox_override("hover", active)
 	item.add_theme_stylebox_override("pressed", down)
@@ -84,10 +130,10 @@ static func style_button(item: Button) -> void:
 	item.focus_entered.connect(func(): item.add_theme_stylebox_override("normal", active))
 	item.focus_exited.connect(func(): item.add_theme_stylebox_override("normal", inactive))
 
-static func button(parent: Node, value: String, action: Callable, primary := false) -> Button:
+static func button(parent: Node, value: String, action: Callable, primary := false, height := 44.0) -> Button:
 	var item := Button.new()
 	item.text = value
-	item.custom_minimum_size.y = 44
+	item.custom_minimum_size.y = height
 	if primary:
 		item.add_theme_color_override("font_color", WHITE)
 	if action.is_valid():

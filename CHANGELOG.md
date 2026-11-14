@@ -2,6 +2,7 @@
 
 ## Game changes
 
+- Fabrication puts RX-07 on the left and blueprints on the right, with clean item rows and readable rarity tags.
 - Menu buttons turn purple while highlighted and return to blue when you move on. The separate outline is gone. Analog-stick menu navigation responds sooner and repeats while held.
 
 - Aim and fire in either direction while climbing. Hold Up or Down to grab a ladder mid-dash. Step off at the top, or press Down + B on a one-way deck to drop through.
