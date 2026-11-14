@@ -1,5 +1,7 @@
 [gd_scene format=3]
 
+[ext_resource type="FontFile" path="res://assets/ui/fonts/BarlowCondensed-ExtraBoldItalic.ttf" id="riftcore_display_font"]
+
 [ext_resource type="Script" path="res://scripts/enemy_pickup.gd" id="pickup"]
 [ext_resource type="Material" path="res://assets/neon_factory/dark.tres" id="dark"]
 [ext_resource type="Material" path="res://assets/neon_factory/cyan.tres" id="cyan"]
@@ -35,6 +37,7 @@ rotation = Vector3(1.5707963, 0, 0)
 mesh = SubResource("Rim")
 
 [node name="Mark" type="Label3D" parent="Visual"]
+font = ExtResource("riftcore_display_font")
 position = Vector3(0, 0, 0.119)
 pixel_size = 0.0034
 font_size = 75

@@ -153,6 +153,7 @@ func telegraph() -> void:
 	zones.clear()
 	if attack == "signature":
 		var label := Label3D.new()
+		label.font = preload("res://assets/ui/fonts/BarlowCondensed-ExtraBoldItalic.ttf")
 		label.text = SIGNATURES[sector - 1]
 		label.modulate = accent.lerp(Color.WHITE, 0.45)
 		label.pixel_size = 0.0046

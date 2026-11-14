@@ -148,6 +148,7 @@ func windup() -> void:
 	ATTACK_FX.telegraph(warning, width * 2.0, accent, cooldown)
 	if attack == "crossfire":
 		var signal_light := Label3D.new()
+		signal_light.font = preload("res://assets/ui/fonts/BarlowCondensed-ExtraBoldItalic.ttf")
 		signal_light.text = "CROSSFIRE"
 		signal_light.pixel_size = 0.0054
 		signal_light.modulate = accent.lerp(Color.WHITE, 0.35)

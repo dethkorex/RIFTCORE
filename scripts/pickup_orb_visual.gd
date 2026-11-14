@@ -57,6 +57,7 @@ func add_orbit() -> void:
 
 func add_text(symbol: String, ink: Color, units_per_pixel: float) -> void:
 	var glyph := Label3D.new()
+	glyph.font = preload("res://assets/ui/fonts/BarlowCondensed-ExtraBoldItalic.ttf")
 	glyph.text = symbol
 	glyph.font_size = 104
 	glyph.pixel_size = units_per_pixel

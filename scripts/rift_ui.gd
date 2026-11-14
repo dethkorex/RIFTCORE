@@ -1,7 +1,6 @@
 extends RefCounted
 
 const DISPLAY := preload("res://assets/ui/fonts/BarlowCondensed-ExtraBoldItalic.ttf")
-const BODY := preload("res://assets/ui/fonts/BarlowCondensed-Medium.ttf")
 const KIT := "res://assets/ui/riftcore_kit/"
 
 const CYAN := Color("55e7ff")
@@ -69,7 +68,7 @@ static func equipment_card(tint: Color) -> PanelContainer:
 
 static func theme() -> Theme:
 	var result := Theme.new()
-	result.default_font = BODY
+	result.default_font = DISPLAY
 	result.default_font_size = 16
 	result.set_color("font_color", "Label", WHITE)
 	result.set_stylebox("panel", "PanelContainer", texture_frame("panel_base_small", 31, Vector2(21, 14)))
@@ -94,7 +93,7 @@ static func label(parent: Node, value: String, font_size := 16, color := WHITE) 
 	item.text = value
 	item.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	item.add_theme_font_size_override("font_size", maxi(12, roundi(font_size * 0.91)))
-	item.add_theme_font_override("font", DISPLAY if font_size >= 23 else BODY)
+	item.add_theme_font_override("font", DISPLAY)
 	item.add_theme_color_override("font_color", color)
 	item.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	parent.add_child(item)

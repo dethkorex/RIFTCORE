@@ -144,7 +144,7 @@ func plate(rect: Rect2, cut := 9.0, edge := CYAN) -> void:
 	draw_line(Vector2(x + cut + 3, y + 3), Vector2(r - cut - 3, y + 3), WHITE, 1.0)
 
 func caption(at: Vector2, value: String, font_size := 18, color := WHITE) -> void:
-	var face := UI.DISPLAY if font_size >= 19 else UI.BODY
+	var face := UI.DISPLAY
 	draw_string(face, at + Vector2(1, 2), value, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, Color("020817"))
 	draw_string(face, at, value, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, color)
 

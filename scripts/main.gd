@@ -934,6 +934,7 @@ func decorate_miniboss_room() -> void:
 		if child is Label3D and child.name in [&"ArenaName", &"BossSign", &"GroveCounterplayHint"]:
 			child.hide()
 	var signpost := Label3D.new()
+	signpost.font = preload("res://assets/ui/fonts/BarlowCondensed-ExtraBoldItalic.ttf")
 	signpost.text = "ACT 1  /  " + title
 	signpost.modulate = Color(Catalog.info(sector).color)
 	signpost.font_size = 54
@@ -941,6 +942,7 @@ func decorate_miniboss_room() -> void:
 	decor.add_child(signpost)
 	signpost.global_position = Vector3(gate.global_position.x + 8.0, gate.global_position.y + 4.35, -1.8)
 	var exit_sign := Label3D.new()
+	exit_sign.font = preload("res://assets/ui/fonts/BarlowCondensed-ExtraBoldItalic.ttf")
 	exit_sign.text = "ACT 2"
 	exit_sign.font_size = 48
 	exit_sign.pixel_size = 0.006

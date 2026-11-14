@@ -197,7 +197,7 @@ func load_stage() -> void:
 		operators.append(operator)
 		var plate := Label3D.new()
 		plate.position.y = 1.48
-		plate.font = UI.BODY
+		plate.font = UI.DISPLAY
 		plate.font_size = 30
 		plate.pixel_size = 0.0048
 		plate.outline_size = 10
