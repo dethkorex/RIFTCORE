@@ -198,14 +198,17 @@ size = Vector3(1.52, 1.25, 1.5)"""
         self.node(name, parent=parent, kind="Label3D", pos=(x,y,z), text=f'"{message}"',
                   font=ext("RCFont"), font_size=54, outline_size=10, pixel_size=pixels, modulate=self.color())
 
-    def jungle_opening(self, a, b, floor):
-        # Decorative roots stay behind the side-scrolling lane.
+    def jungle_opening(self, b, floor):
+        if b != self.cave_entrance:
+            return
         parent = self.node("OpenCanopy")
-        if b == self.cave_entrance:
-            self.node("CaveMouth", parent=parent, art="RCJungleMouth",
-                      pos=(b,floor-.65,-.2))
-            self.label("CaveMouthSign","ROOT CAVES",b-5.2,floor+3.4,z=-1.45,
-                       parent=parent,pixels=.0052)
+        self.node("CaveMouth", parent=parent, art="RCJungleMouth",
+                  pos=(b,floor,-.12), rotation=vec(0,-math.pi/2,0))
+        self.label("CaveMouthSign","ROOT CAVES",b-3.4,floor+3.1,z=-1.45,
+                   parent=parent,pixels=.0052)
+        if self.act == 1:
+            self.solid("RootCellarCanopy","Deck",(b+3.1,floor+4.55,0),
+                       (7.4,.84,4.8),(7.4/6.0,1,1),-.42)
 
     def jungle_bank(self, name, a, b, from_y, to_y):
         span = math.hypot(b-a,to_y-from_y)
@@ -245,7 +248,7 @@ size = Vector3(1.52, 1.25, 1.5)"""
     def shell(self, a, b, floor, roof, variation, cave_lip_floor=None):
         if self.cave_entrance is not None and a < self.cave_entrance:
             opening_end = min(b,self.cave_entrance)
-            self.jungle_opening(a,opening_end,cave_lip_floor if cave_lip_floor is not None else floor)
+            self.jungle_opening(opening_end,cave_lip_floor if cave_lip_floor is not None else floor)
             if opening_end >= b:
                 return
             a = opening_end
@@ -850,6 +853,33 @@ size = Vector3(1.52, 1.25, 1.5)"""
                 a = self.overhead(overhead,a,floor)
         return a, checkpoint
 
+    def align_portals(self, entries, header):
+        for door_name, visual_name in (("ForgeHallDoor","Door"),("Gate","Door"),("ExitBarrier","Seal")):
+            blocker_path = (door_name if visual_name == "Seal" else door_name+"/Blocker")+"/CollisionShape3D"
+            blocker = entries[blocker_path]
+            shape_id = re.search(r'SubResource\("([^"]+)"\)',blocker)[1]
+            shape = re.search(r'id="'+re.escape(shape_id)+r'"\]\s+size = Vector3\(([^)]+)\)',header)[1]
+            _, height, depth = (float(value.strip()) for value in shape.split(","))
+            # Assets are authored across local X. An exact quarter turn spans world Z.
+            # Fit the panels to their blocker and place jambs just outside its edges.
+            visual = door_name+"/"+visual_name
+            tag = entries[visual].splitlines()[0]
+            entries[visual] = f"{tag}\nrotation = {vec(0,-math.pi/2,0)}\nscale = {vec(depth/5.0,height/3.7,1)}"
+            frame = door_name+"/PortalFrame"
+            if frame not in entries:
+                continue
+            tag = entries[frame].splitlines()[0]
+            legacy_frame = 'ExtResource("door_frame")' in tag
+            root_frame = self.sector == "machine_jungle" and not legacy_frame
+            native_width = 3.0 if legacy_frame else 3.75
+            native_height = 3.0 if legacy_frame or root_frame else 4.22
+            frame_depth = depth + (1.20 if root_frame else .88)
+            # Show the complete frame beside the moving panel.
+            approach = -.25
+            entries[frame] = (f"{tag}\nposition = {vec(approach,0,0)}"
+                              f"\nrotation = {vec(0,-math.pi/2,0)}"
+                              f"\nscale = {vec(frame_depth/native_width,(height+.2)/native_height,1.12)}")
+
     def convert(self, legacy):
         header,*blocks = re.split(r'(?=^\[node )',legacy,flags=re.M)
         entries = {}
@@ -860,6 +890,7 @@ size = Vector3(1.52, 1.25, 1.5)"""
             parent = match[1] if match else ""
             key = f"{parent}/{name}" if parent not in (".","") else name
             entries[key] = block.strip()
+        self.align_portals(entries,header)
         gate_x, gate_y, _ = coordinates(entries["Gate"])
         floor = coordinates(entries["MARKERS/PlayerSpawn"])[1]-.905
         end, checkpoint = self.build_rooms(ROUTES[self.sector][self.act-1],floor,gate_y)

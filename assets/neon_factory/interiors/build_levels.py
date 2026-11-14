@@ -172,8 +172,8 @@ height = 0.44
         decks("ArmorFloor",hallx-3,exitx+6,0)
         for name,x in [("ForgeHallDoor",hallx),("Gate",gx)]:
             node(name,pos=(x,0,0),**({"script":e("hall")} if name=="ForgeHallDoor" else {}))
-            asset("Door",name,"gate",0,0,0,rotation=v((0,1.5708,0)),scale=(.83,1,1))
-            asset("PortalFrame",name,"arch",0,0,0,rotation=v((0,1.5708,0)),scale=(.83,1,1))
+            asset("Door",name,"gate",0,0,0,rotation=v((0,-1.5708,0)),scale=(.93,6.6/3.7,1))
+            asset("PortalFrame",name,"arch",-.25,0,0,rotation=v((0,-1.5708,0)),scale=(5.53/3.0,6.8/3.0,1.12))
             node("Blocker",name,"StaticBody3D")
             node("CollisionShape3D",name+"/Blocker","CollisionShape3D",(0,3.2,0),shape=s("GateShape"))
             # The gate cannot be bypassed over or under the enclosed corridor.
@@ -181,7 +181,7 @@ height = 0.44
         node("Shield","ForgeHallDoor","Area3D",(3.6,1.75,0),collision_layer=0)
         node("Shape","ForgeHallDoor/Shield","CollisionShape3D",shape=s("ShieldShape"))
         node("ExitBarrier",typ="StaticBody3D",pos=(exitx,0,0))
-        asset("Seal","ExitBarrier","gate",0,0,0,rotation=v((0,-1.5708,0)))
+        asset("Seal","ExitBarrier","gate",0,0,0,rotation=v((0,-1.5708,0)),scale=(.93,6.6/3.7,1))
         node("CollisionShape3D","ExitBarrier","CollisionShape3D",(0,3.2,0),shape=s("GateShape"))
         wall("ExtractionEnd",exitx+5,0,14)
         checkpoint("ForgeHallCheckpoint",gx-6.4,0)

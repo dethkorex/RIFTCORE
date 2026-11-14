@@ -108,20 +108,21 @@ def shaft(panel, secondary, glow):
 def jungle_mouth(panel, secondary, glow):
     """Passable root-and-rock lintel with irregular stone sides."""
     rng = random.Random(712)
-    for i in range(7):
-        x = -4.3 + i * 1.24
-        z = 5.35 + .19*i + rng.uniform(-.38,.34)
-        box("Cave crown rock", (x,1.15,z),(1.72,2.12,2.14),panel if i%3 else secondary,.33,rng.uniform(-.43,.39))
-        box("Overgrown crown lip", (x,-.37,z+.27),(1.36,.71,.83),secondary,.26,rng.uniform(-.37,.41))
-    for i in range(5):
-        z = .55+1.04*i
-        x = 1.25 + .28*i
-        box("Rear entrance roots", (x,2.62,z),(1.47,1.13,1.29),panel,.23,rng.uniform(-.34,.29))
-        if i%2==0:
-            box("Bioluminescent seam", (x-.38,1.98,z+.28),(.61,.11,.06),glow,.024,.18)
+    for side in (-1,1):
+        for tier in range(5):
+            x = side * (2.55 - .09*tier)
+            z = .43 + 1.01*tier
+            box("Grounded root column", (x,.18,z),(1.17,1.9,1.30),panel if tier%2 else secondary,
+                .24,side*.14+rng.uniform(-.17,.17))
+            if tier%2==1:
+                box("Bioluminescent seam", (x,-.86,z),(.44,.18,.09),glow,.035,side*.26)
+        box("Cave shoulder", (side*1.72,.36,5.15),(1.85,2.45,1.28),secondary,.28,side*.36)
     for i in range(4):
-        box("Hanging root tip", (-4.22+i*.83,-.61,4.52+i*.24),(.22,.40,1.15-i*.11),
-            secondary,.076,.16+i*.09)
+        x = (i-1.5)*1.13
+        box("Binding crown rock", (x,.57,5.65+rng.uniform(-.2,.2)),(1.43,2.61,1.41),
+            panel if i%3 else secondary,.29,rng.uniform(-.30,.30))
+        if i%2==0:
+            box("Hanging root tip", (x,-.72,4.80),(.22,.40,.83),secondary,.08,.22)
 
 
 def jungle_bank(panel, secondary):
