@@ -1,6 +1,6 @@
 extends Node
 
-const CoopSetup := preload("res://scripts/coop_setup.gd")
+const PauseOperator := preload("res://scripts/pause_operator_panel.gd")
 const Materials := preload("res://scripts/fabrication_catalog.gd")
 const Story := preload("res://scripts/rift_story.gd")
 const Drop := preload("res://scripts/material_pickup.gd")
@@ -83,7 +83,9 @@ func _ready() -> void:
 	var pointer := preload("res://scripts/menu_pointer.gd").new()
 	pointer.name = "MenuPointer"
 	pointer.menu_open = func(): return (is_instance_valid(menu) and menu.is_visible_in_tree()
-		or is_instance_valid(pause_menu) and pause_menu.is_visible_in_tree())
+		or is_instance_valid(pause_menu) and pause_menu.is_visible_in_tree()
+		or is_instance_valid(coop_mission) and coop_mission.is_pause_open()
+		or is_instance_valid(home_hub) and home_hub.is_pause_open())
 	add_child(pointer)
 	var arguments := OS.get_cmdline_user_args()
 	if "--verify-social" in arguments or "--verify-relay" in arguments:
@@ -448,7 +450,7 @@ func enter_leader_hub() -> void:
 	menu.hide()
 	menu.process_mode = Node.PROCESS_MODE_DISABLED
 	home_hub.set_panel_open(true)
-	await get_tree().create_timer(0.65).timeout
+	await get_tree().create_timer(0.25).timeout
 	if is_instance_valid(home_hub) and not RiftRelay.mission_active:
 		home_hub.set_panel_open(false)
 	if is_instance_valid(loading):
@@ -796,7 +798,16 @@ func load_checkpoint_location(save: ConfigFile) -> void:
 	camera_rig.global_position.x = checkpoint_spawn.x
 
 func build_pause_menu() -> void:
-	var stack := overlay(true)
+	var stack := overlay(false, true)
+	var layout := HBoxContainer.new()
+	layout.add_theme_constant_override("separation", 18)
+	stack.add_child(layout)
+	stack = UI.column(layout, 10)
+	stack.custom_minimum_size.x = 230
+	var readout := PauseOperator.new()
+	readout.operator = func(): return player
+	readout.profile = profile
+	layout.add_child(readout)
 	UI.label(stack, "PAUSED", 36, UI.CYAN)
 	UI.label(stack, "%s / Act %d" % [Catalog.info(sector).title, act], 17, UI.MUTED)
 	if controller_disconnected:
@@ -808,7 +819,6 @@ func build_pause_menu() -> void:
 		UI.button(stack, "Save Game", show_pause_save)
 	UI.button(stack, "Restart run", restart_run)
 	UI.button(stack, "Settings", show_pause_settings)
-	UI.button(stack, "Co-op Setup Guide", show_pause_coop_setup)
 	UI.button(stack, "Return to title", show_exit_confirmation)
 
 func show_pause_save() -> void:
@@ -857,12 +867,6 @@ func overlay(sidebar := false, wide := false) -> VBoxContainer:
 		panel.offset_top = 55
 		panel.offset_bottom = -55
 	return UI.column(panel, 12)
-
-func show_pause_coop_setup() -> void:
-	var stack := overlay()
-	stack.get_parent().custom_minimum_size.x = 650
-	pause_menu.back_action = build_pause_menu
-	CoopSetup.build(stack, build_pause_menu)
 
 func show_pause_settings() -> void:
 	var stack := overlay(false, true)
@@ -1071,13 +1075,13 @@ func build_hud() -> void:
 	player.experience_changed.connect(factory_hud.set_experience)
 	player.blueprint_found.connect(func(id: String):
 		if not profile.blueprints.has(id) and profile.GEAR.has(id):
-			factory_hud.announce("BLUEPRINT RECOVERED  /  " + profile.GEAR[id].name, Color("ffda83"))
+			factory_hud.announce("BLUEPRINT RECOVERED  /  " + profile.GEAR[id].name, Color("ffda83"), 27)
 	)
 	player.salvage_collected.connect(func(drop: Dictionary):
 		var recovered: Array[String] = []
 		for id in drop:
 			recovered.append("%s +%d" % [Materials.label(id), drop[id]])
-		factory_hud.announce("SALVAGE  /  " + "  ·  ".join(recovered), Color("ff8ada"))
+		factory_hud.announce("SALVAGE  /  " + "  ·  ".join(recovered), Color("ff8ada"), 27)
 	)
 	player.experience_earned.connect(func(amount: int):
 		mission_stats.operator_xp += amount
@@ -1099,7 +1103,7 @@ func build_hud() -> void:
 	)
 	player.life_picked_up.connect(func():
 		life_taken = true
-		factory_hud.announce("EXTRA LIFE", Color("6dffdd"))
+		factory_hud.announce("EXTRA LIFE", Color("6dffdd"), 27)
 		if checkpoint_reached:
 			save_checkpoint()
 	)

@@ -89,7 +89,6 @@ func _ready() -> void:
 	notice.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	notice.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	notice.add_theme_font_override("font", UI.DISPLAY)
-	notice.add_theme_font_size_override("font_size", 30)
 	notice.add_theme_constant_override("outline_size", 8)
 	notice.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	notice.hide()
@@ -111,10 +110,11 @@ func set_experience(total: int) -> void:
 		announce("LEVEL UP!", Color("c9a0ff"))
 		RiftAudio.play_effect(&"voice_level_up")
 
-func announce(message: String, tint: Color) -> void:
+func announce(message: String, tint: Color, font_size := 30) -> void:
 	if notice_tween and notice_tween.is_valid():
 		notice_tween.kill()
 	notice.text = message
+	notice.add_theme_font_size_override("font_size", font_size)
 	notice.add_theme_color_override("font_color", tint)
 	notice.show()
 	notice.pivot_offset = notice.size * 0.5

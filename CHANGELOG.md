@@ -1,4 +1,12 @@
-# RIFTCORE Alpha 6.0.1 — Fractured Connections
+# RIFTCORE Alpha 6.0.2 — Fractured Connections
+
+## Alpha 6.0.2
+
+- Co-op Pause opens a personal menu in missions and at Operations Station. Your partner can keep playing, and your operator can still take damage during a mission. Leaving the party requires confirmation.
+- The mission pause menu shows live operator stats, equipped gear, D-pad quick slots, and inventory. Level-ups and active buffs update the readout. The Co-op Setup Guide is available under Social.
+- Reduced co-op state packet size, improved guest input delivery, and smoothed the remote player's movement. Both players need Alpha 6.0.2 to join the same room.
+- Increased damage number font sizes by two units and reduced pickup notification font sizes by three units.
+- Refined Station Shop spacing so the item list and selected item details fit together.
 
 ## Alpha 6.0.1
 

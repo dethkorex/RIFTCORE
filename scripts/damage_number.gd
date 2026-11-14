@@ -4,7 +4,7 @@ func animate(amount: float, hurt_player: bool, burning := false, critical := fal
 	text = "%.1f" % amount if absf(amount - roundf(amount)) > 0.05 else "%d" % roundi(amount)
 	if critical:
 		text = "CRIT " + text
-	font_size = 78 if critical else (74 if hurt_player else 65)
+	font_size = 80 if critical else (76 if hurt_player else 67)
 	pixel_size = 0.0034
 	outline_size = 14
 	billboard = BaseMaterial3D.BILLBOARD_ENABLED

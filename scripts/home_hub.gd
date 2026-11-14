@@ -4,6 +4,7 @@ signal station_requested(page: String)
 signal title_requested
 
 const UI := preload("res://scripts/rift_ui.gd")
+const PauseMenu := preload("res://scripts/coop_pause_menu.gd")
 const AVATAR := preload("res://scenes/actors/riftcore_player.tscn")
 const WINDOW := preload("res://assets/hub/orbital_view.png")
 const STATIONS := [
@@ -28,6 +29,7 @@ var camera: Camera3D
 var prompt: Label3D
 var current_station := -1
 var panel_open := false
+var pause_menu: PauseMenu
 var reconstructing := false
 var pads: Array[Dictionary] = []
 var bank_label: Label
@@ -67,6 +69,13 @@ func _ready() -> void:
 	camera.fov = 59.0
 	camera.make_current()
 	build_hud()
+	pause_menu = PauseMenu.new()
+	pause_menu.dismissed.connect(set_panel_open.bind(false))
+	pause_menu.leave_requested.connect(func():
+		pause_menu.close()
+		RiftRelay.leave()
+	)
+	add_child(pause_menu)
 	RiftRelay.partner_moved.connect(update_partner)
 	RiftRelay.changed.connect(refresh_partner_room)
 	refresh_partner_room()
@@ -145,6 +154,8 @@ func update_partner(x: float, facing: float, animation: String, display_name: St
 	partner.play_character_animation(animation)
 
 func refresh_partner_room() -> void:
+	if RiftRelay.connected_room.is_empty() and is_pause_open():
+		pause_menu.close()
 	local_online_label.text = RiftRelay.local_name
 	local_online_label.visible = not RiftRelay.connected_room.is_empty()
 	if RiftRelay.room_size != 2 and is_instance_valid(partner):
@@ -179,9 +190,14 @@ func set_bank(amount: int, shards: int, level: int) -> void:
 	bank_label.text = "RX-07   /   PLAYER %02d\n%04d BOLTS   ·   %03d CORE SHARDS" % [level, amount, shards]
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event is InputEventMouse:
+	if event is InputEventMouse and not is_pause_open():
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	if panel_open or reconstructing:
+		return
+	if not RiftRelay.connected_room.is_empty() and (event.is_action_pressed("pause") or event.is_action_pressed("ui_cancel")):
+		get_viewport().set_input_as_handled()
+		pause_menu.open()
+		set_panel_open(true)
 		return
 	if event.is_action_pressed("ui_cancel"):
 		get_viewport().set_input_as_handled()
@@ -191,6 +207,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	if current_station >= 0 and (use_key or event.is_action_pressed("ui_accept")):
 		get_viewport().set_input_as_handled()
 		activate_station()
+
+func is_pause_open() -> bool:
+	return is_instance_valid(pause_menu) and pause_menu.is_open()
 
 func activate_station() -> void:
 	if panel_open or reconstructing or current_station < 0:

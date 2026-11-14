@@ -12,8 +12,11 @@ const Details := preload("res://scripts/sector_details.gd")
 const Loading := preload("res://scripts/act_loading_screen.gd")
 const Equipment := preload("res://scripts/equipment_stats.gd")
 const INPUTS := [&"jump", &"dash", &"crouch", &"crouch_stick", &"shoot", &"melee", &"climb_down", &"swap_weapon", &"previous_suit", &"quick_0", &"quick_1", &"quick_2", &"quick_3"]
+const INPUT_SUSPENDED := 1 << 30
+const PauseMenu := preload("res://scripts/coop_pause_menu.gd")
 const TICK := 0.05
 const INPUT_INTERVAL := 1.0 / 30.0
+const MAX_SNAPSHOT_LEAD := 0.10
 const DIFFICULTY := 2.5
 const XP_BONUS := 1.5
 const Blueprints := preload("res://scripts/blueprint_catalog.gd")
@@ -38,7 +41,6 @@ var boss_position := Vector3.ZERO
 var stage_props: Array[NodePath] = []
 var moving_platforms: Array[AnimatableBody3D] = []
 var props_consumed: Array[int] = []
-var projectiles_seen: Dictionary = {}
 var last_gate_open := false
 var active_weapon_ids: Array = []
 var remote_gear: Dictionary = {}
@@ -58,6 +60,9 @@ var partner_status: Label
 var camera: SideCameraRig
 var nameplates: Array[Label3D] = []
 var return_button: Button
+var pause_menu: PauseMenu
+var guest_suspended := false
+var resume_controls_pending := false
 var rewards_status: Label
 var stats: Label
 var clock := 0.0
@@ -71,6 +76,7 @@ var loot_rng := RandomNumberGenerator.new()
 var rewards_delivered := false
 var blueprint_count := 0
 var last_sent_axis := Vector2.ZERO
+var snapshot_age := 0.0
 var input_sequence := 0
 var latest_input := -1
 var latest_edge := -1
@@ -80,7 +86,9 @@ var correction := Vector3.ZERO
 var pressed: Dictionary = {}
 var released: Dictionary = {}
 var targets: Array = []
-var enemy_targets: Array = []
+var enemy_targets := PackedVector3Array()
+var enemy_health := PackedFloat32Array()
+var enemy_rotation := PackedVector2Array()
 
 func _ready() -> void:
 	peer = RiftRelay.relay
@@ -136,11 +144,12 @@ func load_stage() -> void:
 	enemies.clear()
 	targets.clear()
 	enemy_targets.clear()
+	enemy_health.clear()
+	enemy_rotation.clear()
 	nameplates.clear()
 	stage_props.clear()
 	moving_platforms.clear()
 	props_consumed.clear()
-	projectiles_seen.clear()
 	boss_started = false
 	resetting_arena = false
 	entrance_open = false
@@ -167,6 +176,7 @@ func load_stage() -> void:
 		if host:
 			operator.quick_profile = local_profile if index == 0 else remote_inventory
 		operator.remote_input = host and index == 1
+		operator.set_controls_suspended(guest_suspended if operator.remote_input else is_pause_open() and index == (0 if host else 1))
 		operator.damage_taken_scale = DIFFICULTY
 		var loadout = local_profile if index == (0 if host else 1) else Profile.new()
 		if host and index == 1:
@@ -218,7 +228,6 @@ func load_stage() -> void:
 		else:
 			disable_replica(enemy)
 		enemies.append(enemy)
-		enemy_targets.append([])
 	gate = stage.get_node("Gate")
 	exit_marker = stage.get_node("MARKERS/RoomExit")
 	boss = actors.get_node(info.boss_node) as Combatant
@@ -453,9 +462,38 @@ func build_hud() -> void:
 	partner_status = UI.label(content, "", 16, UI.CYAN)
 	room_status = UI.label(content, "2.5× enemy health and damage  /  1.5× shared XP", 16, UI.MUTED)
 	rewards_status = UI.label(content, "", 15, UI.CYAN)
-	return_button = UI.button(content, "Leave Mission", func(): exit_requested.emit(), false, 34)
+	return_button = UI.button(content, "Pause", func():
+		if outcome.is_empty():
+			open_pause()
+		else:
+			exit_requested.emit()
+	, false, 34)
 	return_button.focus_mode = Control.FOCUS_NONE
+	pause_menu = PauseMenu.new()
+	pause_menu.in_mission = true
+	pause_menu.profile = local_profile
+	pause_menu.operator = func(): return operators[0 if host else 1]
+	pause_menu.dismissed.connect(func(): resume_controls_pending = true)
+	pause_menu.leave_requested.connect(func(): exit_requested.emit())
+	add_child(pause_menu)
 	update_personal_hud(operators[0 if host else 1])
+
+func is_pause_open() -> bool:
+	return is_instance_valid(pause_menu) and pause_menu.is_open()
+
+func open_pause() -> void:
+	if is_pause_open() or not outcome.is_empty() or changing_act:
+		return
+	pause_menu.open()
+	resume_controls_pending = false
+	set_local_controls_suspended(true)
+
+func set_local_controls_suspended(suspended: bool) -> void:
+	operators[0 if host else 1].set_controls_suspended(suspended)
+	if not host and outcome.is_empty() and not changing_act:
+		pressed.clear()
+		released.clear()
+		send_input(true)
 
 func update_personal_hud(operator: RiftPlayer) -> void:
 	personal_hud.health = clampf(operator.health / operator.max_health, 0.0, 1.0)
@@ -478,9 +516,16 @@ func update_personal_hud(operator: RiftPlayer) -> void:
 		personal_hud.queue_redraw()
 
 func get_player_axis() -> Vector2:
+	if is_pause_open():
+		return Vector2.ZERO
 	return Vector2(Input.get_axis("move_left", "move_right"), Input.get_axis("climb_down", "climb_up"))
 
 func _physics_process(delta: float) -> void:
+	if resume_controls_pending:
+		resume_controls_pending = false
+		# Let this physics tick finish before gameplay can read the dismiss action.
+		resume_controls.call_deferred()
+		return
 	if not outcome.is_empty() or changing_act or not RiftRelay.mission_active:
 		return
 	if not host:
@@ -490,11 +535,12 @@ func _physics_process(delta: float) -> void:
 			var step := correction * (1.0 - exp(-9.0 * delta))
 			local.move_and_collide(step)
 			correction -= step
-		for action in INPUTS:
-			if Input.is_action_just_pressed(action):
-				pressed[action] = true
-			if Input.is_action_just_released(action):
-				released[action] = true
+		if not is_pause_open():
+			for action in INPUTS:
+				if Input.is_action_just_pressed(action):
+					pressed[action] = true
+				if Input.is_action_just_released(action):
+					released[action] = true
 	else:
 		sector_seconds += delta
 		guest_timeout -= delta
@@ -515,8 +561,8 @@ func _physics_process(delta: float) -> void:
 		if is_instance_valid(boss) and boss_started:
 			boss.target = nearest_operator(boss.global_position)
 		for shot in get_tree().get_nodes_in_group(&"rift_projectile"):
-			if not projectiles_seen.has(shot.get_instance_id()):
-				projectiles_seen[shot.get_instance_id()] = true
+			if not shot.has_meta(&"coop_sent"):
+				shot.set_meta(&"coop_sent", true)
 				send_shot(shot)
 		check_campaign_progress()
 		if changing_act or not outcome.is_empty():
@@ -532,6 +578,10 @@ func _physics_process(delta: float) -> void:
 	else:
 		send_input()
 
+func resume_controls() -> void:
+	if not is_pause_open():
+		set_local_controls_suspended(false)
+
 func nearest_operator(at: Vector3) -> RiftPlayer:
 	var best: RiftPlayer
 	var distance := INF
@@ -542,13 +592,14 @@ func nearest_operator(at: Vector3) -> RiftPlayer:
 			distance = gap
 	return best
 
-func send_input() -> void:
-	var current := 0
+func send_input(force_reliable := false) -> void:
+	var suspended := is_pause_open()
+	var current := INPUT_SUSPENDED if suspended else 0
 	var down := 0
 	var up := 0
 	for index in INPUTS.size():
 		var action: StringName = INPUTS[index]
-		if Input.is_action_pressed(action):
+		if not suspended and Input.is_action_pressed(action):
 			current |= 1 << index
 		if pressed.has(action):
 			down |= 1 << index
@@ -559,10 +610,10 @@ func send_input() -> void:
 	var axis := get_player_axis()
 	last_sent_axis = axis
 	input_sequence += 1
-	if down != 0 or up != 0:
+	# Take the first arrival for action edges, with reliable delivery as a fallback.
+	peer.call_func_on_unreliable(peer.get_host(), receive_input, axis, current, down, up, input_sequence)
+	if force_reliable or down != 0 or up != 0:
 		peer.call_func_on(peer.get_host(), receive_input, axis, current, down, up, input_sequence)
-	else:
-		peer.call_func_on_unreliable(peer.get_host(), receive_input, axis, current, down, up, input_sequence)
 
 func receive_input(axis: Vector2, current: int, down: int, up: int, sequence: int) -> void:
 	if not host or not outcome.is_empty() or not axis.is_finite() or not peer.lobby_get_all_clients().has(peer.get_sender_id()) or peer.get_sender_id() == peer.get_client_id():
@@ -571,11 +622,17 @@ func receive_input(axis: Vector2, current: int, down: int, up: int, sequence: in
 	if sequence > latest_input:
 		latest_input = sequence
 		guest_timeout = 0.45
+		guest_suspended = (current & INPUT_SUSPENDED) != 0
+		operator.set_controls_suspended(guest_suspended)
 		operator.remote_axis = axis.clamp(Vector2(-1, -1), Vector2(1, 1))
 		operator.remote_held.clear()
 		for index in INPUTS.size():
 			if current & (1 << index):
 				operator.remote_held[INPUTS[index]] = true
+		if guest_suspended:
+			latest_edge = sequence
+	if guest_suspended:
+		return
 	if (down != 0 or up != 0) and sequence > latest_edge:
 		latest_edge = sequence
 		for index in INPUTS.size():
@@ -610,15 +667,21 @@ func award_shared(base_xp: int, bolts: int, source: String) -> void:
 
 func broadcast_state() -> void:
 	var players := []
-	var security := []
+	var security := PackedFloat32Array()
+	security.resize(enemies.size() * 6)
 	props_consumed.clear()
 	for operator in operators:
-		players.append([operator.global_position, operator.model_root.rotation, operator.health, operator.energy, operator.current_animation, operator.facing, operator.equipped_suit(), operator.lives, operator.max_health, operator.max_energy, operator.velocity, operator.fire_lock, operator.charge_held, operator.melee_lock, operator.quick_profile.quick_slots if operator.quick_profile else []])
-	for enemy in enemies:
+		players.append([operator.global_position, operator.model_root.rotation, operator.health, operator.energy, operator.current_animation, operator.facing, operator.equipped_suit(), operator.lives, operator.max_health, operator.max_energy, operator.velocity, operator.fire_lock, operator.charge_held, operator.melee_lock, operator.quick_profile.quick_slots if operator.quick_profile else [], operator.supplies])
+	for index in enemies.size():
+		var enemy := enemies[index]
 		if is_instance_valid(enemy) and enemy.health > 0:
-			security.append([enemy.global_position, enemy.robot.rotation, enemy.health])
-		else:
-			security.append([])
+			var offset := index * 6
+			security[offset] = enemy.global_position.x
+			security[offset + 1] = enemy.global_position.y
+			security[offset + 2] = enemy.global_position.z
+			security[offset + 3] = enemy.robot.rotation.y
+			security[offset + 4] = enemy.robot.rotation.z
+			security[offset + 5] = enemy.health
 	for index in stage_props.size():
 		if not stage.has_node(stage_props[index]):
 			props_consumed.append(index)
@@ -636,12 +699,14 @@ func broadcast_state() -> void:
 		peer.call_func(receive_outcome, false, 0, 0, [], 0.0)
 		finish_mission(false, 0, 0, [])
 
-func receive_state(remote_act: int, players: Array, security: Array, arena: Array, consumed: Array, xp: int, bolts: int, blueprints_found: int, sequence: int) -> void:
-	if host or changing_act or remote_act != act or not outcome.is_empty() or peer.get_sender_id() != peer.get_host() or sequence <= latest_state or players.size() != 2 or security.size() != enemies.size():
+func receive_state(remote_act: int, players: Array, security: PackedFloat32Array, arena: Array, consumed: Array, xp: int, bolts: int, blueprints_found: int, sequence: int) -> void:
+	if host or changing_act or remote_act != act or not outcome.is_empty() or peer.get_sender_id() != peer.get_host() or sequence <= latest_state or players.size() != 2 or security.size() != enemies.size() * 6:
 		return
 	latest_state = sequence
+	snapshot_age = 0.0
 	var local := operators[1]
 	var local_data: Array = players[1]
+	local.supplies = local_data[15].duplicate()
 	var projected: Vector3 = local_data[0] + local_data[10] * TICK
 	correction = projected - local.global_position
 	if local_data[2] <= 0.0 or local.health <= 0.0 or correction.length() > 2.5:
@@ -686,10 +751,18 @@ func receive_state(remote_act: int, players: Array, security: Array, arena: Arra
 	team_bolts = bolts
 	blueprint_count = blueprints_found
 	targets = players
-	enemy_targets = security
+	enemy_targets.resize(enemies.size())
+	enemy_health.resize(enemies.size())
+	enemy_rotation.resize(enemies.size())
+	for index in enemies.size():
+		var offset := index * 6
+		enemy_targets[index] = Vector3(security[offset], security[offset + 1], security[offset + 2])
+		enemy_rotation[index] = Vector2(security[offset + 3], security[offset + 4])
+		enemy_health[index] = security[offset + 5]
 
 func _process(delta: float) -> void:
 	if not host:
+		snapshot_age += delta
 		var blend := 1.0 - exp(-19.0 * delta)
 		for index in operators.size():
 			var data: Array = targets[index]
@@ -697,13 +770,18 @@ func _process(delta: float) -> void:
 				continue
 			var operator := operators[index]
 			if index == 0:
-				operator.global_position = operator.global_position.lerp(data[0], blend)
+				var projected: Vector3 = data[0]
+				if operator.health > 0 and data[2] > 0 and operator.lives == data[7] and operator.global_position.distance_squared_to(projected) < 6.25:
+					projected += data[10] * minf(snapshot_age + TICK * 0.5, MAX_SNAPSHOT_LEAD)
+					operator.global_position = operator.global_position.lerp(projected, blend)
+				else:
+					operator.global_position = projected
 				operator.model_root.rotation = data[1]
 				operator.play_character_animation(data[4])
 				operator.facing = data[5]
 			else:
 				operator.fire_lock = data[11]
-				operator.charge_held = data[12]
+				operator.charge_held = data[12] and not operator.controls_suspended
 				operator.melee_lock = data[13]
 				if data[14].size() == 4:
 					for slot in 4:
@@ -724,15 +802,14 @@ func _process(delta: float) -> void:
 					operator.unlock_sector_weapon(data[6])
 			operator.visible = operator.health > 0
 			operator.experience = team_xp
-		for index in enemies.size():
+		for index in enemy_targets.size():
 			var enemy := enemies[index]
-			var data: Array = enemy_targets[index]
-			enemy.visible = not data.is_empty()
+			enemy.visible = enemy_health[index] > 0.0
 			if enemy.visible:
-				enemy.global_position = enemy.global_position.lerp(data[0], blend)
-				enemy.robot.rotation = data[1]
-				if enemy.health != data[2]:
-					enemy.health = data[2]
+				enemy.global_position = enemy.global_position.lerp(enemy_targets[index], blend)
+				enemy.robot.rotation = Vector3(0.0, enemy_rotation[index].x, enemy_rotation[index].y)
+				if enemy.health != enemy_health[index]:
+					enemy.health = enemy_health[index]
 					enemy.health_changed.emit(enemy.health, enemy.max_health)
 	var partner_index := 1 if host else 0
 	var partner := operators[partner_index]
@@ -802,6 +879,8 @@ func finish_mission(success: bool, xp: int, bolts: int, blueprints: Array) -> vo
 			rewards_delivered = true
 			rewards_earned.emit(xp, bolts, unlocked, sector)
 	outcome = message
+	if is_pause_open():
+		pause_menu.close()
 	room_status.text = message
 	if success:
 		rewards_status.text = "Save at the System pad to keep your rewards."
@@ -821,8 +900,8 @@ func finish_mission(success: bool, xp: int, bolts: int, blueprints: Array) -> vo
 			enemy.set_physics_process(false)
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event is InputEventMouse:
+	if event is InputEventMouse and not is_pause_open():
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	if event.is_action_pressed("pause") and not event is InputEventMouseButton:
+	if event.is_action_pressed("pause") and not event is InputEventMouseButton and not is_pause_open():
 		get_viewport().set_input_as_handled()
-		exit_requested.emit()
+		open_pause()

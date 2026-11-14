@@ -13,7 +13,7 @@ const Client := preload("res://addons/GD-Sync/MultiplayerClient.gd")
 const RelayEnums := preload("res://addons/GD-Sync/Scripts/Enums/Enums.gd")
 const Codes := "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 const CodeLength := 10
-const ROOM_PREFIX := "riftcore-coop-v4-"
+const ROOM_PREFIX := "riftcore-coop-v5-"
 const RELAY_UNAVAILABLE := "Online rooms are unavailable. Solo play is available."
 
 var status := "Create a room or enter a friend’s room code."

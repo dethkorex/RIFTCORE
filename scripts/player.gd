@@ -302,19 +302,40 @@ var remote_axis := Vector2.ZERO
 var remote_held: Dictionary = {}
 var remote_pressed: Dictionary = {}
 var remote_released: Dictionary = {}
+var controls_suspended := false
+
+func set_controls_suspended(suspended: bool) -> void:
+	if controls_suspended == suspended:
+		return
+	controls_suspended = suspended
+	if suspended:
+		cancel_charge()
+		shot_buffer_left = 0.0
+		jump_buffer = 0.0
+		combo_queued = 0
+		remote_pressed.clear()
+		remote_released.clear()
 
 func movement_axis(negative: StringName, positive: StringName) -> float:
+	if controls_suspended:
+		return 0.0
 	if not remote_input:
 		return Input.get_axis(negative, positive)
 	return remote_axis.x if positive == &"move_right" else remote_axis.y
 
 func action_held(action: StringName) -> bool:
+	if controls_suspended:
+		return false
 	return remote_held.has(action) if remote_input else Input.is_action_pressed(action)
 
 func action_pressed(action: StringName) -> bool:
+	if controls_suspended:
+		return false
 	return remote_pressed.has(action) if remote_input else Input.is_action_just_pressed(action)
 
 func action_released(action: StringName) -> bool:
+	if controls_suspended:
+		return false
 	return remote_released.has(action) if remote_input else Input.is_action_just_released(action)
 
 func _physics_process(delta: float) -> void:
@@ -1182,7 +1203,10 @@ static func defense_for_experience(total: int) -> float:
 	return minf(0.25, (level_for_experience(total) - 1) * 0.02)
 
 func mitigate_damage(amount: float) -> float:
-	return amount * damage_taken_scale * (1.0 - defense_for_experience(experience)) * (1.0 - armor_resistance) * (1.0 - supply_bonus("defense"))
+	return amount * damage_taken_scale * (1.0 - defense_rating())
+
+func defense_rating() -> float:
+	return 1.0 - (1.0 - defense_for_experience(experience)) * (1.0 - armor_resistance) * (1.0 - supply_bonus("defense"))
 
 func take_damage(amount: float, source_position := Vector3.ZERO) -> void:
 	var before := health

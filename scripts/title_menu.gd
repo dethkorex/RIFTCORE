@@ -333,7 +333,7 @@ func leave_page() -> void:
 	if page == "Settings" and find_children("RiftSettingsPanel", "", true, false).any(func(panel): return panel.installing):
 		return
 	if page == "Co-op Setup Guide":
-		show_page("Party")
+		show_page("Social")
 		return
 	if page in ["Party", "Social", "Leaderboard", "Co-op Sectors"] and party_from_deploy:
 		party_from_deploy = false
@@ -540,6 +540,7 @@ func build_social(columns: HBoxContainer) -> void:
 	UI.label(tools, RiftSocial.message, 15, UI.MUTED)
 	UI.button(tools, "Refresh Steam Presence", show_page.bind("Social"), false, 36)
 	UI.button(tools, "Open Party", show_page.bind("Party"), false, 36)
+	UI.button(tools, "Co-op Setup Guide", show_page.bind("Co-op Setup Guide"), false, 36)
 	refresh_steam_invites()
 
 func refresh_steam_invites() -> void:
@@ -596,7 +597,6 @@ func build_online_room(columns: HBoxContainer) -> void:
 	relay_deploy = UI.button(form, "Choose Co-op Sector", show_page.bind("Co-op Sectors"), true)
 	relay_copy = UI.button(form, "Copy Room Code", func(): DisplayServer.clipboard_set(RiftRelay.connected_room))
 	relay_leave = UI.button(form, "Leave Room", func(): RiftRelay.leave())
-	UI.button(form, "Co-op Setup Guide", show_page.bind("Co-op Setup Guide"))
 	refresh_online_room()
 	if not relay_host.disabled:
 		relay_host.grab_focus()
@@ -722,13 +722,14 @@ func shop_type(item: Dictionary) -> String:
 	return "Supply"
 
 func build_shop(columns: HBoxContainer) -> void:
-	var catalog := card(columns, 1.13)
+	var catalog := card(columns, 1.08)
 	var heading := HBoxContainer.new()
 	heading.add_theme_constant_override("separation", 20)
 	catalog.add_child(heading)
-	UI.label(heading, "Station Shop", 31, UI.CYAN)
+	UI.label(heading, "Station Shop", 31, UI.CYAN).autowrap_mode = TextServer.AUTOWRAP_OFF
 	var subtitle := UI.label(heading, "Supplies and Materials", 16, Color("ffd079"))
 	subtitle.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	subtitle.autowrap_mode = TextServer.AUTOWRAP_OFF
 	var filters := HBoxContainer.new()
 	filters.add_theme_constant_override("separation", 6)
 	catalog.add_child(filters)
@@ -749,7 +750,12 @@ func build_shop(columns: HBoxContainer) -> void:
 		var type := shop_type(Profile.stock[id])
 		if shop_category == "All Items" or (shop_category == "Supplies" and type in ["Supply", "Energy Cell"]) or (shop_category == "Materials" and type == "Material") or (shop_category == "Buffs" and type == "Buff") or (shop_category == "Cores" and type == "Core Material"):
 			items.append(id)
-	shop_columns(catalog, "ITEM (%d)" % items.size(), "TYPE", "PRICE", Color("a6c7df"))
+	var list_header := shop_columns(catalog, "ITEM (%d)" % items.size(), "TYPE", "PRICE", Color("a6c7df"))
+	var gutter := Control.new()
+	gutter.custom_minimum_size.x = 39
+	gutter.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	list_header.add_child(gutter)
+	list_header.move_child(gutter, 0)
 	var entries := scroll_entries(catalog)
 	entries.add_theme_constant_override("separation", 4)
 
@@ -785,10 +791,12 @@ func build_shop(columns: HBoxContainer) -> void:
 	var quantity_row := HBoxContainer.new()
 	controls.add_child(quantity_row)
 	var quantity := UI.label(quantity_row, "1", 23)
+	quantity.autowrap_mode = TextServer.AUTOWRAP_OFF
 	quantity.custom_minimum_size.x = 32
 	quantity.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	quantity.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	var total := UI.label(quantity_row, "", 23, Color("ffd079"))
+	total.autowrap_mode = TextServer.AUTOWRAP_OFF
 	total.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	total.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var buy := UI.button(info, "Buy", func():
@@ -796,6 +804,9 @@ func build_shop(columns: HBoxContainer) -> void:
 		show_page("Shop")
 	, true, 51)
 	buy.icon = EquipmentIcons.icon("core", "core")
+	buy.expand_icon = true
+	buy.add_theme_constant_override("icon_max_width", 24)
+	buy.add_theme_font_size_override("font_size", 21)
 	var message := UI.label(info, inventory_status, 15, UI.VIOLET)
 	message.custom_minimum_size.y = 18
 
@@ -865,7 +876,7 @@ func build_shop(columns: HBoxContainer) -> void:
 		cells.add_child(name_stack)
 		cells.move_child(name_stack, 1)
 		name_stack.add_child(name_label)
-		UI.label(name_stack, Profile.RARITY_NAMES[item.rarity], 14, Profile.RARITY_COLORS[item.rarity])
+		UI.label(name_stack, Profile.RARITY_NAMES[item.rarity], 14, Profile.RARITY_COLORS[item.rarity]).autowrap_mode = TextServer.AUTOWRAP_OFF
 		record.focus_entered.connect(reveal.bind(id))
 		record.focus_neighbor_right = record.get_path_to(plus)
 		if id == selected:
@@ -894,8 +905,12 @@ func shop_fact(parent: VBoxContainer, caption: String) -> Label:
 	parent.add_child(HSeparator.new())
 	var row := HBoxContainer.new()
 	parent.add_child(row)
-	UI.label(row, caption, 17, UI.MUTED).size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	return UI.label(row, "", 18)
+	var label := UI.label(row, caption, 17, UI.MUTED)
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	var value := UI.label(row, "", 18)
+	value.autowrap_mode = TextServer.AUTOWRAP_OFF
+	return value
 
 func build_challenges(columns: HBoxContainer) -> void:
 	var sectors := card(columns, 0.8)
