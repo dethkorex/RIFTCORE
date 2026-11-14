@@ -789,7 +789,7 @@ func award_shared(base_xp: int, bolts: int, source: String) -> void:
 			operator.gain_experience(xp, false)
 			operator.health = 0.0
 
-func broadcast_state() -> void:
+func broadcast_state(reliable_operators := false) -> void:
 	var players := []
 	var security := PackedFloat32Array()
 	security.resize(enemies.size() * 6)
@@ -823,7 +823,10 @@ func broadcast_state() -> void:
 		for other in players.size():
 			if other != index:
 				snapshot[other] = players[other].slice(0, 11)
-		peer.call_func_on_unreliable(roster[index], receive_operators, act, snapshot, state_sequence)
+		if reliable_operators:
+			peer.call_func_on(roster[index], receive_operators, act, snapshot, state_sequence)
+		else:
+			peer.call_func_on_unreliable(roster[index], receive_operators, act, snapshot, state_sequence)
 	peer.call_func_unreliable(receive_state, act, security, boss_state, props_consumed, team_xp, team_bolts, team_blueprints.size(), state_sequence)
 	if (not boss_started and operators.any(func(operator): return operator.lives <= 0)) or (boss_started and operators.all(func(operator): return operator.health <= 0.0) and operators.any(func(operator): return operator.lives <= 0)):
 		peer.call_func(receive_outcome, false, 0, 0, [], 0.0)

@@ -409,14 +409,14 @@ func verify_jungle_coop_crossing(operator: RiftPlayer, mission: Node, pit_name: 
 			player.invulnerable_time = 8.0
 			player.global_position = Vector3(edge - 2.8, height + 0.93, 0)
 			player.velocity = Vector3.ZERO
-		RiftRelay.relay.lobby_set_data("coop_approach_started", pit_name)
+		mission.broadcast_state(true)
 	else:
 		RiftRelay.relay.lobby_set_data("coop_approach_ready", pit_name)
-	if not await wait_for_relay(func(): return RiftRelay.relay.lobby_get_data("coop_approach_started", "") == pit_name and absf(operator.global_position.x - edge + 2.8) < 2.0, 10.0):
+	if not await wait_for_relay(func(): return absf(operator.global_position.x - edge + 2.8) < 1.15, 10.0):
 		print("JUNGLE CROSSING ", pit_name, " did not receive approach position ", operator.global_position)
 		return false
 	Input.action_press("move_right")
-	var at_lip := await wait_for_relay(func(): return operator.global_position.x >= edge - 0.80, 2.0)
+	var at_lip := await wait_for_jump_lip(operator, edge)
 	if at_lip:
 		Input.action_press("jump")
 		if pit_name == "ViaductThorns":
@@ -428,6 +428,17 @@ func verify_jungle_coop_crossing(operator: RiftPlayer, mission: Node, pit_name: 
 	Input.action_release("dash")
 	print("JUNGLE CROSSING ", pit_name, " ", crossed)
 	return crossed
+
+
+func wait_for_jump_lip(operator: RiftPlayer, edge: float) -> bool:
+	# Physics ticks keep the takeoff repeatable under load.
+	for frame in 135:
+		await get_tree().physics_frame
+		if operator.health <= 0:
+			return false
+		if operator.global_position.x >= edge - 0.48:
+			return operator.is_on_floor()
+	return false
 
 
 func clear_coop_test_boss(mission: Node) -> bool:

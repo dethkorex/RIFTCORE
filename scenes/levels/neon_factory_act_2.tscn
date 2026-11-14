@@ -5,6 +5,8 @@
 [ext_resource type="PackedScene" path="res://assets/neon_factory/interiors/interior_bulkhead.tscn" id="Lining"]
 [ext_resource type="PackedScene" path="res://assets/neon_factory/interiors/cave_lining.tscn" id="Cave"]
 [ext_resource type="PackedScene" path="res://assets/neon_factory/interiors/pressure_bank.glb" id="PressureBank"]
+[ext_resource type="Script" path="res://scripts/jungle_backdrop.gd" id="FactorySky"]
+[ext_resource type="Texture2D" path="res://assets/neon_factory/factory_panorama.png" id="FactoryPanorama"]
 [ext_resource type="PackedScene" path="res://assets/neon_factory/interiors/powered_bridge.tscn" id="Bridge"]
 [ext_resource type="PackedScene" path="res://assets/neon_factory/interiors/service_shutter.tscn" id="Shutter"]
 [ext_resource type="PackedScene" path="res://assets/neon_factory/interiors/shot_relay.glb" id="Relay"]
@@ -74,6 +76,74 @@ shadow_enabled = true
 [node name="Actors" type="Node3D" parent="."]
 
 [node name="MARKERS" type="Node3D" parent="."]
+
+[node name="SectorPanorama" type="Node3D" parent="DECOR"]
+script = ExtResource("FactorySky")
+panorama_texture = ExtResource("FactoryPanorama")
+
+[node name="IntakeArch0" parent="DECOR" instance=ExtResource("arch")]
+position = Vector3(185.3500, 1.4200, 0.0000)
+rotation = Vector3(0.0000, -1.5708, 0.0000)
+scale = Vector3(1.7000, 1.4300, 1.1200)
+
+[node name="OutsideReturn0" type="Label3D" parent="DECOR"]
+position = Vector3(183.9000, 4.5700, -1.7400)
+font = ExtResource("Font")
+text = "FREIGHT WORKS"
+pixel_size = 0.005
+font_size = 56
+outline_size = 11
+modulate = Color(0.48, 0.88, 1, 1)
+
+[node name="IndustrialButtress0_137" parent="DECOR" instance=ExtResource("Wall")]
+position = Vector3(137.0000, -3.7800, -3.2500)
+scale = Vector3(2.7500, 1.4000, 0.7900)
+
+[node name="IndustrialButtress0_152" parent="DECOR" instance=ExtResource("Wall")]
+position = Vector3(152.0000, -3.7800, -3.2500)
+scale = Vector3(2.7500, 1.4000, 0.7900)
+
+[node name="IndustrialButtress0_167" parent="DECOR" instance=ExtResource("Wall")]
+position = Vector3(167.0000, -3.7800, -3.2500)
+scale = Vector3(2.7500, 1.4000, 0.7900)
+
+[node name="IndustrialButtress0_182" parent="DECOR" instance=ExtResource("Wall")]
+position = Vector3(182.0000, -3.7800, -3.2500)
+scale = Vector3(2.7500, 1.4000, 0.7900)
+
+[node name="IntakeArch1" parent="DECOR" instance=ExtResource("arch")]
+position = Vector3(461.3500, 0.1600, 0.0000)
+rotation = Vector3(0.0000, -1.5708, 0.0000)
+scale = Vector3(1.7000, 1.4300, 1.1200)
+
+[node name="OutsideReturn1" type="Label3D" parent="DECOR"]
+position = Vector3(459.9000, 3.3100, -1.7400)
+font = ExtResource("Font")
+text = "SMELTER ACCESS"
+pixel_size = 0.005
+font_size = 56
+outline_size = 11
+modulate = Color(0.48, 0.88, 1, 1)
+
+[node name="IndustrialButtress1_401" parent="DECOR" instance=ExtResource("Wall")]
+position = Vector3(401.0000, -5.0400, -3.2500)
+scale = Vector3(2.7500, 1.4000, 0.7900)
+
+[node name="IndustrialButtress1_416" parent="DECOR" instance=ExtResource("Wall")]
+position = Vector3(416.0000, -5.0400, -3.2500)
+scale = Vector3(2.7500, 1.4000, 0.7900)
+
+[node name="IndustrialButtress1_431" parent="DECOR" instance=ExtResource("Wall")]
+position = Vector3(431.0000, -5.0400, -3.2500)
+scale = Vector3(2.7500, 1.4000, 0.7900)
+
+[node name="IndustrialButtress1_446" parent="DECOR" instance=ExtResource("Wall")]
+position = Vector3(446.0000, -5.0400, -3.2500)
+scale = Vector3(2.7500, 1.4000, 0.7900)
+
+[node name="IndustrialButtress1_461" parent="DECOR" instance=ExtResource("Wall")]
+position = Vector3(461.0000, -5.0400, -3.2500)
+scale = Vector3(2.7500, 1.4000, 0.7900)
 
 [node name="Rear000" parent="DECOR" instance=ExtResource("Lining")]
 position = Vector3(-9.0000, -2.3500, -3.6000)
@@ -407,135 +477,6 @@ position = Vector3(129.0000, 13.6500, -3.2800)
 
 [node name="HighWall1_023" parent="DECOR" instance=ExtResource("Lining")]
 position = Vector3(129.0000, 21.6500, -3.2800)
-
-[node name="Rear024" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(135.0000, -2.3500, -3.6000)
-
-[node name="RearUpper024" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(135.0000, 5.6500, -3.6000)
-
-[node name="HighWall0_024" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(135.0000, 13.6500, -3.6000)
-
-[node name="HighWall1_024" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(135.0000, 21.6500, -3.6000)
-
-[node name="BayLight24" type="OmniLight3D" parent="DECOR"]
-position = Vector3(135.0000, 4.2000, -1.3500)
-light_color = Color(0.19, 0.62, 1, 1)
-light_energy = 1.60
-omni_range = 9.0
-
-[node name="Rear025" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(141.0000, -2.3500, -3.2800)
-
-[node name="RearUpper025" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(141.0000, 5.6500, -3.2800)
-
-[node name="HighWall0_025" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(141.0000, 13.6500, -3.2800)
-
-[node name="HighWall1_025" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(141.0000, 21.6500, -3.2800)
-
-[node name="Rear026" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(147.0000, -2.3500, -3.2800)
-
-[node name="RearUpper026" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(147.0000, 5.6500, -3.2800)
-
-[node name="HighWall0_026" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(147.0000, 13.6500, -3.2800)
-
-[node name="HighWall1_026" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(147.0000, 21.6500, -3.2800)
-
-[node name="Rear027" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(153.0000, -2.3500, -3.2800)
-
-[node name="RearUpper027" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(153.0000, 5.6500, -3.2800)
-
-[node name="HighWall0_027" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(153.0000, 13.6500, -3.2800)
-
-[node name="HighWall1_027" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(153.0000, 21.6500, -3.2800)
-
-[node name="Rear028" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(159.0000, -2.3500, -3.2800)
-
-[node name="RearUpper028" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(159.0000, 5.6500, -3.2800)
-
-[node name="HighWall0_028" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(159.0000, 13.6500, -3.2800)
-
-[node name="HighWall1_028" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(159.0000, 21.6500, -3.2800)
-
-[node name="BayLight28" type="OmniLight3D" parent="DECOR"]
-position = Vector3(159.0000, 4.2000, -1.3500)
-light_color = Color(0.19, 0.62, 1, 1)
-light_energy = 1.60
-omni_range = 9.0
-
-[node name="Rear029" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(165.0000, -2.3500, -3.2800)
-
-[node name="RearUpper029" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(165.0000, 5.6500, -3.2800)
-
-[node name="PressureBank029" parent="DECOR" instance=ExtResource("PressureBank")]
-position = Vector3(165.0000, 0.1000, -2.8600)
-
-[node name="HighWall0_029" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(165.0000, 13.6500, -3.2800)
-
-[node name="HighWall1_029" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(165.0000, 21.6500, -3.2800)
-
-[node name="Rear030" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(171.0000, -2.3500, -3.2800)
-
-[node name="RearUpper030" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(171.0000, 5.6500, -3.2800)
-
-[node name="HighWall0_030" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(171.0000, 13.6500, -3.2800)
-
-[node name="HighWall1_030" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(171.0000, 21.6500, -3.2800)
-
-[node name="Rear031" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(177.0000, -2.3500, -3.2800)
-
-[node name="RearUpper031" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(177.0000, 5.6500, -3.2800)
-
-[node name="HighWall0_031" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(177.0000, 13.6500, -3.2800)
-
-[node name="HighWall1_031" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(177.0000, 21.6500, -3.2800)
-
-[node name="Rear032" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(183.0000, -2.3500, -3.6000)
-
-[node name="RearUpper032" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(183.0000, 5.6500, -3.6000)
-
-[node name="HighWall0_032" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(183.0000, 13.6500, -3.6000)
-
-[node name="HighWall1_032" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(183.0000, 21.6500, -3.6000)
-
-[node name="BayLight32" type="OmniLight3D" parent="DECOR"]
-position = Vector3(183.0000, 4.2000, -1.3500)
-light_color = Color(0.19, 0.62, 1, 1)
-light_energy = 1.60
-omni_range = 9.0
 
 [node name="Rear033" parent="DECOR" instance=ExtResource("Lining")]
 position = Vector3(189.0000, -2.3500, -3.2800)
@@ -1011,162 +952,6 @@ position = Vector3(393.0000, 13.6500, -3.2800)
 [node name="HighWall1_067" parent="DECOR" instance=ExtResource("Lining")]
 position = Vector3(393.0000, 21.6500, -3.2800)
 
-[node name="Rear068" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(399.0000, -2.3500, -3.2800)
-
-[node name="RearUpper068" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(399.0000, 5.6500, -3.2800)
-
-[node name="HighWall0_068" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(399.0000, 13.6500, -3.2800)
-
-[node name="HighWall1_068" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(399.0000, 21.6500, -3.2800)
-
-[node name="BayLight68" type="OmniLight3D" parent="DECOR"]
-position = Vector3(399.0000, 4.2000, -1.3500)
-light_color = Color(0.19, 0.62, 1, 1)
-light_energy = 1.60
-omni_range = 9.0
-
-[node name="Rear069" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(405.0000, -2.3500, -3.2800)
-
-[node name="RearUpper069" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(405.0000, 5.6500, -3.2800)
-
-[node name="HighWall0_069" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(405.0000, 13.6500, -3.2800)
-
-[node name="HighWall1_069" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(405.0000, 21.6500, -3.2800)
-
-[node name="Rear070" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(411.0000, -2.3500, -3.2800)
-
-[node name="RearUpper070" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(411.0000, 5.6500, -3.2800)
-
-[node name="HighWall0_070" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(411.0000, 13.6500, -3.2800)
-
-[node name="HighWall1_070" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(411.0000, 21.6500, -3.2800)
-
-[node name="Rear071" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(417.0000, -2.3500, -3.2800)
-
-[node name="RearUpper071" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(417.0000, 5.6500, -3.2800)
-
-[node name="PressureBank071" parent="DECOR" instance=ExtResource("PressureBank")]
-position = Vector3(417.0000, 0.1000, -2.8600)
-
-[node name="HighWall0_071" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(417.0000, 13.6500, -3.2800)
-
-[node name="HighWall1_071" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(417.0000, 21.6500, -3.2800)
-
-[node name="Rear072" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(423.0000, -2.3500, -3.6000)
-
-[node name="RearUpper072" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(423.0000, 5.6500, -3.6000)
-
-[node name="HighWall0_072" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(423.0000, 13.6500, -3.6000)
-
-[node name="HighWall1_072" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(423.0000, 21.6500, -3.6000)
-
-[node name="BayLight72" type="OmniLight3D" parent="DECOR"]
-position = Vector3(423.0000, 4.2000, -1.3500)
-light_color = Color(0.19, 0.62, 1, 1)
-light_energy = 1.60
-omni_range = 9.0
-
-[node name="Rear073" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(429.0000, -2.3500, -3.2800)
-
-[node name="RearUpper073" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(429.0000, 5.6500, -3.2800)
-
-[node name="HighWall0_073" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(429.0000, 13.6500, -3.2800)
-
-[node name="HighWall1_073" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(429.0000, 21.6500, -3.2800)
-
-[node name="Rear074" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(435.0000, -2.3500, -3.2800)
-
-[node name="RearUpper074" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(435.0000, 5.6500, -3.2800)
-
-[node name="HighWall0_074" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(435.0000, 13.6500, -3.2800)
-
-[node name="HighWall1_074" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(435.0000, 21.6500, -3.2800)
-
-[node name="Rear075" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(441.0000, -2.3500, -3.2800)
-
-[node name="RearUpper075" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(441.0000, 5.6500, -3.2800)
-
-[node name="HighWall0_075" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(441.0000, 13.6500, -3.2800)
-
-[node name="HighWall1_075" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(441.0000, 21.6500, -3.2800)
-
-[node name="Rear076" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(447.0000, -2.3500, -3.2800)
-
-[node name="RearUpper076" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(447.0000, 5.6500, -3.2800)
-
-[node name="HighWall0_076" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(447.0000, 13.6500, -3.2800)
-
-[node name="HighWall1_076" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(447.0000, 21.6500, -3.2800)
-
-[node name="BayLight76" type="OmniLight3D" parent="DECOR"]
-position = Vector3(447.0000, 4.2000, -1.3500)
-light_color = Color(0.19, 0.62, 1, 1)
-light_energy = 1.60
-omni_range = 9.0
-
-[node name="Rear077" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(453.0000, -2.3500, -3.2800)
-
-[node name="RearUpper077" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(453.0000, 5.6500, -3.2800)
-
-[node name="HighWall0_077" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(453.0000, 13.6500, -3.2800)
-
-[node name="HighWall1_077" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(453.0000, 21.6500, -3.2800)
-
-[node name="Rear078" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(459.0000, -2.3500, -3.2800)
-
-[node name="RearUpper078" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(459.0000, 5.6500, -3.2800)
-
-[node name="PressureBank078" parent="DECOR" instance=ExtResource("PressureBank")]
-position = Vector3(459.0000, 0.1000, -2.8600)
-
-[node name="HighWall0_078" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(459.0000, 13.6500, -3.2800)
-
-[node name="HighWall1_078" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(459.0000, 21.6500, -3.2800)
-
 [node name="Rear079" parent="DECOR" instance=ExtResource("Lining")]
 position = Vector3(465.0000, -2.3500, -3.2800)
 
@@ -1564,22 +1349,6 @@ scale = Vector3(2.0000, 0.1100, 1.2000)
 position = Vector3(126.0000, 21.6000, -2.6500)
 scale = Vector3(2.0000, 0.1100, 1.2000)
 
-[node name="CeilingBeam12" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(138.0000, 21.6000, -2.6500)
-scale = Vector3(2.0000, 0.1100, 1.2000)
-
-[node name="CeilingBeam13" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(150.0000, 21.6000, -2.6500)
-scale = Vector3(2.0000, 0.1100, 1.2000)
-
-[node name="CeilingBeam14" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(162.0000, 21.6000, -2.6500)
-scale = Vector3(2.0000, 0.1100, 1.2000)
-
-[node name="CeilingBeam15" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(174.0000, 21.6000, -2.6500)
-scale = Vector3(2.0000, 0.1100, 1.2000)
-
 [node name="CeilingBeam16" parent="DECOR" instance=ExtResource("Lining")]
 position = Vector3(186.0000, 21.6000, -2.6500)
 scale = Vector3(2.0000, 0.1100, 1.2000)
@@ -1650,26 +1419,6 @@ scale = Vector3(2.0000, 0.1100, 1.2000)
 
 [node name="CeilingBeam33" parent="DECOR" instance=ExtResource("Lining")]
 position = Vector3(390.0000, 21.6000, -2.6500)
-scale = Vector3(2.0000, 0.1100, 1.2000)
-
-[node name="CeilingBeam34" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(402.0000, 21.6000, -2.6500)
-scale = Vector3(2.0000, 0.1100, 1.2000)
-
-[node name="CeilingBeam35" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(414.0000, 21.6000, -2.6500)
-scale = Vector3(2.0000, 0.1100, 1.2000)
-
-[node name="CeilingBeam36" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(426.0000, 21.6000, -2.6500)
-scale = Vector3(2.0000, 0.1100, 1.2000)
-
-[node name="CeilingBeam37" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(438.0000, 21.6000, -2.6500)
-scale = Vector3(2.0000, 0.1100, 1.2000)
-
-[node name="CeilingBeam38" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(450.0000, 21.6000, -2.6500)
 scale = Vector3(2.0000, 0.1100, 1.2000)
 
 [node name="CeilingBeam39" parent="DECOR" instance=ExtResource("Lining")]

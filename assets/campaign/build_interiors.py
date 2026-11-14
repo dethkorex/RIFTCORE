@@ -5,6 +5,7 @@ import re
 from pathlib import Path
 
 from branch_junctions import JUNCTIONS, ROUTE_BEATS
+from exterior_routes import EXTERIORS
 from interior_routes import ROUTES
 from overhead_routes import ARENAS, OVERHEAD
 
@@ -101,6 +102,7 @@ class Scene:
         self.rooms = []
         self.cache_count = 0
         self.cave_entrance = None
+        self.exterior = EXTERIORS[sector][act-1]
         self.accent = ACCENTS[number - 2]
         self.chamber = ""
 
@@ -118,9 +120,15 @@ class Scene:
                    ("RCPit", "res://scripts/spike_pit.gd", "Script"),
                    ("RCLaser", "res://scripts/factory_interior_trap.gd", "Script"),
                    ("RCFont", "res://assets/ui/fonts/BarlowCondensed-ExtraBoldItalic.ttf", "FontFile")]
+        panorama = ("res://assets/machine_jungle/jungle_panorama.png" if self.sector == "machine_jungle"
+                    else f"res://assets/campaign/{self.sector}/panorama.png")
+        arch = ("res://assets/machine_jungle/terrain/root_arch.tscn" if self.sector == "machine_jungle"
+                else f"res://assets/campaign/{self.sector}/terrain/arch.tscn")
+        assets.extend([("RCSky", "res://scripts/jungle_backdrop.gd", "Script"),
+                       ("RCPanorama", panorama, "Texture2D"),
+                       ("RCExteriorFrame", arch, "PackedScene")])
         if self.sector == "machine_jungle":
             assets.extend([
-                ("RCJungleSky", "res://scripts/jungle_backdrop.gd", "Script"),
                 ("RCJungleBank", "res://assets/campaign/machine_jungle/interior/jungle_root_bank.glb", "PackedScene"),
                 ("RCJungleMouth", "res://assets/campaign/machine_jungle/interior/jungle_cave_mouth.glb", "PackedScene"),
             ])
@@ -245,6 +253,62 @@ size = Vector3(1.52, 1.25, 1.5)"""
         self.label("ViaductDashSign","JUMP / AIR DASH",gap-2.8,floor+1.25,z=-1.6)
         return floor-1.60
 
+    def exposed_shell(self, start, end, entry_y, exit_y, *, end_frame=True):
+        parent = self.node("ExteriorView", **{"metadata/begin": start, "metadata/end": end})
+        span = end-start
+        # A low rear retaining wall leaves the panorama visible behind each landing.
+        blocks = math.ceil(span/8.4)
+        for index in range(blocks):
+            offset = (index+.5)/blocks
+            y = entry_y + (exit_y-entry_y)*offset
+            self.node(f"RearSkirt{index}", parent=parent, art="RCRoom",
+                      pos=(start+span*offset,y-7.52,-4.35),
+                      scale=vec(span/blocks/6,.71,1.0))
+            if index%3==1:
+                self.node(f"Pier{index}",parent=parent,art="RCWall",
+                          pos=(start+span*offset,y-5.5,-3.12),
+                          scale=vec(1.6,1.45,.66))
+        if end_frame:
+            self.node("ReturnFrame", parent=parent, art="RCExteriorFrame",
+                      pos=(end-.72,exit_y,0), rotation=vec(0,-math.pi/2,0),
+                      scale=vec(1.43,1.36,1.10))
+            self.label("ReturnSign", self.exterior.exit_sign, end-2.1,exit_y+3.86,z=-2.15,
+                       parent=parent,pixels=.0041)
+
+    def exterior_traverse(self, p, q, floor):
+        route = self.exterior
+        width = q-p
+        gap_left = p + width * (.40 if route.style == "ridge" else .29)
+        gap_right = gap_left + route.gap
+        shelf = floor+route.shelf_rise
+        high = floor+route.exit_rise
+        depart = floor
+        if route.style == "ridge":
+            self.stretch("EaveApproach",p,gap_left-4.5,floor)
+            self.deck("EaveRidge",gap_left-4.5,gap_left-1.8,floor,floor+.32)
+            depart = floor+.32
+            self.deck("EaveTakeoff",gap_left-1.8,gap_left,depart)
+        else:
+            self.stretch("EaveApproach",p,gap_left,depart)
+        spike_y = min(depart,shelf)-3.4
+        self.spike_pit("ExteriorSpikes",gap_left,gap_right,spike_y)
+        self.label("ExteriorJumpSign","AIR DASH" if route.gap>6.4 else "JUMP",
+                   gap_left-1.9,depart+1.33,z=-1.65)
+        if route.style == "stepped":
+            second = min(q-4.0,gap_right+6.0)
+            self.deck("EaveStep",gap_right,second,shelf)
+            self.deck("EaveLowerStep",second+1.4,q,high)
+        else:
+            grade = min(q-2.4,gap_right+4.25)
+            self.deck("EaveLanding",gap_right,grade,shelf)
+            self.deck("EaveReturn",grade,q-1.5,shelf,high)
+            self.deck("EaveEnd",q-1.5,q,high)
+        self.spawns.append((q+1.75,high))
+        if route.style == "ledge" and width >= 25:
+            self.deck("EaveLookout",p+.8,p+5.5,floor+2.15,thin=True)
+            self.cache(p+3.5,floor+2.15,blueprint=False)
+        return high
+
     def shell(self, a, b, floor, roof, variation, cave_lip_floor=None):
         if self.cave_entrance is not None and a < self.cave_entrance:
             opening_end = min(b,self.cave_entrance)
@@ -252,7 +316,7 @@ size = Vector3(1.52, 1.25, 1.5)"""
             if opening_end >= b:
                 return
             a = opening_end
-        parent = self.node("InteriorCladding")
+        parent = self.node(f"InteriorCladding_{variation}")
         roof += ROOF_CLEARANCE
         length = b-a
         n = math.ceil(length/7.0)
@@ -708,11 +772,11 @@ size = Vector3(1.52, 1.25, 1.5)"""
     def build_rooms(self, act_routes, floor, gate_y):
         self.shapes = []
         a = -7
+        self.node("SectorPanorama",parent="DECOR",script=ext("RCSky"),panorama_texture=ext("RCPanorama"))
         if self.sector == "machine_jungle":
             # Act I enters the caves at the nursery lip. Act II returns to the
             # canopy, crosses a viaduct, then descends through the hollow trunk.
             self.cave_entrance = 37.5 if self.act == 1 else 116.0
-            self.node("JunglePanorama",parent="DECOR",script=ext("RCJungleSky"))
             self.node("CanopyKey",parent="DECOR",kind="DirectionalLight3D",
                       rotation=vec(-.62,-.45,0),light_color="Color(0.83, 1, 0.88, 1)",
                       light_energy=.60,shadow_enabled="true")
@@ -728,6 +792,8 @@ size = Vector3(1.52, 1.25, 1.5)"""
                 kind = "switchback" if spec.depth else "junction"
             if not spec and kind != "hall":
                 width += 6 if self.act == 1 else 8
+            if title == self.exterior.room:
+                width = max(width, 48)
             b = a + width
             self.chamber = self.node(f"Room{i+1:02d}_{kind.title()}", parent="TERRAIN", pos=(0,0,0), **{"metadata/entry_x": a, "metadata/entry_y": floor})
             shift = 1 + (self.number + i + self.act) % 4
@@ -756,6 +822,8 @@ size = Vector3(1.52, 1.25, 1.5)"""
                 bottom = self.junction(spec,p,q,floor,next(beats))
             elif self.sector == "machine_jungle" and ((self.act == 1 and i == 0) or (self.act == 2 and i == 1)):
                 high = self.jungle_traverse(a,p,q,floor)
+            elif title == self.exterior.room:
+                high = self.exterior_traverse(p,q,floor)
             elif kind == "shaft" or kind == "branch":
                 right = p + 9 + shift
                 span = 4.0
@@ -843,9 +911,20 @@ size = Vector3(1.52, 1.25, 1.5)"""
                 self.spawns.append((q-2,floor))
                 self.hazard(p+8.3,floor,exposed=True)
             self.stretch("Exit",q,b,high)
-            self.shell(a,b,min(bottom,high)-(1.4 if kind=="loop" else 0),
-                       max(floor,high)+(13.1 if spec else 10.8 if kind=="shaft" else 8.7),
-                       i+self.number,cave_lip_floor=high if kind=="gallery" else entry_floor)
+            shell_floor = min(bottom,high)-(1.4 if kind=="loop" else 0)
+            shell_roof = max(floor,high)+(13.1 if spec else 10.8 if kind=="shaft" else 8.7)
+            if title == self.exterior.room:
+                self.exposed_shell(a,b,entry_floor,high)
+            elif title == self.exterior.view_room:
+                # Short openings in a larger room keep its mechanics and boss route intact.
+                view_start = a + min(18,(b-a)*.32)
+                view_end = b - min(11,(b-a)*.23)
+                self.shell(a,view_start,shell_floor,shell_roof,i+self.number)
+                self.exposed_shell(view_start,view_end,entry_floor,high,end_frame=False)
+                self.shell(view_end,b,shell_floor,shell_roof,i+self.number+2)
+            else:
+                self.shell(a,b,shell_floor,shell_roof,i+self.number,
+                           cave_lip_floor=high if kind=="gallery" else entry_floor)
             self.rooms.append((a,b,kind,high))
             floor = high
             a = b

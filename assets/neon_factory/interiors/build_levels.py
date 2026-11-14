@@ -12,6 +12,8 @@ def make(act):
         ("Floor",kit+"interior_deck.tscn","PackedScene"),("Wall",kit+"shaft_column.tscn","PackedScene"),
         ("Lining",kit+"interior_bulkhead.tscn","PackedScene"),("Cave",kit+"cave_lining.tscn","PackedScene"),
         ("PressureBank",kit+"pressure_bank.glb","PackedScene"),
+        ("FactorySky","res://scripts/jungle_backdrop.gd","Script"),
+        ("FactoryPanorama","res://assets/neon_factory/factory_panorama.png","Texture2D"),
         ("Bridge",kit+"powered_bridge.tscn","PackedScene"),("Shutter",kit+"service_shutter.tscn","PackedScene"),("Relay",kit+"shot_relay.glb","PackedScene"),
         ("Chest",kit+"salvage_chest.glb","PackedScene"),("RelayCode","res://scripts/factory_interior_relay.gd","Script"),
         ("ChestCode","res://scripts/factory_salvage_chest.gd","Script"),("Hazard","res://scripts/factory_interior_trap.gd","Script"),
@@ -95,7 +97,18 @@ height = 0.44
     def wall(name,x,base,h,z=0):
         asset(name,"TERRAIN","Wall",x,base+h/2,z,scale=(1,h/4,1))
     def shell(end,boss,descent):
+        exterior = [(-12,30,0.0,"COOLING INTAKE"),(96,150,6.15,"MAINTENANCE SHAFT"),
+                    (366,411,1.2,"FORGE ACCESS")] if act==1 else [
+                        (132,186,1.42,"FREIGHT WORKS"),(396,462,.16,"SMELTER ACCESS")]
+        node("SectorPanorama","DECOR",script=e("FactorySky"),panorama_texture=e("FactoryPanorama"))
+        for i,(a,b,y,title) in enumerate(exterior):
+            asset(f"IntakeArch{i}","DECOR","arch",b-.65,y,0,rotation=v((0,-1.5708,0)),scale=(1.7,1.43,1.12))
+            label(f"OutsideReturn{i}","DECOR",title,b-2.1,y+3.15)
+            for n in range(a+5,b,15):
+                asset(f"IndustrialButtress{i}_{n}","DECOR","Wall",n,y-5.2,-3.25,scale=(2.75,1.4,.79))
         for index,x in enumerate(range(-9,end+6,6)):
+            if any(a<=x<b for a,b,_,_ in exterior):
+                continue
             cave=any(a<=x<b for a,b in descent)
             if index%8==0: z=-3.6
             else: z=-3.28
@@ -110,7 +123,7 @@ height = 0.44
         for i,x in enumerate(range(-6,end+10,12)):
             asset("BedrockBase"+str(i),"DECOR","Cave",x,-10.35,-2.85,scale=(2,1,1))
         for i,x in enumerate(range(-6,end,12)):
-            if x<boss:
+            if x<boss and not any(a<=x<b for a,b,_,_ in exterior):
                 asset("CeilingBeam"+str(i),"DECOR","Lining",x,21.6,-2.65,scale=(2,0.11,1.2))
     def checkpoint(name,x,y):
         node(name,"TERRAIN","Area3D",(x,y,0),script=e("checkpoint"),collision_layer=0)
