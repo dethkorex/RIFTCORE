@@ -157,7 +157,7 @@ func finish_armor() -> void:
 	for piece in robot.find_children("*", "MeshInstance3D", true, false):
 		for surface in piece.mesh.get_surface_count():
 			var material := piece.get_active_material(surface) as StandardMaterial3D
-			if not material or not material.albedo_texture:
+			if not material or material.resource_name not in ["Ceramic", "Cobalt", "Brushed steel", "Service caution"]:
 				continue
 			var slot := material.resource_name
 			var key := "%d:%s" % [kit, slot]

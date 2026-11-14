@@ -39,15 +39,15 @@ ROOMS = {
     ),
     "biolab": (
         Room("STERILIZATION STACK", "climb", .38, 0, -1.25, 4.6),
-        Room("PATIENT VAULT", "low_branch", .41, 4.4, -2.2, -1.35),
+        Room("THAW LAB", "low_branch", .41, 4.4, -2.2, -1.35),
     ),
     "orbital_array": (
         Room("CALIBRATION LIFT", "terraces", .54, 5.3, .62, 1.15),
         Room("UPLINK SHAFT", "climb", .46, 0, -2.45, 4.65),
     ),
     "scrapyard_expanse": (
-        Room("RECOVERY TRENCH", "low_branch", .39, 4.3, -2.4, -.65),
-        Room("RECLAIMED CORES", "terraces", .48, 4.85, -1.2, -.65),
+        Room("COMPACTOR SHAFT", "low_branch", .39, 4.3, -2.4, -.65),
+        Room("SCRAP BYPASS", "terraces", .48, 4.85, -1.2, -.65),
     ),
     "riftcore_nexus": (
         Room("NULL RISER", "climb", .50, 0, -1.55, 4.7),

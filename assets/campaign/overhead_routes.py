@@ -38,7 +38,7 @@ OVERHEAD = {
     ),
     "sky_dock": (
         OverheadRoute("FLIGHT DECK RAMP", "CRANE RAIL", 87, "vent", 1, 17.2, "WIND", (7.4,4.5), (3.6,6.35)),
-        OverheadRoute("CROSSWIND TRUSS", "NAVIGATION SPINE", 77, "lift", -1, 16.5, "UPDRAFT", (5.9,7.0), (3.15,7.75)),
+        OverheadRoute("CROSSWIND TRUSS", "NAVIGATION SPINE", 77, "lift", -1, 16.5, "UPDRAFT", (5.9,5.65), (3.15,7.75)),
     ),
     "biolab": (
         OverheadRoute("OBSERVATION WALK", "STERILE OVERLOOK", 79, "hatch", 1, 15.9, "MUTATION", (4.2,7.5), (3.1,5.55)),

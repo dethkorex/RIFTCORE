@@ -1,6 +1,6 @@
-# RIFTCORE Alpha 6.1.5
+# RIFTCORE Alpha 6.1.6
 
-- All 20 acts received new room layouts, tighter indoor routes, measured gaps, and climbs that lead to a different story of the room.
+- All 20 acts received new routes, fewer crowded platforms, and more gaps, step-ups, and climbs. Ladders link each floor where a normal jump falls short.
 - Discover sealed salvage rooms. Buster shots reveal spreading cracks and break the barricade on the fifth hit.
 - Ground dash is a reclined slide and can carry you under low platforms at 1.5× speed. Down + B drops through raised catwalks.
 - Saber combos have new timing, trails, and sounds. Hold the saber button and release for a ranged slash.

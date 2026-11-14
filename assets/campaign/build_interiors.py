@@ -452,8 +452,7 @@ size = Vector3(1.52, 1.25, 1.5)"""
                     self.deck("LateUpperSecond",east_step-3.2,east_step-.55,mid+3.13,thin=True)
                     upper_start = p+11
                 else:
-                    self.deck("UpperEntryStep",start_step,start_step+4.0,mid+1.45,thin=True)
-                    self.deck("UpperSecondStep",start_step+4.5,start_step+7,mid+3.13,thin=True)
+                    self.deck("UpperApproach",start_step,start_step+7.0,mid+1.35,mid+3.13,thin=True)
             if spec.upper_route == "boost":
                 self.field("BoostVent",start_step+.8,mid,6,"VENT TO UPPER DECK",width=2.65)
             if spec.upper_route == "phase":
@@ -607,7 +606,7 @@ size = Vector3(1.52, 1.25, 1.5)"""
         return low-1.0
 
     def overhead(self, spec, a, floor):
-        """A second traversal loop above a continuous, accessible main deck."""
+        """A route above the main floor, with a deliberately sparse way down."""
         b = a+spec.width
         self.chamber = self.node("OverheadLoop",parent="TERRAIN",
                                  **{"metadata/left": a, "metadata/right": b, "metadata/floor": floor,
@@ -625,21 +624,36 @@ size = Vector3(1.52, 1.25, 1.5)"""
         dock = 5.1 if spec.mechanism=="lift" else 4.0
         # Two breaks under the high loop. Offset the second jump and its
         # raised landing between acts to vary the rhythm across sectors.
-        left_gap = a + (37 if self.act==1 else 39)
+        left_gap = a + (25 if self.act==1 else 30) + 2.0*((self.number+self.act)%4)
         first_width = 4.55 + .14 * ((self.number+self.act)%4)
-        far_gap = b - (17 if self.act==1 else 20)
+        far_gap = b - (18 if self.act==1 else 20) - 1.8*(self.number%3)
         far_width = 5.18 if self.act==1 else 8.65
+        # In westbound lofts the low ladder dock sits on the east side.
+        # Leave enough room before it for an unobstructed jump arc.
+        if direction < 0:
+            left_gap = a + 19.2 + (self.number%3)
+            far_gap = b - 34.4
         step = .55 if self.act==1 else .22
         self.stretch("MainWest",a,left_gap,floor)
         self.spike_pit("LoftSpikesWest",left_gap,left_gap+first_width,floor-3.35)
-        self.stretch("MainBetween",left_gap+first_width,far_gap,floor)
+        # Break up the long centre run with a supported step-up and a clearly
+        # separated takeoff at the other end.
+        middle = (left_gap+first_width+far_gap)*.5
+        rise = (.90 if self.act == 1 else 1.26) + .10*(self.number%3)
+        self.stretch("MainBetweenWest",left_gap+first_width,middle-2.1,floor)
+        self.deck("MainRaisedMachine",middle-2.1,middle+2.4,floor+rise)
+        self.node("MachineRiser",art="RCWall",pos=(middle+.15,floor+rise*.29,-.98),
+                  scale=vec(4.5/.8,rise/4.25,.55))
+        self.deck("MachineDescent",middle+2.4,middle+5.9,floor+rise,floor)
+        self.stretch("MainBetweenEast",middle+5.9,far_gap,floor)
         self.spike_pit("LoftSpikesEast",far_gap,far_gap+far_width,floor-3.8)
         self.deck("MainRaisedLanding",far_gap+far_width,far_gap+far_width+3.8,floor+step)
         self.deck("MainLandingRamp",far_gap+far_width+3.8,far_gap+far_width+7.4,floor+step,floor)
         self.stretch("MainEast",far_gap+far_width+7.4,b,floor)
-        span("EntrySide", -9,-5,1.4)
-        span("EntryTurn",-4.4,-.6,2.75)
-        span("EntryDock",.2,4.6,dock)
+        # The dock's only ordinary access is the climb from the ground.
+        # Eliminating the low steps leaves both approaches unobstructed.
+        self.node("LoftAccessHatch",art="RCHatch",pos=(x(2.4),floor+dock,0),
+                  deck_width=4.4,climb_height=dock)
         if spec.mechanism == "lift":
             # A platform carries the operator the whole way from the dock.
             span("HighHoist",5.05,10.15,dock,moving=True)
@@ -673,7 +687,7 @@ size = Vector3(1.52, 1.25, 1.5)"""
             # Updrafts offer a quick line onto the transfer deck, with the
             # hatch available when the vent is between cycles.
             if spec.mechanism=="vent":
-                self.field("OverheadBoost",x(3.7),floor+dock,6,"BOOST TO TRANSFER",width=2.5)
+                self.field("OverheadBoost",x(4.7),floor+dock,6,"BOOST TO TRANSFER",width=2.35)
             if spec.mechanism in ("gravity","buoyant"):
                 kind = 3 if spec.mechanism=="gravity" else 1
                 self.field("OverheadAccessField",x(9.9),floor+first_y,kind,
@@ -695,7 +709,7 @@ size = Vector3(1.52, 1.25, 1.5)"""
             self.node("OverheadPhaseStep",art="RCPhase",
                       pos=(x(launch_end+spec.gaps[0]*.5),floor+spec.rise-.45,0),
                       period=3.8 if self.act==2 else 4.55,phase_offset=.45)
-        else:
+        elif kind != 6:
             self.field("OverheadGimmick",x(midpoint),floor+middle_height,kind,label,
                        direction=direction,width=3.2)
 
@@ -704,9 +718,16 @@ size = Vector3(1.52, 1.25, 1.5)"""
         first_return = spec.rise-spec.drops[0]
         second_return = spec.rise-spec.drops[1]
         span("Turnaround",vault_end+1.85,turn_tip,first_return)
-        span("ReturnOuter",vault_end-2.1,turn_tip-2.45,second_return)
-        span("ReturnCross",vault_start-3.8,vault_end-3.2,second_return-1.75)
-        span("ReturnDrop",vault_start-10.1,vault_start-4.8,max(2.1,second_return-4.2))
+        if kind == 6:
+            # Catch a missed descent without pre-launching the vault jump.
+            self.field("ReturnUpdraft",x(vault_end+5.65),floor+first_return,kind,label,
+                       direction=direction,width=1.85)
+        if self.act == 1:
+            span("ReturnCross",vault_start-6.1,vault_end+.3,second_return-.8,second_return)
+        else:
+            span("ReturnCross",vault_start-1.9,turn_tip-1.85,second_return,second_return+1.35)
+        # Past the return deck, drop onto the signalled main route. No extra
+        # platform inside the landing line is needed.
         for index,at in enumerate((launch_end-3,midpoint,vault_end-2)):
             support_height = 24.0 - spec.rise
             self.node(f"OverheadBrace{index}",art="RCWall",
@@ -940,7 +961,14 @@ size = Vector3(1.52, 1.25, 1.5)"""
                 else:
                     self.spawns.append((q+3,high))
             else:
-                self.stretch("Ground",p,q,floor)
+                landing = p + (q-p) * (.59 if self.act==1 else .47)
+                if q-p > 19.0:
+                    self.stretch("GroundIn",p,landing-1.6,floor)
+                    self.deck("GroundStep",landing-1.6,landing+2.4,floor + .82)
+                    self.deck("GroundRollOff",landing+2.4,landing+6.2,floor+.82,floor)
+                    self.stretch("GroundOut",landing+6.2,q,floor)
+                else:
+                    self.stretch("Ground",p,q,floor)
                 # A room-length gallery is a single walkable balcony. A
                 # climb or an approach jump earns access at one end.
                 route_y = floor+3.95 if self.sector=="machine_jungle" else floor+3.72+shift*.18
