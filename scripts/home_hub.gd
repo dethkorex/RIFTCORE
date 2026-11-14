@@ -39,9 +39,9 @@ const RX07 := preload("res://assets/ui/rx07_menu.png")
 const ARRIVAL := [
 	["NOVA", "RX-07, can you hear me? I am NOVA. You are on the Deploy pad at Operations Station."],
 	["RX-07", "I can hear you. Why can't I remember getting here?"],
-	["NOVA", "I reconstructed you from a stored operator pattern. Your frame can survive inside the Rift. Most of us cannot."],
+	["NOVA", "The Architect built you. After the Blackout, Dr. Mara Voss installed the Rogue Protocol so you could choose your own orders."],
 	["RX-07", "Then tell me where you need me."],
-	["NOVA", "Start in Neon Factory. Shut down its overseer and extract. Each sector will bring us closer to the signal at the heart of the Rift."],
+	["NOVA", "The Architect seized ten facilities. Start in Neon Factory. Stop the Forge Titan and bring back its memory. We need those records to reach the Architect."],
 	["RX-07", "Understood. Put Neon Factory on the deployment map."],
 ]
 const RECONSTRUCTION := [

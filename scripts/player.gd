@@ -540,7 +540,7 @@ func catch_hatch_landing(previous: Vector3, incoming: Vector3, previous_hatch: S
 		return
 	var half := standing_capsule.height * 0.5
 	for deck in get_tree().get_nodes_in_group(&"factory_one_way"):
-		if deck == drop_through or not deck.has_meta("hatch_walk_support"):
+		if deck == drop_through or not deck.is_visible_in_tree() or not deck.has_meta("hatch_walk_support"):
 			continue
 		var shape := deck.get_node_or_null("Collider") as CollisionShape3D
 		if not shape or shape.disabled:
@@ -596,11 +596,12 @@ func update_one_way_collisions() -> void:
 		var soles := global_position.y - standing_capsule.height * 0.5
 		if platform == drop_through and soles < surface_y - 0.22:
 			drop_through = null
+		var climbing_through := is_instance_valid(ladder) and velocity.y > 0.0 and absf(global_position.x - ladder.global_position.x) < 0.48
 		var ascending := velocity.y > 0.0 and soles < surface_y - 0.04 - slope_allowance
 		var below := not is_on_floor() and soles < surface_y - 0.20 - slope_allowance
 		var hatch := platform.has_meta("hatch_walk_support")
 		var pass_below_hatch := hatch and soles < surface_y - 0.18
-		var ignore := platform == drop_through or platform == ladder_support_exception or pass_below_hatch or (not hatch and not side_contact and (ascending or below))
+		var ignore := platform == drop_through or platform == ladder_support_exception or pass_below_hatch or (not hatch and (ascending or below) and (not side_contact or climbing_through))
 		if ignore and not exceptions.has(platform):
 			add_collision_exception_with(platform)
 		elif not ignore and exceptions.has(platform):
