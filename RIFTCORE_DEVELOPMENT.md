@@ -26,7 +26,7 @@ Status: in development. Baseline checkpoint: 970d50a. No v0.5 release tag.
 | 7 Expanded levels | Pending |
 | 8 Puzzles | Pending |
 | 9 Procedural rooms | Pending |
-| 10 UI overhaul | Pending |
+| 10 UI overhaul | Shared typography, angular kit frames, equipment cards, pause, HUD, and Operations Station integrated. Full page-by-page review pending |
 | 11 Enemy model polish | Pending |
 | 12 Leaderboards and time trials | Pending |
 | 13 Verification | Offline campaign and sector regression suites, ladder aim, save migration, permanent progression, relay UI and launcher patch notes checks passed. Live relay and installers still require runtime testing |

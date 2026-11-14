@@ -106,6 +106,8 @@ var low_profile := false
 var contact_recoil := 0.0
 var ladder: Node3D
 var ladder_lock := 0.0
+var ladder_exit := false
+var drop_through: StaticBody3D
 var wall_side := 0.0
 var wall_grace := 0.0
 var wall_launch_lock := 0.0
@@ -280,7 +282,11 @@ func _physics_process(delta: float) -> void:
 	var axis := Input.get_axis("move_left", "move_right")
 	ladder_lock = maxf(0.0, ladder_lock - delta)
 	update_wall_contact(delta, axis)
-	if update_ladder(delta, axis):
+	var dropping := false
+	var down := Input.is_action_pressed("crouch") or Input.is_action_pressed("crouch_stick")
+	if is_on_floor() and down and Input.is_action_just_pressed("dash") and not is_instance_valid(ladder):
+		dropping = start_platform_drop()
+	if not dropping and update_ladder(delta, axis):
 		return
 	if climb_pose:
 		climb_pose.influence = move_toward(climb_pose.influence, 0.0, 0.28)
@@ -290,7 +296,9 @@ func _physics_process(delta: float) -> void:
 	if dash_left <= 0.0 and absf(axis) > 0.1:
 		var next_facing := signf(axis)
 		facing = next_facing
-	if is_on_floor():
+	if dropping:
+		coyote = 0.0
+	elif is_on_floor():
 		coyote = coyote_duration
 		air_dash_available = true
 	else:
@@ -299,7 +307,7 @@ func _physics_process(delta: float) -> void:
 		jump_buffer = jump_buffer_duration
 	else:
 		jump_buffer = maxf(0.0, jump_buffer - delta)
-	if resume_input_guard <= 0.0 and contact_recoil <= 0.0 and Input.is_action_just_pressed("dash") and dash_lock <= 0.0 and (is_on_floor() or air_dash_available):
+	if not dropping and resume_input_guard <= 0.0 and contact_recoil <= 0.0 and Input.is_action_just_pressed("dash") and dash_lock <= 0.0 and (is_on_floor() or air_dash_available):
 		dash_left = dash_duration
 		dash_elapsed = 0.0
 		dash_facing = facing
@@ -313,7 +321,7 @@ func _physics_process(delta: float) -> void:
 		if not is_on_floor(): air_dash_available = false
 	var stick_crouch := Input.is_action_pressed("crouch_stick") and absf(axis) < 0.35
 	var wants_crouch := Input.is_action_pressed("crouch") or stick_crouch
-	set_crouch(wants_crouch and is_on_floor() and dash_left <= 0.0 and jump_buffer <= 0.0)
+	set_crouch(not dropping and wants_crouch and is_on_floor() and dash_left <= 0.0 and jump_buffer <= 0.0)
 	if melee_lock <= 0.0:
 		if Input.is_action_just_pressed("swap_weapon"):
 			cycle_weapon()
@@ -376,7 +384,9 @@ func _physics_process(delta: float) -> void:
 				surface_y = top.y - (normal.x * relative.x + normal.z * relative.z) / normal.y
 				side_contact = not platform.has_meta("hatch_walk_support") and outside_one_way_edge(platform_shape, half_size)
 		var soles := global_position.y - standing_capsule.height * 0.5
-		if not side_contact and (velocity.y > 0.0 or soles < surface_y - 0.115):
+		if platform == drop_through and soles < surface_y - 0.22:
+			drop_through = null
+		if platform == drop_through or (not side_contact and (velocity.y > 0.0 or soles < surface_y - 0.115)):
 			add_collision_exception_with(platform)
 		else:
 			remove_collision_exception_with(platform)
@@ -504,17 +514,32 @@ func update_wall_contact(delta: float, axis: float) -> void:
 		wall_sliding = velocity.y <= 0.0
 		return
 
+func start_platform_drop() -> bool:
+	for index in range(get_slide_collision_count()):
+		var hit := get_slide_collision(index)
+		var deck := hit.get_collider() as StaticBody3D
+		if not deck or not deck.is_in_group(&"factory_one_way") or hit.get_normal().dot(Vector3.UP) < cos(floor_max_angle):
+			continue
+		drop_through = deck
+		add_collision_exception_with(deck)
+		velocity.y = -4.5
+		jump_buffer = 0.0
+		ladder_lock = 0.25
+		return true
+	return false
+
 func climb_rise(climb: Node3D) -> float:
 	return (climb.global_basis.y * float(climb.rise)).y
 
 func update_ladder(delta: float, axis: float) -> bool:
 	var vertical := Input.get_axis("climb_down", "climb_up")
 	if not is_instance_valid(ladder):
+		var dash_grab := dash_left > 0.0
 		var wall_intent := wall_grace > 0.0 and (axis * wall_side > 0.14 or Input.is_action_just_pressed("jump"))
 		var diagonal_air_input := not is_on_floor() and absf(axis) >= 0.50
-		if wall_intent or diagonal_air_input or wall_launch_lock > 0.0:
+		if not dash_grab and (wall_intent or diagonal_air_input or wall_launch_lock > 0.0):
 			return false
-		if absf(vertical) < 0.35 or ladder_lock > 0.0 or dash_left > 0.0 or contact_recoil > 0.0:
+		if absf(vertical) < 0.35 or ladder_lock > 0.0 or contact_recoil > 0.0:
 			return false
 		for candidate in get_tree().get_nodes_in_group(&"factory_ladder"):
 			if not candidate.is_visible_in_tree():
@@ -529,14 +554,23 @@ func update_ladder(delta: float, axis: float) -> bool:
 				if not near_top or not Input.is_action_just_pressed("climb_down") or absf(axis) > 0.35:
 					continue
 			var reach := float(candidate.get_meta("hatch_landing_distance")) + 0.13 if hatch_descent else 0.63
-			if absf(offset.x) < reach and offset.y > minimum and offset.y < rise + (1.05 if hatch_descent else (0.93 if vertical < 0.0 else 0.82)):
+			var next_offset_x := offset.x + velocity.x * delta
+			var crosses_ladder := dash_grab and minf(offset.x, next_offset_x) < reach and maxf(offset.x, next_offset_x) > -reach
+			if (absf(offset.x) < reach or crosses_ladder) and offset.y > minimum and offset.y < rise + (1.05 if hatch_descent else (0.93 if vertical < 0.0 else 0.82)):
 				ladder = candidate
+				ladder_exit = false
+				dash_left = 0.0
+				wall_grace = 0.0
+				wall_launch_lock = 0.0
+				wall_sliding = false
+				jump_buffer = 0.0
 				cancel_charge()
 				break
 		if not is_instance_valid(ladder):
 			return false
 	if Input.is_action_just_pressed("jump"):
 		ladder = null
+		ladder_exit = false
 		ladder_lock = 0.24
 		velocity = Vector3(axis * move_speed * 0.52, jump_velocity * 0.78, 0.0)
 		return false
@@ -551,12 +585,13 @@ func update_ladder(delta: float, axis: float) -> bool:
 			remove_collision_exception_with(deck)
 		add_collision_exception_with(ladder.get_meta("hatch_support"))
 		var top_clearance := top + 0.055
-		if vertical > 0.0 and proposed >= top:
+		if ladder_exit or (vertical > 0.0 and proposed >= top):
 			# Step onto the solid half only after the capsule has cleared the hatch.
 			if global_position.y < top_clearance - 0.005:
 				climb_speed = minf(climb_speed, (top_clearance - global_position.y) / delta)
 				finished = false
 			else:
+				ladder_exit = true
 				var exit_direction: float = ladder.get_meta("hatch_exit")
 				var side_distance: float = ladder.get_meta("hatch_landing_distance")
 				target_x = ladder.to_global(Vector3(exit_direction * side_distance, 0, 0)).x
@@ -571,13 +606,18 @@ func update_ladder(delta: float, axis: float) -> bool:
 			var endpoint := top + 0.025 if vertical > 0.0 else bottom + 0.02
 			climb_speed = (endpoint - global_position.y) / delta
 	set_crouch(false)
-	velocity = Vector3(clampf((target_x - global_position.x) * 14.0, -3.8, 3.8), climb_speed, -global_position.z * 18.0)
+	velocity = Vector3(clampf((target_x - global_position.x) * (18.0 if ladder_exit else 14.0), -4.4, 4.4), climb_speed, -global_position.z * 18.0)
 	var incoming := velocity
 	move_and_slide()
 	apply_ceiling_rebound(incoming)
 	var hit_ceiling := incoming.y > 0.0 and velocity.y < 0.0
 	if finished or hit_ceiling:
+		if ladder.has_meta("hatch_support"):
+			remove_collision_exception_with(ladder.get_meta("hatch_support"))
+		if ladder_exit and not hit_ceiling:
+			facing = float(ladder.get_meta("hatch_exit"))
 		ladder = null
+		ladder_exit = false
 		ladder_lock = 0.23
 		if not hit_ceiling:
 			velocity = Vector3.ZERO
@@ -601,8 +641,11 @@ func update_ladder(delta: float, axis: float) -> bool:
 	if is_instance_valid(charge_orb):
 		charge_orb.global_position = cannon_muzzle(facing)
 	if climb_pose:
-		climb_pose.influence = move_toward(climb_pose.influence, 1.0, 0.27)
-		climb_pose.cycle = fposmod(climb_pose.cycle + vertical * delta * 16.4, TAU)
+		climb_pose.influence = move_toward(climb_pose.influence, 0.0 if ladder_exit else 1.0, delta * 13.0)
+		if not ladder_exit:
+			climb_pose.cycle = fposmod(climb_pose.cycle + vertical * delta * 16.4, TAU)
+		else:
+			play_character_animation("walk")
 	return true
 
 static func experience_threshold(level: int) -> int:

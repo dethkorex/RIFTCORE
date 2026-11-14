@@ -42,6 +42,9 @@ func _ready() -> void:
 		show_fallback_notes("No release channel is configured for this installation.")
 
 func build_ui() -> void:
+	var font_theme := Theme.new()
+	font_theme.default_font = preload("res://branding/Barlow-Medium.ttf")
+	theme = font_theme
 	var shade := ColorRect.new()
 	shade.color = Color("091526")
 	add_child(shade)

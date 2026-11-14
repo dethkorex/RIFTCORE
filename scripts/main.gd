@@ -246,7 +246,7 @@ func open_home_hub() -> void:
 	menu.process_mode = Node.PROCESS_MODE_DISABLED
 	home_hub = HOME_HUB.instantiate() as Node3D
 	add_child(home_hub)
-	home_hub.set_bank(profile.credits)
+	home_hub.set_bank(profile.credits, profile.core_shards, profile.player_level())
 	home_hub.station_requested.connect(func(page: String):
 		home_hub.set_panel_open(true)
 		menu.process_mode = Node.PROCESS_MODE_INHERIT
@@ -262,7 +262,7 @@ func open_home_hub() -> void:
 func close_station_panel() -> void:
 	menu.process_mode = Node.PROCESS_MODE_DISABLED
 	if is_instance_valid(home_hub):
-		home_hub.set_bank(profile.credits)
+		home_hub.set_bank(profile.credits, profile.core_shards, profile.player_level())
 		home_hub.set_panel_open(false)
 
 func remove_home_hub() -> void:
@@ -443,7 +443,7 @@ func load_checkpoint_location(save: ConfigFile) -> void:
 	camera_rig.global_position.x = checkpoint_spawn.x
 
 func build_pause_menu() -> void:
-	var stack := overlay()
+	var stack := overlay(true)
 	UI.label(stack, "PAUSED", 36, UI.CYAN)
 	UI.label(stack, "%s / Act %d" % [Catalog.info(sector).title, act], 17, UI.MUTED)
 	UI.button(stack, "Resume", toggle_pause, true).grab_focus()
@@ -465,7 +465,7 @@ func show_pause_save() -> void:
 	, true).grab_focus()
 	UI.button(stack, "Back to Pause", build_pause_menu)
 
-func overlay() -> VBoxContainer:
+func overlay(sidebar := false) -> VBoxContainer:
 	if is_instance_valid(pause_menu):
 		pause_menu.get_parent().remove_child(pause_menu)
 		pause_menu.queue_free()
@@ -478,14 +478,17 @@ func overlay() -> VBoxContainer:
 	hud.add_child(pause_menu)
 	pause_menu.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	var shade := ColorRect.new()
-	shade.color = Color(0.015, 0.035, 0.075, 0.8)
+	shade.color = Color(0.015, 0.035, 0.075, 0.48 if sidebar else 0.8)
 	pause_menu.add_child(shade)
 	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	var center := CenterContainer.new()
 	pause_menu.add_child(center)
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	if sidebar:
+		center.anchor_right = 0.33
+		center.offset_left = 22
 	var panel := PanelContainer.new()
-	panel.custom_minimum_size.x = 460
+	panel.custom_minimum_size.x = 348 if sidebar else 460
 	center.add_child(panel)
 	return UI.column(panel, 12)
 
@@ -640,6 +643,7 @@ func bind_boss_signals() -> void:
 	boss.died.connect(func():
 		boss_defeated = true
 		profile.award_player_xp((35 if act == 1 else 80) + sector * 8)
+		factory_hud.player_level = profile.player_level()
 		profile.core_shards += 1 + sector + (3 if act == 2 else 0)
 		Drop.roll_at(game_root.get_node("Actors"), boss.global_position + Vector3.UP * 0.25, sector, "boss" if act == 2 else "miniboss")
 		open_factory_gate()
@@ -705,6 +709,7 @@ func build_hud() -> void:
 	factory_hud.exit_task = "DEFEAT THE MINIBOSS" if act == 1 else "REACH SECTOR EXTRACTION"
 	factory_hud.boss_name = String(Miniboss.TITLES[sector - 1] if act == 1 else Catalog.info(sector).boss).to_upper()
 	factory_hud.act = act
+	factory_hud.player_level = profile.player_level()
 	factory_hud.boss_tint = Color(Catalog.info(sector).color)
 	hud.add_child(factory_hud)
 	factory_hud.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -730,7 +735,11 @@ func build_hud() -> void:
 			recovered.append("%s +%d" % [Materials.label(id), drop[id]])
 		factory_hud.announce("SALVAGE  /  " + "  ·  ".join(recovered), Color("ff8ada"))
 	)
-	player.experience_earned.connect(func(amount: int): profile.award_player_xp(maxi(1, amount / 3)))
+	player.experience_earned.connect(func(amount: int):
+		profile.award_player_xp(maxi(1, amount / 3))
+		factory_hud.player_level = profile.player_level()
+		factory_hud.queue_redraw()
+	)
 	player.weapon_changed.connect(func(weapon: String):
 		var id := player.equipped_suit()
 		var data := Catalog.weapon(id)

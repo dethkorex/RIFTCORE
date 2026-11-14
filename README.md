@@ -60,3 +60,5 @@ Sectors 03–10 also have editable scenes under `scenes/levels`. Their reusable 
 Each sector's `assets/campaign/<sector>/terrain` folder has `climb_platform_left.tscn`, `climb_platform_center.tscn`, and `climb_platform_right.tscn`. Drag a scene into the level and move its root node. Use **Deck Width**, **Deck Depth**, and **Climb Height** in the Inspector to resize it. The mesh, the hatch collision shapes, and the ladder or vine rebuild together. Position the top of the deck at the desired floor height and set Climb Height to reach the lower floor.
 
 Push a stable tag such as `v0.3.0` to build and publish both installers through GitHub Actions. The update manifest and both game ZIPs are published together. See [distribution instructions](distribution/README.md), [art production notes](ART_NOTES.md), and [audio credits](assets/audio/CREDITS.md).
+
+Hold Up or Down while dashing into a climbable to grab it. On a one-way deck, press Down + B (controller) or S + Shift (keyboard) to drop through.

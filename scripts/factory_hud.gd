@@ -1,11 +1,15 @@
 extends Control
 
+const UI := preload("res://scripts/rift_ui.gd")
+const CURRENCY := preload("res://assets/ui/riftcore_kit/icon_currency.png")
+const PAUSE_PLATE := preload("res://assets/ui/riftcore_kit/panel_base_small.png")
 const PORTRAIT := preload("res://assets/ui/rx07_menu.png")
 const CYAN := Color("00caff")
 const WHITE := Color("f1f8ff")
 const INK := Color(0.018, 0.046, 0.13, 0.96)
 const HUD_SCALE := 0.75
 
+var player_level := 1
 var health := 1.0
 var energy := 1.0
 var health_capacity := 80.0
@@ -38,10 +42,12 @@ func _ready() -> void:
 	notice = Label.new()
 	add_child(notice)
 	notice.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
-	notice.offset_left = -270
-	notice.offset_right = 270
+	notice.offset_left = -400
+	notice.offset_right = 400
 	notice.offset_top = 120
+	notice.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	notice.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	notice.add_theme_font_override("font", UI.DISPLAY)
 	notice.add_theme_font_size_override("font_size", 30)
 	notice.add_theme_constant_override("outline_size", 8)
 	notice.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -97,7 +103,7 @@ func plate(rect: Rect2, cut := 9.0, edge := CYAN) -> void:
 	draw_line(Vector2(x + cut + 3, y + 3), Vector2(r - cut - 3, y + 3), WHITE, 1.0)
 
 func caption(at: Vector2, value: String, font_size := 18, color := WHITE) -> void:
-	var face := ThemeDB.fallback_font
+	var face := UI.DISPLAY if font_size >= 19 else UI.BODY
 	draw_string(face, at + Vector2(1, 2), value, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, Color("020817"))
 	draw_string(face, at, value, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, color)
 
@@ -129,7 +135,7 @@ func _draw() -> void:
 	var hud_size := size / HUD_SCALE
 	var health_width := clampf(150.0 + (displayed_health_capacity - 80.0) * 1.4, 150.0, 245.0)
 	var energy_width := clampf(150.0 + (displayed_energy_capacity - 75.0) * 1.8, 150.0, 245.0)
-	plate(Rect2(105, 69, 124 + maxf(health_width, energy_width), 103), 13)
+	draw_texture_rect(PAUSE_PLATE, Rect2(102, 67, 132 + maxf(health_width, energy_width), 111), false)
 	plate(Rect2(20, 26, 103, 118), 15)
 	var source_size := PORTRAIT.get_size()
 	draw_texture_rect_region(PORTRAIT, Rect2(26, 33, 91, 103),
@@ -137,26 +143,27 @@ func _draw() -> void:
 	plate(Rect2(130, 39, 96, 26), 8)
 	plate(Rect2(236, 36, 86, 29), 8)
 	caption(Vector2(145, 58), "RX-07", 18)
-	caption(Vector2(250, 57), "LV.%02d" % RiftPlayer.level_for_experience(experience), 18)
+	caption(Vector2(250, 57), "OP %02d" % RiftPlayer.level_for_experience(experience), 18)
+	plate(Rect2(328, 36, 84, 29), 8, Color("bf82ff"))
+	caption(Vector2(341, 57), "PL %02d" % player_level, 18)
 	gauge(77, "HEALTH", health, Color("62f10b"), health_width)
 	gauge(108, "ENERGY", energy, Color("04dafa"), energy_width)
 	var shown_level := RiftPlayer.level_for_experience(animated_xp)
 	var threshold := RiftPlayer.experience_threshold(shown_level)
 	var next_threshold := RiftPlayer.experience_threshold(shown_level + 1)
 	gauge(139, "XP", (animated_xp - threshold) / (next_threshold - threshold), Color("ab72ff"), 150.0)
-	plate(Rect2(334, 20, 255, 31), 10)
-	caption(Vector2(352, 43), "RIFTCORE   /   ACT %d" % act, 20)
 	var right := hud_size.x - 20.0
 	var x := right - 348.0
 	plate(Rect2(x, 21, 348, 105), 14)
 	for y in range(56, 120, 5):
 		draw_line(Vector2(x + 5, y), Vector2(right - 5, y), Color("102752"), 1.0)
-	caption(Vector2(x + 18, 49), "⊕   OBJECTIVE", 22)
+	caption(Vector2(x + 18, 49), "ACT %s  /  OBJECTIVE" % ("II" if act == 2 else "I"), 22)
 	draw_line(Vector2(x + 12, 55), Vector2(right - 12, 55), CYAN, 1.0)
 	task(Vector2(x + 20, 80), exit_task, reached_exit)
 	task(Vector2(x + 20, 106), "OPTIONAL: SECURITY   %d LEFT" % remaining, remaining == 0)
 	plate(Rect2(right - 222, 139, 222, 36), 11)
-	caption(Vector2(right - 207, 164), "⬡   BOLTS  %04d" % credits, 19)
+	draw_texture_rect(CURRENCY, Rect2(right - 209, 144, 24, 24), false)
+	caption(Vector2(right - 175, 164), "BOLTS  %04d" % credits, 19)
 	plate(Rect2(right - 222, 181, 222, 33), 9)
 	var life_text := "RX   LIVES   %02d" % lives
 	if reserve_lives > 0:

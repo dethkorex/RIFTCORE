@@ -5,19 +5,17 @@ signal title_requested
 
 const UI := preload("res://scripts/rift_ui.gd")
 const AVATAR := preload("res://scenes/actors/riftcore_player.tscn")
-const WINDOW := preload("res://assets/campaign/orbital_array/panorama.png")
-const DECK := preload("res://assets/campaign/orbital_array/terrain/deck.tscn")
-const REACTOR := preload("res://assets/campaign/props/sci-reactor.glb")
+const WINDOW := preload("res://assets/hub/orbital_view.png")
 const STATIONS := [
-	{"x": -18.0, "name": "Save Game", "page": "Save Game", "color": Color("f18da9")},
-	{"x": -13.5, "name": "Settings", "page": "Settings", "color": Color("a5a9ff")},
-	{"x": -9.0, "name": "Fabrication", "page": "Fabrication", "color": Color("f2ac85")},
-	{"x": -4.5, "name": "Core Enhancement", "page": "Upgrades", "color": Color("ffc971")},
-	{"x": 0.0, "name": "Deploy", "page": "Sector select", "color": Color("5dffdc")},
-	{"x": 4.5, "name": "Storage", "page": "Storage", "color": Color("86ecc8")},
-	{"x": 9.0, "name": "Loadout", "page": "Loadout", "color": Color("72d1ff")},
-	{"x": 13.5, "name": "Challenges", "page": "Challenges", "color": Color("d2a0ff")},
-	{"x": 18.0, "name": "NOVA Archive", "page": "Collection", "color": Color("a3eca4")},
+	{"x": -18.0, "name": "Save Game", "page": "Save Game", "color": Color("b465ff"), "prop": "save_terminal"},
+	{"x": -13.5, "name": "Settings", "page": "Settings", "color": Color("9cbbff"), "prop": "settings_terminal"},
+	{"x": -9.0, "name": "Fabrication", "page": "Fabrication", "color": Color("ffbd66"), "prop": "trader_bay"},
+	{"x": -4.5, "name": "Core Enhancement", "page": "Upgrades", "color": Color("ffc465"), "prop": "forge_bay"},
+	{"x": 0.0, "name": "Deploy", "page": "Sector select", "color": Color("52edff"), "prop": "deploy_pad"},
+	{"x": 4.5, "name": "Storage", "page": "Storage", "color": Color("5ffcec"), "prop": "storage_bay"},
+	{"x": 9.0, "name": "Loadout", "page": "Loadout", "color": Color("f871ef"), "prop": "loadout_bay"},
+	{"x": 13.5, "name": "Challenges", "page": "Challenges", "color": Color("bd8cff"), "prop": "challenge_terminal"},
+	{"x": 18.0, "name": "NOVA Archive", "page": "Collection", "color": Color("81ffe8"), "prop": "archive_terminal"},
 ]
 
 var avatar: RiftPlayer
@@ -27,6 +25,8 @@ var current_station := -1
 var panel_open := false
 var pads: Array[Dictionary] = []
 var bank_label: Label
+var station_notice: Label
+var station_panel: PanelContainer
 var hud_layer: CanvasLayer
 var velocity_x := 0.0
 var metal: StandardMaterial3D
@@ -42,20 +42,20 @@ func _ready() -> void:
 		build_pad(station)
 	avatar = AVATAR.instantiate() as RiftPlayer
 	add_child(avatar)
-	avatar.position = Vector3(0, 0.89, 0)
+	avatar.position = Vector3(0, 1.11, 0)
 	avatar.set_physics_process(false)
 	avatar.collision_layer = 0
 	avatar.collision_mask = 0
 	avatar.model_root.rotation.y = 0.28
 	avatar.play_character_animation("idle", true)
-	prompt = label_in_space(avatar, "", Vector3(0, 1.58, 0.25), 46, Color.WHITE)
+	prompt = label_in_space(avatar, "", Vector3(0, 1.52, 0.25), 36, Color.WHITE)
 	prompt.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	prompt.no_depth_test = true
 	camera = Camera3D.new()
 	add_child(camera)
-	camera.position = Vector3(0, 2.6, 8.5)
-	camera.rotation_degrees.x = -4.0
-	camera.fov = 68.0
+	camera.position = Vector3(0, 2.43, 10.25)
+	camera.rotation_degrees.x = -2.8
+	camera.fov = 59.0
 	camera.make_current()
 	build_hud()
 	update_station()
@@ -70,6 +70,7 @@ func _physics_process(delta: float) -> void:
 	var next_x := clampf(avatar.position.x + velocity_x * delta, -19.15, 19.15)
 	var moving := absf(next_x - avatar.position.x) > 0.003
 	avatar.position.x = next_x
+	avatar.position.y = lerpf(avatar.position.y, 1.11 if absf(next_x) < 1.25 else 0.89, 1.0 - exp(-18.0 * delta))
 	if moving:
 		avatar.model_root.rotation.y = lerp_angle(avatar.model_root.rotation.y, signf(velocity_x) * PI * 0.5, 1.0 - exp(-18.0 * delta))
 	avatar.play_character_animation("walk" if moving else "idle")
@@ -99,9 +100,12 @@ func update_station() -> void:
 		RiftAudio.play_effect(&"menu_move")
 	current_station = nearest
 	prompt.visible = nearest >= 0 and not panel_open
+	station_panel.visible = nearest >= 0 and not panel_open
 	if nearest >= 0:
-		prompt.text = "%s\nE / A  ·  Interact" % STATIONS[nearest].name
+		prompt.text = STATIONS[nearest].name.to_upper()
 		prompt.modulate = STATIONS[nearest].color.lerp(Color.WHITE, 0.32)
+		station_notice.text = "%s   /   %s INTERACT" % [STATIONS[nearest].name.to_upper(), "A" if not Input.get_connected_joypads().is_empty() else "E"]
+		station_notice.add_theme_color_override("font_color", prompt.modulate)
 
 func set_panel_open(open: bool) -> void:
 	panel_open = open
@@ -110,8 +114,8 @@ func set_panel_open(open: bool) -> void:
 	avatar.play_character_animation("idle", true)
 	update_station()
 
-func set_bank(amount: int) -> void:
-	bank_label.text = "%04d BOLTS" % amount
+func set_bank(amount: int, shards: int, level: int) -> void:
+	bank_label.text = "RX-07   /   PLAYER %02d\n%04d BOLTS   ·   %03d CORE SHARDS" % [level, amount, shards]
 
 func _unhandled_input(event: InputEvent) -> void:
 	if panel_open:
@@ -146,45 +150,55 @@ func build_room() -> void:
 	add_child(key)
 	var panorama := MeshInstance3D.new()
 	var glass_view := QuadMesh.new()
-	glass_view.size = Vector2(46, 9)
+	glass_view.size = Vector2(63, 21)
 	panorama.mesh = glass_view
 	var view_finish := StandardMaterial3D.new()
 	view_finish.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	view_finish.albedo_texture = WINDOW
-	view_finish.albedo_color = Color("96b8e2")
+	view_finish.albedo_color = Color("dcdeff")
 	panorama.material_override = view_finish
-	panorama.position = Vector3(0, 3.9, -5.3)
+	panorama.position = Vector3(1.0, 4.0, -12.0)
 	add_child(panorama)
-	for x in [-16.0, -8.0, 0.0, 8.0, 16.0]:
-		var platform := DECK.instantiate() as Node3D
-		add_child(platform)
-		platform.position = Vector3(x, 0, 0)
-		platform.scale.z = 2.4
-	box(self, Vector3(0, -0.43, 0), Vector3(40, 0.42, 4.75), metal)
-	box(self, Vector3(0, -0.28, 2.46), Vector3(39.9, 0.045, 0.055), cyan)
-	box(self, Vector3(0, 0.28, -4.26), Vector3(41, 0.54, 0.65), metal)
-	box(self, Vector3(0, 0.62, -4.07), Vector3(41, 0.065, 0.14), cyan)
-	box(self, Vector3(0, 5.3, -2.30), Vector3(41, 0.63, 4.3), metal)
-	box(self, Vector3(0, 4.95, -0.35), Vector3(40.6, 0.08, 0.11), cyan)
-	box(self, Vector3(0, 4.78, -4.13), Vector3(40.6, 0.22, 0.35), frame)
-	for x in [-20.8, -15.6, -10.4, -5.2, 0.0, 5.2, 10.4, 15.6, 20.8]:
-		box(self, Vector3(x, 2.72, -4.19), Vector3(0.27, 4.18, 0.44), frame)
-		box(self, Vector3(x, 3.96, -3.93), Vector3(0.08, 0.61, 0.064), cyan)
-	for x in [-11.1, -6.65, -2.2, 2.2, 6.65, 11.1]:
-		box(self, Vector3(x, 0.36, -2.83), Vector3(0.77, 0.72, 0.58), metal)
-		var screen := box(self, Vector3(x, 0.77, -2.69), Vector3(0.71, 0.27, 0.055), frame)
-		screen.rotation.x = -0.23
-		for row in range(3):
-			box(self, Vector3(x - 0.08, 0.69 + row * 0.066, -2.63), Vector3(0.38 - row * 0.072, 0.017, 0.022), cyan)
-	for x in [-15.05, 15.05]:
-		var reactor := REACTOR.instantiate() as Node3D
-		add_child(reactor)
-		reactor.position = Vector3(x, 0, -2.9)
+	for index in range(-4, 5):
+		var x := 4.5 * index
+		place_asset("deck_section", Vector3(x, 0.0, 0.0))
+		place_asset("window_frame", Vector3(x, 0.45, -3.28))
+	for x in [-18.0, -9.0, 0.0, 9.0, 18.0]:
+		box(self, Vector3(x, 4.86, -1.85), Vector3(8.92, 0.39, 2.9), frame)
+		box(self, Vector3(x, 5.15, -0.1), Vector3(8.90, 0.24, 1.5), metal)
+		for side in [-1, 1]:
+			var flange := box(self, Vector3(x + side * 3.06, 4.70, -0.11), Vector3(1.32, 0.18, 0.62), frame)
+			flange.rotation.z = deg_to_rad(side * 13.0)
+			box(self, Vector3(x + side * 2.50, 4.63, -0.06), Vector3(0.63, 0.035, 0.18), paint(Color("cb50f1"), 1.1))
+		box(self, Vector3(x, -0.85, 1.61), Vector3(8.95, 0.93, 0.9), metal)
+		box(self, Vector3(x, -0.69, 2.075), Vector3(7.76, 0.065, 0.034), cyan)
+		box(self, Vector3(x, 4.73, -0.78), Vector3(7.7, 0.071, 0.075), cyan)
+		box(self, Vector3(x, -0.10, -3.52), Vector3(8.96, 0.28, 0.35), metal)
+	place_asset("operations_banner", Vector3(0, 4.36, -1.95))
+	for x in [-10.8, 10.8]:
+		var sash := paint(Color("40235b"), 0.11, 0.35)
+		box(self, Vector3(x, 3.7, -2.28), Vector3(0.97, 1.61, 0.1), sash)
+		box(self, Vector3(x, 4.50, -2.19), Vector3(1.25, 0.14, 0.22), frame)
+		var band := box(self, Vector3(x, 3.35, -2.21), Vector3(0.91, 0.096, 0.034), paint(Color("8542ab"), 0.47))
+		band.rotation.z = -0.30
+		var crest := Sprite3D.new()
+		crest.texture = preload("res://assets/ui/riftcore-icon.svg")
+		crest.pixel_size = 0.63 / crest.texture.get_width()
+		crest.position = Vector3(x, 3.76, -2.20)
+		add_child(crest)
+
+func place_asset(asset: String, position_on_deck: Vector3) -> void:
+	var scene := load("res://assets/hub/" + asset + ".tscn") as PackedScene
+	var instance := scene.instantiate() as Node3D
+	instance.position = position_on_deck
+	add_child(instance)
 
 func build_pad(station: Dictionary) -> void:
 	var at := Node3D.new()
 	add_child(at)
 	at.position.x = station.x
+	var deployment: bool = station.page == "Sector select"
+	place_asset(station.prop, Vector3(station.x, 0, 0 if deployment else -1.84))
 	var tint: Color = station.color
 	var glow := paint(tint, 0.37)
 	var footing := CylinderMesh.new()
@@ -192,17 +206,19 @@ func build_pad(station: Dictionary) -> void:
 	footing.bottom_radius = 1.08
 	footing.height = 0.15
 	footing.radial_segments = 8
-	part(at, footing, Vector3(0, 0.057, 0), frame)
+	if not deployment:
+		part(at, footing, Vector3(0, 0.057, 0), frame)
 	var plate := CylinderMesh.new()
 	plate.top_radius = 0.82
 	plate.bottom_radius = 0.82
 	plate.height = 0.035
 	plate.radial_segments = 24
-	part(at, plate, Vector3(0, 0.14, 0), metal)
+	if not deployment:
+		part(at, plate, Vector3(0, 0.14, 0), metal)
 	var ring := TorusMesh.new()
 	ring.inner_radius = 0.74
 	ring.outer_radius = 0.85
-	part(at, ring, Vector3(0, 0.157, 0), glow)
+	part(at, ring, Vector3(0, 0.252 if deployment else 0.157, 0), glow)
 	for side in [-1.0, 1.0]:
 		box(at, Vector3(side * 0.65, 0.125, 0.68), Vector3(0.29, 0.08, 0.11), glow)
 	var beacon := CylinderMesh.new()
@@ -222,7 +238,6 @@ func build_pad(station: Dictionary) -> void:
 	lamp.light_energy = 0.0
 	lamp.omni_range = 2.9
 	at.add_child(lamp)
-	label_in_space(at, String(station.name).to_upper(), Vector3(0, 0.38, 1.26), 37, tint.lerp(Color.WHITE, 0.24))
 	pads.append({"glow": glow, "beam": beam, "light": lamp})
 
 func build_hud() -> void:
@@ -232,14 +247,29 @@ func build_hud() -> void:
 	interface.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hud_layer.add_child(interface)
 	interface.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	var info := VBoxContainer.new()
-	info.position = Vector2(24, 20)
-	info.custom_minimum_size.x = 380
-	info.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	interface.add_child(info)
-	UI.label(info, "RIFTCORE STATION", 29, UI.CYAN)
-	UI.label(info, "Walk to a pad to access its station.", 15, UI.WHITE)
-	bank_label = UI.label(info, "", 16, Color("ffcd76"))
+	interface.theme = UI.theme()
+	var heading := PanelContainer.new()
+	heading.position = Vector2(24, 21)
+	heading.custom_minimum_size.x = 331
+	interface.add_child(heading)
+	UI.label(heading, "OPERATIONS HUB", 32, UI.CYAN)
+	var wallet := PanelContainer.new()
+	interface.add_child(wallet)
+	bank_label = UI.label(wallet, "", 16, Color("ffcd76"))
+	wallet.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+	wallet.offset_left = -358
+	wallet.offset_right = -24
+	wallet.offset_top = 21
+	station_panel = PanelContainer.new()
+	station_panel.add_theme_stylebox_override("panel", UI.texture_frame("panel_active_small", 31, Vector2(22, 12)))
+	interface.add_child(station_panel)
+	station_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
+	station_panel.offset_left = -190
+	station_panel.offset_right = 190
+	station_panel.offset_top = -77
+	station_panel.offset_bottom = -22
+	station_notice = UI.label(station_panel, "", 23, UI.CYAN)
+	station_notice.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
 func paint(tint: Color, emission: float, metallic := 0.0) -> StandardMaterial3D:
 	var finish := StandardMaterial3D.new()
@@ -267,6 +297,7 @@ func box(parent: Node3D, at: Vector3, dimensions: Vector3, finish: Material) -> 
 func label_in_space(parent: Node3D, text: String, at: Vector3, pixels: int, tint: Color) -> Label3D:
 	var label := Label3D.new()
 	label.text = text
+	label.font = UI.DISPLAY
 	label.font_size = pixels
 	label.pixel_size = 0.0048
 	label.outline_size = 12

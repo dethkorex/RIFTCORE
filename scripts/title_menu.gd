@@ -191,7 +191,7 @@ func card(parent: Container, ratio := 1.0) -> VBoxContainer:
 	var panel := PanelContainer.new()
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	panel.size_flags_stretch_ratio = ratio
-	panel.add_theme_stylebox_override("panel", UI.frame(Color(0.043, 0.073, 0.14, 0.94), Color("426482"), 2))
+	panel.add_theme_stylebox_override("panel", UI.texture_frame("panel_base_large", 40, Vector2(22, 19)))
 	parent.add_child(panel)
 	return UI.column(panel, 12)
 
@@ -227,14 +227,19 @@ func add_menu_art(dimmed: bool) -> void:
 func build_start_screen() -> void:
 	add_menu_art(false)
 	var panel := PanelContainer.new()
-	panel.add_theme_stylebox_override("panel", UI.frame(Color(0.026, 0.052, 0.115, 0.91), UI.CYAN, 3))
+	panel.add_theme_stylebox_override("panel", UI.texture_frame("panel_base_large", 40, Vector2(28, 20)))
 	add_child(panel)
 	panel.anchor_left = 0.60
 	panel.anchor_right = 0.96
 	panel.anchor_top = 0.19
 	var stack := UI.column(panel, 10)
-	UI.label(stack, "RIFTCORE", 54, UI.CYAN)
-	UI.label(stack, "ROGUE PROTOCOL   /   SECTOR 01", 14, UI.VIOLET)
+	var brand := TextureRect.new()
+	brand.texture = preload("res://assets/ui/riftcore-wordmark.svg")
+	brand.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	brand.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	brand.custom_minimum_size.y = 72
+	stack.add_child(brand)
+	UI.label(stack, "ROGUE PROTOCOL", 17, UI.VIOLET)
 	stack.add_child(HSeparator.new())
 	var buttons: Array[Button] = []
 	if active_slot > 0 or developer_session:
@@ -620,7 +625,8 @@ func item_card(parent: VBoxContainer, id: String) -> VBoxContainer:
 	var item: Dictionary = Profile.GEAR[id]
 	var tint: Color = Profile.RARITY_COLORS[item.rarity]
 	var panel := PanelContainer.new()
-	panel.add_theme_stylebox_override("panel", UI.frame(Color("0d2032"), tint.darkened(0.47), 1))
+	var rarity_frames := ["item_slot_common", "item_slot_rare", "item_slot_epic", "item_slot_legendary"]
+	panel.add_theme_stylebox_override("panel", UI.texture_frame(rarity_frames[item.rarity], 24, Vector2(18, 12)))
 	parent.add_child(panel)
 	var stack := UI.column(panel, 6)
 	var head := HBoxContainer.new()
