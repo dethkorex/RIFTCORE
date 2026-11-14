@@ -7,7 +7,7 @@
 - Assign four square quick slots from Storage → Gear. Use the D-pad or keyboard 1–4 in a mission. Each direction holds one item type and up to three units. Each press uses one unit. Inventory stacks hold 100.
 - Made midair ladder grabs more forgiving. The menu cursor hides on controller input and returns on mouse movement or click.
 - Unified the game and launcher under the Barlow Condensed font family.
-- Moved Social next to Deploy. Start or join a group from Deploy or Social. Add recent teammates in Friends and compare seasonal best sector times on the Leaderboard. Friends’ times sync when you group together.
+- Rearranged the hub. Shop, Crafting, and System / Save are left of Deploy. Equipment, Social, Challenges, and NOVA Archive are to the right. Start or join a group from Deploy or Social. Add recent teammates in Friends and compare seasonal best sector times on the Leaderboard. Friends’ times sync when you group together.
 - Storage pairs the RX-07 socket map with a filterable grid of gear, augments, supplies, blueprints, and crafting materials. Equip, stow, learn recipes, and assign quick items there. The separate Loadout station has been removed. Storage shows live DMG, DEF, ENG, HP, and SPD, and shows descriptions and energy costs for unlocked boss abilities. The hub pad is labeled Equipment.
 
 - Launcher 0.2 now supports verified self-updates. Game updates keep one previous build and remove older, unmodified game packages to free disk space. Saves are unaffected.
