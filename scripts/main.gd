@@ -215,6 +215,8 @@ func configure_input() -> void:
 	add_key_action("pause", KEY_ESCAPE)
 	add_joy_action("move_left", JOY_AXIS_LEFT_X, -1.0)
 	add_joy_action("move_right", JOY_AXIS_LEFT_X, 1.0)
+	InputMap.action_set_deadzone("move_left", 0.18)
+	InputMap.action_set_deadzone("move_right", 0.18)
 	add_joy_button("jump", JOY_BUTTON_A)
 	add_joy_button("dash", JOY_BUTTON_B)
 	add_joy_button("shoot", JOY_BUTTON_X)

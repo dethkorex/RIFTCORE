@@ -27,6 +27,7 @@ var bank_label: Label
 var station_notice: Button
 var station_panel: PanelContainer
 var hud_layer: CanvasLayer
+const HUB_RUN_SPEED := 6.6
 var velocity_x := 0.0
 var metal: StandardMaterial3D
 var frame: StandardMaterial3D
@@ -65,14 +66,14 @@ func _physics_process(delta: float) -> void:
 	var input_axis := Input.get_axis("move_left", "move_right")
 	if absf(input_axis) < 0.15:
 		input_axis = Input.get_axis("ui_left", "ui_right")
-	velocity_x = move_toward(velocity_x, input_axis * 6.6, delta * 38.0)
+	velocity_x = move_toward(velocity_x, RiftPlayer.locomotion_speed(input_axis, HUB_RUN_SPEED), delta * 38.0)
 	var next_x := clampf(avatar.position.x + velocity_x * delta, -19.15, 19.15)
 	var moving := absf(next_x - avatar.position.x) > 0.003
 	avatar.position.x = next_x
 	avatar.position.y = lerpf(avatar.position.y, 1.11 if absf(next_x) < 1.25 else 0.89, 1.0 - exp(-18.0 * delta))
 	if moving:
 		avatar.model_root.rotation.y = lerp_angle(avatar.model_root.rotation.y, signf(velocity_x) * PI * 0.5, 1.0 - exp(-18.0 * delta))
-	avatar.play_character_animation("walk" if moving else "idle")
+	avatar.play_ground_locomotion(input_axis, velocity_x if moving else 0.0, HUB_RUN_SPEED)
 	camera.position.x = lerpf(camera.position.x, clampf(next_x * 0.88, -15.3, 15.3), 1.0 - exp(-6.5 * delta))
 	update_station()
 

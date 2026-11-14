@@ -39,6 +39,10 @@ var base_suit_meshes: Array[MeshInstance3D] = []
 var fire_suit_mesh: MeshInstance3D
 var nature_suit_mesh: MeshInstance3D
 
+const RUN_THRESHOLD := 0.72
+const RUN_RELEASE_THRESHOLD := 0.64
+const WALK_SPEED_FRACTION := 0.42
+
 @export_group("Movement")
 @export var move_speed := 9.0
 @export var acceleration := 55.0
@@ -342,7 +346,7 @@ func _physics_process(delta: float) -> void:
 		elif not is_on_floor() and absf(axis) < 0.08:
 			accel = air_braking
 		if contact_recoil <= 0.0 and wall_launch_lock <= 0.0:
-			velocity.x = move_toward(velocity.x, 0.0 if crouching else axis * move_speed, accel * delta)
+			velocity.x = move_toward(velocity.x, 0.0 if crouching else locomotion_speed(axis, move_speed), accel * delta)
 		if not is_on_floor():
 			var gravity_scale := fall_gravity_multiplier if velocity.y < 0.0 else 1.0
 			velocity.y = maxf(-max_fall_speed * clampf(terrain.y * 1.4, 0.36, 1.0), velocity.y - gravity * gravity_scale * terrain.y * delta)
@@ -403,7 +407,7 @@ func _physics_process(delta: float) -> void:
 		var collider := get_slide_collision(index).get_collider()
 		if is_instance_valid(collider) and collider.has_method("damage_on_contact"):
 			collider.damage_on_contact(self)
-	update_character_visuals()
+	update_character_visuals(axis)
 	if global_position.y < -3.4:
 		health = 0.0
 		cancel_charge()
@@ -1042,7 +1046,27 @@ func strike_melee() -> void:
 					candidate.ignite(3.8 * level_damage_scale(), 2.5)
 	melee_performed.emit()
 
-func update_character_visuals() -> void:
+static func locomotion_speed(axis: float, top_speed: float) -> float:
+	var tilt := absf(axis)
+	var fraction := WALK_SPEED_FRACTION * tilt / RUN_THRESHOLD
+	if tilt > RUN_THRESHOLD:
+		fraction = lerpf(WALK_SPEED_FRACTION, 1.0, inverse_lerp(RUN_THRESHOLD, 1.0, tilt))
+	return signf(axis) * top_speed * fraction
+
+func play_ground_locomotion(axis: float, speed: float, top_speed: float) -> void:
+	var threshold := RUN_RELEASE_THRESHOLD if current_animation == "run" else RUN_THRESHOLD
+	if absf(speed) <= 0.18:
+		play_character_animation("idle")
+	elif absf(axis) >= threshold:
+		play_character_animation("run")
+		if animation_player:
+			animation_player.speed_scale = clampf(absf(speed) / (top_speed * 0.72), 0.68, 1.4)
+	else:
+		play_character_animation("walk")
+		if animation_player:
+			animation_player.speed_scale = clampf(absf(speed) / (top_speed * 0.32), 0.45, 1.6)
+
+func update_character_visuals(axis: float) -> void:
 	if model_root:
 		var visual_facing := signf(velocity.x) if absf(velocity.x) > 0.65 and fire_lock <= 0.0 and melee_lock <= 0.0 else facing
 		if is_instance_valid(charge_orb):
@@ -1073,16 +1097,8 @@ func update_character_visuals() -> void:
 		play_character_animation("crouch")
 	elif landing_left > 0.0:
 		play_character_animation("land")
-	elif absf(velocity.x) > move_speed * 0.50:
-		play_character_animation("run")
-	elif absf(velocity.x) > 0.6:
-		play_character_animation("walk")
 	else:
-		play_character_animation("idle")
-	if animation_player:
-		match current_animation:
-			"walk": animation_player.speed_scale = clampf(absf(velocity.x) / 2.0, 0.5, 1.75)
-			"run": animation_player.speed_scale = clampf(absf(velocity.x) / 6.4, 0.8, 1.45)
+		play_ground_locomotion(axis, velocity.x, move_speed)
 
 func play_character_animation(animation_name: String, force := false) -> void:
 	if not animation_player or not animation_player.has_animation(animation_name):
