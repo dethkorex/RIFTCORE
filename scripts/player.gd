@@ -1,6 +1,8 @@
 class_name RiftPlayer
 extends Combatant
 
+const PACK_VFX := preload("res://scripts/pack_combat_vfx.gd")
+
 signal energy_changed(current: float, maximum: float)
 signal credits_changed(total: int)
 signal experience_changed(total: int)
@@ -124,6 +126,7 @@ func _ready() -> void:
 	max_health = START_HEALTH
 	super._ready()
 	floor_snap_length = 0.24
+	slide_on_ceiling = false
 	floor_max_angle = deg_to_rad(52.0)
 	spawn_position = global_position
 	build_visuals()
@@ -141,6 +144,8 @@ func _ready() -> void:
 		climb_pose = preload("res://scripts/climb_pose.gd").new()
 		climb_pose.influence = 0.0
 		skeleton.add_child(climb_pose)
+		if buster_pose:
+			skeleton.move_child(buster_pose, -1)
 		install_fire_suit(skeleton)
 	if animation_player:
 		make_locomotion_in_place()
@@ -271,11 +276,11 @@ func _physics_process(delta: float) -> void:
 	dash_lock = maxf(0.0, dash_lock - delta)
 	var axis := Input.get_axis("move_left", "move_right")
 	ladder_lock = maxf(0.0, ladder_lock - delta)
+	update_wall_contact(delta, axis)
 	if update_ladder(delta, axis):
 		return
 	if climb_pose:
 		climb_pose.influence = move_toward(climb_pose.influence, 0.0, 0.28)
-	update_wall_contact(delta, axis)
 	if contact_recoil > 0.0:
 		contact_recoil = maxf(0.0, contact_recoil - delta)
 		axis = 0.0
@@ -353,25 +358,30 @@ func _physics_process(delta: float) -> void:
 		if platform == null:
 			continue
 		var surface_y := platform.global_position.y
+		var side_contact := false
 		var platform_shape := platform.get_node_or_null("Collider") as CollisionShape3D
-		if platform_shape and platform_shape.shape is BoxShape3D:
-			var dimensions := (platform_shape.shape as BoxShape3D).size
-			var basis := platform_shape.global_basis
-			var top := platform_shape.global_transform * Vector3(0, dimensions.y * 0.5, 0)
-			var normal := basis.z.cross(basis.x).normalized()
-			if normal.y < cos(floor_max_angle):
-				remove_collision_exception_with(platform)
-				continue
-			var relative := global_position - top
-			surface_y = top.y - (normal.x * relative.x + normal.z * relative.z) / normal.y
+		if platform_shape and platform_shape.shape:
+			var half_size := one_way_half_size(platform_shape)
+			if half_size != Vector3.ZERO:
+				var basis := platform_shape.global_basis
+				var top := platform_shape.to_global(Vector3(0, half_size.y, 0))
+				var normal := basis.z.cross(basis.x).normalized()
+				if normal.y < cos(floor_max_angle):
+					remove_collision_exception_with(platform)
+					continue
+				var relative := global_position - top
+				surface_y = top.y - (normal.x * relative.x + normal.z * relative.z) / normal.y
+				side_contact = not platform.has_meta("hatch_walk_support") and outside_one_way_edge(platform_shape, half_size)
 		var soles := global_position.y - standing_capsule.height * 0.5
-		if velocity.y > 0.0 or soles < surface_y - 0.115:
+		if not side_contact and (velocity.y > 0.0 or soles < surface_y - 0.115):
 			add_collision_exception_with(platform)
 		else:
 			remove_collision_exception_with(platform)
 	var was_airborne := not is_on_floor()
-	var landing_speed := velocity.y
+	var incoming_velocity := velocity
 	move_and_slide()
+	apply_ceiling_rebound(incoming_velocity)
+	var landing_speed := incoming_velocity.y
 	if was_airborne and is_on_floor() and landing_speed < -4.0:
 		landing_left = 0.16 if absf(velocity.x) < 3.0 else 0.09
 	for index in range(get_slide_collision_count()):
@@ -387,6 +397,22 @@ func _physics_process(delta: float) -> void:
 		collision_layer = 0
 		hide()
 		fell_into_pit.emit()
+
+func apply_ceiling_rebound(incoming: Vector3) -> void:
+	if incoming.y <= 0.0:
+		return
+	if not is_on_ceiling():
+		var hit_underside := false
+		for index in range(get_slide_collision_count()):
+			var normal := get_slide_collision(index).get_normal()
+			if normal.y < -0.25 and incoming.dot(normal) < 0.0:
+				hit_underside = true
+				break
+		if not hit_underside:
+			return
+	velocity.y = minf(velocity.y, -2.8)
+	jump_buffer = 0.0
+	coyote = 0.0
 
 func update_dash(delta: float, axis: float) -> void:
 	dash_elapsed += delta
@@ -428,6 +454,30 @@ func environment_control() -> Vector4:
 			3: result.y = 0.47
 	return result
 
+func one_way_half_size(collider: CollisionShape3D) -> Vector3:
+	var box := collider.shape as BoxShape3D
+	if box:
+		return box.size * 0.5
+	var perch := collider.shape as CylinderShape3D
+	if perch:
+		var local_z := collider.to_local(global_position).z
+		var edge_x := sqrt(maxf(0.0, perch.radius * perch.radius - local_z * local_z))
+		return Vector3(edge_x, perch.height * 0.5, perch.radius)
+	return Vector3.ZERO
+
+func outside_one_way_edge(collider: CollisionShape3D, half_size: Vector3) -> bool:
+	# Keep the end face solid while the capsule is next to it. The underside
+	# still lets the player jump through the middle or climb through a ladder.
+	var local := collider.to_local(global_position)
+	var box_scale := collider.global_basis.get_scale().abs()
+	var radius := standing_capsule.radius
+	var side_reach := (radius + 0.25) / box_scale.x
+	var body_side := (standing_capsule.height * 0.5 - radius) / box_scale.y
+	return (
+		absf(local.x) >= half_size.x and absf(local.x) <= half_size.x + side_reach
+		and absf(local.y) < half_size.y + body_side and absf(local.z) < half_size.z
+	)
+
 func update_wall_contact(delta: float, axis: float) -> void:
 	wall_launch_lock = maxf(0.0, wall_launch_lock - delta)
 	wall_grace = maxf(0.0, wall_grace - delta)
@@ -451,40 +501,84 @@ func update_wall_contact(delta: float, axis: float) -> void:
 		wall_sliding = velocity.y <= 0.0
 		return
 
+func climb_rise(climb: Node3D) -> float:
+	return (climb.global_basis.y * float(climb.rise)).y
+
 func update_ladder(delta: float, axis: float) -> bool:
 	var vertical := Input.get_axis("climb_down", "climb_up")
 	if not is_instance_valid(ladder):
+		var wall_intent := wall_grace > 0.0 and (axis * wall_side > 0.14 or Input.is_action_just_pressed("jump"))
+		var diagonal_air_input := not is_on_floor() and absf(axis) >= 0.50
+		if wall_intent or diagonal_air_input or wall_launch_lock > 0.0:
+			return false
 		if absf(vertical) < 0.35 or ladder_lock > 0.0 or dash_left > 0.0 or contact_recoil > 0.0:
 			return false
 		for candidate in get_tree().get_nodes_in_group(&"factory_ladder"):
+			if not candidate.is_visible_in_tree():
+				continue
 			var offset: Vector3 = global_position - candidate.global_position
 			var minimum := 0.32 if vertical > 0.0 else 0.96
-			if absf(offset.x) < 0.63 and offset.y > minimum and offset.y < candidate.rise + (0.93 if vertical < 0.0 else 0.82):
+			var rise: float = climb_rise(candidate)
+			var has_hatch: bool = candidate.has_meta("hatch_support")
+			var hatch_descent := has_hatch and vertical < 0.0
+			if hatch_descent:
+				var near_top := absf(offset.y - rise - standing_capsule.height * 0.5) < 0.16
+				if not near_top or not Input.is_action_just_pressed("climb_down") or absf(axis) > 0.35:
+					continue
+			var reach := float(candidate.get_meta("hatch_landing_distance")) + 0.13 if hatch_descent else 0.63
+			if absf(offset.x) < reach and offset.y > minimum and offset.y < rise + (1.05 if hatch_descent else (0.93 if vertical < 0.0 else 0.82)):
 				ladder = candidate
 				cancel_charge()
 				break
 		if not is_instance_valid(ladder):
 			return false
-	if Input.is_action_just_pressed("jump") or (absf(axis) > 0.65 and absf(vertical) < 0.3):
-		var jumping := Input.is_action_just_pressed("jump")
+	if Input.is_action_just_pressed("jump"):
 		ladder = null
 		ladder_lock = 0.24
-		velocity = Vector3(axis * move_speed * 0.52, jump_velocity * 0.78 if jumping else 0.0, 0.0)
+		velocity = Vector3(axis * move_speed * 0.52, jump_velocity * 0.78, 0.0)
 		return false
 	var bottom: float = ladder.global_position.y + standing_capsule.height * 0.5
-	var top: float = bottom + ladder.rise
-	var proposed := global_position.y + vertical * 2.85 * delta
-	if (vertical > 0.0 and proposed >= top) or (vertical < 0.0 and proposed <= bottom):
-		global_position.y = top + 0.025 if vertical > 0.0 else bottom + 0.02
-		velocity = Vector3.ZERO
+	var top := bottom + climb_rise(ladder)
+	var climb_speed := vertical * 2.85
+	var target_x := ladder.global_position.x
+	var proposed := global_position.y + climb_speed * delta
+	var finished := (vertical > 0.0 and proposed >= top) or (vertical < 0.0 and proposed <= bottom)
+	if ladder.has_meta("hatch_support"):
+		for deck in get_tree().get_nodes_in_group(&"factory_one_way"):
+			remove_collision_exception_with(deck)
+		add_collision_exception_with(ladder.get_meta("hatch_support"))
+		var top_clearance := top + 0.055
+		if vertical > 0.0 and proposed >= top:
+			# Step onto the solid half only after the capsule has cleared the hatch.
+			if global_position.y < top_clearance - 0.005:
+				climb_speed = minf(climb_speed, (top_clearance - global_position.y) / delta)
+				finished = false
+			else:
+				var exit_direction: float = ladder.get_meta("hatch_exit")
+				var side_distance: float = ladder.get_meta("hatch_landing_distance")
+				target_x = ladder.to_global(Vector3(exit_direction * side_distance, 0, 0)).x
+				climb_speed = 0.0
+				finished = absf(target_x - global_position.x) < 0.045
+		elif vertical < 0.0 and global_position.y >= top - 0.14 and absf(target_x - global_position.x) > 0.10:
+			climb_speed = 0.0
+	else:
+		for deck in get_tree().get_nodes_in_group(&"factory_one_way"):
+			add_collision_exception_with(deck)
+		if finished:
+			var endpoint := top + 0.025 if vertical > 0.0 else bottom + 0.02
+			climb_speed = (endpoint - global_position.y) / delta
+	set_crouch(false)
+	velocity = Vector3(clampf((target_x - global_position.x) * 14.0, -3.8, 3.8), climb_speed, -global_position.z * 18.0)
+	var incoming := velocity
+	move_and_slide()
+	apply_ceiling_rebound(incoming)
+	var hit_ceiling := incoming.y > 0.0 and velocity.y < 0.0
+	if finished or hit_ceiling:
 		ladder = null
 		ladder_lock = 0.23
-		return false
-	for deck in get_tree().get_nodes_in_group(&"factory_one_way"):
-		add_collision_exception_with(deck)
-	set_crouch(false)
-	velocity = Vector3((ladder.global_position.x - global_position.x) * 14.0, vertical * 2.85, -global_position.z * 18.0)
-	move_and_slide()
+		if not hit_ceiling:
+			velocity = Vector3.ZERO
+		return true
 	play_character_animation("idle")
 	if model_root:
 		# The rungs sit along the ladder's local -Z; RX-07's front is local +Z.
@@ -493,8 +587,16 @@ func update_ladder(delta: float, axis: float) -> bool:
 		var climb_yaw := atan2(local_forward.x, local_forward.z)
 		model_root.rotation.y = lerp_angle(model_root.rotation.y, climb_yaw, 1.0 - exp(-27.0 * delta))
 		model_root.rotation.x = lerpf(model_root.rotation.x, 0.0, 0.4)
+	if absf(axis) > 0.30:
+		facing = signf(axis)
 	if buster_pose:
-		buster_pose.influence = 0.0
+		buster_pose.ladder_direction = facing
+		buster_pose.crouched = false
+		var aiming := absf(axis) > 0.30 or charge_held or fire_lock > 0.0
+		buster_pose.influence = move_toward(buster_pose.influence, 1.0 if aiming else 0.0, 0.30)
+	update_charge(delta)
+	if is_instance_valid(charge_orb):
+		charge_orb.global_position = cannon_muzzle(facing)
 	if climb_pose:
 		climb_pose.influence = move_toward(climb_pose.influence, 1.0, 0.27)
 		climb_pose.cycle = fposmod(climb_pose.cycle + vertical * delta * 16.4, TAU)
@@ -627,7 +729,8 @@ func shoot(charged := false, pose_held := false) -> void:
 		restore_energy(-cost)
 	var aim := facing
 	if buster_pose:
-		buster_pose.crouched = low_profile
+		buster_pose.ladder_direction = aim if is_instance_valid(ladder) else 0.0
+		buster_pose.crouched = low_profile and is_zero_approx(buster_pose.ladder_direction)
 		buster_pose.influence = 1.0 if pose_held else 0.7
 	if health <= 0.0:
 		return
@@ -855,18 +958,15 @@ func perform_melee(step := 1) -> void:
 	var sword := find_child("SwordPivot", true, false) as Node3D
 	if sword:
 		sword.show()
-		if sword_follows_hand:
-			var trail := preload("res://scripts/sword_trail.gd").new()
-			trail.blade = sword
-			trail.swing_time = combo_duration
-			trail.intensity = 1.25 if step == 3 else 1.0
-			trail.hot = combo_hot
-			get_parent().add_child(trail)
-		else:
+		if not sword_follows_hand:
 			sword.rotation_degrees.z = -72.0 * facing if step != 2 else 65.0 * facing
 			var slash := create_tween()
 			slash.tween_property(sword, "rotation_degrees:z", 62.0 * facing if step != 2 else -71.0 * facing, combo_duration)
+		PACK_VFX.blade_trail(sword, combo_duration, saber_tint(), step == 3)
 	RiftAudio.play_effect(&"saber_swing")
+
+func saber_tint() -> Color:
+	return Color("ff6525") if combo_hot else Color("35beff")
 
 func strike_melee() -> void:
 	var reach := melee_range + (0.25 if combo_step == 3 else 0.0)
@@ -881,8 +981,10 @@ func strike_melee() -> void:
 				candidate.take_fire_damage(power, global_position)
 			else:
 				candidate.take_damage(power, global_position)
-			if combo_hot and candidate.health < before and candidate.has_method("ignite"):
-				candidate.ignite(3.8 * level_damage_scale(), 2.5)
+			if candidate.health < before:
+				PACK_VFX.saber_hit.call_deferred(get_parent(), candidate.global_position + Vector3(0, 0.34, 0.3), combo_facing, saber_tint())
+				if combo_hot and candidate.has_method("ignite"):
+					candidate.ignite(3.8 * level_damage_scale(), 2.5)
 	melee_performed.emit()
 
 func update_character_visuals() -> void:
@@ -894,6 +996,7 @@ func update_character_visuals() -> void:
 		model_root.rotation.x = lerpf(model_root.rotation.x, 0.46 if dash_left > 0.0 else (0.13 if wall_sliding else 0.0), 0.48)
 	var swinging := melee_lock > 0.0
 	if buster_pose:
+		buster_pose.ladder_direction = 0.0
 		buster_pose.crouched = low_profile
 		var aiming := not swinging and (charge_held or is_instance_valid(charge_orb) or fire_lock > 0.0)
 		buster_pose.influence = move_toward(buster_pose.influence, 1.0 if aiming else 0.0, 0.30)

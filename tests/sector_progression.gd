@@ -28,7 +28,7 @@ func run():
 	await frames(4)
 	var p = game.player
 	p.invulnerable_time = 99
-	var ladder: Node3D = game.game_root.get_node("TERRAIN/ArenaLadderWest")
+	var ladder: Node3D = game.game_root.get_node("TERRAIN/ArenaCatwalkWest/Assembly/Climb")
 	p.global_position = ladder.global_position + Vector3.UP * 0.86
 	p.model_root.rotation.y = PI / 2.0
 	Input.action_press("climb_up")

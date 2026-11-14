@@ -174,6 +174,7 @@ func refresh_menu_save() -> void:
 	menu.can_load = save != null
 	menu.saved_sector = 1
 	menu.saved_act = 1
+	menu.saved_level = 1
 	menu.run_cleared_through = 0
 	menu.at_sector_start = false
 	menu.run_unlocks = []
@@ -182,6 +183,7 @@ func refresh_menu_save() -> void:
 		menu.run_cleared_through = clampi(int(save.get_value("checkpoint", "run_cleared_through", menu.saved_sector - 1)), 0, Catalog.SECTORS.size())
 		profile.unlock_sector(menu.saved_sector)
 		menu.saved_act = clampi(int(save.get_value("checkpoint", "act", 1)), 1, 2)
+		menu.saved_level = RiftPlayer.level_for_experience(int(save.get_value("checkpoint", "experience", 0)))
 		menu.at_sector_start = bool(save.get_value("checkpoint", "at_start", false))
 		menu.run_unlocks = save.get_value("checkpoint", "weapons", [])
 
@@ -196,15 +198,25 @@ func select_save_slot(number: int, fresh: bool) -> void:
 	open_home_hub()
 
 func save_at_station() -> void:
-	menu.show_save_result(write_manual_save())
+	menu.show_save_result(manual_save_status(write_manual_save()))
 
-func write_manual_save() -> String:
+func write_manual_save() -> Error:
 	if not save_session:
+		return ERR_UNCONFIGURED
+	if is_instance_valid(player) and not sector_complete:
+		if respawning or player.health <= 0.0:
+			return ERR_BUSY
+		save_checkpoint(true)
+	return save_session.save_slot()
+
+func manual_save_status(error: Error) -> String:
+	if error == OK:
+		return "Saved to Slot %d." % save_session.slot
+	if error == ERR_UNCONFIGURED:
 		return "Select a save slot from the title screen first."
-	var error := save_session.save_slot()
-	if error != OK:
-		return "Save failed. %s" % error_string(error)
-	return "Saved to Slot %d." % save_session.slot
+	if error == ERR_BUSY:
+		return "Wait for RX-07 to respawn before saving."
+	return "Save failed. %s" % error_string(error)
 
 func read_checkpoint() -> ConfigFile:
 	if save_session:
@@ -443,8 +455,7 @@ func show_pause_save() -> void:
 	UI.label(stack, "Resume from the latest checkpoint or the start of this act.", 17, UI.MUTED)
 	var status := UI.label(stack, "", 17, UI.CYAN)
 	UI.button(stack, "Save to Slot %d" % save_session.slot, func():
-		save_checkpoint(true)
-		status.text = write_manual_save()
+		status.text = manual_save_status(write_manual_save())
 	, true).grab_focus()
 	UI.button(stack, "Back to Pause", build_pause_menu)
 
@@ -870,10 +881,19 @@ func bank_run_credits(bonus := 0) -> void:
 func show_exit_confirmation() -> void:
 	var stack := overlay()
 	pause_menu.back_action = build_pause_menu
-	UI.label(stack, "LEAVE SECTOR?", 30, UI.VIOLET)
-	UI.label(stack, "This run ends and your earned bolts go to the bank.")
+	UI.label(stack, "RETURN TO TITLE?", 30, UI.VIOLET)
+	UI.label(stack, "Resume this run from the station. Save to keep your progress after closing the game.", 17, UI.MUTED)
 	UI.button(stack, "Stay in sector", build_pause_menu).grab_focus()
-	UI.button(stack, "Return to title", return_to_title, true)
+	if save_session:
+		var status := UI.label(stack, "", 16, UI.CYAN)
+		UI.button(stack, "Save and return to title", func():
+			var error := write_manual_save()
+			if error == OK:
+				return_to_title()
+			else:
+				status.text = manual_save_status(error)
+		, true)
+	UI.button(stack, "Return to title", return_to_title)
 
 func _process(_delta: float) -> void:
 	if deploying or advancing_act or arena_intro or suit_reveal_active or sector_complete or not is_instance_valid(player) or player.health <= 0.0:
@@ -1118,7 +1138,8 @@ func restart_run() -> void:
 	get_tree().reload_current_scene()
 
 func return_to_title() -> void:
-	bank_run_credits()
+	if is_instance_valid(player) and player.health > 0.0 and not sector_complete:
+		save_checkpoint(true)
 	get_tree().paused = false
 	get_tree().reload_current_scene()
 

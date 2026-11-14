@@ -62,7 +62,8 @@ func dispatch_canopy_supply() -> void:
 	drone.adaptive_supply = true
 	drone.supply_target = target
 	drone.add_to_group(&"boss_supply")
-	drone.position = get_parent_node_3d().to_local(perch.global_position + Vector3.UP * 2.3)
+	var landing: Vector3 = perch.supply_landing_point() if perch.has_method("supply_landing_point") else perch.global_position
+	drone.position = get_parent_node_3d().to_local(landing + Vector3.UP * 2.3)
 	get_parent().add_child.call_deferred(drone)
 	supply_threshold += 1
 

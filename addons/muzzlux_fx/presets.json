@@ -1,0 +1,110 @@
+{
+ "pack": "MUZZLUX Lite",
+ "title": "Free Bullet Impact VFX for Godot 4",
+ "build": "lite",
+ "version": "1.0",
+ "godot_minimum": "4.4",
+ "verified_on": [
+  "4.4.1",
+  "4.7.2"
+ ],
+ "renderers": [
+  "Forward+",
+  "Mobile",
+  "Compatibility"
+ ],
+ "web": true,
+ "addon_path": "res://addons/muzzlux_fx/",
+ "helper": "Muzzlux",
+ "full_version": "https://gennai.itch.io/gun-shooting-vfx-godot-4",
+ "globals": {
+  "Muzzlux.quality": "LOW / MEDIUM / HIGH, element counts 35% / 65% / 100%",
+  "Muzzlux.wind": "Vector3, m/s. The cloud a hit throws off drifts with it.",
+  "Muzzlux.impact_parent": "where Muzzlux.impact() parents a fire-and-forget hit",
+  "Muzzlux.impact_scene": "use one scene for every surface instead of a preset per surface"
+ },
+ "one_liners": [
+  "Muzzlux.impact(hit.position, hit.normal, &\"metal\")"
+ ],
+ "surfaces": [
+  {
+   "id": "concrete",
+   "debris": "grey chips, ballistic",
+   "sparks": "none",
+   "cloud": "a grey-white cone of powder that hangs"
+  },
+  {
+   "id": "metal",
+   "debris": "tiny flakes",
+   "sparks": "many, white-hot, short-lived, curving",
+   "cloud": "a thin grey puff"
+  },
+  {
+   "id": "wood",
+   "debris": "long splinters that spin",
+   "sparks": "none",
+   "cloud": "a tan puff"
+  }
+ ],
+ "nodes_3d": [
+  {
+   "class": "MuzzluxImpact3D",
+   "what": "the material-specific impact for concrete, metal and wood",
+   "api": [
+    "burst(position, normal, surface, strength, delay)",
+    "get_hit_count()",
+    "get_last_surface()",
+    "get_last_position()",
+    "get_live_count()",
+    "get_surface_ids()",
+    "duration_of(surface)"
+   ],
+   "signals": [
+    "hit_added(slot)"
+   ]
+  }
+ ],
+ "not_in_lite": [
+  "No muzzle flash and no tracer. Lite is the hit side only.",
+  "Shots leave nothing behind: no bullet holes, no shell casings, no gun smoke.",
+  "3 surfaces of 9, and no automatic surface detection - you pass the string yourself.",
+  "One set of colours. max_concurrent is capped at 4, so sustained fire drops hits.",
+  "No energy weapons, no flashbang, no smoke grenade, no blood option, no 2D."
+ ],
+ "gotchas": [
+  "Lite has no surface table, so pass the surface id yourself: &\"concrete\", &\"metal\" or &\"wood\". An id Lite does not know draws the concrete hit.",
+  "max_concurrent is capped at 4 in Lite. The full pack ships 16 and allows 32.",
+  "Upgrading is a folder copy: drop the full pack's addons/muzzlux_fx over this one. Every export here exists there with the same default.",
+  "The pack ships no audio of any kind."
+ ],
+ "presets": [
+  {
+   "name": "impact_concrete",
+   "path": "res://addons/muzzlux_fx/presets/3d/impact_concrete.tscn",
+   "node": "MuzzluxImpact3D",
+   "dimension": "3d",
+   "group": "Impact",
+   "what": "Grey chips, a hanging cone of powder, a faint dust ring.",
+   "call": "Muzzlux.impact(p, n, &\"concrete\")"
+  },
+  {
+   "name": "impact_metal",
+   "path": "res://addons/muzzlux_fx/presets/3d/impact_metal.tscn",
+   "node": "MuzzluxImpact3D",
+   "dimension": "3d",
+   "group": "Impact",
+   "what": "Many white-hot curving sparks, metal flakes, a thin grey puff.",
+   "call": "Muzzlux.impact(p, n, &\"metal\")"
+  },
+  {
+   "name": "impact_wood",
+   "path": "res://addons/muzzlux_fx/presets/3d/impact_wood.tscn",
+   "node": "MuzzluxImpact3D",
+   "dimension": "3d",
+   "group": "Impact",
+   "what": "Long splinters that spin end over end, a tan puff.",
+   "call": "Muzzlux.impact(p, n, &\"wood\")"
+  }
+ ],
+ "preset_count": 3
+}

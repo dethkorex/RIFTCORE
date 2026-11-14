@@ -319,7 +319,8 @@ func check_supply() -> void:
 	cargo.adaptive_supply = true
 	cargo.supply_target = target
 	cargo.add_to_group("boss_supply")
-	cargo.position = get_parent_node_3d().to_local(platform.global_position + Vector3.UP * 2.3)
+	var landing: Vector3 = platform.supply_landing_point() if platform.has_method("supply_landing_point") else platform.global_position
+	cargo.position = get_parent_node_3d().to_local(landing + Vector3.UP * 2.3)
 	get_parent().add_child.call_deferred(cargo)
 	supply_index += 1
 

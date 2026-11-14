@@ -2,7 +2,7 @@ class_name RiftProjectile
 extends Area3D
 
 const HALO := preload("res://assets/pickups/pickup_halo.gdshader")
-const COMBAT_VFX := preload("res://scripts/combat_vfx.gd")
+const PACK_VFX := preload("res://scripts/pack_combat_vfx.gd")
 const ATTACK_FX := preload("res://scripts/attack_fx.gd")
 static var paint_cache: Dictionary = {}
 static var mesh_cache: Dictionary = {}
@@ -103,6 +103,8 @@ func _on_body_entered(body: Node) -> void:
 				body.ignite(burn_power, 3.0)
 			apply_reward_effect(body)
 		if pierces > 0:
+			if weapon_id == "frost_lance":
+				spawn_impact(false)
 			pierces -= 1
 			damage *= 0.78
 			return
@@ -135,29 +137,23 @@ func apply_reward_effect(body: Node3D) -> void:
 			target.recoil = signf(body.global_position.x - target.global_position.x) * 6.5
 
 func impact() -> void:
+	spawn_impact(is_charged)
+	queue_free()
+
+func spawn_impact(charged: bool) -> void:
 	var burst := Node3D.new()
 	burst.name = "ProjectileImpact"
 	get_parent().add_child.call_deferred(burst)
-	finish_impact.call_deferred(burst, position, palette, is_charged, direction)
-	queue_free()
+	finish_impact.call_deferred(burst, position, palette, charged, direction, weapon_id)
 
-static func finish_impact(burst: Node3D, at: Vector3, tint: Color, charged: bool, travel: Vector3) -> void:
+static func finish_impact(burst: Node3D, at: Vector3, tint: Color, charged: bool, travel: Vector3, weapon: String) -> void:
 	if not is_instance_valid(burst) or not burst.is_inside_tree():
 		return
 	burst.position = at
-	var scale_factor := 1.65 if charged else 1.0
-	COMBAT_VFX.hit(burst, tint, scale_factor)
-	var flash := add_glow(burst, tint, 1.28 * scale_factor)
-	var tween := burst.create_tween().set_parallel()
-	tween.tween_property(flash, "scale", Vector3.ONE * 0.02, 0.17)
-	for i in range(8 if charged else 5):
-		var angle := i * TAU / (8.0 if charged else 5.0) + 0.22
-		var offset := Vector3(cos(angle), sin(angle), (i % 3 - 1) * 0.21)
-		var fragment := part(burst, cached_mesh("Orb"), light_paint(tint.lerp(Color.WHITE, 0.48), 2.0), Vector3.ZERO, Vector3(0.036, 0.036, 0.12) * scale_factor)
-		fragment.basis = Basis.looking_at(offset.normalized(), Vector3.BACK, true).scaled_local(fragment.scale)
-		tween.tween_property(fragment, "position", (offset * 0.64 - travel * 0.13) * scale_factor, 0.21).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-		tween.tween_property(fragment, "scale", Vector3.ZERO, 0.22)
-	tween.chain().tween_callback(burst.queue_free)
+	PACK_VFX.projectile_hit(burst, travel, tint, charged, weapon)
+	var flash := add_glow(burst, tint, 1.55 if charged else 0.90)
+	burst.create_tween().tween_property(flash, "scale", Vector3.ONE * 0.02, 0.16)
+	burst.get_tree().create_timer(0.72, false).timeout.connect(burst.queue_free)
 
 static func drill_visual(parent: Node3D, tint: Color, factor: float) -> Node3D:
 	var rotor := Node3D.new()

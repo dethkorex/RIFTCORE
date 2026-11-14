@@ -1,5 +1,7 @@
 extends RefCounted
 
+const PACK_VFX := preload("res://scripts/pack_combat_vfx.gd")
+
 const VFX := preload("res://scripts/combat_vfx.gd")
 const PALETTES := ["ff6639", "9cf765", "8cecff", "42fff1", "ffbc61", "a6eeff", "e9ff43", "db9dff", "ff954f", "ff70ef"]
 static var materials := {}
@@ -91,6 +93,9 @@ static func telegraph(parent: Node3D, width: float, tint: Color, duration: float
 
 static func field(parent: Node3D, sector: int, radius: float, height: float, duration: float, move: String) -> void:
 	var tint := tint_for(sector)
+	if move == "orbital_beam":
+		PACK_VFX.orbital_beam(parent, radius, height, tint, duration)
+		return
 	var span := radius * 2.0
 	var tween := parent.create_tween().set_parallel()
 	if move == "flood":
@@ -105,9 +110,9 @@ static func field(parent: Node3D, sector: int, radius: float, height: float, dur
 			eddy.rotation.z = (index - 1.5) * 0.20
 			tween.tween_property(eddy, "rotation:z", eddy.rotation.z + 2.3 * (-1 if index % 2 else 1), duration)
 			tween.tween_property(eddy, "modulate:a", 0.06, duration)
-	if height <= 0.3 or move == "orbital_beam":
+	if height <= 0.3:
 		var beam := piece(parent, cube, Vector3.ZERO, Vector3(span, maxf(height * 1.8, 0.11), 0.21), tint)
-		piece(parent, cube, Vector3(0, 0, 0.13), Vector3(span * (0.33 if move == "orbital_beam" else 0.99), maxf(height * 1.55, 0.06), 0.10), tint.lerp(Color.WHITE, 0.8))
+		piece(parent, cube, Vector3(0, 0, 0.13), Vector3(span * 0.99, maxf(height * 1.55, 0.06), 0.10), tint.lerp(Color.WHITE, 0.8))
 		tween.tween_property(beam, "scale:z", 0.04, duration)
 		return
 	var count := clampi(ceili(span / 0.85), 3, 24)

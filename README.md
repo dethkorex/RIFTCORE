@@ -43,7 +43,7 @@ Walk with A/D, the left stick, or the D-pad. Stand on a pad and press E, Enter, 
 
 Choose **New Game** or **Load Game** at the title screen. The manual-save update starts with three empty slots. Saves from earlier builds are ignored, and display, audio, and control settings carry over.
 
-Use the **Save Game** pad in the station or **Pause > Save Game** during a mission. A mission save resumes at the latest activated checkpoint or the start of the current act. Checkpoints, purchases, and act transitions update the running session. Use Save Game to keep those changes across launches. Starting over in an occupied slot replaces it on the next manual save.
+Use the **Save Game** pad in the station or **Pause > Save Game** during a mission. A mission save resumes at the latest activated checkpoint or the start of the current act. Checkpoints, purchases, and act transitions update the running session. Use Save Game to keep those changes across launches. Pause also offers Save and return to title. Returning to the title without saving keeps your run available for the current session. Starting over in an occupied slot replaces it on the next manual save.
 
 Losing all lives invalidates the saved run and removes lost equipped gear from that slot. The slot's saved bank, purchased workshop upgrades, and stored items carry over. Save again at the station to keep newly banked bolts.
 
@@ -53,8 +53,10 @@ See [gameplay expansion ideas](GAMEPLAY_EXPANSION.md) for optional routes, diffi
 
 Open `project.godot` in Godot **4.7.2**. Edit `scenes/levels/neon_factory_test.tscn` for the level. Use the `Actors/RiftcoreMecha` node to move the player start.
 
-Machine Jungle is authored in `scenes/levels/machine_jungle.tscn`. Its reusable enemies, terrain, traps, and vine barriers are under `assets/machine_jungle`. Deployment and extraction pads are under `assets/neon_factory`; their visual details do not change platform collisions. The player faces the ladder's local -Z while climbing.
+Machine Jungle is authored in `scenes/levels/machine_jungle.tscn`. Its reusable enemies, terrain, traps, and vine barriers are under `assets/machine_jungle`. Deployment and extraction pads are under `assets/neon_factory`; their visual details do not change platform collisions. While climbing a ladder or vine, hold left or right to aim the cannon and press or charge fire as usual. Jump to detach.
 
 Sectors 03–10 also have editable scenes under `scenes/levels`. Their reusable biome kits, original Blender generation scripts, and campaign data live under `assets/campaign`. The generation scripts regenerate sectors 03–10, so keep a copy of hand edits before running them.
+
+Each sector's `assets/campaign/<sector>/terrain` folder has `climb_platform_left.tscn`, `climb_platform_center.tscn`, and `climb_platform_right.tscn`. Drag a scene into the level and move its root node. Use **Deck Width**, **Deck Depth**, and **Climb Height** in the Inspector to resize it. The mesh, the hatch collision shapes, and the ladder or vine rebuild together. Position the top of the deck at the desired floor height and set Climb Height to reach the lower floor.
 
 Push a stable tag such as `v0.3.0` to build and publish both installers through GitHub Actions. The update manifest and both game ZIPs are published together. See [distribution instructions](distribution/README.md), [art production notes](ART_NOTES.md), and [audio credits](assets/audio/CREDITS.md).

@@ -18,6 +18,7 @@ var save_status: Label
 var can_load := false
 var saved_sector := 1
 var saved_act := 1
+var saved_level := 1
 var run_cleared_through := 0
 var at_sector_start := false
 var run_unlocks: Array = []
@@ -249,7 +250,8 @@ func build_save_slots(columns: HBoxContainer, fresh: bool) -> void:
 			description = "Station"
 			if data.has_section("checkpoint"):
 				var sector := clampi(int(data.get_value("checkpoint", "sector", 1)), 1, Catalog.SECTORS.size())
-				description = "%s  /  Act %d" % [Catalog.info(sector).title, data.get_value("checkpoint", "act", 1)]
+				var level := RiftPlayer.level_for_experience(int(data.get_value("checkpoint", "experience", 0)))
+				description = "%s  /  Act %d  /  Lv. %d" % [Catalog.info(sector).title, data.get_value("checkpoint", "act", 1), level]
 		var occupied := data != null
 		var button := UI.button(slots, "Slot %d   /   %s" % [number, description], choose_slot.bind(number, fresh, occupied))
 		button.disabled = not fresh and not occupied
@@ -363,7 +365,8 @@ func build_sector(columns: HBoxContainer) -> void:
 	UI.label(route, "%s  /  Act %s" % [sector_title, "II" if can_load and saved_act == 2 else "I"], 23, UI.WHITE)
 	route.add_child(HSeparator.new())
 	if can_load:
-		UI.button(route, "Deploy  ›" if at_sector_start else "Resume checkpoint  ›", func(): load_requested.emit(), true).grab_focus()
+		UI.label(route, "RX-07  /  Level %d" % saved_level, 17, UI.MUTED)
+		UI.button(route, "Continue run  ›" if at_sector_start else "Resume checkpoint  ›", func(): load_requested.emit(), true).grab_focus()
 		if run_cleared_through > 0:
 			UI.button(route, "Level Select", show_page.bind("Level select"))
 		UI.button(route, "Start a new run", show_page.bind("New run"))

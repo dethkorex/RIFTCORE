@@ -184,7 +184,7 @@ def make_level(info, act_two=False):
     for key in ['scout','quad','heavy','turret','flyer']:ext(key,f'{prefix}/enemies/{key}.tscn')
     for key in ['health_large','energy_large','energy_small','xp_orb','extra_life']:ext(key,'assets/pickups/'+key+'.tscn')
     for key in ['checkpoint_beacon','deployment_pad','extraction_pad']:ext(key,'assets/neon_factory/'+key+'.tscn')
-    for key in ['camera_rig','jungle_backdrop','factory_checkpoint','factory_ladder','forge_safe_hall','biome_zone']:ext(key,'scripts/'+key+'.gd','Script')
+    for key in ['camera_rig','jungle_backdrop','factory_checkpoint','forge_safe_hall','biome_zone']:ext(key,'scripts/'+key+'.gd','Script')
     ext('panorama',prefix+'/panorama.png','Texture2D')
     if n <= 2:
         terrain = 'assets/neon_factory' if n == 1 else 'assets/machine_jungle/terrain'
@@ -198,10 +198,11 @@ def make_level(info, act_two=False):
             for key in ['scout','quad','heavy','turret','flyer']:
                 refs.pop(key)
         else:
-            ext('factory_ladder','scripts/climb_vine.gd','Script')
             ext('vine','assets/machine_jungle/terrain/burnable_vine.tscn')
             for key, piece in zip(['scout','quad','heavy','turret','flyer'], ['rootrunner','thorn_weaver','bark_bulwark','spore_sentry','canopy_wasp']):
                 ext(key, f'assets/machine_jungle/enemies/{piece}.tscn')
+    for side in ('left','center','right'):
+        ext('climb_'+side,f'{prefix}/terrain/climb_platform_{side}.tscn')
     ext('player','scenes/actors/riftcore_player.tscn')
     ext('boss',f"scenes/levels/{info['boss_slug']}.tscn")
     out=['[gd_scene format=3]']
@@ -282,9 +283,11 @@ tonemap_mode = 2
         supply_names = {1: ['ArenaCatwalkWest','ArenaCatwalkCenter','ArenaCatwalkEast'], 2: ['Canopy6','RootPerchWestUpper']}
         names = supply_names.get(n, [])
         perch_name = names[i] if i < len(names) else f'ArenaPerch{i}'
-        instance(perch_name,'perch',(gate+px,fy+py,0),props='scale = '+v(pw/4,1,1))
-        if i in [0,1,2]:
-            node(f'ArenaClimb{i}','Node3D','TERRAIN',f'position = {v(gate+px,fy,0)}\nscript = ExtResource("factory_ladder")\nrise = {py}','factory_ladder')
+        if i < 3:
+            side = ('left','center','right')[i]
+            instance(perch_name,'climb_'+side,(gate+px,fy+py,0),props=f'deck_width = {pw}\nclimb_height = {py}')
+        else:
+            instance(perch_name,'perch',(gate+px,fy+py,0),props='scale = '+v(pw/4,1,1))
     p=hall
     i=0
     while p<end+2.3-.01:

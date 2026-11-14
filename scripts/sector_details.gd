@@ -162,7 +162,7 @@ func fit_model(model: Node3D, width: float, height: float) -> void:
 		model.scale.y = height / bounds.size.y
 
 func fit_platform(deck: Node3D) -> void:
-	if deck.has_meta("wall_trim"):
+	if deck.has_meta("wall_trim") or deck.has_method("supply_landing_point"):
 		return
 	var path := deck.scene_file_path
 	var is_deck := deck.name.begins_with("RouteDeck") or path.contains("platform") or path.contains("floor") or path.contains("catwalk") or path.contains("perch") or path.ends_with("/deck.tscn") or path.ends_with("/lift.tscn") or path.ends_with("/phase.tscn")

@@ -22,7 +22,6 @@
 [ext_resource type="PackedScene" path="res://assets/neon_factory/boss_gate_door.tscn" id="boss_gate_door"]
 [ext_resource type="PackedScene" path="res://assets/neon_factory/door_frame.tscn" id="door_frame"]
 [ext_resource type="Script" path="res://scripts/factory_checkpoint.gd" id="factory_checkpoint"]
-[ext_resource type="Script" path="res://scripts/climb_vine.gd" id="factory_ladder"]
 [ext_resource type="Script" path="res://scripts/forge_safe_hall.gd" id="forge_safe_hall"]
 [ext_resource type="Script" path="res://scripts/camera_rig.gd" id="camera_rig"]
 [ext_resource type="Script" path="res://scripts/jungle_backdrop.gd" id="jungle_backdrop"]
@@ -37,6 +36,12 @@
 [ext_resource type="PackedScene" path="res://assets/machine_jungle/terrain/vine_hoist.tscn" id="hoist"]
 
 [ext_resource type="PackedScene" path="res://assets/machine_jungle/terrain/root_perch.tscn" id="root_perch"]
+
+[ext_resource type="PackedScene" path="res://assets/campaign/machine_jungle/terrain/climb_platform_center.tscn" id="climb_center"]
+
+[ext_resource type="PackedScene" path="res://assets/campaign/machine_jungle/terrain/climb_platform_left.tscn" id="climb_left"]
+
+[ext_resource type="PackedScene" path="res://assets/campaign/machine_jungle/terrain/climb_platform_right.tscn" id="climb_right"]
 
 [sub_resource type="Environment" id="JungleLight"]
 background_mode = 1
@@ -171,43 +176,35 @@ position = Vector3(28, 3.3, 0)
 [node name="Canopy2" parent="TERRAIN" instance=ExtResource("canopy_catwalk")]
 position = Vector3(33, 3.98, 0)
 
-[node name="Canopy3" parent="TERRAIN" instance=ExtResource("canopy_catwalk")]
+[node name="Canopy3" parent="TERRAIN" instance=ExtResource("climb_center")]
 position = Vector3(109, 3.72, 0)
+deck_width = 4.4
+deck_depth = 1.9
+climb_height = 3
 
 [node name="Canopy4" parent="TERRAIN" instance=ExtResource("canopy_catwalk")]
 position = Vector3(114, 4.58, 0)
 
-[node name="Canopy5" parent="TERRAIN" instance=ExtResource("root_perch")]
-position = Vector3(232.8,3.0,0)
+[node name="Canopy5" parent="TERRAIN" instance=ExtResource("climb_left")]
+position = Vector3(232.8, 3, 0)
+deck_width = 3.45
+deck_depth = 1.9
+climb_height = 2.75
 
-[node name="Canopy6" parent="TERRAIN" instance=ExtResource("root_perch")]
-position = Vector3(247,5.7,0)
+[node name="Canopy6" parent="TERRAIN" instance=ExtResource("climb_center")]
+position = Vector3(247, 5.7, 0)
+deck_width = 3.45
+deck_depth = 1.9
+climb_height = 5.45
 
-[node name="Canopy7" parent="TERRAIN" instance=ExtResource("root_perch")]
-position = Vector3(256.2,3.7,0)
+[node name="Canopy7" parent="TERRAIN" instance=ExtResource("climb_right")]
+position = Vector3(256.2, 3.7, 0)
+deck_width = 3.45
+deck_depth = 1.9
+climb_height = 3.45
 
 [node name="WallHike" parent="TERRAIN" instance=ExtResource("vine_wall")]
 position = Vector3(42.45, 2.675, 0)
-
-[node name="ServiceLadder0" type="Node3D" parent="TERRAIN" groups=["factory_ladder"]]
-position = Vector3(109, 0.72, 0)
-script = ExtResource("factory_ladder")
-rise = 3
-
-[node name="ServiceLadder1" type="Node3D" parent="TERRAIN" groups=["factory_ladder"]]
-position = Vector3(232.8,0.25,0)
-script = ExtResource("factory_ladder")
-rise = 2.75
-
-[node name="ServiceLadder2" type="Node3D" parent="TERRAIN" groups=["factory_ladder"]]
-position = Vector3(247,0.25,0)
-script = ExtResource("factory_ladder")
-rise = 5.45
-
-[node name="ServiceLadder3" type="Node3D" parent="TERRAIN" groups=["factory_ladder"]]
-position = Vector3(256.2,0.25,0)
-script = ExtResource("factory_ladder")
-rise = 3.45
 
 [node name="JungleTrap0" parent="TERRAIN" instance=ExtResource("thorn_bed")]
 position = Vector3(13, 0.18, 0)
@@ -625,13 +622,11 @@ font_size = 47
 modulate = Color(0.5, 0.94, 1, 1)
 
 
-[node name="RootPerchWestUpper" parent="TERRAIN" instance=ExtResource("root_perch")]
+[node name="RootPerchWestUpper" parent="TERRAIN" instance=ExtResource("climb_right")]
 position = Vector3(239.2, 4.3, 0)
-
-[node name="VineToWestUpper" type="Node3D" parent="TERRAIN" groups=["factory_ladder"]]
-position = Vector3(239.2, 0.25, 0)
-script = ExtResource("factory_ladder")
-rise = 4.05
+deck_width = 3.45
+deck_depth = 1.9
+climb_height = 4.05
 
 [node name="GroveReactorWest" parent="DECOR" instance=ExtResource("spore_reservoir")]
 position = Vector3(235.5, 0.25, -3)

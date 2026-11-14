@@ -11,7 +11,6 @@
 [ext_resource type="PackedScene" path="res://assets/neon_factory/extraction_pad.tscn" id="extraction_pad"]
 [ext_resource type="PackedScene" path="res://assets/pickups/extra_life.tscn" id="extra_life"]
 [ext_resource type="Script" uid="uid://dbwnwslje6f7g" path="res://scripts/factory_checkpoint.gd" id="factory_checkpoint"]
-[ext_resource type="Script" uid="uid://ey76lretdj4x" path="res://scripts/factory_ladder.gd" id="factory_ladder"]
 [ext_resource type="PackedScene" path="res://assets/campaign/abyssal_plant/enemies/flyer.tscn" id="flyer"]
 [ext_resource type="Script" uid="uid://oxsiel3i0gcq" path="res://scripts/forge_safe_hall.gd" id="forge_safe_hall"]
 [ext_resource type="PackedScene" path="res://assets/campaign/abyssal_plant/terrain/gate.tscn" id="gate"]
@@ -26,6 +25,12 @@
 [ext_resource type="PackedScene" path="res://assets/campaign/abyssal_plant/enemies/scout.tscn" id="scout"]
 [ext_resource type="PackedScene" path="res://assets/campaign/abyssal_plant/enemies/turret.tscn" id="turret"]
 [ext_resource type="PackedScene" path="res://assets/pickups/xp_orb.tscn" id="xp_orb"]
+
+[ext_resource type="PackedScene" path="res://assets/campaign/abyssal_plant/terrain/climb_platform_center.tscn" id="climb_center"]
+
+[ext_resource type="PackedScene" path="res://assets/campaign/abyssal_plant/terrain/climb_platform_left.tscn" id="climb_left"]
+
+[ext_resource type="PackedScene" path="res://assets/campaign/abyssal_plant/terrain/climb_platform_right.tscn" id="climb_right"]
 
 [sub_resource type="Environment" id="Backdrop"]
 background_mode = 1
@@ -299,29 +304,23 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 79.4, 2.54, 0)
 [node name="AirPocket9" parent="TERRAIN" unique_id=915361430 instance=ExtResource("perch")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 91.4, 1.8, 0)
 
-[node name="ArenaPerch0" parent="TERRAIN" unique_id=1693860850 instance=ExtResource("perch")]
-transform = Transform3D(1.5, 0, 0, 0, 1, 0, 0, 0, 1, 252.2, 4.85, 0)
+[node name="ArenaPerch0" parent="TERRAIN" unique_id=1693860850 instance=ExtResource("climb_left")]
+position = Vector3(252.2, 4.85, 0)
+deck_width = 6
+deck_depth = 1.9
+climb_height = 4.25
 
-[node name="ArenaClimb0" type="Node3D" parent="TERRAIN" unique_id=467669343 groups=["factory_ladder"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 252.2, 0.6, 0)
-script = ExtResource("factory_ladder")
-rise = 4.25
+[node name="ArenaPerch1" parent="TERRAIN" unique_id=1159344410 instance=ExtResource("climb_center")]
+position = Vector3(264.2, 3.7, 0)
+deck_width = 4
+deck_depth = 1.9
+climb_height = 3.1
 
-[node name="ArenaPerch1" parent="TERRAIN" unique_id=1159344410 instance=ExtResource("perch")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 264.2, 3.7, 0)
-
-[node name="ArenaClimb1" type="Node3D" parent="TERRAIN" unique_id=967227264 groups=["factory_ladder"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 264.2, 0.6, 0)
-script = ExtResource("factory_ladder")
-rise = 3.1
-
-[node name="ArenaPerch2" parent="TERRAIN" unique_id=1279103999 instance=ExtResource("perch")]
-transform = Transform3D(1.5, 0, 0, 0, 1, 0, 0, 0, 1, 279.2, 5.35, 0)
-
-[node name="ArenaClimb2" type="Node3D" parent="TERRAIN" unique_id=1754973883 groups=["factory_ladder"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 279.2, 0.6, 0)
-script = ExtResource("factory_ladder")
-rise = 4.75
+[node name="ArenaPerch2" parent="TERRAIN" unique_id=1279103999 instance=ExtResource("climb_right")]
+position = Vector3(279.2, 5.35, 0)
+deck_width = 6
+deck_depth = 1.9
+climb_height = 4.75
 
 [node name="DuelFloor0" parent="TERRAIN" unique_id=1940253035 instance=ExtResource("deck")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 240, 0.6, 0)

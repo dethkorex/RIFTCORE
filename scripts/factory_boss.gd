@@ -65,7 +65,8 @@ func drop_supply(index: int) -> void:
 	if not deck:
 		return
 	var carrier := CARRIER.new()
-	carrier.position = get_parent_node_3d().to_local(deck.global_position + Vector3.UP * 2.3)
+	var landing: Vector3 = deck.supply_landing_point() if deck.has_method("supply_landing_point") else deck.global_position
+	carrier.position = get_parent_node_3d().to_local(landing + Vector3.UP * 2.3)
 	carrier.adaptive_supply = true
 	carrier.supply_target = target
 	carrier.add_to_group(&"boss_supply")

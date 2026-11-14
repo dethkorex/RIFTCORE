@@ -48,8 +48,6 @@
 
 [ext_resource type="Script" path="res://scripts/factory_checkpoint.gd" id="factory_checkpoint"]
 
-[ext_resource type="Script" path="res://scripts/factory_ladder.gd" id="factory_ladder"]
-
 [ext_resource type="Script" path="res://scripts/forge_safe_hall.gd" id="forge_safe_hall"]
 
 [ext_resource type="Script" path="res://scripts/biome_zone.gd" id="biome_zone"]
@@ -59,6 +57,12 @@
 [ext_resource type="PackedScene" path="res://scenes/actors/riftcore_player.tscn" id="player"]
 
 [ext_resource type="PackedScene" path="res://scenes/levels/the_architect.tscn" id="boss"]
+
+[ext_resource type="PackedScene" path="res://assets/campaign/riftcore_nexus/terrain/climb_platform_center.tscn" id="climb_center"]
+
+[ext_resource type="PackedScene" path="res://assets/campaign/riftcore_nexus/terrain/climb_platform_left.tscn" id="climb_left"]
+
+[ext_resource type="PackedScene" path="res://assets/campaign/riftcore_nexus/terrain/climb_platform_right.tscn" id="climb_right"]
 
 [sub_resource type="BoxShape3D" id="Checkpoint"]
 size = Vector3(2.1, 1.9, 1.8)
@@ -384,32 +388,23 @@ scale = Vector3(1.16, 1, 1)
 position = Vector3(127, 3.23, 0)
 scale = Vector3(1.16, 1, 1)
 
-[node name="ArenaPerch0" parent="TERRAIN" instance=ExtResource("perch")]
+[node name="ArenaPerch0" parent="TERRAIN" instance=ExtResource("climb_left")]
 position = Vector3(200.2, 4.8, 0)
-scale = Vector3(1.25, 1, 1)
+deck_width = 5
+deck_depth = 1.9
+climb_height = 3.7
 
-[node name="ArenaClimb0" type="Node3D" parent="TERRAIN" groups=["factory_ladder"]]
-position = Vector3(200.2, 1.1, 0)
-script = ExtResource("factory_ladder")
-rise = 3.7
-
-[node name="ArenaPerch1" parent="TERRAIN" instance=ExtResource("perch")]
+[node name="ArenaPerch1" parent="TERRAIN" instance=ExtResource("climb_center")]
 position = Vector3(211.2, 6.9, 0)
-scale = Vector3(1.25, 1, 1)
+deck_width = 5
+deck_depth = 1.9
+climb_height = 5.8
 
-[node name="ArenaClimb1" type="Node3D" parent="TERRAIN" groups=["factory_ladder"]]
-position = Vector3(211.2, 1.1, 0)
-script = ExtResource("factory_ladder")
-rise = 5.8
-
-[node name="ArenaPerch2" parent="TERRAIN" instance=ExtResource("perch")]
+[node name="ArenaPerch2" parent="TERRAIN" instance=ExtResource("climb_right")]
 position = Vector3(224.2, 5.3, 0)
-scale = Vector3(1.25, 1, 1)
-
-[node name="ArenaClimb2" type="Node3D" parent="TERRAIN" groups=["factory_ladder"]]
-position = Vector3(224.2, 1.1, 0)
-script = ExtResource("factory_ladder")
-rise = 4.2
+deck_width = 5
+deck_depth = 1.9
+climb_height = 4.2
 
 [node name="ArenaPerch3" parent="TERRAIN" instance=ExtResource("perch")]
 position = Vector3(235.2, 4, 0)
