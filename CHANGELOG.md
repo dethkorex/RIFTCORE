@@ -9,6 +9,7 @@
 - Restored the personal HUD in co-op and moved mission and partner information to the right.
 - Reduced guest movement delay with immediate local movement and faster input updates. The host still decides combat, damage and rewards. Both players need 5.9.2 to join the same room.
 - Offline missions pause when the controller being used disconnects. Resume manually after reconnecting or switching input.
+- Empty save slots start immediately, and Load Game only appears when there is a save to load.
 - Added the game version in small text at the bottom right and removed the overlapping hub prompt frame.
 
 ## 5.9.1

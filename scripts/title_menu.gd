@@ -71,6 +71,9 @@ func show_page(next: String) -> void:
 	if next == "Hub":
 		hub_requested.emit()
 		return
+	if next == "Replace Slot" and ManualSave.read_slot(replace_slot) == null:
+		slot_requested.emit(replace_slot, true, new_operator_name)
+		return
 	page = next
 	for child in get_children():
 		remove_child(child)
@@ -302,7 +305,10 @@ func build_start_screen() -> void:
 		var label := "Continue Station  /  Slot %d" % active_slot if active_slot > 0 else "Enter Station"
 		buttons.append(UI.button(stack, label, func(): hub_requested.emit(), true))
 	buttons.append(UI.button(stack, "New Game", open_slot_picker.bind("New Game"), buttons.is_empty()))
-	buttons.append(UI.button(stack, "Load Game", open_slot_picker.bind("Load Game")))
+	for number in range(1, ManualSave.SLOT_COUNT + 1):
+		if ManualSave.read_slot(number) != null:
+			buttons.append(UI.button(stack, "Load Game", open_slot_picker.bind("Load Game")))
+			break
 	buttons.append(UI.button(stack, "Settings", show_page.bind("Settings")))
 	buttons.append(UI.button(stack, "Quit Game", get_tree().quit))
 	for i in range(buttons.size()):
@@ -492,11 +498,13 @@ func build_save_slots(columns: HBoxContainer, fresh: bool) -> void:
 				var sector := clampi(int(data.get_value("checkpoint", "sector", 1)), 1, Catalog.SECTORS.size())
 				var level := RiftPlayer.level_for_experience(int(data.get_value("checkpoint", "experience", 0)))
 				description = "%s  /  Act %d  /  Lv. %d" % [Catalog.info(sector).title, data.get_value("checkpoint", "act", 1), level]
-		var occupied := data != null
-		var button := UI.button(slots, "Slot %d   /   %s" % [number, description], choose_slot.bind(number, fresh, occupied))
-		button.disabled = not fresh and not occupied
-		if not button.disabled and not first:
+		if not fresh and data == null:
+			continue
+		var button := UI.button(slots, "Slot %d   /   %s" % [number, description], choose_slot.bind(number, fresh))
+		if not first:
 			first = button
+	if not fresh and not first:
+		UI.label(slots, "No saved games yet.", 19, UI.MUTED)
 	if name_field:
 		name_field.grab_focus()
 	elif first:
@@ -505,8 +513,8 @@ func build_save_slots(columns: HBoxContainer, fresh: bool) -> void:
 		UI.label(slots, slot_error, 18, UI.CYAN)
 	portrait(card(columns))
 
-func choose_slot(number: int, fresh: bool, occupied: bool) -> void:
-	if fresh and occupied:
+func choose_slot(number: int, fresh: bool) -> void:
+	if fresh and ManualSave.read_slot(number) != null:
 		replace_slot = number
 		show_page("Replace Slot")
 	else:
