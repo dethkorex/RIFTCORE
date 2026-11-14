@@ -24,7 +24,7 @@ var current_station := -1
 var panel_open := false
 var pads: Array[Dictionary] = []
 var bank_label: Label
-var station_notice: Label
+var station_notice: Button
 var station_panel: PanelContainer
 var hud_layer: CanvasLayer
 var velocity_x := 0.0
@@ -126,12 +126,16 @@ func _unhandled_input(event: InputEvent) -> void:
 	var use_key: bool = event is InputEventKey and event.physical_keycode == KEY_E and event.pressed and not event.echo
 	if current_station >= 0 and (use_key or event.is_action_pressed("ui_accept")):
 		get_viewport().set_input_as_handled()
-		RiftAudio.play_effect(&"menu_confirm")
-		var destination: String = STATIONS[current_station].page
-		if destination == "Title":
-			title_requested.emit()
-		else:
-			station_requested.emit(destination)
+		activate_station()
+
+func activate_station() -> void:
+	if panel_open or current_station < 0:
+		return
+	var destination: String = STATIONS[current_station].page
+	if destination == "Title":
+		title_requested.emit()
+	else:
+		station_requested.emit(destination)
 
 func build_room() -> void:
 	var world := WorldEnvironment.new()
@@ -307,8 +311,9 @@ func build_hud() -> void:
 	station_panel.offset_right = 190
 	station_panel.offset_top = -77
 	station_panel.offset_bottom = -22
-	station_notice = UI.label(station_panel, "", 23, UI.CYAN)
-	station_notice.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	station_notice = UI.button(station_panel, "", activate_station, false, 34)
+	station_notice.focus_mode = Control.FOCUS_NONE
+	station_notice.add_theme_font_size_override("font_size", 18)
 
 func paint(tint: Color, emission: float, metallic := 0.0) -> StandardMaterial3D:
 	var finish := StandardMaterial3D.new()

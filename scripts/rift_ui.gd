@@ -84,6 +84,7 @@ static func theme() -> Theme:
 static func label(parent: Node, value: String, font_size := 16, color := WHITE) -> Label:
 	var item := Label.new()
 	item.text = value
+	item.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	item.add_theme_font_size_override("font_size", maxi(12, roundi(font_size * 0.91)))
 	item.add_theme_font_override("font", DISPLAY if font_size >= 23 else BODY)
 	item.add_theme_color_override("font_color", color)
@@ -125,10 +126,6 @@ static func set_button_states(item: Button, inactive: StyleBox, active: StyleBox
 	item.add_theme_stylebox_override("hover", active)
 	item.add_theme_stylebox_override("pressed", down)
 	item.add_theme_stylebox_override("hover_pressed", down)
-	item.mouse_entered.connect(func():
-		if not item.disabled and item.focus_mode != Control.FOCUS_NONE:
-			item.grab_focus()
-	)
 	item.focus_entered.connect(func(): item.add_theme_stylebox_override("normal", active))
 	item.focus_exited.connect(func(): item.add_theme_stylebox_override("normal", inactive))
 
@@ -140,7 +137,6 @@ static func button(parent: Node, value: String, action: Callable, primary := fal
 		item.add_theme_color_override("font_color", WHITE)
 	if action.is_valid():
 		item.pressed.connect(func(): RiftAudio.play_effect(&"menu_confirm"))
-		item.mouse_entered.connect(func(): RiftAudio.play_effect(&"menu_move"))
 		item.focus_entered.connect(func(): RiftAudio.play_effect(&"menu_move"))
 		item.pressed.connect(action)
 	else:
@@ -189,6 +185,7 @@ static func column(parent: Node, spacing := 12) -> VBoxContainer:
 	parent.add_child(stack)
 	return stack
 
-static func settings(parent: VBoxContainer) -> void:
+static func settings(parent: VBoxContainer) -> Control:
 	var panel := preload("res://scripts/settings_panel.gd").new()
 	parent.add_child(panel)
+	return panel

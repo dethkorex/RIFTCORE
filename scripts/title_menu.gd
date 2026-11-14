@@ -164,7 +164,8 @@ func show_page(next: String) -> void:
 		"Settings":
 			var form := card(columns, 2.0)
 			UI.label(form, "Audio and display", 28, UI.CYAN)
-			UI.settings(form)
+			var settings := UI.settings(form)
+			settings.initial_focus.grab_focus()
 			UI.label(form, "Default keyboard  /  A–D move · S crouch · W/S ladder · Space jump · J fire · K slash · Shift dash\nDefault controller  /  Left stick move · Down crouch · Up/Down ladder · A jump · X fire · Y slash · B dash · Start pause\nHold fire to charge, then release. Charged shots use 30 energy.", 16, UI.MUTED)
 			var art := card(columns)
 			portrait(art)

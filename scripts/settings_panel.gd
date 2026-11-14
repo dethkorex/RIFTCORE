@@ -6,6 +6,8 @@ var pending_action := ""
 var pending_device := ""
 var controls: ScrollContainer
 var note: Label
+var cancel_capture: Button
+var initial_focus: OptionButton
 var slots: Dictionary = {}
 
 func _ready() -> void:
@@ -13,6 +15,7 @@ func _ready() -> void:
 	var display := HBoxContainer.new()
 	add_child(display)
 	var mode := OptionButton.new()
+	initial_focus = mode
 	mode.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	for resolution in RiftSettings.MODES:
 		mode.add_item("%d × %d" % [resolution.x, resolution.y])
@@ -51,8 +54,11 @@ func _ready() -> void:
 	UI.style_button(toggle)
 	note = Label.new()
 	note.add_theme_font_size_override("font_size", 14)
+	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	note.text = "Set display, audio, and controls."
 	add_child(note)
+	cancel_capture = UI.button(self, "Cancel Binding", cancel_remap, false, 34)
+	cancel_capture.hide()
 	controls = ScrollContainer.new()
 	controls.custom_minimum_size.y = 215
 	controls.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -92,15 +98,16 @@ func _ready() -> void:
 	toggle.pressed.connect(func():
 		controls.visible = not controls.visible
 		toggle.text = "Hide controls" if controls.visible else "Remap controls  ›"
-		pending_action = ""
-		refresh()
+		if not pending_action.is_empty():
+			cancel_remap()
 	)
 
 func begin_capture(action: String, device: String) -> void:
 	pending_action = action
 	pending_device = device
+	cancel_capture.show()
 	refresh()
-	note.text = "Press a key or mouse button  /  Esc to cancel" if device == "key" else "Press a controller input  /  Esc to cancel"
+	note.text = "Press a key or mouse button. For left click, use an empty area. Esc cancels." if device == "key" else "Press a controller input  /  Esc to cancel"
 
 func refresh() -> void:
 	for action in RiftSettings.ACTIONS:
@@ -110,17 +117,29 @@ func refresh() -> void:
 func _input(event: InputEvent) -> void:
 	if pending_action.is_empty() or not is_visible_in_tree():
 		return
-	if event is InputEventKey and event.pressed and not event.echo and event.physical_keycode == KEY_ESCAPE:
+	if event is InputEventKey and event.pressed and not event.echo and (event.physical_keycode == KEY_ESCAPE or event.keycode == KEY_ESCAPE):
 		get_viewport().set_input_as_handled()
-		pending_action = ""
-		refresh()
-		note.text = "Binding canceled."
+		cancel_remap()
 		return
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		for control in [cancel_capture, get_viewport().gui_get_hovered_control()]:
+			if control == null or not control.get_global_rect().has_point(event.position):
+				continue
+			if control is BaseButton or control is Slider or control is ScrollBar:
+				return
 	var mouse_button: bool = event is InputEventMouseButton and event.pressed and not RiftSettings.to_data(event).is_empty()
 	var usable: bool = mouse_button or (event is InputEventKey and event.pressed and not event.echo) or (event is InputEventJoypadButton and event.pressed) or (event is InputEventJoypadMotion and absf(event.axis_value) > 0.76)
 	if not usable or RiftSettings.device_of(event) != pending_device:
 		return
 	get_viewport().set_input_as_handled()
 	note.text = RiftSettings.set_binding(pending_action, event, pending_device)
+	end_capture()
+
+func cancel_remap() -> void:
+	note.text = "Binding canceled."
+	end_capture()
+
+func end_capture() -> void:
 	pending_action = ""
+	cancel_capture.hide()
 	refresh()

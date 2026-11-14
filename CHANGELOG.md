@@ -2,6 +2,7 @@
 
 ## Game changes
 
+- Mouse hover and keyboard focus work independently. Settings opens with keyboard focus on its first control, remapping has a clickable cancel button, and the hub interaction prompt supports mouse clicks.
 - More blueprint and gear tiles fit on screen, with distinct part icons and tighter menu spacing.
 
 - Social is now a hub pad. Find Steam Friends, save contacts, and create or join co-op preview rooms from there. Steam presence and invitations require a configured RIFTCORE Steam App ID and live services.

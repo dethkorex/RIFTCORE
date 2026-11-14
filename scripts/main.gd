@@ -608,8 +608,9 @@ func show_pause_settings() -> void:
 	var stack := overlay()
 	pause_menu.back_action = build_pause_menu
 	UI.label(stack, "SETTINGS", 32, UI.CYAN)
-	UI.settings(stack)
-	UI.button(stack, "Back to pause", build_pause_menu).grab_focus()
+	var settings := UI.settings(stack)
+	UI.button(stack, "Back to pause", build_pause_menu)
+	settings.initial_focus.grab_focus()
 
 func build_level() -> void:
 	if editor_level and sector == 1 and act == 1:
