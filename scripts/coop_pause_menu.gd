@@ -36,7 +36,8 @@ func _ready() -> void:
 	menu.add_child(center)
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	var panel := PanelContainer.new()
-	panel.custom_minimum_size.x = 370
+	panel.custom_minimum_size.x = 232 if in_mission else 370
+	panel.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	var layout := HBoxContainer.new()
 	layout.add_theme_constant_override("separation", 16)
 	center.add_child(layout)
@@ -46,6 +47,7 @@ func _ready() -> void:
 		operator_panel.operator = operator
 		operator_panel.profile = profile
 		layout.add_child(operator_panel)
+		menu.sections = operator_panel.sections
 	var content := UI.column(panel)
 	UI.label(content, "CO-OP PAUSE", 30, UI.CYAN)
 	var hint := "The mission continues. You can still take damage." if in_mission else "Your partner can still move around the station."

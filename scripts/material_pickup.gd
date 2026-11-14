@@ -8,8 +8,9 @@ var blueprint_id := ""
 
 static func roll_at(host: Node3D, at: Vector3, sector: int, source: String) -> void:
 	var drop := new()
-	drop.materials = Catalog.roll(sector, source, rng)
-	drop.blueprint_id = Blueprints.roll(sector, source, rng)
+	var loot_scale := float(host.get_meta("loot_scale", 1.0))
+	drop.materials = Catalog.roll(sector, source, rng, loot_scale)
+	drop.blueprint_id = Blueprints.roll(sector, source, rng, loot_scale)
 	drop.position = host.to_local(at)
 	host.add_child.call_deferred(drop)
 

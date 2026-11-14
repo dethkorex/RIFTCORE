@@ -73,7 +73,7 @@ func play_effect(cue: StringName) -> void:
 			if not ResourceLoader.exists(path):
 				continue
 			var voice := AudioStreamPlayer.new()
-			voice.bus = &"SFX"
+			voice.bus = &"Voice"
 			voice.stream = load(path)
 			voice.volume_db = -7.0
 			add_child(voice)

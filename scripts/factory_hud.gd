@@ -1,7 +1,8 @@
 extends Control
 
 const UI := preload("res://scripts/rift_ui.gd")
-const CURRENCY := preload("res://assets/ui/riftcore_kit/icon_currency.png")
+const CURRENCY := preload("res://assets/ui/bolt.svg")
+const SHARD := preload("res://assets/ui/core-shard.svg")
 const PAUSE_PLATE := preload("res://assets/ui/riftcore_kit/panel_base_small.png")
 const PORTRAIT := preload("res://assets/ui/rx07_menu.png")
 const CYAN := Color("00caff")
@@ -9,7 +10,6 @@ const WHITE := Color("f1f8ff")
 const INK := Color(0.018, 0.046, 0.13, 0.96)
 const HUD_SCALE := 0.75
 
-var player_level := 1
 var health := 1.0
 var energy := 1.0
 var health_capacity := 80.0
@@ -17,6 +17,7 @@ var energy_capacity := 75.0
 var displayed_health_capacity := 80.0
 var displayed_energy_capacity := 75.0
 var credits := 0
+var core_shards := 0
 var experience := 0
 var animated_xp := 0.0
 var xp_tween: Tween
@@ -80,6 +81,7 @@ func show_quick_slots(profile) -> void:
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	resized.connect(queue_redraw)
+	RiftSettings.hud_scale_changed.connect(queue_redraw)
 	notice = Label.new()
 	add_child(notice)
 	notice.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
@@ -148,7 +150,7 @@ func caption(at: Vector2, value: String, font_size := 18, color := WHITE) -> voi
 	draw_string(face, at + Vector2(1, 2), value, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, Color("020817"))
 	draw_string(face, at, value, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, color)
 
-func gauge(y: float, label: String, ratio: float, tint: Color, width: float) -> void:
+func gauge(y: float, label: String, ratio: float, tint: Color, width: float, values := "") -> void:
 	plate(Rect2(129, y, 78, 25), 6, WHITE)
 	caption(Vector2(137, y + 18), label, 14)
 	plate(Rect2(214, y, width, 25), 7, WHITE)
@@ -163,6 +165,13 @@ func gauge(y: float, label: String, ratio: float, tint: Color, width: float) -> 
 		draw_colored_polygon(PackedVector2Array([start, start + segment_width, start + segment_width + slant, start + slant]), Color("172d4b"))
 		if amount > 0.0:
 			draw_colored_polygon(PackedVector2Array([start, start + segment_width * amount, start + segment_width * amount + slant, start + slant]), tint)
+	if not values.is_empty():
+		const FONT_SIZE := 17
+		var face := UI.DISPLAY
+		var text_width := face.get_string_size(values, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE).x
+		var at := Vector2(214.0 + (width - text_width) * 0.5, y + 18)
+		draw_string_outline(face, at, values, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE, 5, Color("020817"))
+		draw_string(face, at, values, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE, WHITE)
 
 func task(at: Vector2, value: String, done: bool) -> void:
 	var color := CYAN if done else WHITE
@@ -172,8 +181,9 @@ func task(at: Vector2, value: String, done: bool) -> void:
 	caption(at + Vector2(23, 0), value, 16, color)
 
 func _draw() -> void:
-	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE * HUD_SCALE)
-	var hud_size := size / HUD_SCALE
+	var hud_scale := HUD_SCALE * RiftSettings.hud_scale
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE * hud_scale)
+	var hud_size := size / hud_scale
 	var health_width := clampf(150.0 + (displayed_health_capacity - 80.0) * 1.4, 150.0, 245.0)
 	var energy_width := clampf(150.0 + (displayed_energy_capacity - 75.0) * 1.8, 150.0, 245.0)
 	draw_texture_rect(PAUSE_PLATE, Rect2(102, 67, 132 + maxf(health_width, energy_width), 111), false)
@@ -182,13 +192,9 @@ func _draw() -> void:
 	draw_texture_rect_region(PORTRAIT, Rect2(26, 33, 91, 103),
 		Rect2(source_size * Vector2(0.415, 0.008), source_size * Vector2(0.17, 0.27)))
 	plate(Rect2(130, 39, 96, 26), 8)
-	plate(Rect2(236, 36, 86, 29), 8)
 	caption(Vector2(145, 58), "RX-07", 18)
-	caption(Vector2(250, 57), "OP %02d" % RiftPlayer.level_for_experience(experience), 18)
-	plate(Rect2(328, 36, 84, 29), 8, Color("bf82ff"))
-	caption(Vector2(341, 57), "PL %02d" % player_level, 18)
-	gauge(77, "HEALTH", health, Color("62f10b"), health_width)
-	gauge(108, "ENERGY", energy, Color("04dafa"), energy_width)
+	gauge(77, "HEALTH", health, Color("62f10b"), health_width, "%d / %d" % [roundi(health * health_capacity), roundi(health_capacity)])
+	gauge(108, "ENERGY", energy, Color("04dafa"), energy_width, "%d / %d" % [roundi(energy * energy_capacity), roundi(energy_capacity)])
 	var shown_level := RiftPlayer.level_for_experience(animated_xp)
 	var threshold := RiftPlayer.experience_threshold(shown_level)
 	var next_threshold := RiftPlayer.experience_threshold(shown_level + 1)
@@ -203,15 +209,18 @@ func _draw() -> void:
 		draw_line(Vector2(x + 12, 55), Vector2(right - 12, 55), CYAN, 1.0)
 		task(Vector2(x + 20, 80), exit_task, reached_exit)
 		task(Vector2(x + 20, 106), "OPTIONAL: SECURITY   %d LEFT" % remaining, remaining == 0)
-	var counters := Vector2(20, 247) if coop else Vector2(right - 222, 139)
-	plate(Rect2(counters, Vector2(222, 36)), 11)
+	var counters := Vector2(20, 218) if coop else Vector2(right - 222, 139)
+	plate(Rect2(counters, Vector2(222, 65)), 11)
 	draw_texture_rect(CURRENCY, Rect2(counters + Vector2(13, 5), Vector2(24, 24)), false)
 	caption(counters + Vector2(47, 25), "BOLTS  %04d" % credits, 19)
-	plate(Rect2(counters + Vector2(0, 42), Vector2(222, 33)), 9)
+	draw_line(counters + Vector2(13, 34), counters + Vector2(208, 34), Color("346681"))
+	draw_texture_rect(SHARD, Rect2(counters + Vector2(13, 37), Vector2(24, 24)), false)
+	caption(counters + Vector2(47, 55), "%04d CORE SHARDS" % core_shards, 17)
+	plate(Rect2(counters + Vector2(0, 71), Vector2(222, 33)), 9)
 	var life_text := "RX   LIVES   %02d" % lives
 	if reserve_lives > 0:
 		life_text += "  +%d" % reserve_lives
-	caption(counters + Vector2(15, 65), life_text, 17)
+	caption(counters + Vector2(15, 94), life_text, 17)
 	if boss_visible:
 		var center := hud_size.x * 0.5
 		plate(Rect2(center - 180, 14, 360, 47), 11, boss_tint)
@@ -222,15 +231,13 @@ func _draw() -> void:
 		plate(Rect2(hud_size.x * 0.5 - 168, hud_size.y * 0.72, 336, 44), 10, Color("ff536c"))
 		caption(Vector2(hud_size.x * 0.5 - 151, hud_size.y * 0.72 + 28), "RUN OVER   /   BANKING CREDITS" if lives <= 0 else "SYSTEM FAILURE   /   RESPAWNING", 17)
 
-	plate(Rect2(18, 157, 119, 29))
-	caption(Vector2(28, 178), "DEF  %.1f%%" % (RiftPlayer.defense_for_experience(experience) * 100.0), 15, Color("a8e5ff"))
-	plate(Rect2(18, 192, 280, 43), 9, suit_tint)
-	var visor := PackedVector2Array([Vector2(33, 202), Vector2(40, 199), Vector2(48, 199),
-		Vector2(55, 202), Vector2(54, 217), Vector2(44, 228), Vector2(34, 217), Vector2(33, 202)])
+	plate(Rect2(18, 164, 280, 43), 9, suit_tint)
+	var visor := PackedVector2Array([Vector2(33, 174), Vector2(40, 171), Vector2(48, 171),
+		Vector2(55, 174), Vector2(54, 189), Vector2(44, 200), Vector2(34, 189), Vector2(33, 174)])
 	draw_polyline(visor, suit_tint, 2.0, true)
-	draw_line(Vector2(36, 210), Vector2(52, 210), suit_tint, 2.0, true)
-	caption(Vector2(64, 210), weapon, 16, suit_tint)
+	draw_line(Vector2(36, 182), Vector2(52, 182), suit_tint, 2.0, true)
+	caption(Vector2(64, 182), weapon, 16, suit_tint)
 	var device := "pad" if not Input.get_connected_joypads().is_empty() else "key"
 	var previous := RiftSettings.binding_label("previous_suit", device)
 	var next := RiftSettings.binding_label("swap_weapon", device)
-	caption(Vector2(64, 227), "%s  ‹  PREV     NEXT  ›  %s" % [previous, next], 12, Color("a8c6db"))
+	caption(Vector2(64, 199), "%s  ‹  PREV     NEXT  ›  %s" % [previous, next], 12, Color("a8c6db"))

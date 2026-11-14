@@ -2,6 +2,13 @@ extends Node
 
 const FRIEND := 4
 signal records_changed
+signal whispers_changed(steam_id: int)
+
+const WHISPER_CHANNEL := 27
+const WHISPER_LIMIT := 300
+var whispers: Dictionary = {}
+var unread_whispers: Dictionary = {}
+var next_whisper_at := 0
 
 const SEASON_SECONDS := 30 * 24 * 60 * 60
 const STEAM_MIN := 76561197960265728
@@ -120,6 +127,9 @@ func connect_steam() -> void:
 		if ready_to_query:
 			app_id = steam.getAppID()
 			ready_to_query = app_id == expected
+			if ready_to_query:
+				steam.network_messages_session_request.connect(accept_whisper_session)
+				RiftRelay.listen_for_steam_invites()
 	if not ready_to_query:
 		message = "RIFTCORE could not connect to Steam. Open Steam and try Refresh Presence."
 	elif not steam.loggedOn():
@@ -130,6 +140,54 @@ func connect_steam() -> void:
 func _process(_delta: float) -> void:
 	if ready_to_query and (not steam.loggedOn() or get_node_or_null("/root/GDSync") == null):
 		steam.run_callbacks()
+	if ready_to_query and steam.loggedOn():
+		for packet in steam.receiveMessagesOnChannel(WHISPER_CHANNEL, 12):
+			var sender := int(packet.get("identity", 0))
+			var payload: PackedByteArray = packet.get("payload", PackedByteArray())
+			if payload.size() <= WHISPER_LIMIT * 4 and can_whisper(sender):
+				var message_text := clean_whisper(payload.get_string_from_utf8())
+				if not message_text.is_empty():
+					unread_whispers[sender] = int(unread_whispers.get(sender, 0)) + 1
+					add_whisper(sender, message_text, false)
+
+func can_whisper(id: int) -> bool:
+	return id >= STEAM_MIN and ready_to_query and steam.loggedOn() and steam.getFriendRelationship(id) == 3
+
+func accept_whisper_session(id: int) -> void:
+	if can_whisper(id):
+		steam.acceptSessionWithUser(id)
+
+func clean_whisper(raw: String) -> String:
+	var cleaned := ""
+	for character in raw.strip_edges().left(WHISPER_LIMIT):
+		var code := character.unicode_at(0)
+		if code >= 32 and code != 127 and not (code >= 0x202a and code <= 0x202e) and not (code >= 0x2066 and code <= 0x2069):
+			cleaned += character
+	return cleaned.strip_edges()
+
+func send_whisper(id: int, raw: String) -> bool:
+	var body := clean_whisper(raw)
+	var now := Time.get_ticks_msec()
+	if not can_whisper(id) or body.is_empty() or now < next_whisper_at:
+		return false
+	next_whisper_at = now + 500
+	if steam.sendMessageToUser(id, body.to_utf8_buffer(), steam.NETWORKING_SEND_RELIABLE_NO_NAGLE, WHISPER_CHANNEL) != 1:
+		return false
+	add_whisper(id, body, true)
+	return true
+
+func add_whisper(id: int, body: String, outgoing: bool) -> void:
+	if not whispers.has(id):
+		if whispers.size() >= 32:
+			var oldest: int = whispers.keys()[0]
+			whispers.erase(oldest)
+			unread_whispers.erase(oldest)
+		whispers[id] = []
+	var conversation: Array = whispers[id]
+	conversation.append({"body": body, "outgoing": outgoing})
+	if conversation.size() > 50:
+		conversation.pop_front()
+	whispers_changed.emit(id)
 
 func contacts() -> Array[Dictionary]:
 	var ids := followed.duplicate()

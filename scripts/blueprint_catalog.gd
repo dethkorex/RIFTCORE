@@ -49,11 +49,11 @@ static func all_gear(legacy: Dictionary) -> Dictionary:
 static func blueprint_id(sector: int, part: int) -> String:
 	return "bp_%02d_%02d" % [sector, part]
 
-static func roll(sector: int, source: String, rng: RandomNumberGenerator) -> String:
+static func roll(sector: int, source: String, rng: RandomNumberGenerator, loot_scale := 1.0) -> String:
 	var rates: Array = RATES.get(source, RATES.enemy)
 	var chance := rng.randf()
 	for rarity in range(3, -1, -1):
-		chance -= rates[rarity]
+		chance -= rates[rarity] * (1.0 + (loot_scale - 1.0) * (0.5 + 0.25 * rarity))
 		if chance < 0:
 			var pool: Array[int] = []
 			for index in PARTS.size():

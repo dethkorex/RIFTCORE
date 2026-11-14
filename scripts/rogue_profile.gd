@@ -8,6 +8,14 @@ const CHALLENGES := [
 	{"name": "Sector Clear", "objective": "Defeat the Act 2 boss and reach extraction.", "credits": 240, "step": 25},
 	{"name": "Clean Run", "objective": "Clear both acts in the same run without losing a life.", "credits": 420, "step": 35},
 ]
+const CHALLENGE_COOLDOWN := 86400
+const CHALLENGE_SETS := [
+	[["Gatebreaker", "Enter Act II", "act", 1], ["Sector Clear", "Extract from the sector", "clear", 1], ["Clean Run", "Extract without losing a life", "clean", 1], ["Security Sweep", "Defeat 10 security units before extraction", "kills", 10], ["Salvage Run", "Extract with 5 recovered materials", "materials", 5]],
+	[["First Breach", "Enter Act II", "act", 1], ["Extraction Ready", "Extract from the sector", "clear", 1], ["Health Reserve", "Extract with at least 60% HP", "health", 60], ["Credit Runner", "Collect 50 bolts before extraction", "bolts", 50], ["Quick Response", "Extract within 15 minutes", "time", 900]],
+	[["Frontline", "Enter Act II", "act", 1], ["Finish the Job", "Extract from the sector", "clear", 1], ["Power Reserve", "Extract with at least 60% energy", "energy", 60], ["Salvage Specialist", "Extract with 8 recovered materials", "materials", 8], ["Sweep Team", "Defeat 8 security units before extraction", "kills", 8]],
+	[["Breach and Advance", "Enter Act II", "act", 1], ["Return to Station", "Extract from the sector", "clear", 1], ["No Casualties", "Extract without losing a life", "clean", 1], ["On the Clock", "Extract within 20 minutes", "time", 1200], ["Full Power", "Extract with at least 75% energy", "energy", 75]],
+	[["Make an Opening", "Enter Act II", "act", 1], ["Homebound", "Extract from the sector", "clear", 1], ["Intact Chassis", "Extract with at least 75% HP", "health", 75], ["Bolts on Board", "Collect 35 bolts before extraction", "bolts", 35], ["Clear the Route", "Defeat 12 security units before extraction", "kills", 12]],
+]
 
 const UPGRADES := [
 	{"id": "armor", "name": "Ceramic Armor", "prices": [15, 28], "effects": ["+12 starting HP", "+28 starting HP and 10% damage resistance"]},
@@ -90,6 +98,8 @@ var credits := 0
 var owned: Dictionary = {}
 var unlocked_sector := 1
 var completed_challenges: Dictionary = {}
+var challenge_cycles: Dictionary = {}
+var loot_clears: Dictionary = {}
 var reserve_lives := 0
 var gear := {}
 var manual_only := false
@@ -177,6 +187,13 @@ func decode_from(data: ConfigFile) -> void:
 	unlocked_sector = clampi(int(data.get_value("profile", "unlocked_sector", 1)), 1, Catalog.SECTORS.size())
 	reserve_lives = maxi(0, int(data.get_value("profile", "reserve_lives", 0)))
 	completed_challenges.clear()
+	var cycles: Variant = data.get_value("challenge_cycles", "sectors", {})
+	challenge_cycles = cycles if cycles is Dictionary else {}
+	var clears: Variant = data.get_value("archive", "loot_clears", {})
+	loot_clears = clears if clears is Dictionary else {}
+	for number in memories:
+		if not loot_clears.has(number):
+			loot_clears[number] = 0
 	for sector in range(1, Catalog.SECTORS.size() + 1):
 		for tier in range(CHALLENGES.size()):
 			var id := challenge_key(sector, tier)
@@ -226,6 +243,8 @@ func encode_into(data: ConfigFile) -> void:
 		data.set_value("upgrades", id, rank(id))
 	for id in completed_challenges:
 		data.set_value("challenges", id, true)
+	data.set_value("challenge_cycles", "sectors", challenge_cycles)
+	data.set_value("archive", "loot_clears", loot_clears)
 	for id in gear:
 		data.set_value("equipment", id, gear[id])
 
@@ -327,6 +346,55 @@ static func challenge_key(sector: int, tier: int) -> String:
 
 static func challenge_credits(sector: int, tier: int) -> int:
 	return CHALLENGES[tier].credits + (sector - 1) * CHALLENGES[tier].step
+
+func challenge_cycle(sector: int) -> Dictionary:
+	var cycle: Dictionary = challenge_cycles.get(sector, {})
+	var now := int(Time.get_unix_time_from_system())
+	if cycle.is_empty() or (int(cycle.get("reset_at", 0)) > 0 and now >= int(cycle.reset_at)):
+		var next := 0 if cycle.is_empty() else posmod(int(cycle.set) + randi_range(1, CHALLENGE_SETS.size() - 1), CHALLENGE_SETS.size())
+		var done: Array = []
+		if cycle.is_empty():
+			for tier in CHALLENGES.size():
+				if completed_challenges.has(challenge_key(sector, tier)):
+					done.append(tier)
+		cycle = {"set": next, "done": done, "reset_at": 0}
+		challenge_cycles[sector] = cycle
+	return cycle
+
+static func rotated_challenge_credits(sector: int, index: int) -> int:
+	return 120 + index * 35 + (sector - 1) * 18
+
+func record_challenges(sector: int, results: Dictionary) -> Dictionary:
+	var cycle := challenge_cycle(sector)
+	var before := cycle.duplicate(true)
+	var payment := 0
+	var earned := 0
+	for index in 5:
+		if cycle.done.has(index):
+			continue
+		var task: Array = CHALLENGE_SETS[cycle.set][index]
+		if not results.has(task[2]):
+			continue
+		var value: float = results[task[2]]
+		if (value <= task[3] if task[2] == "time" else value >= task[3]):
+			cycle.done.append(index)
+			payment += rotated_challenge_credits(sector, index)
+			earned += 1
+	if earned == 0:
+		return {}
+	if cycle.done.size() == 5:
+		cycle.reset_at = int(Time.get_unix_time_from_system()) + CHALLENGE_COOLDOWN
+	credits += payment
+	reserve_lives += earned
+	var shards := earned * (3 + sector)
+	core_shards += shards
+	if save() != OK:
+		challenge_cycles[sector] = before
+		credits -= payment
+		reserve_lives -= earned
+		core_shards -= shards
+		return {}
+	return {"credits": payment, "shards": shards, "lives": earned}
 
 func unlock_sector(sector: int) -> void:
 	var next := clampi(sector, 1, Catalog.SECTORS.size())

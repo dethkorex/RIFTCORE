@@ -1,4 +1,14 @@
-# RIFTCORE Alpha 6.0.2 — Fractured Connections
+# RIFTCORE Alpha 6.0.3 — Fractured Connections
+
+## Alpha 6.0.3
+
+- Form groups of up to four players. Enemy and boss health and damage scale by an additional 25% for each extra player at deployment. Update every copy of the game before joining a group.
+- Deploy from a sector map with mission intel and Standard, Veteran, and Nightmare difficulties. Higher difficulties increase rare drop odds. NOVA Archive shows a sector’s material and blueprint pools after your first extraction, and that intel survives a lost run.
+- Each unlocked sector has five active challenges. Finish all five to start a 24-hour cooldown. The next set is drawn from five possible sets.
+- Use Operators to load a saved operator or create one in an empty slot. Operator cards show sector progress, levels, materials, and recorded playtime.
+- Split Settings into Audio, Video, Gameplay, Keyboard & Mouse, Controller, and Update Game. Added voice volume, graphics quality, HUD scale, and controller vibration. Use LB/RB to switch tabs in Settings and Pause, or to cycle Equipment filters.
+- Social now has Friends, Whispers, and Leaderboard. Manage parties from Deploy. With a supported Steam session, Quick Invite creates a room when needed and friends can accept the invite in-game without entering a code.
+- Health and energy bars show current and maximum values. Removed level and defense badges from the mission HUD, updated the bolt and Core Shard readouts, and removed icons over the equipment hologram. Live defense is in Pause.
 
 ## Alpha 6.0.2
 

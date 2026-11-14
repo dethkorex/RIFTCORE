@@ -10,6 +10,8 @@ var slot: int
 var profile := Profile.new()
 var run := ConfigFile.new()
 var owns_slot := false
+var play_seconds := 0
+var session_started_at := Time.get_ticks_msec()
 
 func _init(number: int) -> void:
 	slot = number
@@ -31,6 +33,8 @@ func load_slot() -> bool:
 	if not data:
 		return false
 	owns_slot = true
+	play_seconds = maxi(0, int(data.get_value("slot", "play_seconds", 0)))
+	session_started_at = Time.get_ticks_msec()
 	profile.decode_from(data)
 	run = ConfigFile.new()
 	copy_checkpoint(data, run)
@@ -40,6 +44,7 @@ func save_slot() -> Error:
 	var data := ConfigFile.new()
 	data.set_value("slot", "format", FORMAT)
 	data.set_value("slot", "saved_at", Time.get_datetime_string_from_system(false, true))
+	data.set_value("slot", "play_seconds", play_seconds + floori((Time.get_ticks_msec() - session_started_at) / 1000.0))
 	profile.encode_into(data)
 	copy_checkpoint(run, data)
 	var error := write_slot(data)
@@ -62,6 +67,8 @@ func invalidate_defeated_run() -> Error:
 	data.set_value("inventory", "stock", profile.inventory)
 	data.set_value("inventory", "quick", profile.quick_slots)
 	data.set_value("inventory", "blueprints", profile.blueprint_items)
+	data.set_value("challenge_cycles", "sectors", profile.challenge_cycles)
+	data.set_value("archive", "loot_clears", profile.loot_clears)
 	for id in profile.blueprints:
 		data.set_value("blueprints", id, true)
 	for index in profile.memories:

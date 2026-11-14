@@ -9,9 +9,14 @@ const ACTIONS := {
 const QUICK_DEFAULTS := [JOY_BUTTON_DPAD_UP, JOY_BUTTON_DPAD_LEFT, JOY_BUTTON_DPAD_RIGHT, JOY_BUTTON_DPAD_DOWN]
 const AXES := ["move_left", "move_right", "climb_up", "climb_down", "crouch"]
 var path := "user://riftcore_settings.cfg"
-var volumes := {"Master": 1.0, "Music": 0.85, "SFX": 1.0}
+signal hud_scale_changed
+const QUALITY_SCALES := [0.67, 0.85, 1.0]
+var volumes := {"Master": 1.0, "Music": 0.85, "SFX": 1.0, "Voice": 1.0}
 var resolution_index := 2
 var fullscreen := true
+var graphics_quality := 2
+var hud_scale := 1.0
+var vibration := true
 var show_hub_tips := true
 var seen_hub_tips := PackedStringArray()
 var last_operator_name := ""
@@ -19,7 +24,7 @@ var defaults: Dictionary = {}
 var bindings: Dictionary = {}
 
 func _ready() -> void:
-	for bus_name in ["Music", "SFX"]:
+	for bus_name in ["Music", "SFX", "Voice"]:
 		if AudioServer.get_bus_index(bus_name) == -1:
 			AudioServer.add_bus()
 			AudioServer.set_bus_name(AudioServer.bus_count - 1, bus_name)
@@ -34,6 +39,9 @@ func restore() -> void:
 			volumes[bus_name] = clampf(float(data.get_value("audio", bus_name, volumes[bus_name])), 0.0, 1.0)
 		resolution_index = clampi(int(data.get_value("video", "resolution", resolution_index)), 0, MODES.size() - 1)
 		fullscreen = bool(data.get_value("video", "fullscreen", fullscreen))
+		graphics_quality = clampi(int(data.get_value("video", "quality", 2)), 0, QUALITY_SCALES.size() - 1)
+		hud_scale = clampf(float(data.get_value("gameplay", "hud_scale", 1.0)), 0.80, 1.15)
+		vibration = bool(data.get_value("controller", "vibration", true))
 		last_operator_name = str(data.get_value("player", "last_operator_name", "")).left(20)
 		show_hub_tips = bool(data.get_value("tutorial", "enabled", true))
 		var seen: Variant = data.get_value("tutorial", "seen_stations", PackedStringArray())
@@ -53,6 +61,9 @@ func save() -> Error:
 		data.set_value("audio", bus_name, volumes[bus_name])
 	data.set_value("video", "resolution", resolution_index)
 	data.set_value("video", "fullscreen", fullscreen)
+	data.set_value("video", "quality", graphics_quality)
+	data.set_value("gameplay", "hud_scale", hud_scale)
+	data.set_value("controller", "vibration", vibration)
 	data.set_value("controls", "bindings", bindings)
 	data.set_value("tutorial", "enabled", show_hub_tips)
 	data.set_value("tutorial", "seen_stations", seen_hub_tips)
@@ -103,6 +114,17 @@ func apply_video() -> void:
 		window.size = fitted
 		window.position = available.position + (available.size - fitted) / 2
 		window.scaling_3d_scale = 1.0
+	window.scaling_3d_scale *= QUALITY_SCALES[graphics_quality]
+
+func set_hud_scale(value: float) -> void:
+	hud_scale = clampf(value, 0.80, 1.15)
+	hud_scale_changed.emit()
+	save()
+
+func rumble() -> void:
+	if vibration:
+		for device in Input.get_connected_joypads():
+			Input.start_joy_vibration(device, 0.32, 0.18, 0.14)
 
 func configure_bindings() -> void:
 	if defaults.is_empty():
@@ -201,8 +223,13 @@ func apply_bindings() -> void:
 					continue
 			InputMap.action_add_event(action, event)
 
-func reset_bindings() -> void:
-	bindings.clear()
+func reset_bindings(device := "") -> void:
+	if device.is_empty():
+		bindings.clear()
+	else:
+		for action in bindings.keys():
+			if bindings[action] is Dictionary:
+				bindings[action].erase(device)
 	apply_bindings()
 	save()
 

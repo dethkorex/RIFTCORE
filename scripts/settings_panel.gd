@@ -2,13 +2,16 @@ extends VBoxContainer
 
 const UI := preload("res://scripts/rift_ui.gd")
 const UpdateClient := preload("res://scripts/update_client.gd")
+const ControllerOverlay := preload("res://scripts/controller_overlay.gd")
+var tabs: TabContainer
 
 var pending_action := ""
 var pending_device := ""
-var controls: ScrollContainer
+var notes: Dictionary = {}
+var cancel_buttons: Dictionary = {}
 var note: Label
 var cancel_capture: Button
-var initial_focus: OptionButton
+var initial_focus: Control
 var slots: Dictionary = {}
 var can_restart := false
 var updater: Node
@@ -24,112 +27,143 @@ var installing := false
 func _ready() -> void:
 	add_theme_constant_override("separation", 15)
 	size_flags_vertical = Control.SIZE_EXPAND_FILL
-	var tabs := TabContainer.new()
+	UI.label(self, "LB / RB   Switch tab", 14, UI.MUTED)
+	tabs = TabContainer.new()
 	tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	tabs.add_theme_stylebox_override("panel", UI.frame(Color("101e32"), Color("365d79"), 1))
 	tabs.add_theme_stylebox_override("tab_selected", UI.frame(Color("34244f"), UI.VIOLET))
 	tabs.add_theme_stylebox_override("tab_hovered", UI.frame(Color("34244f"), UI.VIOLET))
 	tabs.add_theme_stylebox_override("tab_unselected", UI.frame(Color("12253d"), Color("3b6384")))
 	add_child(tabs)
-	var audio_video := VBoxContainer.new()
-	audio_video.name = "Display & Audio"
-	audio_video.add_theme_constant_override("separation", 12)
-	tabs.add_child(audio_video)
-	UI.label(audio_video, "Display", 24, UI.CYAN)
-	var display := HBoxContainer.new()
-	display.add_theme_constant_override("separation", 16)
-	audio_video.add_child(display)
-	UI.label(display, "Resolution", 17, UI.MUTED).custom_minimum_size.x = 120
-	var mode := OptionButton.new()
-	initial_focus = mode
-	mode.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	for resolution in RiftSettings.MODES:
-		mode.add_item("%d × %d" % [resolution.x, resolution.y])
-	mode.select(RiftSettings.resolution_index)
-	display.add_child(mode)
-	UI.style_button(mode)
-	var fullscreen := CheckButton.new()
-	fullscreen.text = "Fullscreen"
-	fullscreen.button_pressed = RiftSettings.fullscreen
-	display.add_child(fullscreen)
-	UI.style_button(fullscreen)
-	mode.item_selected.connect(func(index: int): RiftSettings.set_display(index, fullscreen.button_pressed))
-	fullscreen.toggled.connect(func(on: bool): RiftSettings.set_display(mode.selected, on))
-	audio_video.add_child(HSeparator.new())
-	UI.label(audio_video, "Audio", 24, UI.CYAN)
-	for bus_name in ["Master", "Music", "SFX"]:
-		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 10)
-		audio_video.add_child(row)
-		var value := Label.new()
-		value.custom_minimum_size.x = 126
-		row.add_child(value)
-		var slider := HSlider.new()
-		slider.max_value = 100.0
-		slider.step = 1.0
-		slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		slider.custom_minimum_size.y = 28
-		slider.value = RiftSettings.volumes[bus_name] * 100
-		value.text = "%s  %d%%" % [bus_name, slider.value]
-		row.add_child(slider)
-		slider.value_changed.connect(func(level: float):
-			value.text = "%s  %d%%" % [bus_name, level]
-			RiftSettings.set_volume(bus_name, level / 100.0)
-		)
-	var tips := CheckButton.new()
-	tips.text = "Show first-visit hub tips"
-	tips.button_pressed = RiftSettings.show_hub_tips
-	audio_video.add_child(tips)
-	UI.style_button(tips)
-	tips.toggled.connect(func(enabled: bool):
+	var audio := settings_tab("Audio", "Volume")
+	for bus_name in RiftSettings.volumes:
+		var key: String = bus_name
+		add_slider(audio, key + " Volume", RiftSettings.volumes[key] * 100.0, 0, 100, 1,
+			func(value: float): RiftSettings.set_volume(key, value / 100.0))
+	var video := settings_tab("Video", "Display")
+	var mode := add_selector(video, "Resolution", RiftSettings.MODES.map(func(size): return "%d × %d" % [size.x, size.y]), RiftSettings.resolution_index)
+	add_toggle(video, "Fullscreen", RiftSettings.fullscreen, func(enabled: bool): RiftSettings.set_display(RiftSettings.resolution_index, enabled))
+	mode.item_selected.connect(func(index: int): RiftSettings.set_display(index, RiftSettings.fullscreen))
+	var quality := add_selector(video, "Graphics Quality", ["Performance", "Balanced", "High"], RiftSettings.graphics_quality)
+	quality.item_selected.connect(func(index: int):
+		RiftSettings.graphics_quality = index
+		RiftSettings.apply_video()
+		RiftSettings.save()
+	)
+	var gameplay := settings_tab("Gameplay", "Interface")
+	add_slider(gameplay, "HUD Scale", RiftSettings.hud_scale * 100.0, 80, 115, 5, func(value: float): RiftSettings.set_hud_scale(value / 100.0))
+	add_toggle(gameplay, "Show first-visit hub tips", RiftSettings.show_hub_tips, func(enabled: bool):
 		RiftSettings.show_hub_tips = enabled
 		RiftSettings.save()
 	)
-	var input_settings := VBoxContainer.new()
-	input_settings.name = "Controls"
-	input_settings.add_theme_constant_override("separation", 8)
-	tabs.add_child(input_settings)
-	note = UI.label(input_settings, "Select a binding to change it.", 16, UI.MUTED)
-	cancel_capture = UI.button(input_settings, "Cancel Binding", cancel_remap, false, 34)
-	cancel_capture.hide()
-	controls = ScrollContainer.new()
-	controls.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	controls.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	controls.follow_focus = true
-	input_settings.add_child(controls)
-	var grid := GridContainer.new()
-	grid.columns = 3
-	grid.add_theme_constant_override("h_separation", 10)
-	grid.add_theme_constant_override("v_separation", 5)
-	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	controls.add_child(grid)
-	for caption in ["Action", "Keyboard / Mouse", "Controller"]:
-		var item := Label.new()
-		item.text = caption
-		grid.add_child(item)
-	for action in RiftSettings.ACTIONS:
-		var caption := Label.new()
-		caption.text = RiftSettings.ACTIONS[action]
-		caption.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		grid.add_child(caption)
-		for device in ["key", "pad"]:
-			var bind := Button.new()
-			bind.custom_minimum_size = Vector2(130, 32)
-			bind.text = RiftSettings.binding_label(action, device)
-			grid.add_child(bind)
-			UI.style_button(bind)
-			slots[action + ":" + device] = bind
-			bind.pressed.connect(begin_capture.bind(action, device))
-	UI.button(input_settings, "Reset Bindings", func():
-		RiftSettings.reset_bindings()
-		end_capture()
-		note.text = "Default controls restored."
-	, false, 34)
+	build_bindings("Keyboard & Mouse", "key")
+	build_bindings("Controller", "pad")
 	tabs.tab_changed.connect(func(_tab: int):
 		if not pending_action.is_empty():
 			cancel_remap()
 	)
 	build_updates(tabs)
+	tabs.tab_changed.connect(func(_tab: int):
+		if is_visible_in_tree():
+			var focused := get_viewport().gui_get_focus_owner()
+			if focused == null or not focused.is_visible_in_tree():
+				tabs.get_tab_bar().grab_focus()
+	)
+
+func settings_tab(title: String, heading: String) -> VBoxContainer:
+	var panel := VBoxContainer.new()
+	panel.name = title
+	panel.add_theme_constant_override("separation", 12)
+	tabs.add_child(panel)
+	UI.label(panel, heading, 25, UI.CYAN)
+	return panel
+
+func add_selector(panel: VBoxContainer, title: String, options: Array, index: int) -> OptionButton:
+	var row := HBoxContainer.new()
+	panel.add_child(row)
+	UI.label(row, title, 17, UI.MUTED).custom_minimum_size.x = 150
+	var choice := OptionButton.new()
+	choice.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(choice)
+	UI.style_button(choice)
+	for label in options:
+		choice.add_item(label)
+	choice.select(index)
+	return choice
+
+func add_toggle(panel: VBoxContainer, title: String, state: bool, action: Callable) -> void:
+	var toggle := CheckButton.new()
+	toggle.text = title
+	toggle.button_pressed = state
+	panel.add_child(toggle)
+	UI.style_button(toggle)
+	toggle.toggled.connect(action)
+
+func add_slider(panel: VBoxContainer, title: String, value: float, minimum: int, maximum: int, increment: int, action: Callable) -> void:
+	var row := HBoxContainer.new()
+	panel.add_child(row)
+	UI.label(row, title, 17).custom_minimum_size.x = 150
+	var slider := HSlider.new()
+	slider.min_value = minimum
+	slider.max_value = maximum
+	slider.step = increment
+	slider.value = value
+	slider.custom_minimum_size.y = 28
+	slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(slider)
+	var caption := UI.label(row, "%d%%" % value, 17, UI.CYAN)
+	caption.custom_minimum_size.x = 55
+	caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	slider.value_changed.connect(func(next: float):
+		caption.text = "%d%%" % next
+		action.call(next)
+	)
+	if initial_focus == null:
+		initial_focus = slider
+
+func build_bindings(title: String, device: String) -> void:
+	var panel := settings_tab(title, "Bindings")
+	if device == "pad":
+		add_toggle(panel, "Controller vibration", RiftSettings.vibration, func(enabled: bool):
+			RiftSettings.vibration = enabled
+			if not enabled:
+				for id in Input.get_connected_joypads():
+					Input.stop_joy_vibration(id)
+			RiftSettings.save()
+		)
+	notes[device] = UI.label(panel, "Select an action to change its binding.", 16, UI.MUTED)
+	var cancel := UI.button(panel, "Cancel Binding", cancel_remap, false, 34)
+	cancel.hide()
+	cancel_buttons[device] = cancel
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.custom_minimum_size.y = 170
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.follow_focus = true
+	panel.add_child(scroll)
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	grid.add_theme_constant_override("v_separation", 5)
+	scroll.add_child(grid)
+	for action in RiftSettings.ACTIONS:
+		var caption := UI.label(grid, RiftSettings.ACTIONS[action], 17)
+		caption.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		caption.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		var button := UI.button(grid, RiftSettings.binding_label(action, device), begin_capture.bind(action, device), false, 34)
+		button.custom_minimum_size.x = 190
+		slots[action + ":" + device] = button
+	UI.button(panel, "Reset " + title + " Bindings", func():
+		RiftSettings.reset_bindings(device)
+		refresh()
+		notes[device].text = "Default bindings restored."
+	, false, 34)
+
+func _unhandled_input(event: InputEvent) -> void:
+	var step := ControllerOverlay.shoulder_step(event)
+	if step != 0 and is_visible_in_tree() and pending_action.is_empty():
+		get_viewport().set_input_as_handled()
+		ControllerOverlay.cycle_tabs(tabs, step)
 
 func build_updates(tabs: TabContainer) -> void:
 	var panel := VBoxContainer.new()
@@ -208,6 +242,8 @@ func install_update() -> void:
 func begin_capture(action: String, device: String) -> void:
 	pending_action = action
 	pending_device = device
+	note = notes[device]
+	cancel_capture = cancel_buttons[device]
 	cancel_capture.show()
 	refresh()
 	note.text = "Press a key or mouse button. For left click, use an empty area. Esc cancels." if device == "key" else "Press a controller input  /  Esc to cancel"

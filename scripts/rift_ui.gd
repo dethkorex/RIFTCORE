@@ -192,6 +192,21 @@ static func column(parent: Node, spacing := 12) -> VBoxContainer:
 	parent.add_child(stack)
 	return stack
 
+static func currency_row(parent: Control, title: String, shard := false) -> Label:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 7)
+	parent.add_child(row)
+	var icon := TextureRect.new()
+	icon.texture = preload("res://assets/ui/core-shard.svg") if shard else preload("res://assets/ui/bolt.svg")
+	icon.custom_minimum_size = Vector2(21, 21)
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(icon)
+	var amount := label(row, title, 16)
+	amount.autowrap_mode = TextServer.AUTOWRAP_OFF
+	return amount
+
 static func settings(parent: VBoxContainer, can_restart := false) -> Control:
 	var panel := preload("res://scripts/settings_panel.gd").new()
 	panel.name = "RiftSettingsPanel"

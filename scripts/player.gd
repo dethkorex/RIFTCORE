@@ -1213,6 +1213,8 @@ func take_damage(amount: float, source_position := Vector3.ZERO) -> void:
 	super.take_damage(mitigate_damage(amount), source_position)
 	if health < before:
 		RiftAudio.play_effect(&"armor_hit")
+		if not remote_input:
+			RiftSettings.rumble()
 	if health < before and health > 0.0:
 		invulnerable_time = 0.65
 		var away := signf(global_position.x - source_position.x)
@@ -1228,6 +1230,8 @@ func take_projectile_damage(amount: float) -> void:
 	super.take_damage(mitigate_damage(amount))
 	if health < before:
 		RiftAudio.play_effect(&"armor_hit")
+		if not remote_input:
+			RiftSettings.rumble()
 	if health < before and health > 0.0:
 		invulnerable_time = 0.65
 

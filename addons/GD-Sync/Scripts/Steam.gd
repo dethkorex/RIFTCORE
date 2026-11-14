@@ -107,7 +107,9 @@ func steam_login(valid_time : float) -> Dictionary:
 
 func create_steam_lobby() -> void:
 	if !steam_initialized(): return
-	steam.createLobby(steam.LOBBY_TYPE_FRIENDS_ONLY, 2)
+	var social := get_node_or_null("/root/RiftRelay")
+	var limit := 4 if social != null else 2
+	steam.createLobby(steam.LOBBY_TYPE_FRIENDS_ONLY, limit)
 	
 	var result : Array = await steam.lobby_created
 	

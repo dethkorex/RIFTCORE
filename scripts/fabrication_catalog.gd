@@ -6,6 +6,11 @@ const SECTOR_MATERIALS := [
 	"Forge Alloy", "Conductive Sap", "Cryo Quartz", "Pressure Pearl", "Cipher Glass",
 	"Storm Filament", "Splice Tissue", "Solar Foil", "Magnetite", "Nexus Residue",
 ]
+const COMPONENT_POOLS := [
+	["components", "cells"], ["cells", "components"], ["cells", "circuits"],
+	["circuits", "cells"], ["circuits", "components"], ["components", "circuits"],
+	["cells", "components"], ["cells", "circuits"], ["components", "cells"], ["circuits", "components"],
+]
 
 static func sector_key(sector: int) -> String:
 	return "sector_%d" % clampi(sector, 1, SECTOR_MATERIALS.size())
@@ -17,21 +22,17 @@ static func label(id: String) -> String:
 			return SECTOR_MATERIALS[number - 1]
 	return COMMON.get(id, id.capitalize())
 
-static func roll(sector: int, source: String, rng: RandomNumberGenerator) -> Dictionary:
+static func pool(sector: int) -> Array:
+	return ["scrap", "core", "legendary", sector_key(sector)] + COMPONENT_POOLS[clampi(sector, 1, COMPONENT_POOLS.size()) - 1]
+
+static func roll(sector: int, source: String, rng: RandomNumberGenerator, loot_scale := 1.0) -> Dictionary:
 	var result := {"scrap": rng.randi_range(1, 3)}
-	var table := [
-		["components", "circuits", "cells"], ["cells", "components", "circuits"],
-		["cells", "circuits", "components"], ["circuits", "cells", "components"],
-		["circuits", "components", "cells"], ["components", "cells", "circuits"],
-		["cells", "circuits", "components"], ["cells", "components", "circuits"],
-		["components", "circuits", "cells"], ["circuits", "cells", "components"],
-	]
-	var tier: Array = table[clampi(sector, 1, table.size()) - 1]
-	result[tier[rng.rand_weighted(PackedFloat32Array([0.55, 0.30, 0.15]))]] = 1 if source == "enemy" else 2
-	if source != "enemy" or rng.randf() < 0.16:
+	var components: Array = COMPONENT_POOLS[clampi(sector, 1, COMPONENT_POOLS.size()) - 1]
+	result[components[0 if rng.randf() < 0.67 else 1]] = 1 if source == "enemy" else 2
+	if source != "enemy" or rng.randf() < 0.16 * loot_scale:
 		result[sector_key(sector)] = 1
 	if source == "boss":
 		result["core"] = 1
-	if source in ["boss", "elite"] and rng.randf() < (0.22 if source == "boss" else 0.06):
+	if source in ["boss", "elite"] and rng.randf() < (0.22 if source == "boss" else 0.06) * loot_scale:
 		result["legendary"] = 1
 	return result

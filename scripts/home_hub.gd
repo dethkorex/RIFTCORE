@@ -19,11 +19,8 @@ const STATIONS := [
 ]
 
 var avatar: RiftPlayer
-var partner: RiftPlayer
-var partner_label: Label3D
+var partners: Dictionary = {}
 var local_online_label: Label3D
-var partner_x := 0.0
-var partner_facing := 0.0
 var station_sync := 0.0
 var camera: Camera3D
 var prompt: Label3D
@@ -33,6 +30,8 @@ var pause_menu: PauseMenu
 var reconstructing := false
 var pads: Array[Dictionary] = []
 var bank_label: Label
+var bolts_label: Label
+var shards_label: Label
 var station_notice: Button
 var hud_layer: CanvasLayer
 const HUB_RUN_SPEED := 6.6
@@ -116,10 +115,11 @@ func _physics_process(delta: float) -> void:
 	update_station()
 
 func _process(delta: float) -> void:
-	if is_instance_valid(partner):
-		partner.position.x = lerpf(partner.position.x, partner_x, 1.0 - exp(-16.0 * delta))
+	for entry in partners.values():
+		var partner: RiftPlayer = entry.actor
+		partner.position.x = lerpf(partner.position.x, entry.x, 1.0 - exp(-16.0 * delta))
 		partner.position.y = 1.11 if absf(partner.position.x) < 1.25 else 0.89
-		partner.model_root.rotation.y = partner_facing
+		partner.model_root.rotation.y = entry.facing
 	station_sync += delta
 	if station_sync >= 0.05:
 		station_sync = 0.0
@@ -137,30 +137,34 @@ func _process(delta: float) -> void:
 		var lamp: OmniLight3D = pad.light
 		lamp.light_energy = move_toward(lamp.light_energy, 1.75 if active else 0.0, delta * 7.0)
 
-func update_partner(x: float, facing: float, animation: String, display_name: String) -> void:
-	if not is_instance_valid(partner):
-		partner = AVATAR.instantiate() as RiftPlayer
+func update_partner(id: int, x: float, facing: float, animation: String, display_name: String) -> void:
+	if not partners.has(id):
+		var partner := AVATAR.instantiate() as RiftPlayer
 		add_child(partner)
-		partner.position = Vector3(x, 1.11, -0.26)
+		partner.position = Vector3(x, 1.11, -0.26 * (partners.size() + 1))
 		partner.set_physics_process(false)
 		partner.set_process(false)
 		partner.collision_layer = 0
 		partner.collision_mask = 0
-		partner_label = label_in_space(partner, "", Vector3(0, 1.54, 0), 29, Color("ca99ff"))
+		var partner_label := label_in_space(partner, "", Vector3(0, 1.54, 0), 29, Color("ca99ff"))
 		partner_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	partner_label.text = display_name
-	partner_x = x
-	partner_facing = facing
-	partner.play_character_animation(animation)
+		partners[id] = {"actor": partner, "label": partner_label}
+	var entry: Dictionary = partners[id]
+	entry.label.text = display_name
+	entry.x = x
+	entry.facing = facing
+	entry.actor.play_character_animation(animation)
 
 func refresh_partner_room() -> void:
 	if RiftRelay.connected_room.is_empty() and is_pause_open():
 		pause_menu.close()
 	local_online_label.text = RiftRelay.local_name
 	local_online_label.visible = not RiftRelay.connected_room.is_empty()
-	if RiftRelay.room_size != 2 and is_instance_valid(partner):
-		partner.queue_free()
-		partner = null
+	var members: Array = [] if RiftRelay.connected_room.is_empty() else RiftRelay.relay.lobby_get_all_clients()
+	for id in partners.keys():
+		if not members.has(id):
+			partners[id].actor.queue_free()
+			partners.erase(id)
 
 func update_station() -> void:
 	var nearest := -1
@@ -187,7 +191,9 @@ func set_panel_open(open: bool) -> void:
 	update_station()
 
 func set_bank(amount: int, shards: int, level: int) -> void:
-	bank_label.text = "RX-07   /   PLAYER %02d\n%04d BOLTS   ·   %03d CORE SHARDS" % [level, amount, shards]
+	bank_label.text = "RX-07   /   PLAYER %02d" % level
+	bolts_label.text = "%04d BOLTS" % amount
+	shards_label.text = "%04d CORE SHARDS" % shards
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouse and not is_pause_open():
@@ -382,7 +388,11 @@ func build_hud() -> void:
 	UI.label(heading, "OPERATIONS HUB", 32, UI.CYAN)
 	var wallet := PanelContainer.new()
 	interface.add_child(wallet)
-	bank_label = UI.label(wallet, "", 16, Color("ffcd76"))
+	var funds := UI.column(wallet, 3)
+	bank_label = UI.label(funds, "", 16, UI.MUTED)
+	bolts_label = UI.currency_row(funds, "")
+	funds.add_child(HSeparator.new())
+	shards_label = UI.currency_row(funds, "", true)
 	wallet.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
 	wallet.offset_left = -358
 	wallet.offset_right = -24

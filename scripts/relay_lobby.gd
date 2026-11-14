@@ -2,10 +2,11 @@ extends Node
 
 signal changed
 signal deploy_requested(host: bool, sector: int)
-signal partner_moved(x: float, facing: float, animation: String, display_name: String)
+signal partner_moved(id: int, x: float, facing: float, animation: String, display_name: String)
 signal guest_joined
 signal mission_returned
 signal mission_disconnected(message: String)
+signal invite_received(display_name: String, code: String)
 
 const Profile := preload("res://scripts/rogue_profile.gd")
 const Keys := preload("res://addons/GD-Sync/Scripts/KeyStore.gd")
@@ -13,7 +14,8 @@ const Client := preload("res://addons/GD-Sync/MultiplayerClient.gd")
 const RelayEnums := preload("res://addons/GD-Sync/Scripts/Enums/Enums.gd")
 const Codes := "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 const CodeLength := 10
-const ROOM_PREFIX := "riftcore-coop-v5-"
+const ROOM_PREFIX := "riftcore-coop-v6-"
+const MAX_PLAYERS := 4
 const RELAY_UNAVAILABLE := "Online rooms are unavailable. Solo play is available."
 
 var status := "Create a room or enter a friend’s room code."
@@ -24,6 +26,9 @@ var room_size := 0
 var available := false
 var pending_invite := 0
 var mission_active := false
+var mission_roster: Array = []
+var mission_mode := 0
+var steam_invite_lobbies: Dictionary = {}
 var local_name := "RX-07"
 var unlocked_sector := 1
 
@@ -83,11 +88,48 @@ func join_room(entered_code: String) -> void:
 func listen_for_steam_invites() -> void:
 	if RiftSocial.ready_to_query and available:
 		_initialize_client()
+		var steam: Object = RiftSocial.steam
+		if not steam.is_connected("lobby_invite", _receive_steam_invite):
+			steam.connect("lobby_invite", _receive_steam_invite)
+			steam.connect("lobby_data_update", _receive_invite_lobby_data)
+
+func can_receive_invite() -> bool:
+	return available and not mission_active and connected_room.is_empty() and pending.is_empty()
+
+func _receive_steam_invite(inviter: int, lobby: int, _game: int) -> void:
+	if not can_receive_invite() or steam_invite_lobbies.has(lobby) or steam_invite_lobbies.size() >= MAX_PLAYERS:
+		return
+	var steam: Object = RiftSocial.steam
+	if steam.getFriendRelationship(inviter) != 3:
+		return
+	steam_invite_lobbies[lobby] = inviter
+	if not steam.requestLobbyData(lobby):
+		steam_invite_lobbies.erase(lobby)
+		return
+	get_tree().create_timer(8.0).timeout.connect(func(): steam_invite_lobbies.erase(lobby))
+
+func _receive_invite_lobby_data(success: int, lobby: int, member: int) -> void:
+	if member != lobby or not steam_invite_lobbies.has(lobby):
+		return
+	var inviter: int = steam_invite_lobbies[lobby]
+	steam_invite_lobbies.erase(lobby)
+	if success == 0 or not can_receive_invite():
+		return
+	var steam: Object = RiftSocial.steam
+	var name: String = steam.getLobbyData(lobby, "gdsyncid")
+	if not name.begins_with(ROOM_PREFIX) or steam.getLobbyData(lobby, "haspassword") == "true":
+		return
+	var code := name.trim_prefix(ROOM_PREFIX)
+	if valid_code(code):
+		invite_received.emit(Profile.clean_operator_name(steam.getFriendPersonaName(inviter)), code)
 
 func invite_friend(steam_id: int) -> void:
 	if not available or not RiftSocial.ready_to_query or not RiftSocial.steam.loggedOn():
 		return
-	if room_size >= 2 or pending_invite != 0 or not pending.is_empty():
+	if room_size >= MAX_PLAYERS or mission_active or pending_invite != 0 or not pending.is_empty():
+		return
+	if not connected_room.is_empty() and not relay.is_host():
+		_update("Only the party leader can send Steam invites.")
 		return
 	pending_invite = steam_id
 	if connected_room.is_empty():
@@ -134,7 +176,7 @@ func _request_room() -> void:
 	match pending:
 		"host":
 			_update("Creating your room…")
-			relay.lobby_create(_room_name(), "", false, 2)
+			relay.lobby_create(_room_name(), "", false, MAX_PLAYERS)
 		"join":
 			_update("Joining your friend’s room…")
 			relay.lobby_join(_room_name())
@@ -183,17 +225,17 @@ func _players_changed(_client_id: int) -> void:
 	if connected_room.is_empty():
 		return
 	room_size = relay.lobby_get_player_count()
-	_update("%d / 2 players connected" % room_size)
-	if room_size == 2 and not mission_active:
+	_update("%d / %d players connected" % [room_size, MAX_PLAYERS])
+	if room_size >= 2 and not mission_active:
 		share_sector_records.call_deferred()
 
 func share_sector_records() -> void:
-	if room_size == 2 and is_instance_valid(relay):
+	if room_size >= 2 and is_instance_valid(relay):
 		relay.call_func(_receive_sector_records, RiftSocial.get_records(), local_name)
 
 func _receive_sector_records(payload: Dictionary, alias: String) -> void:
 	var sender: int = relay.get_sender_id()
-	if room_size == 2 and sender != relay.get_client_id() and relay.lobby_get_all_clients().has(sender):
+	if room_size >= 2 and sender != relay.get_client_id() and relay.lobby_get_all_clients().has(sender):
 		if connected_room.is_empty():
 			return
 		var new_player: bool = not RiftSocial.recent_players.has(String(payload.get("id", "")))
@@ -202,35 +244,51 @@ func _receive_sector_records(payload: Dictionary, alias: String) -> void:
 			share_sector_records.call_deferred()
 
 func can_deploy() -> bool:
-	return not mission_active and room_size == 2 and is_instance_valid(relay) and relay.is_host()
+	return not mission_active and room_size >= 2 and is_instance_valid(relay) and relay.is_host()
 
-func deploy(sector := 1) -> void:
+func deploy(sector := 1, mode := 0) -> void:
 	if not can_deploy() or sector < 1 or sector > unlocked_sector:
 		return
+	mission_roster = relay.lobby_get_all_clients().duplicate()
+	mission_roster.erase(relay.get_client_id())
+	mission_roster.sort()
+	mission_roster.push_front(relay.get_client_id())
+	if mission_roster.size() < 2 or mission_roster.size() > MAX_PLAYERS:
+		return
 	mission_active = true
-	relay.call_func(_receive_deploy, sector)
+	mission_mode = clampi(mode, 0, 2)
+	relay.lobby_close()
+	relay.call_func(_receive_deploy, sector, mission_roster, mission_mode)
 	deploy_requested.emit(true, sector)
 
-func _receive_deploy(sector: int) -> void:
+func _receive_deploy(sector: int, roster: Array, mode: int) -> void:
 	if mission_active or connected_room.is_empty() or sector < 1 or sector > 10 or relay.get_sender_id() != relay.get_host():
 		return
+	if roster.size() < 2 or roster.size() > MAX_PLAYERS or roster[0] != relay.get_host() or not roster.has(relay.get_client_id()):
+		return
+	var members: Array = relay.lobby_get_all_clients()
+	if roster.any(func(id): return not id is int or roster.count(id) != 1 or not members.has(id)):
+		return
+	mission_roster = roster.duplicate()
+	mission_mode = clampi(mode, 0, 2)
 	mission_active = true
 	deploy_requested.emit(false, sector)
 
 func send_station_position(x: float, facing: float, animation: String) -> void:
-	if room_size == 2 and not mission_active and is_instance_valid(relay):
+	if room_size >= 2 and not mission_active and is_instance_valid(relay):
 		relay.call_func_unreliable(_receive_partner_position, x, facing, animation, local_name)
 
 func _receive_partner_position(x: float, facing: float, animation: String, display_name: String) -> void:
 	var sender: int = relay.get_sender_id()
-	if mission_active or room_size != 2 or sender == relay.get_client_id() or not relay.lobby_get_all_clients().has(sender):
+	if mission_active or room_size < 2 or sender == relay.get_client_id() or not relay.lobby_get_all_clients().has(sender):
 		return
 	if is_finite(x) and is_finite(facing) and animation in ["idle", "walk", "run"]:
-		partner_moved.emit(clampf(x, -19.15, 19.15), clampf(facing, -1.57, 1.57), animation, Profile.clean_operator_name(display_name))
+		partner_moved.emit(sender, clampf(x, -19.15, 19.15), clampf(facing, -1.57, 1.57), animation, Profile.clean_operator_name(display_name))
 
 func return_to_station() -> void:
 	if mission_active and relay.is_host():
 		relay.call_func(_receive_return)
+		relay.lobby_open()
 		_finish_return()
 
 func _receive_return() -> void:
@@ -239,6 +297,7 @@ func _receive_return() -> void:
 
 func _finish_return() -> void:
 	mission_active = false
+	mission_roster.clear()
 	_players_changed(0)
 	mission_returned.emit()
 
@@ -251,6 +310,7 @@ func _peer_left(client_id: int) -> void:
 func leave(message := "Create a room or enter a friend’s room code.") -> void:
 	var was_in_mission := mission_active
 	mission_active = false
+	mission_roster.clear()
 	var was_joined := not connected_room.is_empty()
 	var disconnect := not pending.is_empty() or was_joined
 	pending = ""
