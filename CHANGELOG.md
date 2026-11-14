@@ -2,6 +2,9 @@
 
 ## Game changes
 
+- Play Neon Factory Defense with a friend. Create or join a room in Social, then the host selects Deploy Co-op. Both players fight the same security units and see the same mission result.
+- Online co-op currently covers Neon Factory Defense. Campaign progression stays in solo play.
+
 - Online rooms use the RIFTCORE relay configuration included in the game. Social no longer asks players to enter keys.
 
 - Tilt the left stick lightly to walk. Push it farther to run in the station and during missions.
@@ -33,7 +36,7 @@
 - Read sector briefings and recovered guardian memories in the NOVA Archive. The final extraction scene has two possible endings.
 - The Co-op Setup Guide is available from Social and Pause. Builds without relay configuration show a status in Social and disable Create Room and Join Room.
 
-Live room connections and Steam invitations require service configuration. Shared campaign gameplay is still in development. The full v0.5 overhaul has further campaign, visual, and competitive-mode work tracked in RIFTCORE_DEVELOPMENT.md.
+Live room connections and Steam invitations require service configuration. The campaign remains available in solo play. The full v0.5 overhaul has further campaign, visual, and competitive-mode work tracked in RIFTCORE_DEVELOPMENT.md.
 
 ## Installer and launcher 0.2
 

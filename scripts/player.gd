@@ -276,6 +276,26 @@ func build_visuals() -> void:
 	core.omni_range = 3.5
 	add_child(core)
 
+var remote_input := false
+var remote_axis := Vector2.ZERO
+var remote_held: Dictionary = {}
+var remote_pressed: Dictionary = {}
+var remote_released: Dictionary = {}
+
+func movement_axis(negative: StringName, positive: StringName) -> float:
+	if not remote_input:
+		return Input.get_axis(negative, positive)
+	return remote_axis.x if positive == &"move_right" else remote_axis.y
+
+func action_held(action: StringName) -> bool:
+	return remote_held.has(action) if remote_input else Input.is_action_pressed(action)
+
+func action_pressed(action: StringName) -> bool:
+	return remote_pressed.has(action) if remote_input else Input.is_action_just_pressed(action)
+
+func action_released(action: StringName) -> bool:
+	return remote_released.has(action) if remote_input else Input.is_action_just_released(action)
+
 func _physics_process(delta: float) -> void:
 	resume_input_guard = maxf(0.0, resume_input_guard - delta)
 	if health <= 0.0:
@@ -285,12 +305,12 @@ func _physics_process(delta: float) -> void:
 	landing_left = maxf(0.0, landing_left - delta)
 	fire_lock = maxf(0.0, fire_lock - delta)
 	dash_lock = maxf(0.0, dash_lock - delta)
-	var axis := Input.get_axis("move_left", "move_right")
+	var axis := movement_axis("move_left", "move_right")
 	ladder_lock = maxf(0.0, ladder_lock - delta)
 	update_wall_contact(delta, axis)
 	var dropping := false
-	var down := Input.is_action_pressed("crouch") or Input.is_action_pressed("crouch_stick")
-	if is_on_floor() and down and Input.is_action_just_pressed("dash") and not is_instance_valid(ladder):
+	var down := action_held("crouch") or action_held("crouch_stick")
+	if is_on_floor() and down and action_pressed("dash") and not is_instance_valid(ladder):
 		dropping = start_platform_drop()
 	if not dropping and update_ladder(delta, axis):
 		return
@@ -309,11 +329,11 @@ func _physics_process(delta: float) -> void:
 		air_dash_available = true
 	else:
 		coyote = maxf(0.0, coyote - delta)
-	if Input.is_action_just_pressed("jump"):
+	if action_pressed("jump"):
 		jump_buffer = jump_buffer_duration
 	else:
 		jump_buffer = maxf(0.0, jump_buffer - delta)
-	if not dropping and resume_input_guard <= 0.0 and contact_recoil <= 0.0 and Input.is_action_just_pressed("dash") and dash_lock <= 0.0 and (is_on_floor() or air_dash_available):
+	if not dropping and resume_input_guard <= 0.0 and contact_recoil <= 0.0 and action_pressed("dash") and dash_lock <= 0.0 and (is_on_floor() or air_dash_available):
 		dash_left = dash_duration
 		dash_elapsed = 0.0
 		dash_facing = facing
@@ -325,13 +345,13 @@ func _physics_process(delta: float) -> void:
 		flash.global_position = global_position
 		flash.ignite(facing)
 		if not is_on_floor(): air_dash_available = false
-	var stick_crouch := Input.is_action_pressed("crouch_stick") and absf(axis) < 0.35
-	var wants_crouch := Input.is_action_pressed("crouch") or stick_crouch
+	var stick_crouch := action_held("crouch_stick") and absf(axis) < 0.35
+	var wants_crouch := action_held("crouch") or stick_crouch
 	set_crouch(not dropping and wants_crouch and is_on_floor() and dash_left <= 0.0 and jump_buffer <= 0.0)
 	if melee_lock <= 0.0:
-		if Input.is_action_just_pressed("swap_weapon"):
+		if action_pressed("swap_weapon"):
 			cycle_weapon()
-		elif Input.is_action_just_pressed("previous_suit"):
+		elif action_pressed("previous_suit"):
 			cycle_weapon(-1)
 	update_charge(delta)
 	update_melee(delta)
@@ -367,7 +387,7 @@ func _physics_process(delta: float) -> void:
 		elif jump_buffer > 0.0 and terrain.w > 0.0 and contact_recoil <= 0.0:
 			velocity.y = 8.4
 			jump_buffer = 0.0
-		if Input.is_action_just_released("jump") and not Input.is_action_pressed("jump") and velocity.y > 0.0:
+		if action_released("jump") and not action_held("jump") and velocity.y > 0.0:
 			velocity.y *= 0.45
 	velocity.z = -global_position.z * 18.0
 	for deck in get_tree().get_nodes_in_group(&"factory_one_way"):
@@ -436,7 +456,7 @@ func apply_ceiling_rebound(incoming: Vector3) -> void:
 func update_dash(delta: float, axis: float) -> void:
 	dash_elapsed += delta
 	var reversing := axis * dash_facing < -0.27
-	var released := not Input.is_action_pressed("dash") and dash_elapsed >= 0.065
+	var released := not action_held("dash") and dash_elapsed >= 0.065
 	var at_edge := ground_dash and is_on_floor() and absf(axis) < 0.17 and not has_dash_floor(delta)
 	if reversing or released or at_edge:
 		dash_left = 0.0
@@ -538,10 +558,10 @@ func climb_rise(climb: Node3D) -> float:
 	return (climb.global_basis.y * float(climb.rise)).y
 
 func update_ladder(delta: float, axis: float) -> bool:
-	var vertical := Input.get_axis("climb_down", "climb_up")
+	var vertical := movement_axis("climb_down", "climb_up")
 	if not is_instance_valid(ladder):
 		var dash_grab := dash_left > 0.0
-		var wall_intent := wall_grace > 0.0 and (axis * wall_side > 0.14 or Input.is_action_just_pressed("jump"))
+		var wall_intent := wall_grace > 0.0 and (axis * wall_side > 0.14 or action_pressed("jump"))
 		var diagonal_air_input := not is_on_floor() and absf(axis) >= 0.50
 		if not dash_grab and (wall_intent or diagonal_air_input or wall_launch_lock > 0.0):
 			return false
@@ -557,7 +577,7 @@ func update_ladder(delta: float, axis: float) -> bool:
 			var hatch_descent := has_hatch and vertical < 0.0
 			if hatch_descent:
 				var near_top := absf(offset.y - rise - standing_capsule.height * 0.5) < 0.16
-				if not near_top or not Input.is_action_just_pressed("climb_down") or absf(axis) > 0.35:
+				if not near_top or not action_pressed("climb_down") or absf(axis) > 0.35:
 					continue
 			var reach := float(candidate.get_meta("hatch_landing_distance")) + 0.13 if hatch_descent else 0.63
 			var next_offset_x := offset.x + velocity.x * delta
@@ -574,7 +594,7 @@ func update_ladder(delta: float, axis: float) -> bool:
 				break
 		if not is_instance_valid(ladder):
 			return false
-	if Input.is_action_just_pressed("jump"):
+	if action_pressed("jump"):
 		ladder = null
 		ladder_exit = false
 		ladder_lock = 0.24
@@ -726,12 +746,12 @@ func update_charge(delta: float) -> void:
 		if fire_lock <= 0.0 and melee_lock <= 0.0:
 			shot_buffer_left = 0.0
 			shoot(queued_charged, queued_pose)
-	if Input.is_action_just_pressed("shoot"):
+	if action_pressed("shoot"):
 		charge_held = true
 		charge_elapsed = 0.0
 	if not charge_held:
 		return
-	if not Input.is_action_pressed("shoot"):
+	if not action_held("shoot"):
 		var full := charge_elapsed >= charge_time and energy >= charged_shot_cost()
 		var pose_held := is_instance_valid(charge_orb)
 		cancel_charge()
@@ -974,7 +994,7 @@ func build_finisher_clip() -> void:
 	library.add_animation(&"slash_finisher", finisher)
 
 func update_melee(delta: float) -> void:
-	var pressed := Input.is_action_just_pressed("melee") and contact_recoil <= 0.0 and dash_left <= 0.0
+	var pressed := action_pressed("melee") and contact_recoil <= 0.0 and dash_left <= 0.0
 	if melee_lock > 0.0:
 		if pressed and combo_step + combo_queued < 3:
 			combo_queued += 1

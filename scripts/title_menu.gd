@@ -19,6 +19,7 @@ var relay_code: LineEdit
 var relay_host: Button
 var relay_join: Button
 var relay_paste: Button
+var relay_deploy: Button
 var relay_copy: Button
 var relay_leave: Button
 var steam_invite_buttons: Array[Button] = []
@@ -394,7 +395,7 @@ func build_social(columns: HBoxContainer) -> void:
 func build_online_room(columns: HBoxContainer) -> void:
 	var form := card(columns, 1.35)
 	UI.label(form, "CO-OP ROOM", 27, UI.CYAN)
-	UI.label(form, "Share a room code to connect with a friend. Co-op deployment is still in development.", 18, UI.MUTED)
+	UI.label(form, "Both players join the room. The host then starts Neon Factory Defense.", 18, UI.MUTED)
 	relay_host = UI.button(form, "Create Room", RiftRelay.host_room, true)
 	var join_row := HBoxContainer.new()
 	join_row.add_theme_constant_override("separation", 12)
@@ -412,6 +413,7 @@ func build_online_room(columns: HBoxContainer) -> void:
 	)
 	relay_join = UI.button(join_row, "Join Room", func(): RiftRelay.join_room(relay_code.text))
 	relay_status = UI.label(form, "", 18, UI.CYAN)
+	relay_deploy = UI.button(form, "Deploy Co-op", RiftRelay.deploy, true)
 	relay_copy = UI.button(form, "Copy Room Code", func(): DisplayServer.clipboard_set(RiftRelay.connected_room))
 	relay_leave = UI.button(form, "Leave Room", func(): RiftRelay.leave())
 	UI.button(form, "Co-op Setup Guide", show_page.bind("Co-op Setup Guide"))
@@ -428,13 +430,16 @@ func refresh_online_room() -> void:
 	relay_join.disabled = relay_host.disabled
 	relay_paste.disabled = relay_join.disabled
 	relay_code.editable = not relay_join.disabled
+	relay_deploy.visible = RiftRelay.can_deploy()
 	relay_copy.visible = joined
 	relay_leave.visible = joined or requesting
 	relay_leave.text = "Leave Room" if joined else "Cancel Connection"
 	for invite in steam_invite_buttons:
 		invite.disabled = not RiftRelay.available or requesting or RiftRelay.pending_invite != 0 or RiftRelay.room_size >= 2
 	relay_status.text = "%s   /   Code %s" % [RiftRelay.status, RiftRelay.connected_room] if joined else RiftRelay.status
-	if joined:
+	if relay_deploy.visible:
+		relay_deploy.grab_focus()
+	elif joined:
 		relay_copy.grab_focus()
 	elif requesting or get_viewport().gui_get_focus_owner() == relay_leave:
 		if requesting:

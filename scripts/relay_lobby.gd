@@ -1,6 +1,8 @@
 extends Node
 
 signal changed
+signal deploy_requested(host: bool)
+signal mission_disconnected(message: String)
 
 const Keys := preload("res://addons/GD-Sync/Scripts/KeyStore.gd")
 const Client := preload("res://addons/GD-Sync/MultiplayerClient.gd")
@@ -16,6 +18,7 @@ var room_code := ""
 var room_size := 0
 var available := false
 var pending_invite := 0
+var mission_active := false
 
 var relay: Node
 var request_timeout: Timer
@@ -46,11 +49,11 @@ func _initialize_client() -> void:
 	relay.lobby_joined.connect(_room_joined)
 	relay.lobby_join_failed.connect(_room_failed)
 	relay.steam_join_request.connect(func(lobby_name: String, has_password: bool):
-		if not has_password and lobby_name.begins_with("riftcore-v05-"):
-			join_room(lobby_name.trim_prefix("riftcore-v05-"))
+		if not has_password and lobby_name.begins_with("riftcore-coop-v1-"):
+			join_room(lobby_name.trim_prefix("riftcore-coop-v1-"))
 	)
 	relay.client_joined.connect(_players_changed)
-	relay.client_left.connect(_players_changed)
+	relay.client_left.connect(_peer_left)
 	relay.kicked.connect(func(_reason: String): leave("You were removed from the room."))
 
 func host_room() -> void:
@@ -137,6 +140,7 @@ func _room_joined(lobby_name: String) -> void:
 	if pending.is_empty() or lobby_name != _room_name():
 		return
 	request_timeout.stop()
+	relay.expose_func(_receive_deploy, RelayEnums.EXPOSE_PERMISSION.HOST)
 	connected_room = room_code
 	pending = ""
 	_players_changed(0)
@@ -167,7 +171,31 @@ func _players_changed(_client_id: int) -> void:
 	room_size = relay.lobby_get_player_count()
 	_update("%d / 2 players connected" % room_size)
 
+func can_deploy() -> bool:
+	return not mission_active and room_size == 2 and is_instance_valid(relay) and relay.is_host()
+
+func deploy() -> void:
+	if not can_deploy():
+		return
+	mission_active = true
+	relay.call_func(_receive_deploy)
+	deploy_requested.emit(true)
+
+func _receive_deploy() -> void:
+	if mission_active or connected_room.is_empty() or relay.get_sender_id() != relay.get_host():
+		return
+	mission_active = true
+	deploy_requested.emit(false)
+
+func _peer_left(client_id: int) -> void:
+	if mission_active:
+		leave("Your partner left the mission.")
+	else:
+		_players_changed(client_id)
+
 func leave(message := "Create a room or enter a friend’s room code.") -> void:
+	var was_in_mission := mission_active
+	mission_active = false
 	var was_joined := not connected_room.is_empty()
 	var disconnect := not pending.is_empty() or was_joined
 	pending = ""
@@ -181,9 +209,11 @@ func leave(message := "Create a room or enter a friend’s room code.") -> void:
 			relay.lobby_leave()
 		relay.stop_multiplayer()
 	_update(message if available else RELAY_UNAVAILABLE)
+	if was_in_mission:
+		mission_disconnected.emit(message)
 
 func _room_name() -> String:
-	return "riftcore-v05-" + room_code
+	return "riftcore-coop-v1-" + room_code
 
 func _update(message: String) -> void:
 	status = message

@@ -60,6 +60,7 @@ var menu: Control
 var game_root: Node3D
 var pause_menu: Control
 var editor_level: Node3D
+var coop_mission: Node3D
 
 func _ready() -> void:
 	var arguments := OS.get_cmdline_user_args()
@@ -127,6 +128,9 @@ func verify_social() -> void:
 	get_tree().quit(0 if valid else 1)
 
 func verify_live_relay(arguments: PackedStringArray) -> void:
+	var mission_test := arguments.has("mission")
+	if mission_test:
+		arguments = arguments.slice(0, arguments.size() - 1)
 	var host := arguments == PackedStringArray(["host"])
 	var guest := arguments.size() == 2 and arguments[0] == "join" and RiftRelay.valid_code(arguments[1])
 	if not host and not guest:
@@ -155,6 +159,10 @@ func verify_live_relay(arguments: PackedStringArray) -> void:
 		finish_relay_check(false)
 		return
 
+	if mission_test:
+		await verify_coop_mission(host)
+		return
+
 	# Exchange lobby data to verify both clients share more than a room name.
 	var platform := OS.get_name()
 	if host:
@@ -174,6 +182,42 @@ func verify_live_relay(arguments: PackedStringArray) -> void:
 		print("RELAY PEER ", peer.lobby_get_data("rift_check_host"))
 		peer.lobby_set_data("rift_check_guest", platform)
 		finish_relay_check(await wait_for_relay(func(): return peer.lobby_get_data("rift_check_ack", false), 15.0))
+
+func verify_coop_mission(host: bool) -> void:
+	if host:
+		await get_tree().create_timer(0.8).timeout
+		RiftRelay.deploy()
+	if not await wait_for_relay(func(): return is_instance_valid(coop_mission), 12.0):
+		finish_relay_check(false)
+		return
+	var mission = coop_mission
+	if not host:
+		Input.action_press("move_right")
+		await get_tree().create_timer(0.46).timeout
+		Input.action_release("move_right")
+		Input.action_press("shoot")
+		await get_tree().create_timer(0.045).timeout
+		Input.action_release("shoot")
+		var moved := await wait_for_relay(func(): return is_instance_valid(mission) and mission.operators[1].position.x > 3.7, 5.0)
+		if moved:
+			RiftRelay.relay.lobby_set_data("coop_guest_saw_movement", true)
+		var won := await wait_for_relay(func(): return is_instance_valid(mission) and mission.outcome.begins_with("Mission complete"), 16.0)
+		if won:
+			RiftRelay.relay.lobby_set_data("coop_guest_saw_completion", true)
+			await get_tree().create_timer(1.5).timeout
+		finish_relay_check(moved and won)
+		return
+	var guest_moved := await wait_for_relay(func(): return is_instance_valid(mission) and mission.operators[1].position.x > 3.7 and RiftRelay.relay.lobby_get_data("coop_guest_saw_movement", false), 8.0)
+	var guest_hit := await wait_for_relay(func(): return is_instance_valid(mission) and (not is_instance_valid(mission.enemies[0]) or mission.enemies[0].health < mission.enemies[0].max_health), 8.0)
+	if guest_moved and guest_hit:
+		for enemy in mission.enemies:
+			if is_instance_valid(enemy):
+				enemy.take_damage(10000.0)
+		var won := await wait_for_relay(func(): return RiftRelay.relay.lobby_get_data("coop_guest_saw_completion", false), 10.0)
+		finish_relay_check(won)
+	else:
+		print("Co-op guest movement: ", guest_moved, "  guest attack: ", guest_hit)
+		finish_relay_check(false)
 
 func wait_for_relay(condition: Callable, timeout: float) -> bool:
 	var deadline := Time.get_ticks_msec() + int(timeout * 1000)
@@ -263,6 +307,9 @@ func add_joy_button(action: StringName, button: JoyButton) -> void:
 		InputMap.action_add_event(action, event)
 
 func show_main_menu() -> void:
+	if not RiftRelay.deploy_requested.is_connected(start_coop_mission):
+		RiftRelay.deploy_requested.connect(start_coop_mission)
+		RiftRelay.mission_disconnected.connect(close_coop_mission)
 	RiftAudio.play_music(false)
 	menu = RiftTitleMenu.new()
 	refresh_menu_save()
@@ -277,6 +324,33 @@ func show_main_menu() -> void:
 	if get_tree().has_meta(&"open_command_deck"):
 		get_tree().remove_meta(&"open_command_deck")
 		open_home_hub()
+
+func start_coop_mission(is_host: bool) -> void:
+	if is_instance_valid(coop_mission) or is_instance_valid(game_root):
+		return
+	if is_instance_valid(home_hub):
+		remove_home_hub()
+	menu.hide()
+	menu.process_mode = Node.PROCESS_MODE_DISABLED
+	coop_mission = preload("res://scripts/coop_mission.gd").new()
+	coop_mission.name = "CoopMission"
+	coop_mission.host = is_host
+	coop_mission.exit_requested.connect(func(): RiftRelay.leave("You left the mission."))
+	add_child(coop_mission)
+	RiftAudio.play_music(true, 1)
+
+func close_coop_mission(message: String) -> void:
+	if not is_instance_valid(coop_mission):
+		return
+	remove_child(coop_mission)
+	coop_mission.queue_free()
+	coop_mission = null
+	for shot in get_tree().get_nodes_in_group(&"rift_projectile"):
+		shot.queue_free()
+	open_home_hub()
+	home_hub.station_requested.emit("Social")
+	RiftAudio.play_music(false)
+	menu.relay_status.text = message
 
 func refresh_menu_save() -> void:
 	menu.profile = profile

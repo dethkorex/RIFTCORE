@@ -62,6 +62,12 @@ jobs:
           "$build" --headless --quit-after 100 --log-file "$RUNNER_TEMP/riftcore-smoke.log"
           ! grep -E 'SCRIPT ERROR:|Failed to load' "$RUNNER_TEMP/riftcore-smoke.log"
           test -s release-tools/artifacts/RIFTCORE-Windows-x64-Setup.exe
+      - name: Play the packaged Linux co-op mission
+        run: |
+          base="$(mktemp -d)"
+          unzip -q release-tools/artifacts/RIFTCORE-linux-x64.zip -d "$base"
+          chmod +x "$base/RIFTCORE"
+          python3 distribution/verify_coop.py "$base/RIFTCORE"
       - name: Test portable and installed builds on Arch
         run: |
           docker run --rm -v "$PWD/release-tools/artifacts:/artifacts:ro" archlinux:latest sh -ec '
@@ -109,6 +115,7 @@ jobs:
     needs: package
     runs-on: windows-latest
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           name: riftcore-playtest
@@ -122,6 +129,9 @@ jobs:
           Get-Content -LiteralPath $log
           if ($run.ExitCode -ne 0 -or !(Select-String -LiteralPath $log -Pattern 'SOCIAL SMOKE PASS' -Quiet)) { exit 1 }
 
+      - name: Play the packaged Windows co-op mission
+        shell: pwsh
+        run: python distribution/verify_coop.py game/RIFTCORE.exe
       - uses: actions/download-artifact@v4
         with:
           name: riftcore-legacy-migration

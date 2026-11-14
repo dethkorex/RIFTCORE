@@ -1,6 +1,8 @@
 class_name WalkerBot
 extends Combatant
 
+signal shot_fired(shot: RiftProjectile)
+
 const XP_REWARDS := [12, 16, 26, 18, 16]
 const XP_ORB := preload("res://assets/pickups/xp_orb.tscn")
 const ATTACK_FX := preload("res://scripts/attack_fx.gd")
@@ -20,6 +22,7 @@ enum Variant { SCOUT, QUAD, HEAVY, TURRET, FLYER }
 @export var model_override: PackedScene
 @export var patrol_right_limit := 100000.0
 @export var planted_override := false
+var mission_enemy := false
 const MODELS := [
 	preload("res://assets/enemies/factory_scout.tscn"),
 	preload("res://assets/enemies/factory_quad.tscn"),
@@ -237,6 +240,7 @@ func fire_at_player() -> void:
 		shot.speed = (17.0 if variant == Variant.TURRET else 13.2) * (1.10 if second_act else 1.0)
 		shot.damage = (15.0 if variant == Variant.HEAVY else 9.0) * sector_damage_scale
 		shot.setup(locked_aim.rotated(Vector3.BACK, angle), faction, tint, false, variant == Variant.HEAVY, false, sector_number, variant)
+		shot_fired.emit(shot)
 
 func spawn_pickup(scene: PackedScene, at: Vector3, temporary: bool, experience := 0, anchor: StaticBody3D = null) -> void:
 	var pickup := scene.instantiate() as Area3D
@@ -274,14 +278,15 @@ func find_drop_anchor() -> Dictionary:
 	return {"position": Vector3(patrol_center, home_height - 0.18, 0), "body": null}
 
 func _on_died() -> void:
-	var anchor := find_drop_anchor()
-	var drop_position: Vector3 = anchor.position
-	spawn_pickup(XP_ORB, drop_position, false, roundi(XP_REWARDS[variant] * sector_experience_scale), anchor.body)
-	var host := anchor.body as Node3D if is_instance_valid(anchor.body) else get_parent_node_3d()
-	preload("res://scripts/material_pickup.gd").roll_at(host, drop_position + Vector3(0.42, 0.1, 0), sector_number, "elite" if variant == Variant.HEAVY else "enemy")
-	if global_position.y > -3.0 and randf() < drop_chance:
-		var pool := LARGE_DROPS if randf() < 0.2 else SMALL_DROPS
-		spawn_pickup(pool.pick_random(), drop_position + Vector3.FORWARD * 0.25, true, 0, anchor.body)
+	if not mission_enemy:
+		var anchor := find_drop_anchor()
+		var drop_position: Vector3 = anchor.position
+		spawn_pickup(XP_ORB, drop_position, false, roundi(XP_REWARDS[variant] * sector_experience_scale), anchor.body)
+		var host := anchor.body as Node3D if is_instance_valid(anchor.body) else get_parent_node_3d()
+		preload("res://scripts/material_pickup.gd").roll_at(host, drop_position + Vector3(0.42, 0.1, 0), sector_number, "elite" if variant == Variant.HEAVY else "enemy")
+		if global_position.y > -3.0 and randf() < drop_chance:
+			var pool := LARGE_DROPS if randf() < 0.2 else SMALL_DROPS
+			spawn_pickup(pool.pick_random(), drop_position + Vector3.FORWARD * 0.25, true, 0, anchor.body)
 	set_physics_process(false)
 	set_deferred("collision_layer", 0)
 	if global_position.y <= -3.0:
