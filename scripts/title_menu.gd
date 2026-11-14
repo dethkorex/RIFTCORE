@@ -1,6 +1,7 @@
 class_name RiftTitleMenu
 extends Control
 
+signal operator_deleted(slot: int)
 signal blueprint_drop_requested(id: String)
 signal start_requested
 signal load_requested
@@ -15,6 +16,7 @@ var developer_session := false
 var replace_slot := 0
 var displayed_operator := 1
 var new_operator_name := ""
+var delete_return_page := "New Game"
 var slot_error := ""
 var save_status: Label
 var relay_status: Label
@@ -160,6 +162,14 @@ func show_page(next: String) -> void:
 	match page:
 		"New Game", "Load Game":
 			build_save_slots(columns)
+		"Delete Operator":
+			var form := card(columns)
+			var saved := ManualSave.read_slot(displayed_operator)
+			if saved:
+				UI.label(form, "Delete %s?" % operator_name(saved), 32, UI.CYAN)
+				UI.label(form, "This permanently deletes Operator %02d and all progress saved in this slot." % displayed_operator, 19, UI.MUTED)
+				UI.button(form, "Cancel", show_page.bind(delete_return_page), true).grab_focus()
+				UI.button(form, "Delete Operator", delete_selected_operator)
 		"Replace Slot":
 			var form := card(columns)
 			UI.label(form, "Replace Operator %02d?" % replace_slot, 32, UI.CYAN)
@@ -389,6 +399,9 @@ func leave_page() -> void:
 		station_panel = false
 		hide()
 		station_closed.emit()
+		return
+	if page == "Delete Operator":
+		show_page(delete_return_page)
 		return
 	show_page("New Game" if page == "Replace Slot" else "Title")
 
@@ -834,10 +847,23 @@ func build_save_slots(columns: HBoxContainer) -> void:
 		UI.button(detail, "Create Operator", choose_slot.bind(displayed_operator, true), true, 34)
 	if saved:
 		UI.button(detail, "Load Operator", choose_slot.bind(displayed_operator, false), true, 34)
+		UI.button(detail, "Delete Operator", func():
+			delete_return_page = page
+			show_page("Delete Operator")
+		, false, 34)
 	if not slot_error.is_empty():
 		UI.label(detail, slot_error, 16, UI.VIOLET)
 	cards[displayed_operator - 1].add_theme_color_override("font_color", UI.CYAN)
 	cards[displayed_operator - 1].grab_focus()
+
+func delete_selected_operator() -> void:
+	var result := ManualSave.delete_slot(displayed_operator)
+	if result == OK:
+		operator_deleted.emit(displayed_operator)
+		slot_error = ""
+	else:
+		slot_error = "Could not delete this operator. " + error_string(result)
+	show_page(delete_return_page)
 
 func select_operator(number: int) -> void:
 	displayed_operator = number

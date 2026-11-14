@@ -34,6 +34,7 @@ static var enhancements := Enhancements.catalog()
 const QUICK_MAX := 3
 const STACK_MAX := 100
 const BLUEPRINT_POUCH_SIZE := 8
+var reconstruction_seen := false
 var blueprint_items := {}
 var blueprint_pouch: Array[String] = []
 var inventory := {}
@@ -136,6 +137,7 @@ func storage_capacity() -> int:
 	return 12 + floori(player_level() / 5.0) + rank("storage") * 7
 
 func decode_from(data: ConfigFile) -> void:
+	reconstruction_seen = bool(data.get_value("story", "reconstruction_seen", false))
 	operator_name = clean_operator_name(str(data.get_value("profile", "operator_name", "RX-07")))
 	materials.clear()
 	blueprints.clear()
@@ -234,6 +236,7 @@ func save() -> Error:
 	return data.save(path)
 
 func encode_into(data: ConfigFile) -> void:
+	data.set_value("story", "reconstruction_seen", reconstruction_seen)
 	data.set_value("inventory", "stock", inventory)
 	data.set_value("inventory", "quick", quick_slots)
 	data.set_value("inventory", "blueprints", blueprint_items)

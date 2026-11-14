@@ -33,6 +33,23 @@ var current_station := -1
 var panel_open := false
 var pause_menu: PauseMenu
 var reconstructing := false
+var story: CanvasLayer
+const NOVA := preload("res://assets/ui/nova_guide.svg")
+const RX07 := preload("res://assets/ui/rx07_menu.png")
+const ARRIVAL := [
+	["NOVA", "RX-07, can you hear me? I am NOVA. You are on the Deploy pad at Operations Station."],
+	["RX-07", "I can hear you. Why can't I remember getting here?"],
+	["NOVA", "I reconstructed you from a stored operator pattern. Your frame can survive inside the Rift. Most of us cannot."],
+	["RX-07", "Then tell me where you need me."],
+	["NOVA", "Start in Neon Factory. Shut down its overseer and extract. Each sector will bring us closer to the signal at the heart of the Rift."],
+	["RX-07", "Understood. Put Neon Factory on the deployment map."],
+]
+const RECONSTRUCTION := [
+	["NOVA", "You're back, RX-07. When a frame is lost, I can recode you from the operator pattern."],
+	["RX-07", "Then put me back where I fell."],
+	["NOVA", "I can restore you here. The deployment is gone, so you'll start again in Neon Factory. Your banked bolts and permanent enhancements are still here."],
+	["RX-07", "All right. Let's make this run count."],
+]
 var pads: Array[Dictionary] = []
 var bank_label: Label
 var bolts_label: Label
@@ -90,22 +107,93 @@ func _ready() -> void:
 	refresh_partner_room()
 	update_station()
 
-func materialize_operator() -> void:
+func materialize_operator(sequence := "") -> void:
 	reconstructing = true
-	avatar.hide()
 	update_station()
+	avatar.position = Vector3(0.0, 1.11, 0.0)
+	avatar.model_root.rotation.y = 0.28
+	avatar.play_character_animation("idle", true)
+	var fade_meshes: Array[MeshInstance3D] = []
+	var original_transparency := PackedFloat32Array()
+	for child in avatar.model_root.find_children("*", "MeshInstance3D", true, false):
+		var mesh := child as MeshInstance3D
+		if mesh.is_visible_in_tree():
+			fade_meshes.append(mesh)
+			original_transparency.append(mesh.transparency)
+			mesh.transparency = 1.0
 	var beam := preload("res://scripts/deploy_lightning.gd").new()
 	add_child(beam)
 	beam.global_position = Vector3(0, 0.18, 0)
 	beam.strike()
 	RiftAudio.play_effect(&"deploy_zap")
-	await get_tree().create_timer(0.16).timeout
-	avatar.show()
+	var opening := camera.position
+	var close := Vector3(0.0, 2.35, 8.1)
+	var reveal := create_tween().set_parallel().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	var reveal_time := 1.85 if sequence == "arrival" else (1.30 if sequence == "reconstruction" else 0.45)
+	reveal.tween_property(camera, "position", close, reveal_time)
+	reveal.tween_method(func(weight: float):
+		for index in fade_meshes.size():
+			fade_meshes[index].transparency = lerpf(1.0, original_transparency[index], weight)
+	, 0.0, 1.0, reveal_time)
+	await reveal.finished
 	avatar.play_character_animation("land", true)
-	await get_tree().create_timer(0.32).timeout
+	await get_tree().create_timer(0.26).timeout
 	avatar.play_character_animation("idle", true)
+	if not sequence.is_empty():
+		await play_station_story(ARRIVAL if sequence == "arrival" else RECONSTRUCTION)
+	await create_tween().tween_property(camera, "position", opening, 0.42).finished
 	reconstructing = false
 	update_station()
+
+func has_dialogue() -> bool:
+	return is_instance_valid(story) and story.visible and not story.is_queued_for_deletion()
+
+func play_station_story(lines: Array) -> void:
+	story = CanvasLayer.new()
+	story.layer = 39
+	add_child(story)
+	var box := PanelContainer.new()
+	box.add_theme_stylebox_override("panel", UI.frame(Color("0c182cf5"), UI.CYAN, 4))
+	story.add_child(box)
+	box.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
+	box.offset_left = -408
+	box.offset_right = 408
+	box.offset_top = -197
+	box.offset_bottom = -23
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 16)
+	box.add_child(row)
+	var portrait := TextureRect.new()
+	portrait.custom_minimum_size = Vector2(112, 112)
+	portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	var frame_box := PanelContainer.new()
+	frame_box.add_theme_stylebox_override("panel", UI.frame(Color("081222"), UI.CYAN, 2))
+	row.add_child(frame_box)
+	frame_box.add_child(portrait)
+	var pane := VBoxContainer.new()
+	pane.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(pane)
+	var speaker := UI.label(pane, "", 23, UI.CYAN)
+	var speech := UI.label(pane, "", 22)
+	speech.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	var next := UI.button(pane, "Continue", func(): pass, true, 43)
+	var pilot := AtlasTexture.new()
+	pilot.atlas = RX07
+	var source := RX07.get_size()
+	pilot.region = Rect2(source.x * 0.35, source.y * 0.05, source.x * 0.31, source.y * 0.46)
+	for index in lines.size():
+		var line: Array = lines[index]
+		speaker.text = line[0]
+		speech.text = line[1]
+		var guide: bool = line[0] == "NOVA"
+		portrait.texture = NOVA if guide else pilot
+		speaker.add_theme_color_override("font_color", UI.VIOLET if guide else UI.CYAN)
+		next.text = "Continue" if index < lines.size() - 1 else "Back to Station"
+		next.grab_focus()
+		await next.pressed
+	story.hide()
+	story.queue_free()
 
 func _physics_process(delta: float) -> void:
 	if panel_open or reconstructing:

@@ -113,8 +113,9 @@ var low_profile := false
 var contact_recoil := 0.0
 var ladder: Node3D
 var ladder_lock := 0.0
-var ladder_exit := false
 var drop_through: StaticBody3D
+var ladder_support_exception: StaticBody3D
+var hatch_floor: StaticBody3D
 var wall_side := 0.0
 var wall_grace := 0.0
 var wall_launch_lock := 0.0
@@ -368,7 +369,7 @@ func simulate_movement(delta: float) -> void:
 	update_wall_contact(delta, axis)
 	var dropping := false
 	var down := action_held("crouch") or action_held("crouch_stick")
-	if is_on_floor() and down and action_pressed("dash") and not is_instance_valid(ladder):
+	if grounded() and down and action_pressed("dash") and not is_instance_valid(ladder):
 		dropping = start_platform_drop()
 	if not dropping and update_ladder(delta, axis):
 		return
@@ -382,7 +383,7 @@ func simulate_movement(delta: float) -> void:
 		facing = next_facing
 	if dropping:
 		coyote = 0.0
-	elif is_on_floor():
+	elif grounded():
 		coyote = coyote_duration
 		air_dash_available = true
 	else:
@@ -391,21 +392,21 @@ func simulate_movement(delta: float) -> void:
 		jump_buffer = jump_buffer_duration
 	else:
 		jump_buffer = maxf(0.0, jump_buffer - delta)
-	if not dropping and resume_input_guard <= 0.0 and contact_recoil <= 0.0 and action_pressed("dash") and dash_lock <= 0.0 and (is_on_floor() or air_dash_available):
+	if not dropping and resume_input_guard <= 0.0 and contact_recoil <= 0.0 and action_pressed("dash") and dash_lock <= 0.0 and (grounded() or air_dash_available):
 		dash_left = dash_duration
 		dash_elapsed = 0.0
 		dash_facing = facing
-		ground_dash = is_on_floor()
+		ground_dash = grounded()
 		dash_lock = dash_cooldown
 		RiftAudio.play_effect(&"dash")
 		var flash := preload("res://scripts/dash_flash.gd").new()
 		get_parent().add_child(flash)
 		flash.global_position = global_position
 		flash.ignite(facing)
-		if not is_on_floor(): air_dash_available = false
+		if not grounded(): air_dash_available = false
 	var stick_crouch := action_held("crouch_stick") and absf(axis) < 0.35
 	var wants_crouch := action_held("crouch") or stick_crouch
-	set_crouch(not dropping and wants_crouch and is_on_floor() and dash_left <= 0.0 and jump_buffer <= 0.0)
+	set_crouch(not dropping and wants_crouch and grounded() and dash_left <= 0.0 and jump_buffer <= 0.0)
 	if not local_prediction and melee_lock <= 0.0:
 		if action_pressed("swap_weapon"):
 			cycle_weapon()
@@ -417,16 +418,16 @@ func simulate_movement(delta: float) -> void:
 	if dash_left > 0.0:
 		update_dash(delta, axis)
 	if dash_left <= 0.0:
-		var accel := acceleration * terrain.x if is_on_floor() else air_acceleration
+		var accel := acceleration * terrain.x if grounded() else air_acceleration
 		if axis * velocity.x < 0.0:
-			accel = acceleration * 1.8 * terrain.x if is_on_floor() else air_reverse_acceleration
-		elif is_on_floor() and absf(axis) < 0.08:
+			accel = acceleration * 1.8 * terrain.x if grounded() else air_reverse_acceleration
+		elif grounded() and absf(axis) < 0.08:
 			accel *= 1.20
-		elif not is_on_floor() and absf(axis) < 0.08:
+		elif not grounded() and absf(axis) < 0.08:
 			accel = air_braking
 		if contact_recoil <= 0.0 and wall_launch_lock <= 0.0:
 			velocity.x = move_toward(velocity.x, 0.0 if crouching else locomotion_speed(axis, move_speed * (1.0 + supply_bonus("speed"))), accel * delta)
-		if not is_on_floor():
+		if not grounded():
 			var gravity_scale := fall_gravity_multiplier if velocity.y < 0.0 else 1.0
 			velocity.y = maxf(-max_fall_speed * clampf(terrain.y * 1.4, 0.36, 1.0), velocity.y - gravity * gravity_scale * terrain.y * delta)
 		velocity.x += terrain.z * delta
@@ -449,38 +450,17 @@ func simulate_movement(delta: float) -> void:
 		if action_released("jump") and not action_held("jump") and velocity.y > 0.0:
 			velocity.y *= 0.45
 	velocity.z = -global_position.z * 18.0
-	for deck in get_tree().get_nodes_in_group(&"factory_one_way"):
-		var platform := deck as StaticBody3D
-		if platform == null:
-			continue
-		var surface_y := platform.global_position.y
-		var side_contact := false
-		var platform_shape := platform.get_node_or_null("Collider") as CollisionShape3D
-		if platform_shape and platform_shape.shape:
-			var half_size := one_way_half_size(platform_shape)
-			if half_size != Vector3.ZERO:
-				var basis := platform_shape.global_basis
-				var top := platform_shape.to_global(Vector3(0, half_size.y, 0))
-				var normal := basis.z.cross(basis.x).normalized()
-				if normal.y < cos(floor_max_angle):
-					remove_collision_exception_with(platform)
-					continue
-				var relative := global_position - top
-				surface_y = top.y - (normal.x * relative.x + normal.z * relative.z) / normal.y
-				side_contact = not platform.has_meta("hatch_walk_support") and outside_one_way_edge(platform_shape, half_size)
-		var soles := global_position.y - standing_capsule.height * 0.5
-		if platform == drop_through and soles < surface_y - 0.22:
-			drop_through = null
-		if platform == drop_through or (not side_contact and (velocity.y > 0.0 or soles < surface_y - 0.115)):
-			add_collision_exception_with(platform)
-		else:
-			remove_collision_exception_with(platform)
-	var was_airborne := not is_on_floor()
+	update_one_way_collisions()
+	var was_airborne := not grounded()
 	var incoming_velocity := velocity
+	var previous_position := global_position
+	var previous_hatch := hatch_floor
+	hatch_floor = null
 	move_and_slide()
+	catch_hatch_landing(previous_position, incoming_velocity, previous_hatch)
 	apply_ceiling_rebound(incoming_velocity)
 	var landing_speed := incoming_velocity.y
-	if was_airborne and is_on_floor() and landing_speed < -4.0:
+	if was_airborne and grounded() and landing_speed < -4.0:
 		landing_left = 0.16 if absf(velocity.x) < 3.0 else 0.09
 	for index in range(get_slide_collision_count()):
 		var collider := get_slide_collision(index).get_collider()
@@ -552,6 +532,80 @@ func environment_control() -> Vector4:
 			3: result.y = 0.47
 	return result
 
+func grounded() -> bool:
+	return is_on_floor() or is_instance_valid(hatch_floor)
+
+func catch_hatch_landing(previous: Vector3, incoming: Vector3, previous_hatch: StaticBody3D) -> void:
+	if incoming.y > 0.0 or is_on_floor():
+		return
+	var half := standing_capsule.height * 0.5
+	for deck in get_tree().get_nodes_in_group(&"factory_one_way"):
+		if deck == drop_through or not deck.has_meta("hatch_walk_support"):
+			continue
+		var shape := deck.get_node_or_null("Collider") as CollisionShape3D
+		if not shape or shape.disabled:
+			continue
+		var box := shape.shape as BoxShape3D
+		var position_on_hatch := shape.to_local(global_position - Vector3.UP * half)
+		var previous_on_hatch := shape.to_local(previous - Vector3.UP * half)
+		var top := box.size.y * 0.5
+		var half_width := box.size.x * 0.5 + standing_capsule.radius * 0.45
+		if absf(position_on_hatch.x) > half_width and deck == previous_hatch:
+			var sample := global_position - Vector3.UP * half + Vector3.UP * 0.15
+			var query := PhysicsRayQueryParameters3D.create(sample, sample - Vector3.UP * 0.31, collision_mask, [get_rid(), deck.get_rid()])
+			var hit := get_world_3d().direct_space_state.intersect_ray(query)
+			if not hit.is_empty() and hit.normal.dot(Vector3.UP) >= cos(floor_max_angle):
+				global_position.y = hit.position.y + half + 0.04
+				velocity.y = 0.0
+				apply_floor_snap()
+				return
+		if absf(position_on_hatch.x) > half_width or absf(position_on_hatch.z) > box.size.z * 0.5:
+			continue
+		if previous_on_hatch.y < top - 0.035 or position_on_hatch.y > top + 0.055:
+			continue
+		global_position = shape.to_global(Vector3(position_on_hatch.x, top + 0.005, position_on_hatch.z)) + Vector3.UP * half
+		velocity.y = 0.0
+		hatch_floor = deck
+		apply_floor_snap()
+		return
+
+func update_one_way_collisions() -> void:
+	var exceptions := get_collision_exceptions()
+	for deck in get_tree().get_nodes_in_group(&"factory_one_way"):
+		var platform := deck as StaticBody3D
+		if platform == null:
+			continue
+		var surface_y := platform.global_position.y
+		var slope_allowance := 0.0
+		var side_contact := false
+		var platform_shape := platform.get_node_or_null("Collider") as CollisionShape3D
+		if platform_shape and platform_shape.shape:
+			var half_size := one_way_half_size(platform_shape)
+			if half_size != Vector3.ZERO:
+				var basis := platform_shape.global_basis
+				var top := platform_shape.to_global(Vector3(0, half_size.y, 0))
+				var normal := basis.z.cross(basis.x).normalized()
+				if normal.y < cos(floor_max_angle):
+					if exceptions.has(platform):
+						remove_collision_exception_with(platform)
+					continue
+				var relative := global_position - top
+				surface_y = top.y - (normal.x * relative.x + normal.z * relative.z) / normal.y
+				slope_allowance = standing_capsule.radius * Vector2(normal.x, normal.z).length() / normal.y
+				side_contact = not platform.has_meta("hatch_walk_support") and outside_one_way_edge(platform_shape, half_size)
+		var soles := global_position.y - standing_capsule.height * 0.5
+		if platform == drop_through and soles < surface_y - 0.22:
+			drop_through = null
+		var ascending := velocity.y > 0.0 and soles < surface_y - 0.04 - slope_allowance
+		var below := not is_on_floor() and soles < surface_y - 0.20 - slope_allowance
+		var hatch := platform.has_meta("hatch_walk_support")
+		var pass_below_hatch := hatch and soles < surface_y - 0.18
+		var ignore := platform == drop_through or platform == ladder_support_exception or pass_below_hatch or (not hatch and not side_contact and (ascending or below))
+		if ignore and not exceptions.has(platform):
+			add_collision_exception_with(platform)
+		elif not ignore and exceptions.has(platform):
+			remove_collision_exception_with(platform)
+
 func one_way_half_size(collider: CollisionShape3D) -> Vector3:
 	var box := collider.shape as BoxShape3D
 	if box:
@@ -580,7 +634,7 @@ func update_wall_contact(delta: float, axis: float) -> void:
 	wall_launch_lock = maxf(0.0, wall_launch_lock - delta)
 	wall_grace = maxf(0.0, wall_grace - delta)
 	wall_sliding = false
-	if is_on_floor() or dash_left > 0.0 or wall_launch_lock > 0.0 or contact_recoil > 0.0:
+	if grounded() or dash_left > 0.0 or wall_launch_lock > 0.0 or contact_recoil > 0.0:
 		wall_grace = 0.0
 		return
 	for i in range(get_slide_collision_count()):
@@ -600,18 +654,24 @@ func update_wall_contact(delta: float, axis: float) -> void:
 		return
 
 func start_platform_drop() -> bool:
+	if is_instance_valid(hatch_floor):
+		return drop_from(hatch_floor)
 	for index in range(get_slide_collision_count()):
 		var hit := get_slide_collision(index)
 		var deck := hit.get_collider() as StaticBody3D
 		if not deck or not deck.is_in_group(&"factory_one_way") or hit.get_normal().dot(Vector3.UP) < cos(floor_max_angle):
 			continue
-		drop_through = deck
-		add_collision_exception_with(deck)
-		velocity.y = -4.5
-		jump_buffer = 0.0
-		ladder_lock = 0.25
-		return true
+		return drop_from(deck)
 	return false
+
+func drop_from(deck: StaticBody3D) -> bool:
+	drop_through = deck
+	hatch_floor = null
+	add_collision_exception_with(deck)
+	velocity.y = -4.5
+	jump_buffer = 0.0
+	ladder_lock = 0.25
+	return true
 
 func climb_rise(climb: Node3D) -> float:
 	return (climb.global_basis.y * float(climb.rise)).y
@@ -621,7 +681,7 @@ func update_ladder(delta: float, axis: float) -> bool:
 	if not is_instance_valid(ladder):
 		var dash_grab := dash_left > 0.0
 		var wall_intent := wall_grace > 0.0 and (axis * wall_side > 0.14 or action_pressed("jump"))
-		var aerial := not is_on_floor()
+		var aerial := not grounded()
 		if not dash_grab and (action_pressed("jump") or wall_launch_lock > 0.0 or (wall_intent and absf(vertical) < 0.70)):
 			return false
 		var climb_threshold := 0.30 if dash_grab or aerial else 0.35
@@ -644,7 +704,6 @@ func update_ladder(delta: float, axis: float) -> bool:
 			var crosses_ladder := not hatch_descent and (dash_grab or aerial) and minf(offset.x, next_offset_x) < reach and maxf(offset.x, next_offset_x) > -reach
 			if (absf(offset.x) < reach or crosses_ladder) and offset.y > minimum and offset.y < rise + (1.05 if hatch_descent else (0.93 if vertical < 0.0 else 0.82)):
 				ladder = candidate
-				ladder_exit = false
 				dash_left = 0.0
 				wall_grace = 0.0
 				wall_launch_lock = 0.0
@@ -655,8 +714,8 @@ func update_ladder(delta: float, axis: float) -> bool:
 		if not is_instance_valid(ladder):
 			return false
 	if action_pressed("jump"):
+		clear_ladder_support()
 		ladder = null
-		ladder_exit = false
 		ladder_lock = 0.24
 		velocity = Vector3(axis * move_speed * 0.52, jump_velocity * 0.78, 0.0)
 		return false
@@ -667,46 +726,30 @@ func update_ladder(delta: float, axis: float) -> bool:
 	var proposed := global_position.y + climb_speed * delta
 	var finished := (vertical > 0.0 and proposed >= top) or (vertical < 0.0 and proposed <= bottom)
 	if ladder.has_meta("hatch_support"):
-		for deck in get_tree().get_nodes_in_group(&"factory_one_way"):
-			remove_collision_exception_with(deck)
-		add_collision_exception_with(ladder.get_meta("hatch_support"))
-		var top_clearance := top + 0.055
-		if ladder_exit or (vertical > 0.0 and proposed >= top):
-			# Step onto the solid half only after the capsule has cleared the hatch.
-			if global_position.y < top_clearance - 0.005:
-				climb_speed = minf(climb_speed, (top_clearance - global_position.y) / delta)
-				finished = false
-			else:
-				ladder_exit = true
-				var exit_direction: float = ladder.get_meta("hatch_exit")
-				var side_distance: float = ladder.get_meta("hatch_landing_distance")
-				target_x = ladder.to_global(Vector3(exit_direction * side_distance, 0, 0)).x
-				climb_speed = 0.0
-				finished = absf(target_x - global_position.x) < 0.045
+		ladder_support_exception = ladder.get_meta("hatch_support") as StaticBody3D
+		var top_clearance := top + 0.075
+		if vertical > 0.0 and proposed >= top:
+			# Restore the walk support once the capsule clears the rim. No sideways step is needed.
+			climb_speed = (top_clearance - global_position.y) / delta
+			finished = true
 		elif vertical < 0.0 and global_position.y >= top - 0.14 and absf(target_x - global_position.x) > 0.10:
 			climb_speed = 0.0
 	else:
-		for deck in get_tree().get_nodes_in_group(&"factory_one_way"):
-			add_collision_exception_with(deck)
 		if finished:
 			var endpoint := top + 0.025 if vertical > 0.0 else bottom + 0.02
 			climb_speed = (endpoint - global_position.y) / delta
 	set_crouch(false)
-	velocity = Vector3(clampf((target_x - global_position.x) * (18.0 if ladder_exit else 14.0), -4.4, 4.4), climb_speed, -global_position.z * 18.0)
+	velocity = Vector3(clampf((target_x - global_position.x) * 17.0, -5.2, 5.2), climb_speed, -global_position.z * 18.0)
+	update_one_way_collisions()
 	var incoming := velocity
 	move_and_slide()
 	apply_ceiling_rebound(incoming)
 	var hit_ceiling := incoming.y > 0.0 and velocity.y < 0.0
-	if finished or hit_ceiling:
-		if ladder.has_meta("hatch_support"):
-			remove_collision_exception_with(ladder.get_meta("hatch_support"))
-		if ladder_exit and not hit_ceiling:
-			facing = float(ladder.get_meta("hatch_exit"))
-		ladder = null
-		ladder_exit = false
-		ladder_lock = 0.23
-		if not hit_ceiling:
-			velocity = Vector3.ZERO
+	if hit_ceiling:
+		finish_climb(false, axis)
+		return true
+	if finished and (vertical > 0.0 and global_position.y >= top + 0.015 or vertical < 0.0 and global_position.y <= bottom + 0.08):
+		finish_climb(true, axis)
 		return true
 	play_character_animation("idle")
 	if model_root:
@@ -728,12 +771,26 @@ func update_ladder(delta: float, axis: float) -> bool:
 	if is_instance_valid(charge_orb):
 		charge_orb.global_position = cannon_muzzle(facing)
 	if climb_pose:
-		climb_pose.influence = move_toward(climb_pose.influence, 0.0 if ladder_exit else 1.0, delta * 13.0)
-		if not ladder_exit:
-			climb_pose.cycle = fposmod(climb_pose.cycle + vertical * delta * 16.4, TAU)
-		else:
-			play_character_animation("walk")
+		climb_pose.influence = move_toward(climb_pose.influence, 1.0, delta * 17.0)
+		climb_pose.cycle = fposmod(climb_pose.cycle + vertical * delta * 16.4, TAU)
 	return true
+
+func finish_climb(completed: bool, axis: float) -> void:
+	clear_ladder_support()
+	ladder = null
+	ladder_lock = 0.17
+	if climb_pose:
+		climb_pose.influence = minf(climb_pose.influence, 0.40)
+	if completed:
+		velocity = Vector3(axis * move_speed * 0.36, 0.0, 0.0)
+		if absf(axis) > 0.10:
+			facing = signf(axis)
+		play_character_animation("walk" if absf(axis) > 0.1 else "idle", true)
+
+func clear_ladder_support() -> void:
+	if is_instance_valid(ladder_support_exception):
+		remove_collision_exception_with(ladder_support_exception)
+	ladder_support_exception = null
 
 static func experience_threshold(level: int) -> int:
 	var steps := maxi(level - 1, 0)
@@ -1222,6 +1279,7 @@ func take_damage(amount: float, source_position := Vector3.ZERO) -> void:
 		velocity.y = 2.9
 		contact_recoil = 0.115
 		dash_left = 0.0
+		clear_ladder_support()
 		ladder = null
 		ladder_lock = 0.24
 

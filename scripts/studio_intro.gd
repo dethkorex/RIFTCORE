@@ -4,6 +4,10 @@ const UI := preload("res://scripts/rift_ui.gd")
 
 const GAME_SCENE := "res://scenes/main.tscn"
 const MIN_LOADING_TIME := 6.0
+const INTRO_SOUND := preload("res://assets/audio/dfg_intro.ogg")
+const AMBIENT := preload("res://assets/audio/dfg_ambient.ogg")
+const ART := preload("res://assets/ui/riftcore_title_art.png")
+const PORTRAIT := preload("res://assets/ui/rx07_menu.png")
 
 @onready var video: VideoStreamPlayer = $Video
 var wordmark: Label
@@ -16,6 +20,8 @@ var displayed_progress := 0.0
 var game: PackedScene
 var scene_progress := 0.0
 var switched := false
+var impact_audio: AudioStreamPlayer
+var ambiance: AudioStreamPlayer
 
 func _ready() -> void:
 	if DisplayServer.get_name() == "headless":
@@ -32,6 +38,12 @@ func _ready() -> void:
 	wordmark.add_theme_constant_override("outline_size", 13)
 	wordmark.modulate.a = 0.0
 	build_loading_panel()
+	impact_audio = create_audio(INTRO_SOUND, &"SFX", -10.0)
+	var bed := AMBIENT.duplicate() as AudioStreamOggVorbis
+	bed.loop = true
+	ambiance = create_audio(bed, &"Music", -37.0)
+	ambiance.play()
+	create_tween().tween_property(ambiance, "volume_db", -22.0, 1.3)
 	if ResourceLoader.load_threaded_request(GAME_SCENE) != OK:
 		begin_loading()
 		return
@@ -41,17 +53,53 @@ func _ready() -> void:
 	video.finished.connect(begin_loading)
 	get_tree().create_timer(4.0).timeout.connect(begin_loading)
 	video.play()
+	impact_audio.play()
+
+func create_audio(track: AudioStream, bus: StringName, level: float) -> AudioStreamPlayer:
+	var player := AudioStreamPlayer.new()
+	player.stream = track
+	player.bus = bus
+	player.volume_db = level
+	add_child(player)
+	return player
 
 func build_loading_panel() -> void:
 	loading_panel = CenterContainer.new()
 	loading_panel.name = "GameLoading"
 	add_child(loading_panel)
 	loading_panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	var backdrop := TextureRect.new()
+	backdrop.texture = ART
+	backdrop.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	backdrop.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	backdrop.modulate = Color(0.30, 0.39, 0.55)
+	backdrop.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(backdrop)
+	backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	move_child(backdrop, loading_panel.get_index())
+	backdrop.hide()
+	loading_panel.visibility_changed.connect(func(): backdrop.visible = loading_panel.visible)
+	var panel := PanelContainer.new()
+	panel.add_theme_stylebox_override("panel", UI.texture_frame("panel_base_large", 40, Vector2(26, 23)))
+	loading_panel.add_child(panel)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 24)
+	panel.add_child(row)
+	var portrait_panel := PanelContainer.new()
+	portrait_panel.add_theme_stylebox_override("panel", UI.frame(Color("071d30"), UI.CYAN, 2))
+	row.add_child(portrait_panel)
+	var image := TextureRect.new()
+	image.texture = PORTRAIT
+	image.custom_minimum_size = Vector2(176, 224)
+	image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	image.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	image.modulate = Color("80e7ff")
+	portrait_panel.add_child(image)
 	var column := VBoxContainer.new()
-	column.custom_minimum_size.x = 475
-	column.add_theme_constant_override("separation", 15)
-	loading_panel.add_child(column)
-	var brand := UI.label(column, "RIFTCORE", 94, UI.CYAN)
+	column.custom_minimum_size.x = 455
+	column.add_theme_constant_override("separation", 12)
+	row.add_child(column)
+	var brand := UI.label(column, "RIFTCORE", 78, UI.CYAN)
 	brand.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	var message := UI.label(column, "LOADING GAME", 24, UI.MUTED)
 	message.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -71,7 +119,7 @@ func _process(delta: float) -> void:
 	if DisplayServer.get_name() == "headless" or switched:
 		return
 	if not loading:
-		wordmark.modulate.a = smoothstep(0.88, 1.35, video.stream_position) * (1.0 - smoothstep(2.60, 3.05, video.stream_position))
+		wordmark.modulate.a = smoothstep(1.16, 1.59, video.stream_position) * (1.0 - smoothstep(2.60, 3.05, video.stream_position))
 		return
 	elapsed += delta
 	if not game:
@@ -100,7 +148,7 @@ func _process(delta: float) -> void:
 		switched = true
 		bar.value = 1.0
 		percent.text = "100%"
-		await get_tree().create_timer(0.2).timeout
+		await create_tween().tween_property(ambiance, "volume_db", -50.0, 0.38).finished
 		get_tree().change_scene_to_packed(game)
 
 func _input(event: InputEvent) -> void:
@@ -112,6 +160,8 @@ func begin_loading() -> void:
 	if loading:
 		return
 	loading = true
+	if is_instance_valid(impact_audio):
+		impact_audio.stop()
 	video.stop()
 	video.hide()
 	wordmark.hide()

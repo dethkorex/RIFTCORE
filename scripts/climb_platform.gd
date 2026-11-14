@@ -95,14 +95,14 @@ func build_hatch_support(at_x: float) -> StaticBody3D:
 	# The opening stays visible. A one-way surface catches players walking across.
 	var support := StaticBody3D.new()
 	support.name = "HatchWalkSupport"
-	support.position = Vector3(at_x, -0.035, 0)
+	support.position = Vector3(at_x, -0.11, 0)
 	support.set_meta("hatch_walk_support", true)
 	assembly.add_child(support)
 	support.add_to_group(&"factory_one_way")
 	var collider := CollisionShape3D.new()
 	collider.name = "Collider"
 	var shape := BoxShape3D.new()
-	shape.size = Vector3(OPENING_WIDTH, 0.07, OPENING_DEPTH)
+	shape.size = Vector3(OPENING_WIDTH, 0.22, OPENING_DEPTH)
 	collider.shape = shape
 	support.add_child(collider)
 	return support

@@ -28,6 +28,20 @@ static func read_slot(number: int) -> ConfigFile:
 static func slot_path(number: int) -> String:
 	return slot_directory.path_join("slot_%d.cfg" % number)
 
+static func delete_slot(number: int) -> Error:
+	if not read_slot(number):
+		return ERR_FILE_NOT_FOUND
+	return DirAccess.remove_absolute(ProjectSettings.globalize_path(slot_path(number)))
+
+func persist_reconstruction_seen() -> Error:
+	if not owns_slot:
+		return OK
+	var data := read_slot(slot)
+	if not data:
+		return ERR_FILE_NOT_FOUND
+	data.set_value("story", "reconstruction_seen", true)
+	return write_slot(data)
+
 func load_slot() -> bool:
 	var data := read_slot(slot)
 	if not data:

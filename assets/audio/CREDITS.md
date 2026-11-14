@@ -14,3 +14,5 @@
 - MintoDog — [Heavy Battle 1](https://opengameart.org/content/heavy-battle-1), [Bravery Demon](https://opengameart.org/content/bravery-demon), [Heavy Boss Battle 1](https://opengameart.org/content/heavy-boss-battle-1)
 - Vitalezzz — [Silver Bullet](https://opengameart.org/content/silver-bullet)
 - Ruskerdax — [Cybershaman](https://opengameart.org/content/cybershaman) (shortened)
+
+- DFG intro — original synthesized engine and ambient bed, with layered Kenney impact and confirmation sounds credited above.

@@ -89,7 +89,7 @@ func _ready() -> void:
 	pointer.menu_open = func(): return (is_instance_valid(menu) and menu.is_visible_in_tree()
 		or is_instance_valid(pause_menu) and pause_menu.is_visible_in_tree()
 		or is_instance_valid(coop_mission) and coop_mission.is_pause_open()
-		or is_instance_valid(home_hub) and home_hub.is_pause_open()
+		or is_instance_valid(home_hub) and (home_hub.is_pause_open() or home_hub.has_dialogue())
 		or is_instance_valid(invite_overlay) and invite_overlay.visible)
 	add_child(pointer)
 	RiftRelay.invite_received.connect(show_friend_invite)
@@ -497,13 +497,14 @@ func show_main_menu() -> void:
 	menu.station_closed.connect(close_station_panel)
 	menu.sector_requested.connect(deploy_selected_sector)
 	menu.slot_requested.connect(select_save_slot)
+	menu.operator_deleted.connect(clear_deleted_operator)
 	menu.save_requested.connect(save_at_station)
 	if get_tree().has_meta(&"open_command_deck"):
 		get_tree().remove_meta(&"open_command_deck")
 		open_home_hub()
 		if get_tree().has_meta(&"reconstruct_operator"):
 			get_tree().remove_meta(&"reconstruct_operator")
-			home_hub.materialize_operator()
+			reconstruct_in_hub()
 
 func enter_leader_hub() -> void:
 	if not is_instance_valid(home_hub) or is_instance_valid(coop_mission):
@@ -618,6 +619,26 @@ func select_save_slot(number: int, fresh: bool, operator_name := "") -> void:
 	RiftSettings.remember_operator_name(profile.operator_name)
 	get_tree().set_meta(&"riftcore_save_session", selected)
 	open_home_hub()
+	if fresh:
+		home_hub.materialize_operator("arrival")
+
+func clear_deleted_operator(slot: int) -> void:
+	if save_session and save_session.slot == slot:
+		save_session = null
+		profile = ManualSave.Profile.new()
+		profile.manual_only = true
+		get_tree().remove_meta(&"riftcore_save_session")
+		refresh_menu_save()
+
+func reconstruct_in_hub() -> void:
+	var first: bool = not profile.reconstruction_seen
+	await home_hub.materialize_operator("reconstruction" if first else "")
+	if first:
+		profile.reconstruction_seen = true
+		if save_session:
+			save_session.persist_reconstruction_seen()
+		else:
+			profile.save()
 
 func save_at_station() -> void:
 	menu.show_save_result(manual_save_status(write_manual_save()))
@@ -1325,6 +1346,7 @@ func _on_pit_fall() -> void:
 	player.dash_lock = 0.0
 	player.jump_buffer = 0.0
 	player.contact_recoil = 0.0
+	player.clear_ladder_support()
 	player.ladder = null
 	player.melee_lock = 0.0
 	player.combo_queued = 0
