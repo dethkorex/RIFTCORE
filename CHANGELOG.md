@@ -2,6 +2,9 @@
 
 ## Alpha 6.0
 
+- NOVA explains each station once on first use. Dismiss with A or Enter, or turn off future tips from the popup or Settings.
+- When an offline run ends, confirm the reconstruction notice to materialize on the hub’s Deploy pad. Remaining lives still respawn at checkpoints.
+
 - Added 50 Core Enhancements across five sockets and 50 Shop products, including existing crafting materials, recovery supplies and temporary buffs.
 - Renamed Blueprints to Crafting. Recovered blueprints go to Storage → Gear after extraction. Learn them there to unlock recipes. Previously learned recipes carry forward.
 - Assign four square quick slots from Storage → Gear. Use the D-pad or keyboard 1–4 in a mission. Each direction holds one item type and up to three units. Each press uses one unit. Inventory stacks hold 100.

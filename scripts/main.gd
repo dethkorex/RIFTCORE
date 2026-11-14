@@ -432,6 +432,9 @@ func show_main_menu() -> void:
 	if get_tree().has_meta(&"open_command_deck"):
 		get_tree().remove_meta(&"open_command_deck")
 		open_home_hub()
+		if get_tree().has_meta(&"reconstruct_operator"):
+			get_tree().remove_meta(&"reconstruct_operator")
+			home_hub.materialize_operator()
 
 func enter_leader_hub() -> void:
 	if not is_instance_valid(home_hub) or is_instance_valid(coop_mission):
@@ -1171,8 +1174,7 @@ func _on_pit_fall() -> void:
 	await get_tree().create_timer(0.45, false).timeout
 	if player.lives <= 0:
 		expire_run_on_death()
-		get_tree().set_meta(&"open_command_deck", true)
-		get_tree().reload_current_scene()
+		show_reconstruction_notice()
 		return
 	if arena_sealed and not boss_defeated:
 		reset_boss_room()
@@ -1203,6 +1205,20 @@ func _on_pit_fall() -> void:
 	if checkpoint_reached or sector > 1 or act == 2 or rescued:
 		save_checkpoint()
 	respawning = false
+
+func show_reconstruction_notice() -> void:
+	get_tree().paused = true
+	var stack := overlay()
+	stack.get_parent().custom_minimum_size.x = 500
+	pause_menu.pause_action = Callable()
+	pause_menu.back_action = Callable()
+	UI.label(stack, "OPERATOR LOST", 30, UI.VIOLET)
+	UI.label(stack, "RX-07 is out of lives. NOVA is ready to reconstruct you on the Deploy pad at Operations Station.", 19)
+	UI.button(stack, "OK  ·  Return to Station", confirm_reconstruction, true).grab_focus()
+
+func confirm_reconstruction() -> void:
+	get_tree().set_meta(&"reconstruct_operator", true)
+	return_to_command_deck()
 
 func expire_run_on_death() -> void:
 	bank_run_credits()

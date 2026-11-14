@@ -62,6 +62,19 @@ var leaderboard_sector := 1
 var party_from_deploy := false
 var layout: VBoxContainer
 var page := "Title"
+var hub_tip: Control
+var tip_focus: Control
+var tip_station := ""
+const HUB_TIPS := {
+	"Sector select": ["Deploy", "Resume a run or start a mission. Use Start a Group to bring a friend."],
+	"Shop": ["Shop", "Spend Bolts here. Recovery items restore health or energy, buffs briefly boost your stats, and materials are used to craft gear."],
+	"Fabrication": ["Crafting", "Use materials to craft gear from learned blueprints. Core Shards are a separate currency for permanent upgrades under Core Enhancements."],
+	"Save Game": ["System / Save", "Save your progress manually here. Settings is on the next tab."],
+	"Storage": ["Equipment", "Equip or stow gear here. Learn a blueprint to unlock its recipe, or assign recovery items and buffs to the D-pad for use during a run."],
+	"Social": ["Social", "Create or join a group, add recent teammates, and compare best sector times."],
+	"Challenges": ["Challenges", "Pick an unlocked sector to see its challenges. Each reward can be claimed once per save."],
+	"Collection": ["NOVA Archive", "Read the story fragments and endings you’ve unlocked, or check the field guide."],
+}
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -74,6 +87,8 @@ func _ready() -> void:
 	show_page("Title")
 
 func show_page(next: String) -> void:
+	hub_tip = null
+	tip_focus = null
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	if next == "Hub":
 		hub_requested.emit()
@@ -237,6 +252,80 @@ func open_station(next: String) -> void:
 	party_from_deploy = false
 	show()
 	show_page(next)
+	if RiftSettings.show_hub_tips and HUB_TIPS.has(next) and not RiftSettings.seen_hub_tips.has(next):
+		show_station_tip(next)
+
+func show_station_tip(station: String) -> void:
+	tip_station = station
+	tip_focus = get_viewport().gui_get_focus_owner()
+	hub_tip = ColorRect.new()
+	hub_tip.name = "HubTip"
+	hub_tip.color = Color(0.02, 0.04, 0.08, 0.50)
+	add_child(hub_tip)
+	hub_tip.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	var panel := PanelContainer.new()
+	panel.add_theme_stylebox_override("panel", UI.frame(Color("11223b"), UI.CYAN))
+	hub_tip.add_child(panel)
+	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
+	panel.offset_left = -320
+	panel.offset_right = 320
+	panel.offset_top = -210
+	panel.offset_bottom = -42
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 14)
+	panel.add_child(row)
+	var robot := TextureRect.new()
+	robot.texture = preload("res://assets/ui/nova_guide.svg")
+	robot.custom_minimum_size = Vector2(84, 84)
+	robot.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	robot.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	robot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(robot)
+	var text := UI.column(row, 6)
+	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var content: Array = HUB_TIPS[station]
+	UI.label(text, "NOVA  /  " + String(content[0]), 26, UI.CYAN)
+	UI.label(text, content[1], 19)
+	var actions := HBoxContainer.new()
+	actions.add_theme_constant_override("separation", 10)
+	text.add_child(actions)
+	var proceed := UI.button(actions, "Continue  ·  A / Enter", dismiss_station_tip.bind(false), true, 34)
+	var disable := UI.button(actions, "Turn off tips", dismiss_station_tip.bind(true), false, 34)
+	proceed.focus_neighbor_right = proceed.get_path_to(disable)
+	proceed.focus_neighbor_left = proceed.get_path_to(disable)
+	disable.focus_neighbor_left = disable.get_path_to(proceed)
+	disable.focus_neighbor_right = disable.get_path_to(proceed)
+	proceed.grab_focus()
+
+func dismiss_station_tip(disable: bool) -> void:
+	if not is_instance_valid(hub_tip):
+		return
+	RiftSettings.seen_hub_tips.append(tip_station)
+	if disable:
+		RiftSettings.show_hub_tips = false
+	RiftSettings.save()
+	remove_child(hub_tip)
+	hub_tip.queue_free()
+	hub_tip = null
+	if is_instance_valid(tip_focus):
+		tip_focus.grab_focus()
+	tip_focus = null
+
+func _input(event: InputEvent) -> void:
+	if not is_instance_valid(hub_tip) or not is_visible_in_tree() or event is InputEventMouse:
+		return
+	if event.is_action_pressed("ui_accept"):
+		get_viewport().set_input_as_handled()
+		var selected := get_viewport().gui_get_focus_owner() as Button
+		if selected and hub_tip.is_ancestor_of(selected):
+			selected.pressed.emit()
+		else:
+			dismiss_station_tip(false)
+	elif event.is_action_pressed("ui_cancel"):
+		get_viewport().set_input_as_handled()
+		dismiss_station_tip(false)
+	elif event.is_action_pressed("ui_up") or event.is_action_pressed("ui_down") or event.is_action_pressed("ui_focus_next") or event.is_action_pressed("ui_focus_prev"):
+		get_viewport().set_input_as_handled()
 
 func leave_page() -> void:
 	if page == "Settings" and find_children("RiftSettingsPanel", "", true, false).any(func(panel): return panel.installing):
@@ -1256,6 +1345,13 @@ func deploy() -> void:
 	start_requested.emit()
 
 func _unhandled_input(event: InputEvent) -> void:
+	if is_instance_valid(hub_tip):
+		var selected := get_viewport().gui_get_focus_owner()
+		if selected == null or not hub_tip.is_ancestor_of(selected):
+			var buttons := hub_tip.find_children("*", "Button", true, false)
+			buttons[0].grab_focus()
+		get_viewport().set_input_as_handled()
+		return
 	if station_panel and event is InputEventJoypadButton and event.pressed and event.button_index in [JOY_BUTTON_LEFT_SHOULDER, JOY_BUTTON_RIGHT_SHOULDER]:
 		var step := 1 if event.button_index == JOY_BUTTON_RIGHT_SHOULDER else -1
 		var tabs := station_tabs().keys()

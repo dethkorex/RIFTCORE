@@ -76,6 +76,15 @@ func _ready() -> void:
 			value.text = "%s  %d%%" % [bus_name, level]
 			RiftSettings.set_volume(bus_name, level / 100.0)
 		)
+	var tips := CheckButton.new()
+	tips.text = "Show first-visit hub tips"
+	tips.button_pressed = RiftSettings.show_hub_tips
+	audio_video.add_child(tips)
+	UI.style_button(tips)
+	tips.toggled.connect(func(enabled: bool):
+		RiftSettings.show_hub_tips = enabled
+		RiftSettings.save()
+	)
 	var input_settings := VBoxContainer.new()
 	input_settings.name = "Controls"
 	input_settings.add_theme_constant_override("separation", 8)

@@ -28,6 +28,7 @@ var camera: Camera3D
 var prompt: Label3D
 var current_station := -1
 var panel_open := false
+var reconstructing := false
 var pads: Array[Dictionary] = []
 var bank_label: Label
 var station_notice: Button
@@ -71,8 +72,25 @@ func _ready() -> void:
 	refresh_partner_room()
 	update_station()
 
+func materialize_operator() -> void:
+	reconstructing = true
+	avatar.hide()
+	update_station()
+	var beam := preload("res://scripts/deploy_lightning.gd").new()
+	add_child(beam)
+	beam.global_position = Vector3(0, 0.18, 0)
+	beam.strike()
+	RiftAudio.play_effect(&"deploy_zap")
+	await get_tree().create_timer(0.16).timeout
+	avatar.show()
+	avatar.play_character_animation("land", true)
+	await get_tree().create_timer(0.32).timeout
+	avatar.play_character_animation("idle", true)
+	reconstructing = false
+	update_station()
+
 func _physics_process(delta: float) -> void:
-	if panel_open:
+	if panel_open or reconstructing:
 		return
 	var input_axis := Input.get_axis("move_left", "move_right")
 	if absf(input_axis) < 0.15:
@@ -142,8 +160,8 @@ func update_station() -> void:
 	if nearest != current_station and nearest >= 0:
 		RiftAudio.play_effect(&"menu_move")
 	current_station = nearest
-	prompt.visible = nearest >= 0 and not panel_open
-	station_notice.visible = nearest >= 0 and not panel_open
+	prompt.visible = nearest >= 0 and not panel_open and not reconstructing
+	station_notice.visible = nearest >= 0 and not panel_open and not reconstructing
 	if nearest >= 0:
 		prompt.text = STATIONS[nearest].name.to_upper()
 		prompt.modulate = STATIONS[nearest].color.lerp(Color.WHITE, 0.32)
@@ -163,7 +181,7 @@ func set_bank(amount: int, shards: int, level: int) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouse:
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	if panel_open:
+	if panel_open or reconstructing:
 		return
 	if event.is_action_pressed("ui_cancel"):
 		get_viewport().set_input_as_handled()
@@ -175,7 +193,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		activate_station()
 
 func activate_station() -> void:
-	if panel_open or current_station < 0:
+	if panel_open or reconstructing or current_station < 0:
 		return
 	var destination: String = STATIONS[current_station].page
 	if destination == "Title":

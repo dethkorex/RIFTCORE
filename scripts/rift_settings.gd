@@ -12,6 +12,8 @@ var path := "user://riftcore_settings.cfg"
 var volumes := {"Master": 1.0, "Music": 0.85, "SFX": 1.0}
 var resolution_index := 2
 var fullscreen := true
+var show_hub_tips := true
+var seen_hub_tips := PackedStringArray()
 var defaults: Dictionary = {}
 var bindings: Dictionary = {}
 
@@ -30,6 +32,10 @@ func restore() -> void:
 			volumes[bus_name] = clampf(float(data.get_value("audio", bus_name, volumes[bus_name])), 0.0, 1.0)
 		resolution_index = clampi(int(data.get_value("video", "resolution", resolution_index)), 0, MODES.size() - 1)
 		fullscreen = bool(data.get_value("video", "fullscreen", fullscreen))
+		show_hub_tips = bool(data.get_value("tutorial", "enabled", true))
+		var seen: Variant = data.get_value("tutorial", "seen_stations", PackedStringArray())
+		if seen is PackedStringArray:
+			seen_hub_tips = seen
 		var loaded = data.get_value("controls", "bindings", {})
 		if loaded is Dictionary:
 			bindings = loaded
@@ -45,6 +51,8 @@ func save() -> Error:
 	data.set_value("video", "resolution", resolution_index)
 	data.set_value("video", "fullscreen", fullscreen)
 	data.set_value("controls", "bindings", bindings)
+	data.set_value("tutorial", "enabled", show_hub_tips)
+	data.set_value("tutorial", "seen_stations", seen_hub_tips)
 	return data.save(path)
 
 func apply_volume(bus_name: String) -> void:
