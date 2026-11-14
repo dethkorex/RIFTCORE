@@ -62,6 +62,12 @@ var pause_menu: Control
 var editor_level: Node3D
 
 func _ready() -> void:
+	if "--verify-social" in OS.get_cmdline_user_args():
+		configure_input()
+		profile.manual_only = true
+		show_main_menu()
+		verify_social.call_deferred()
+		return
 	editor_level = get_node_or_null("NeonFactoryEditable") as Node3D
 	if editor_level:
 		editor_level.visible = false
@@ -84,6 +90,31 @@ func _ready() -> void:
 		load_game.call_deferred()
 	else:
 		show_main_menu()
+
+func verify_social() -> void:
+	var valid := Engine.has_singleton("Steam")
+	valid = valid and not menu.find_children("*", "Button", true, false).any(
+		func(button): return button.text == "Online Room")
+	open_home_hub()
+	home_hub.station_requested.emit("Social")
+	valid = valid and menu.page == "Social" and is_instance_valid(menu.relay_host)
+	if not valid:
+		print("SOCIAL SMOKE FAIL")
+		get_tree().quit(1)
+		return
+	if not RiftRelay.available:
+		valid = menu.relay_host.disabled and menu.relay_join.disabled and not menu.relay_code.editable
+		valid = valid and menu.relay_status.text == RiftRelay.RELAY_UNAVAILABLE
+	RiftRelay.join_room("invalid!")
+	valid = valid and RiftRelay.status.begins_with("Enter the ten-character")
+	valid = valid and RiftRelay.valid_code("7ZX3BAK2QF")
+	if not RiftRelay.available:
+		RiftRelay.host_room()
+		valid = valid and RiftRelay.status == RiftRelay.RELAY_UNAVAILABLE
+		valid = valid and get_node_or_null("/root/GDSync") == null
+	RiftRelay.leave()
+	print("SOCIAL SMOKE PASS" if valid else "SOCIAL SMOKE FAIL")
+	get_tree().quit(0 if valid else 1)
 
 func configure_input() -> void:
 	add_key_action("move_left", KEY_A)

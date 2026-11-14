@@ -19,8 +19,9 @@ func run() -> void:
 	failures += int(not check(relay.valid_code("7ZX3BAK2QF") and not relay.valid_code("7ZX3BAK2OI"), "Codes accept the unambiguous alphabet"))
 	var keys := preload("res://addons/GD-Sync/Scripts/KeyStore.gd")
 	if not keys.has_keys():
-		game.menu.relay_host.pressed.emit()
-		failures += int(not check(relay.status.begins_with("Online rooms are unavailable"), "Missing keys produce a clear status"))
+		failures += int(not check(game.menu.relay_host.disabled and game.menu.relay_join.disabled and not game.menu.relay_code.editable, "Missing keys disable room controls"))
+		relay.host_room()
+		failures += int(not check(relay.status == relay.RELAY_UNAVAILABLE, "Missing keys produce a clear status"))
 		failures += int(not check(root.get_node_or_null("GDSync") == null, "Unconfigured preview leaves the relay stopped"))
 	game.menu.show_page("Co-op Setup Guide")
 	failures += int(not check(game.menu.page == "Co-op Setup Guide", "Co-op guide is available from Social"))

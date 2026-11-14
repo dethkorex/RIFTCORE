@@ -6,17 +6,22 @@ const Keys := preload("res://addons/GD-Sync/Scripts/KeyStore.gd")
 const Client := preload("res://addons/GD-Sync/MultiplayerClient.gd")
 const Codes := "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 const CodeLength := 10
+const RELAY_UNAVAILABLE := "Online rooms are disabled in this build. The GD Sync relay has not been configured."
 
 var status := "Create a room or enter a friend’s room code."
 var connected_room := ""
 var pending := ""
 var room_code := ""
 var room_size := 0
+var available := false
 
 var relay: Node
 var request_timeout: Timer
 
 func _ready() -> void:
+	available = Keys.has_keys()
+	if not available:
+		status = RELAY_UNAVAILABLE
 	request_timeout = Timer.new()
 	request_timeout.one_shot = true
 	request_timeout.wait_time = 30.0
@@ -64,7 +69,7 @@ func join_room(entered_code: String) -> void:
 	_open("join", code)
 
 func listen_for_steam_invites() -> void:
-	if RiftSocial.ready_to_query and Keys.has_keys():
+	if RiftSocial.ready_to_query and available:
 		_initialize_client()
 
 func invite_friend(steam_id: int) -> void:
@@ -89,8 +94,8 @@ func valid_code(code: String) -> bool:
 	return true
 
 func _open(operation: String, code: String) -> void:
-	if not Keys.has_keys():
-		_update("Online rooms are unavailable in this build.")
+	if not available:
+		_update(RELAY_UNAVAILABLE)
 		return
 	_initialize_client()
 	room_code = code
@@ -152,7 +157,7 @@ func leave(message := "Create a room or enter a friend’s room code.") -> void:
 		if was_joined and relay.is_active():
 			relay.lobby_leave()
 		relay.stop_multiplayer()
-	_update(message)
+	_update(message if available else RELAY_UNAVAILABLE)
 
 func _room_name() -> String:
 	return "riftcore-v05-" + room_code

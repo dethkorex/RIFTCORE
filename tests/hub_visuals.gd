@@ -43,7 +43,7 @@ func run() -> void:
 	await frames(3)
 	check(game.menu.page == "Storage" and hub.panel_open, "Storage remains accessible from its pad")
 	var grid := game.menu.find_children("*", "GridContainer", true, false)[0] as GridContainer
-	check(grid.columns == 4 and grid.get_child_count() == 2, "Storage displays compact gear tiles")
+	check(grid.columns >= 4 and grid.get_child_count() == 2 and grid.get_child(0).custom_minimum_size == Vector2(58, 58), "Storage displays compact gear tiles")
 	var indices := grid.get_children()
 	indices[1].grab_focus()
 	check(game.menu.focused_item == "vital_weave", "Focusing a tile selects its details")

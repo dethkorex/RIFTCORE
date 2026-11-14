@@ -74,22 +74,51 @@ jobs:
             grep -F "Exec=\"$XDG_DATA_HOME/riftcore/RIFTCORE\"" "$XDG_DATA_HOME/applications/riftcore.desktop"
             "$XDG_DATA_HOME/riftcore/start-riftcore" --headless --quit-after 30 --log-file /tmp/installed.log
             build="$(find "$XDG_DATA_HOME/riftcore/versions" -name RIFTCORE -type f)"
-            "$build" --headless --quit-after 60 --log-file /tmp/game.log
+            "$build" --headless --quit-after 60 --log-file /tmp/game.log -- --verify-social
+            grep -F "SOCIAL SMOKE PASS" /tmp/game.log
             ! grep -E "SCRIPT ERROR:|Failed to load" /tmp/launcher.log /tmp/native.log /tmp/installed.log /tmp/game.log
           '
       - uses: actions/upload-artifact@v4
         with:
           name: riftcore-playtest
           path: release-tools/artifacts/*
+  windows-smoke:
+    needs: package
+    runs-on: windows-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: riftcore-playtest
+      - name: Start the exported Windows build and check Social
+        shell: pwsh
+        run: |
+          Expand-Archive RIFTCORE-windows-x64.zip -DestinationPath game
+          $game = Join-Path $PWD 'game/RIFTCORE.exe'
+          $log = Join-Path $PWD 'windows-social.log'
+          $run = Start-Process -FilePath $game -ArgumentList @('--headless','--quit-after','120','--log-file',('"' + $log + '"'),'--','--verify-social') -Wait -PassThru
+          Get-Content -LiteralPath $log
+          if ($run.ExitCode -ne 0 -or !(Select-String -LiteralPath $log -Pattern 'SOCIAL SMOKE PASS' -Quiet)) { exit 1 }
+
+  publish:
+    if: github.ref_type == 'tag'
+    needs: [package, windows-smoke]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: riftcore-playtest
+          path: release-tools/artifacts
       - name: Publish tagged preview
         if: github.ref_type == 'tag' && endsWith(github.ref_name, '-preview')
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.ref_name }}
-        run: gh release create "$RELEASE_TAG" release-tools/artifacts/* --verify-tag --notes-file release-tools/artifacts/PATCH_NOTES.md --title "RIFTCORE ${RELEASE_TAG#v} and Installer 0.2" --prerelease --latest=false
+        run: gh release create --repo "${{ github.repository }}" "$RELEASE_TAG" release-tools/artifacts/* --verify-tag --notes-file release-tools/artifacts/PATCH_NOTES.md --title "RIFTCORE ${RELEASE_TAG#v} and Installer 0.2" --prerelease --latest=false
       - name: Publish tagged release
         if: github.ref_type == 'tag' && !endsWith(github.ref_name, '-preview')
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.ref_name }}
-        run: gh release create "$RELEASE_TAG" release-tools/artifacts/* --verify-tag --notes-file release-tools/artifacts/PATCH_NOTES.md --latest
+        run: gh release create --repo "${{ github.repository }}" "$RELEASE_TAG" release-tools/artifacts/* --verify-tag --notes-file release-tools/artifacts/PATCH_NOTES.md --latest

@@ -85,8 +85,8 @@ func show_page(next: String) -> void:
 	add_child(margins)
 	margins.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	for side in ["left", "right", "top", "bottom"]:
-		margins.add_theme_constant_override("margin_" + side, 36)
-	layout = UI.column(margins, 18)
+		margins.add_theme_constant_override("margin_" + side, 27)
+	layout = UI.column(margins, 12)
 	var header := HBoxContainer.new()
 	layout.add_child(header)
 	if station_panel:
@@ -112,7 +112,7 @@ func show_page(next: String) -> void:
 		hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		hint.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	var columns := HBoxContainer.new()
-	columns.add_theme_constant_override("separation", 20)
+	columns.add_theme_constant_override("separation", 14)
 	columns.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	layout.add_child(columns)
 	match page:
@@ -242,7 +242,7 @@ func card(parent: Container, ratio := 1.0) -> VBoxContainer:
 	var panel := PanelContainer.new()
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	panel.size_flags_stretch_ratio = ratio
-	panel.add_theme_stylebox_override("panel", UI.texture_frame("panel_base_large", 40, Vector2(25, 22)))
+	panel.add_theme_stylebox_override("panel", UI.texture_frame("panel_base_large", 40, Vector2(22, 18)))
 	parent.add_child(panel)
 	return UI.column(panel, 12)
 
@@ -303,7 +303,7 @@ func build_start_screen() -> void:
 	for i in range(buttons.size()):
 		var button := buttons[i]
 		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		button.custom_minimum_size.y = 50
+		button.custom_minimum_size.y = 43
 		button.add_theme_font_size_override("font_size", 21)
 		button.focus_neighbor_top = button.get_path_to(buttons[posmod(i - 1, buttons.size())])
 		button.focus_neighbor_bottom = button.get_path_to(buttons[(i + 1) % buttons.size()])
@@ -405,19 +405,22 @@ func build_online_room(columns: HBoxContainer) -> void:
 	relay_status = UI.label(form, "", 18, UI.CYAN)
 	relay_copy = UI.button(form, "Copy Room Code", func(): DisplayServer.clipboard_set(RiftRelay.connected_room))
 	relay_leave = UI.button(form, "Leave Room", func(): RiftRelay.leave())
-	UI.button(form, "Co-op Setup Guide", show_page.bind("Co-op Setup Guide"))
+	var guide := UI.button(form, "Co-op Setup Guide", show_page.bind("Co-op Setup Guide"))
 	portrait(card(columns))
 	refresh_online_room()
-	relay_host.grab_focus()
+	if RiftRelay.available:
+		relay_host.grab_focus()
+	else:
+		guide.grab_focus()
 
 func refresh_online_room() -> void:
 	if page != "Social" or not is_instance_valid(relay_status):
 		return
 	var joined := not RiftRelay.connected_room.is_empty()
 	var requesting := not RiftRelay.pending.is_empty()
-	relay_host.disabled = joined or requesting
-	relay_join.disabled = joined or requesting
-	relay_code.editable = not joined and not requesting
+	relay_host.disabled = not RiftRelay.available or joined or requesting
+	relay_join.disabled = relay_host.disabled
+	relay_code.editable = not relay_join.disabled
 	relay_copy.visible = joined
 	relay_leave.visible = joined or requesting
 	relay_leave.text = "Leave Room" if joined else "Cancel Connection"
@@ -699,20 +702,20 @@ func build_equipment_station(columns: HBoxContainer, shopping: bool) -> void:
 	for id in Profile.GEAR:
 		if (shopping and profile.blueprints.has(id) and Profile.GEAR[id].slot == inventory_slot) or (not shopping and profile.gear.has(id)):
 			items.append(id)
-	build_item_grid(list, items, shopping, 4)
+	build_item_grid(list, items, shopping, 8)
 	if not inventory_status.is_empty():
 		UI.label(list, inventory_status, 16, UI.VIOLET)
 
-func build_item_grid(parent: VBoxContainer, items: Array[String], blueprints: bool, columns: int) -> void:
+func build_item_grid(parent: VBoxContainer, items: Array[String], blueprints: bool, max_columns: int) -> void:
 	if items.is_empty():
 		UI.label(parent, "Storage is empty. Fabricated gear will appear here." if page == "Storage" else ("No blueprints discovered for this slot. Recover them during a deployment and extract." if blueprints else "Fabricate gear at the Workshop to fill your loadout."), 16, UI.MUTED)
 		return
 
 	var entries := scroll_entries(parent)
 	var grid := GridContainer.new()
-	grid.columns = columns
-	grid.add_theme_constant_override("h_separation", 8)
-	grid.add_theme_constant_override("v_separation", 8)
+	grid.columns = 1
+	grid.add_theme_constant_override("h_separation", UI.ITEM_GAP)
+	grid.add_theme_constant_override("v_separation", UI.ITEM_GAP)
 	entries.add_child(grid)
 
 	var detail_card := UI.equipment_card(UI.CYAN)
@@ -750,7 +753,7 @@ func build_item_grid(parent: VBoxContainer, items: Array[String], blueprints: bo
 		var item: Dictionary = Profile.GEAR[id]
 		var tint: Color = Profile.RARITY_COLORS[item.rarity]
 		var texture := EquipmentIcons.icon(id, item.slot)
-		var tile := UI.item_tile(grid, texture, tint, item.rarity, item_status(id, blueprints), func():
+		var tile := UI.item_tile(grid, texture, tint, item.rarity, item_tile_caption(id, blueprints), func():
 			reveal.call(id)
 			if not action.disabled:
 				action.grab_focus()
@@ -759,16 +762,27 @@ func build_item_grid(parent: VBoxContainer, items: Array[String], blueprints: bo
 %s" % [item.name, item.perk]
 		tile.focus_entered.connect(reveal.bind(id))
 		tiles.append(tile)
-	for index in tiles.size():
-		var tile := tiles[index]
-		if index + columns >= tiles.size():
-			tile.focus_neighbor_bottom = tile.get_path_to(action)
+	var fit_columns := func():
+		var width := entries.size.x
+		var columns := clampi(floori((width + UI.ITEM_GAP) / (UI.ITEM_SIZE + UI.ITEM_GAP)), 1, max_columns)
+		grid.columns = columns
+		for index in tiles.size():
+			var tile := tiles[index]
+			tile.focus_neighbor_bottom = tile.get_path_to(action) if index + columns >= tiles.size() else NodePath()
+	entries.resized.connect(fit_columns)
+	fit_columns.call_deferred()
 	for tile in tiles:
 		tile.focus_entered.connect(func(): action.focus_neighbor_top = action.get_path_to(tile))
 	action.focus_neighbor_top = action.get_path_to(tiles[items.find(initial)])
 	reveal.call(initial)
 	if page == "Storage":
 		tiles[items.find(initial)].grab_focus()
+
+func item_tile_caption(id: String, blueprints: bool) -> String:
+	var status := item_status(id, blueprints)
+	if status == "Blueprint" and Profile.GEAR[id].has("sector"):
+		return "S%02d" % Profile.GEAR[id].sector
+	return status
 
 func item_status(id: String, blueprints: bool) -> String:
 	var owned: String = profile.gear.get(id, "")
@@ -895,7 +909,7 @@ func build_loadout(columns: HBoxContainer) -> void:
 			for id in Profile.GEAR:
 				if profile.gear.has(id):
 					items.append(id)
-			build_item_grid(details, items, false, 4)
+			build_item_grid(details, items, false, 6)
 		"Boss Abilities":
 			var entries := scroll_entries(details)
 			if run_unlocks.is_empty():

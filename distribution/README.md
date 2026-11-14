@@ -23,8 +23,8 @@ The PNG frames inside the Windows ICO come from the transparent RIFTCORE SVG. Ga
 
 ## Online room preview
 
-Players create or join a private, two-player room using a shared code. The game uses GD Sync's hosted relay for this flow. A Steam library shortcut only starts the launcher. A configured GD Sync project, host-authoritative gameplay sync, and a verified Steam integration are still needed for the co-op release. Solo play starts independently of the relay.
+Players create or join a private, two-player room using a shared code. The game uses GD Sync's hosted relay for this flow. Open the Social pad in Operations Station. A Steam library shortcut starts the launcher. Live rooms need a configured GD Sync project. Steam presence and invites also require a RIFTCORE Steam App ID. Shared campaign gameplay is under development. Solo play starts independently of the relay.
 
-For a local relay test, the GD Sync project owner can supply the provider keys using `GDSYNC_PUBLIC_KEY` and `GDSYNC_PRIVATE_KEY`, or place them in the ignored `addons/GD-Sync/keys.cfg` on development machines. Export presets exclude that local config. Public release provisioning still needs to be verified.
+For a local relay test, the GD Sync project owner can supply the provider keys using `GDSYNC_PUBLIC_KEY` and `GDSYNC_PRIVATE_KEY`, or place them in the ignored `addons/GD-Sync/keys.cfg` on development machines. Export presets exclude that local config. The exported Windows and Arch Linux checks cover Social navigation, room code validation, and the unconfigured relay state. A live cross-platform relay test requires the same GD Sync project on both clients.
 
 The build reads the current release notes from CHANGELOG.md. GitHub uses them for the release description and the launcher displays them from update.json. Manually dispatched builds upload preview artifacts without changing the public update channel.

@@ -2,6 +2,8 @@
 
 ## Game changes
 
+- More blueprint and gear tiles fit on screen, with distinct part icons and tighter menu spacing.
+
 - Social is now a hub pad. Find Steam Friends, save contacts, and create or join co-op preview rooms from there. Steam presence and invitations require a configured RIFTCORE Steam App ID and live services.
 - Discover 12 blueprints per sector. Rarer blueprints drop less often, and Workshop lists recipes after you recover and extract them.
 - Review mission stats and banked rewards after defeating the final boss of a sector and extracting.
@@ -20,9 +22,9 @@
 - Gain a permanent Player Level alongside the Operator Level earned during a run. A defeated deployment loses its run progression and equipped gear. Stored gear and permanent progression survive.
 - Collect pink salvage drops and extract to bank them. Spend recovered materials at Fabrication and use Core Shards at the enhancement station.
 - Read sector briefings and recovered guardian memories in the NOVA Archive. The final extraction scene has two possible endings.
-- Open Online Room from the title to see the room-code preview. The Co-op Setup Guide is also available from Pause.
+- The Co-op Setup Guide is available from Social and Pause. Builds without relay configuration show a status in Social and disable Create Room and Join Room.
 
-Online co-op missions and Steam invites are still in development. The full v0.5 overhaul has further campaign, visual, and competitive-mode work tracked in RIFTCORE_DEVELOPMENT.md.
+Live room connections and Steam invitations require service configuration. Shared campaign gameplay is still in development. The full v0.5 overhaul has further campaign, visual, and competitive-mode work tracked in RIFTCORE_DEVELOPMENT.md.
 
 ## Installer and launcher 0.2
 
