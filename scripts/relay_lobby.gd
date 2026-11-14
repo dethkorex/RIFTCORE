@@ -2,6 +2,8 @@ extends Node
 
 signal changed
 signal deploy_requested(host: bool)
+signal partner_moved(x: float, facing: float, animation: String)
+signal mission_returned
 signal mission_disconnected(message: String)
 
 const Keys := preload("res://addons/GD-Sync/Scripts/KeyStore.gd")
@@ -141,6 +143,8 @@ func _room_joined(lobby_name: String) -> void:
 		return
 	request_timeout.stop()
 	relay.expose_func(_receive_deploy, RelayEnums.EXPOSE_PERMISSION.HOST)
+	relay.expose_func(_receive_return, RelayEnums.EXPOSE_PERMISSION.HOST)
+	relay.expose_func(_receive_partner_position)
 	connected_room = room_code
 	pending = ""
 	_players_changed(0)
@@ -186,6 +190,31 @@ func _receive_deploy() -> void:
 		return
 	mission_active = true
 	deploy_requested.emit(false)
+
+func send_station_position(x: float, facing: float, animation: String) -> void:
+	if room_size == 2 and not mission_active and is_instance_valid(relay):
+		relay.call_func_unreliable(_receive_partner_position, x, facing, animation)
+
+func _receive_partner_position(x: float, facing: float, animation: String) -> void:
+	var sender: int = relay.get_sender_id()
+	if mission_active or room_size != 2 or sender == relay.get_client_id() or not relay.lobby_get_all_clients().has(sender):
+		return
+	if is_finite(x) and is_finite(facing) and animation in ["idle", "walk", "run"]:
+		partner_moved.emit(clampf(x, -19.15, 19.15), clampf(facing, -1.57, 1.57), animation)
+
+func return_to_station() -> void:
+	if mission_active and relay.is_host():
+		relay.call_func(_receive_return)
+		_finish_return()
+
+func _receive_return() -> void:
+	if mission_active and relay.get_sender_id() == relay.get_host():
+		_finish_return()
+
+func _finish_return() -> void:
+	mission_active = false
+	_players_changed(0)
+	mission_returned.emit()
 
 func _peer_left(client_id: int) -> void:
 	if mission_active:

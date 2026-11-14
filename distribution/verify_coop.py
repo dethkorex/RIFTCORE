@@ -49,7 +49,7 @@ def verify(executable: Path) -> None:
         ):
             print(output)
             raise RuntimeError("Co-op mission did not pass on both clients.")
-        print("Live co-op deployment, guest movement and damage, and shared victory passed.")
+        print("Live shared hub, host deployment, guest combat, difficulty, shared rewards and return passed.")
     finally:
         for process in (host, guest):
             if process is not None and process.poll() is None:

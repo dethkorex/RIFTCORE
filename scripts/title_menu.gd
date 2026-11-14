@@ -223,7 +223,7 @@ func leave_page() -> void:
 	if page == "Co-op Setup Guide":
 		show_page("Social")
 		return
-	if page == "Social":
+	if page == "Social" and not RiftRelay.pending.is_empty():
 		RiftRelay.leave()
 	if station_panel:
 		if page == "Craft Item":

@@ -1,6 +1,7 @@
 extends Node3D
 
 signal exit_requested
+signal rewards_earned(xp: int, bolts: int, blueprints: Array)
 
 const PLAYER := preload("res://scenes/actors/riftcore_player.tscn")
 const FLOOR := preload("res://assets/neon_factory/floor_panel_a.tscn")
@@ -8,16 +9,28 @@ const UI := preload("res://scripts/rift_ui.gd")
 const INPUTS := [&"jump", &"dash", &"crouch", &"crouch_stick", &"shoot", &"melee", &"climb_down", &"swap_weapon", &"previous_suit"]
 const ENEMY_POSITIONS := [10.0, 16.0, 23.0, 30.0, 36.0]
 const TICK := 0.05
+const DIFFICULTY := 2.5
+const XP_BONUS := 1.5
+const Blueprints := preload("res://scripts/blueprint_catalog.gd")
+const Profile := preload("res://scripts/rogue_profile.gd")
 
 var host := false
 var peer: Node
 var operators: Array[RiftPlayer] = []
 var enemies: Array[WalkerBot] = []
 var room_status: Label
+var return_button: Button
+var rewards_status: Label
 var stats: Label
 var clock := 0.0
 var guest_timeout := 0.0
 var outcome := ""
+var team_xp := 0
+var team_bolts := 0
+var team_blueprints: Array = []
+var loot_rng := RandomNumberGenerator.new()
+var rewards_delivered := false
+var blueprint_count := 0
 var held: Dictionary = {}
 var pressed: Dictionary = {}
 var released: Dictionary = {}
@@ -26,6 +39,7 @@ var enemy_targets: Array = []
 
 func _ready() -> void:
 	peer = RiftRelay.relay
+	loot_rng.randomize()
 	peer.expose_func(receive_input)
 	peer.expose_func(receive_state)
 	peer.expose_func(receive_shot)
@@ -61,6 +75,13 @@ func _ready() -> void:
 			enemy.shot_fired.connect(send_shot)
 		enemy.add_to_group(&"damageable_enemies")
 		add_child(enemy)
+		enemy.scale_for_sector(1)
+		enemy.max_health *= DIFFICULTY
+		enemy.health = enemy.max_health
+		enemy.sector_damage_scale *= DIFFICULTY
+		enemy.health_changed.emit(enemy.health, enemy.max_health)
+		if host:
+			enemy.died.connect(earn_security_rewards.bind(enemy.variant))
 		if not host:
 			enemy.set_process(false)
 			enemy.set_physics_process(false)
@@ -73,6 +94,7 @@ func _ready() -> void:
 	camera.min_x = 0.0
 	camera.max_x = 42.0
 	add_child(camera)
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	build_hud()
 
 func build_arena() -> void:
@@ -113,9 +135,10 @@ func build_hud() -> void:
 	var content := UI.column(panel, 5)
 	UI.label(content, "NEON FACTORY DEFENSE", 27, UI.CYAN)
 	stats = UI.label(content, "", 16)
-	room_status = UI.label(content, "Clear the security units with your partner.", 16, UI.MUTED)
-	var leave := UI.button(content, "Return to Station", func(): exit_requested.emit(), false, 34)
-	leave.focus_mode = Control.FOCUS_NONE
+	room_status = UI.label(content, "2.5× enemy health and damage  /  1.5× shared XP", 16, UI.MUTED)
+	rewards_status = UI.label(content, "", 15, UI.CYAN)
+	return_button = UI.button(content, "Leave Mission", func(): exit_requested.emit(), false, 34)
+	return_button.focus_mode = Control.FOCUS_NONE
 
 func get_player_axis() -> Vector2:
 	return Vector2(Input.get_axis("move_left", "move_right"), Input.get_axis("climb_down", "climb_up"))
@@ -199,6 +222,19 @@ func clear_edges(operator: RiftPlayer) -> void:
 	operator.remote_pressed.clear()
 	operator.remote_released.clear()
 
+func earn_security_rewards(variant: int) -> void:
+	if not outcome.is_empty():
+		return
+	var xp := roundi(WalkerBot.XP_REWARDS[variant] * XP_BONUS)
+	team_xp += xp
+	team_bolts += 12 + floori(WalkerBot.XP_REWARDS[variant] * 0.5)
+	var blueprint := Blueprints.roll(1, "elite" if variant == WalkerBot.Variant.HEAVY else "enemy", loot_rng)
+	if not blueprint.is_empty() and not team_blueprints.has(blueprint):
+		team_blueprints.append(blueprint)
+	for operator in operators:
+		if operator.health > 0.0:
+			operator.gain_experience(xp)
+
 func broadcast_state() -> void:
 	var players := []
 	var security := []
@@ -211,15 +247,18 @@ func broadcast_state() -> void:
 			active += 1
 		else:
 			security.append([])
-	peer.call_func_unreliable(receive_state, players, security)
+	peer.call_func_unreliable(receive_state, players, security, team_xp, team_bolts, team_blueprints.size())
 	if active == 0 or nearest_operator(Vector3.ZERO) == null:
-		var message := "Mission complete. All security units defeated." if active == 0 else "Mission failed. Both operators are down."
-		peer.call_func(receive_outcome, message)
-		set_outcome(message)
+		var success := active == 0
+		peer.call_func(receive_outcome, success, team_xp, team_bolts, team_blueprints)
+		finish_mission(success, team_xp, team_bolts, team_blueprints)
 
-func receive_state(players: Array, security: Array) -> void:
-	if host or peer.get_sender_id() != peer.get_host() or players.size() != 2 or security.size() != enemies.size():
+func receive_state(players: Array, security: Array, xp: int, bolts: int, blueprints_found: int) -> void:
+	if host or not outcome.is_empty() or peer.get_sender_id() != peer.get_host() or players.size() != 2 or security.size() != enemies.size():
 		return
+	team_xp = xp
+	team_bolts = bolts
+	blueprint_count = blueprints_found
 	targets = players
 	enemy_targets = security
 
@@ -238,6 +277,7 @@ func _process(delta: float) -> void:
 			operator.play_character_animation(data[4])
 			operator.facing = data[5]
 			operator.visible = operator.health > 0
+			operator.experience = team_xp
 		for index in enemies.size():
 			var enemy := enemies[index]
 			var data: Array = enemy_targets[index]
@@ -245,8 +285,10 @@ func _process(delta: float) -> void:
 			if enemy.visible:
 				enemy.global_position = enemy.global_position.lerp(data[0], blend)
 				enemy.robot.rotation = data[1]
-				enemy.health = data[2]
-	stats.text = "HOST HP %d    PARTNER HP %d    SECURITY %d LEFT" % [operators[0].health, operators[1].health, enemies.filter(func(enemy): return is_instance_valid(enemy) and enemy.health > 0 and enemy.visible).size()]
+				if enemy.health != data[2]:
+					enemy.health = data[2]
+					enemy.health_changed.emit(enemy.health, enemy.max_health)
+	stats.text = "HOST HP %d    PARTNER HP %d    SECURITY %d LEFT\nSHARED  %d XP  /  %d BOLTS  /  %d BLUEPRINTS" % [operators[0].health, operators[1].health, enemies.filter(func(enemy): return is_instance_valid(enemy) and enemy.health > 0 and enemy.visible).size(), team_xp, team_bolts, team_blueprints.size() if host else blueprint_count]
 
 func send_shot(shot: RiftProjectile) -> void:
 	peer.call_func(receive_shot, shot.global_position, shot.direction, shot.speed, shot.palette, shot.is_charged, shot.is_magma, shot.owner_faction)
@@ -262,13 +304,35 @@ func receive_shot(at: Vector3, direction: Vector3, speed: float, tint: Color, ch
 	shot.global_position = at
 	shot.setup(direction, faction, tint, false, charged, magma)
 
-func receive_outcome(message: String) -> void:
+func receive_outcome(success: bool, xp: int, bolts: int, blueprints: Array) -> void:
 	if not host and peer.get_sender_id() == peer.get_host():
-		set_outcome(message)
+		finish_mission(success, xp, bolts, blueprints)
 
-func set_outcome(message: String) -> void:
+func finish_mission(success: bool, xp: int, bolts: int, blueprints: Array) -> void:
+	if not outcome.is_empty():
+		return
+	var message := "Mission failed. Both operators are down."
+	if success:
+		var unlocked: Array[String] = []
+		for id in blueprints:
+			if id is String and Profile.GEAR.has(id) and Profile.GEAR[id].get("sector", 0) == 1 and not unlocked.has(id):
+				unlocked.append(id)
+		xp = clampi(xp, 0, 250)
+		bolts = clampi(bolts, 0, 250)
+		team_xp = xp
+		team_bolts = bolts
+		blueprint_count = unlocked.size()
+		message = "Mission complete. Each player earned %d XP, %d bolts and %d blueprints." % [xp, bolts, unlocked.size()]
+		if not rewards_delivered:
+			rewards_delivered = true
+			rewards_earned.emit(xp, bolts, unlocked)
 	outcome = message
 	room_status.text = message
+	if success:
+		rewards_status.text = "Save at the System pad to keep your rewards."
+	return_button.text = "Return Together" if host else "Leave Mission"
+	return_button.focus_mode = Control.FOCUS_ALL
+	return_button.grab_focus()
 	for operator in operators:
 		operator.set_physics_process(false)
 	for enemy in enemies:
@@ -276,6 +340,8 @@ func set_outcome(message: String) -> void:
 			enemy.set_physics_process(false)
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed("ui_cancel"):
+	if event is InputEventMouse:
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	if event.is_action_pressed("pause") and not event is InputEventMouseButton:
 		get_viewport().set_input_as_handled()
 		exit_requested.emit()

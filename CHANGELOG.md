@@ -3,7 +3,9 @@
 ## Game changes
 
 - Play Neon Factory Defense with a friend. Create or join a room in Social, then the host selects Deploy Co-op. Both players fight the same security units and see the same mission result.
-- Online co-op currently covers Neon Factory Defense. Campaign progression stays in solo play.
+- Explore Operations Station together after joining a room. Only the room leader can deploy or return the group. Inventories, equipment, and station menus remain personal.
+- Co-op enemies have 2.5× health and damage. Both players receive the full shared reward, including 1.5× XP, bolts, and any blueprint discoveries. Use the System pad to save earned rewards.
+- Online co-op covers Neon Factory Defense. Campaign progression stays in solo play.
 
 - Online rooms use the RIFTCORE relay configuration included in the game. Social no longer asks players to enter keys.
 

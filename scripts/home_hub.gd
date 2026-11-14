@@ -18,6 +18,10 @@ const STATIONS := [
 ]
 
 var avatar: RiftPlayer
+var partner: RiftPlayer
+var partner_x := 0.0
+var partner_facing := 0.0
+var station_sync := 0.0
 var camera: Camera3D
 var prompt: Label3D
 var current_station := -1
@@ -58,6 +62,8 @@ func _ready() -> void:
 	camera.fov = 59.0
 	camera.make_current()
 	build_hud()
+	RiftRelay.partner_moved.connect(update_partner)
+	RiftRelay.changed.connect(refresh_partner_room)
 	update_station()
 
 func _physics_process(delta: float) -> void:
@@ -78,6 +84,15 @@ func _physics_process(delta: float) -> void:
 	update_station()
 
 func _process(delta: float) -> void:
+	if is_instance_valid(partner):
+		partner.position.x = lerpf(partner.position.x, partner_x, 1.0 - exp(-16.0 * delta))
+		partner.position.y = 1.11 if absf(partner.position.x) < 1.25 else 0.89
+		partner.model_root.rotation.y = partner_facing
+	station_sync += delta
+	if station_sync >= 0.05:
+		station_sync = 0.0
+		var animation := avatar.current_animation if avatar.current_animation in ["idle", "walk", "run"] else "idle"
+		RiftRelay.send_station_position(avatar.position.x, avatar.model_root.rotation.y, animation)
 	for index in range(pads.size()):
 		var pad := pads[index]
 		var active := index == current_station
@@ -89,6 +104,26 @@ func _process(delta: float) -> void:
 			beam.scale.y = 1.0 + sin(Time.get_ticks_msec() * 0.005) * 0.08
 		var lamp: OmniLight3D = pad.light
 		lamp.light_energy = move_toward(lamp.light_energy, 1.75 if active else 0.0, delta * 7.0)
+
+func update_partner(x: float, facing: float, animation: String) -> void:
+	if not is_instance_valid(partner):
+		partner = AVATAR.instantiate() as RiftPlayer
+		add_child(partner)
+		partner.position = Vector3(x, 1.11, -0.26)
+		partner.set_physics_process(false)
+		partner.set_process(false)
+		partner.collision_layer = 0
+		partner.collision_mask = 0
+		var label := label_in_space(partner, "PARTNER", Vector3(0, 1.54, 0), 29, Color("ca99ff"))
+		label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	partner_x = x
+	partner_facing = facing
+	partner.play_character_animation(animation)
+
+func refresh_partner_room() -> void:
+	if RiftRelay.room_size != 2 and is_instance_valid(partner):
+		partner.queue_free()
+		partner = null
 
 func update_station() -> void:
 	var nearest := -1

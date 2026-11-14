@@ -184,13 +184,29 @@ func verify_live_relay(arguments: PackedStringArray) -> void:
 		finish_relay_check(await wait_for_relay(func(): return peer.lobby_get_data("rift_check_ack", false), 15.0))
 
 func verify_coop_mission(host: bool) -> void:
-	if host:
+	menu.leave_page()
+	var previous_credits: int = profile.credits
+	var previous_xp: int = profile.player_xp
+	profile.gear["impact_liner" if host else "pulse_lens"] = "stored"
+	var saved_gear: Dictionary = profile.gear.duplicate(true)
+	if not host:
+		Input.action_press("move_right")
 		await get_tree().create_timer(0.8).timeout
+		Input.action_release("move_right")
+		RiftRelay.relay.lobby_set_data("coop_guest_in_hub", not RiftRelay.can_deploy())
+	else:
+		var together := await wait_for_relay(func(): return is_instance_valid(home_hub.partner) and home_hub.partner.position.x > 2.0 and RiftRelay.relay.lobby_get_data("coop_guest_in_hub", false), 8.0)
+		if not together:
+			finish_relay_check(false)
+			return
 		RiftRelay.deploy()
 	if not await wait_for_relay(func(): return is_instance_valid(coop_mission), 12.0):
 		finish_relay_check(false)
 		return
 	var mission = coop_mission
+	if not is_equal_approx(mission.enemies[0].max_health, 100.0) or not is_equal_approx(mission.enemies[0].sector_damage_scale, 2.5):
+		finish_relay_check(false)
+		return
 	if not host:
 		Input.action_press("move_right")
 		await get_tree().create_timer(0.46).timeout
@@ -202,22 +218,39 @@ func verify_coop_mission(host: bool) -> void:
 		if moved:
 			RiftRelay.relay.lobby_set_data("coop_guest_saw_movement", true)
 		var won := await wait_for_relay(func(): return is_instance_valid(mission) and mission.outcome.begins_with("Mission complete"), 16.0)
+		won = won and verify_coop_rewards(previous_xp, previous_credits, saved_gear)
 		if won:
 			RiftRelay.relay.lobby_set_data("coop_guest_saw_completion", true)
-			await get_tree().create_timer(1.5).timeout
-		finish_relay_check(moved and won)
+			var returned := await wait_for_relay(func(): return is_instance_valid(home_hub) and not RiftRelay.mission_active, 10.0)
+		if returned:
+			RiftRelay.relay.lobby_set_data("coop_guest_returned", true)
+			await get_tree().create_timer(1.0).timeout
+		finish_relay_check(moved and won and returned)
 		return
 	var guest_moved := await wait_for_relay(func(): return is_instance_valid(mission) and mission.operators[1].position.x > 3.7 and RiftRelay.relay.lobby_get_data("coop_guest_saw_movement", false), 8.0)
 	var guest_hit := await wait_for_relay(func(): return is_instance_valid(mission) and (not is_instance_valid(mission.enemies[0]) or mission.enemies[0].health < mission.enemies[0].max_health), 8.0)
 	if guest_moved and guest_hit:
+		mission.team_blueprints.append("bp_01_00")
 		for enemy in mission.enemies:
 			if is_instance_valid(enemy):
 				enemy.take_damage(10000.0)
 		var won := await wait_for_relay(func(): return RiftRelay.relay.lobby_get_data("coop_guest_saw_completion", false), 10.0)
-		finish_relay_check(won)
+		var verified := won and verify_coop_rewards(previous_xp, previous_credits, saved_gear)
+		if verified:
+			RiftRelay.return_to_station()
+			verified = await wait_for_relay(func(): return is_instance_valid(home_hub) and RiftRelay.relay.lobby_get_data("coop_guest_returned", false), 8.0)
+		finish_relay_check(verified)
 	else:
 		print("Co-op guest movement: ", guest_moved, "  guest attack: ", guest_hit)
 		finish_relay_check(false)
+
+func verify_coop_rewards(previous_xp: int, previous_credits: int, saved_gear: Dictionary) -> bool:
+	const EXPECTED_XP := 132
+	const EXPECTED_BOLTS := 104
+	return (profile.player_xp - previous_xp == EXPECTED_XP
+		and profile.credits - previous_credits == EXPECTED_BOLTS
+		and profile.blueprints.has("bp_01_00")
+		and profile.gear == saved_gear)
 
 func wait_for_relay(condition: Callable, timeout: float) -> bool:
 	var deadline := Time.get_ticks_msec() + int(timeout * 1000)
@@ -310,6 +343,7 @@ func show_main_menu() -> void:
 	if not RiftRelay.deploy_requested.is_connected(start_coop_mission):
 		RiftRelay.deploy_requested.connect(start_coop_mission)
 		RiftRelay.mission_disconnected.connect(close_coop_mission)
+		RiftRelay.mission_returned.connect(close_coop_mission.bind("Back at Operations Station."))
 	RiftAudio.play_music(false)
 	menu = RiftTitleMenu.new()
 	refresh_menu_save()
@@ -335,9 +369,21 @@ func start_coop_mission(is_host: bool) -> void:
 	coop_mission = preload("res://scripts/coop_mission.gd").new()
 	coop_mission.name = "CoopMission"
 	coop_mission.host = is_host
-	coop_mission.exit_requested.connect(func(): RiftRelay.leave("You left the mission."))
+	coop_mission.rewards_earned.connect(bank_coop_rewards)
+	coop_mission.exit_requested.connect(func():
+		if is_host and not coop_mission.outcome.is_empty():
+			RiftRelay.return_to_station()
+		else:
+			RiftRelay.leave("You left the mission.")
+	)
 	add_child(coop_mission)
 	RiftAudio.play_music(true, 1)
+
+func bank_coop_rewards(xp: int, bolts: int, blueprints: Array) -> void:
+	profile.award_player_xp(xp)
+	profile.credits += bolts
+	for id in blueprints:
+		profile.blueprints[id] = true
 
 func close_coop_mission(message: String) -> void:
 	if not is_instance_valid(coop_mission):
@@ -433,11 +479,18 @@ func open_home_hub() -> void:
 	add_child(home_hub)
 	home_hub.set_bank(profile.credits, profile.core_shards, profile.player_level())
 	home_hub.station_requested.connect(func(page: String):
+		if page == "Sector select" and not RiftRelay.connected_room.is_empty():
+			if RiftRelay.can_deploy():
+				RiftRelay.deploy()
+				return
+			page = "Social"
 		home_hub.set_panel_open(true)
 		menu.process_mode = Node.PROCESS_MODE_INHERIT
 		menu.open_station(page)
 	)
 	home_hub.title_requested.connect(func():
+		if not RiftRelay.connected_room.is_empty() or not RiftRelay.pending.is_empty():
+			RiftRelay.leave()
 		remove_home_hub()
 		menu.process_mode = Node.PROCESS_MODE_INHERIT
 		menu.show()
