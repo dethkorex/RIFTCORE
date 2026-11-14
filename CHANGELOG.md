@@ -1,4 +1,10 @@
-# RIFTCORE Alpha 6.0 — Fractured Connections
+# RIFTCORE Alpha 6.0.1 — Fractured Connections
+
+## Alpha 6.0.1
+
+- Rebuilt the Station Shop with filterable rows, rarity labels, a dedicated item preview, stock and owned counts, and quantity controls for buying multiple items at once.
+- Bundled a Steam cover, wide tile, banner, logo, and icon. RIFTCORE fills empty artwork slots for an existing local RIFTCORE shortcut and leaves custom artwork in place. Steam may need a normal restart to refresh the library.
+- Added a game description to the launcher and Steam artwork download. Patch notes continue to update in the launcher and in-game updater.
 
 ## Alpha 6.0
 

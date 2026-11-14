@@ -35,6 +35,7 @@ var at_sector_start := false
 var run_unlocks: Array = []
 var profile
 var shop_status := ""
+var shop_category := "All Items"
 var challenge_sector := 1
 var inventory_slot := "frame"
 var inventory_status := ""
@@ -249,6 +250,7 @@ func open_station(next: String) -> void:
 	focused_item = ""
 	equipment_view = "Gear"
 	storage_filter = "All"
+	shop_category = "All Items"
 	party_from_deploy = false
 	show()
 	show_page(next)
@@ -710,50 +712,190 @@ func build_workshop(columns: HBoxContainer) -> void:
 	if not shop_status.is_empty():
 		UI.label(store, shop_status, 15, UI.VIOLET)
 
+func shop_type(item: Dictionary) -> String:
+	if item.has("material"):
+		return "Core Material" if item.material in ["core", "legendary"] else "Material"
+	if item.has("stat"):
+		return "Buff"
+	if item.get("hp", 0) == 0:
+		return "Energy Cell"
+	return "Supply"
+
 func build_shop(columns: HBoxContainer) -> void:
-	var card_body := card(columns)
-	UI.label(card_body, "Station Shop", 32, UI.CYAN)
-	UI.label(card_body, "Supplies and materials  ·  %d bolts" % profile.credits, 17, Color("ffd079"))
-	var entries := scroll_entries(card_body)
-	var grid := GridContainer.new()
-	grid.columns = 10
-	grid.add_theme_constant_override("h_separation", UI.ITEM_GAP)
-	grid.add_theme_constant_override("v_separation", UI.ITEM_GAP)
-	entries.add_child(grid)
-	var info := card(columns, 0.68)
-	var title := UI.label(info, "", 27, UI.CYAN)
-	var rarity := UI.label(info, "", 17)
-	var description := UI.label(info, "", 18, UI.MUTED)
-	var buy := UI.button(info, "Purchase", func():
-		inventory_status = profile.buy_supply(focused_item)
+	var catalog := card(columns, 1.13)
+	var heading := HBoxContainer.new()
+	heading.add_theme_constant_override("separation", 20)
+	catalog.add_child(heading)
+	UI.label(heading, "Station Shop", 31, UI.CYAN)
+	var subtitle := UI.label(heading, "Supplies and Materials", 16, Color("ffd079"))
+	subtitle.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	var filters := HBoxContainer.new()
+	filters.add_theme_constant_override("separation", 6)
+	catalog.add_child(filters)
+	var categories := {"All Items": "visor", "Supplies": "frame", "Materials": "core", "Buffs": "utility", "Cores": "core"}
+	for category in categories:
+		var tab := UI.button(filters, category, func():
+			shop_category = category
+			show_page("Shop")
+		, false, 34)
+		if category == shop_category:
+			tab.add_theme_color_override("font_color", UI.CYAN)
+		tab.icon = EquipmentIcons.icon(categories[category], categories[category])
+		tab.expand_icon = true
+		tab.add_theme_constant_override("icon_max_width", 16)
+
+	var items: Array[String] = []
+	for id in Profile.stock:
+		var type := shop_type(Profile.stock[id])
+		if shop_category == "All Items" or (shop_category == "Supplies" and type in ["Supply", "Energy Cell"]) or (shop_category == "Materials" and type == "Material") or (shop_category == "Buffs" and type == "Buff") or (shop_category == "Cores" and type == "Core Material"):
+			items.append(id)
+	shop_columns(catalog, "ITEM (%d)" % items.size(), "TYPE", "PRICE", Color("a6c7df"))
+	var entries := scroll_entries(catalog)
+	entries.add_theme_constant_override("separation", 4)
+
+	var info := card(columns, 1.0)
+	var title := UI.label(info, "", 40, UI.CYAN)
+	info.add_child(HSeparator.new())
+	var rarity := UI.label(info, "", 20)
+	var preview := HBoxContainer.new()
+	preview.add_theme_constant_override("separation", 14)
+	preview.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	info.add_child(preview)
+	var tile := UI.equipment_card(UI.CYAN)
+	tile.custom_minimum_size = Vector2(122, 132)
+	tile.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	preview.add_child(tile)
+	var icon := TextureRect.new()
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tile.add_child(icon)
+	var facts := UI.column(preview, 8)
+	facts.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	facts.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var description := UI.label(facts, "", 20, UI.WHITE)
+	var type_value := shop_fact(facts, "Type")
+	var price_value := shop_fact(facts, "Price")
+	shop_fact(facts, "Stock").text = "Unlimited"
+	var owned := shop_fact(facts, "Owned")
+	var order := UI.equipment_card(Color("3b7fa8"))
+	info.add_child(order)
+	var controls := UI.column(order, 4)
+	shop_columns(controls, "Purchase Quantity", "", "Total Cost", UI.MUTED)
+	var quantity_row := HBoxContainer.new()
+	controls.add_child(quantity_row)
+	var quantity := UI.label(quantity_row, "1", 23)
+	quantity.custom_minimum_size.x = 32
+	quantity.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	quantity.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	var total := UI.label(quantity_row, "", 23, Color("ffd079"))
+	total.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	total.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var buy := UI.button(info, "Buy", func():
+		inventory_status = profile.buy_supply(focused_item, int(quantity.text))
 		show_page("Shop")
-	)
+	, true, 51)
+	buy.icon = EquipmentIcons.icon("core", "core")
+	var message := UI.label(info, inventory_status, 15, UI.VIOLET)
+	message.custom_minimum_size.y = 18
+
+	var adjust := func(step: int):
+		var item: Dictionary = Profile.stock[focused_item]
+		var limit: int = profile.supply_purchase_limit(focused_item)
+		var count := clampi(int(quantity.text) + step, 1, maxi(1, limit))
+		quantity.text = str(count)
+		var cost: int = item.price * count
+		total.text = "%d bolts" % cost
+		buy.text = "BUY  /  %d BOLTS" % cost
+		buy.disabled = limit == 0 or profile.credits < cost
+		buy.tooltip_text = "Inventory stack is full" if limit == 0 else ("Not enough bolts" if buy.disabled else "")
+	var minus := UI.button(quantity_row, "‹", adjust.bind(-1), false, 34)
+	quantity_row.move_child(minus, 0)
+	var plus := UI.button(quantity_row, "›", adjust.bind(1), false, 34)
+	quantity_row.move_child(plus, 2)
 	var reveal := func(id: String):
 		focused_item = id
-		var item: Dictionary = profile.stock[id]
+		var item: Dictionary = Profile.stock[id]
 		title.text = item.name
 		rarity.text = Profile.RARITY_NAMES[item.rarity]
 		rarity.add_theme_color_override("font_color", Profile.RARITY_COLORS[item.rarity])
+		var symbol: String = {"Supply": "vital_weave", "Energy Cell": "charge_relay", "Core Material": "pulse_lens"}.get(shop_type(item), item.icon)
+		icon.texture = EquipmentIcons.icon(symbol, item.icon)
+		icon.modulate = Profile.RARITY_COLORS[item.rarity]
 		description.text = item.detail
-		buy.text = "Buy  /  %d bolts" % item.price
-		buy.disabled = profile.credits < item.price
-	var first := true
-	var selected: String = focused_item if profile.stock.has(focused_item) else profile.stock.keys()[0]
-	for id in profile.stock:
-		var item: Dictionary = profile.stock[id]
-		var tile := UI.item_tile(grid, EquipmentIcons.icon(item.icon, item.icon), Profile.RARITY_COLORS[item.rarity], item.rarity, "%d" % item.price, func():
+		type_value.text = shop_type(item)
+		price_value.text = "%d bolts" % item.price
+		owned.text = str(profile.supply_owned(id))
+		quantity.text = "1"
+		adjust.call(0)
+	if items.is_empty():
+		buy.disabled = true
+		minus.disabled = true
+		plus.disabled = true
+		UI.label(entries, "No products in this category.", 17, UI.MUTED)
+		return
+	var selected: String = focused_item if focused_item in items else items[0]
+	for id in items:
+		var item: Dictionary = Profile.stock[id]
+		var record := UI.button(entries, "", func():
 			reveal.call(id)
 			if not buy.disabled:
 				buy.grab_focus()
-		)
-		tile.tooltip_text = item.name
-		tile.focus_entered.connect(reveal.bind(id))
-		if first or id == selected:
-			tile.grab_focus()
-		first = false
+		, false, 39)
+		record.tooltip_text = item.name
+		var cells := shop_columns(record, item.name, shop_type(item), "%d" % item.price, Color("ffd079"))
+		cells.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		cells.offset_left = 10
+		cells.offset_right = -10
+		var entry_icon := TextureRect.new()
+		entry_icon.texture = EquipmentIcons.icon(item.icon, item.icon)
+		entry_icon.modulate = Profile.RARITY_COLORS[item.rarity]
+		entry_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		entry_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		entry_icon.custom_minimum_size.x = 29
+		entry_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		cells.add_child(entry_icon)
+		cells.move_child(entry_icon, 0)
+		var name_label := cells.get_child(1) as Label
+		cells.remove_child(name_label)
+		var name_stack := VBoxContainer.new()
+		name_stack.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		name_stack.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		name_stack.add_theme_constant_override("separation", -2)
+		cells.add_child(name_stack)
+		cells.move_child(name_stack, 1)
+		name_stack.add_child(name_label)
+		UI.label(name_stack, Profile.RARITY_NAMES[item.rarity], 14, Profile.RARITY_COLORS[item.rarity])
+		record.focus_entered.connect(reveal.bind(id))
+		record.focus_neighbor_right = record.get_path_to(plus)
+		if id == selected:
+			record.grab_focus()
 	reveal.call(selected)
-	if not inventory_status.is_empty():
-		UI.label(info, inventory_status, 16, UI.VIOLET)
+
+func shop_columns(parent: Control, item: String, type: String, price: String, color: Color) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_theme_constant_override("separation", 8)
+	parent.add_child(row)
+	var item_label := UI.label(row, item, 18)
+	item_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var type_label := UI.label(row, type, 16, UI.MUTED)
+	type_label.custom_minimum_size.x = 97
+	var price_label := UI.label(row, price, 19, color)
+	price_label.custom_minimum_size.x = 71
+	price_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	for label in [item_label, type_label, price_label]:
+		label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		label.autowrap_mode = TextServer.AUTOWRAP_OFF
+		label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	return row
+
+func shop_fact(parent: VBoxContainer, caption: String) -> Label:
+	parent.add_child(HSeparator.new())
+	var row := HBoxContainer.new()
+	parent.add_child(row)
+	UI.label(row, caption, 17, UI.MUTED).size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	return UI.label(row, "", 18)
 
 func build_challenges(columns: HBoxContainer) -> void:
 	var sectors := card(columns, 0.8)

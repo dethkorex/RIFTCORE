@@ -72,10 +72,12 @@ func _ready() -> void:
 		var latest := updater.newest_installed()
 		var forwarded := latest != running and not latest.is_empty() and updater.compare_tags(latest, running)
 		var started := forwarded and updater.start_version(latest)
+		var install_root: String = updater.install_root
 		updater.free()
 		if started:
 			get_tree().quit()
 			return
+		preload("res://scripts/steam_artwork.gd").apply.call_deferred(install_root)
 	add_build_version()
 	Input.joy_connection_changed.connect(on_joy_connection_changed)
 	var pointer := preload("res://scripts/menu_pointer.gd").new()

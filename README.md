@@ -4,7 +4,9 @@ A 3D side-scrolling roguelike platformer inspired by Mega Man X. The campaign ha
 
 ## Play
 
-Get [RIFTCORE Alpha 6.0 with Installer 0.2](https://github.com/dethkorex/RIFTCORE/releases/tag/v6.0.0-preview). In the game, open Settings → Update Game to check for future releases. Choose `RIFTCORE-Windows-x64-Setup.exe` for Windows or `RIFTCORE-Linux-x64-Setup.run` for Linux. These include the game runtime; players do not need Godot. On Linux, run `chmod +x RIFTCORE-Linux-x64-Setup.run` and then `./RIFTCORE-Linux-x64-Setup.run`.
+Get [RIFTCORE Alpha 6.0.1 with Installer 0.2](https://github.com/dethkorex/RIFTCORE/releases/tag/v6.0.1-preview). In the game, open Settings → Update Game to check for future releases. Choose `RIFTCORE-Windows-x64-Setup.exe` for Windows or `RIFTCORE-Linux-x64-Setup.run` for Linux. These include the game runtime; players do not need Godot. On Linux, run `chmod +x RIFTCORE-Linux-x64-Setup.run` and then `./RIFTCORE-Linux-x64-Setup.run`.
+
+The game and launcher automatically fill missing library artwork for existing RIFTCORE non-Steam shortcuts. A normal Steam restart may be needed to refresh the library. The Steam artwork ZIP also includes the game description.
 
 The installed launcher checks GitHub Releases. When an update is available, select **Update and play**. **Play installed** works offline. Updates verify the package SHA-256 and install next to the prior version, leaving user data in its normal Godot directory. The ZIP downloads are standalone portable games without the launcher.
 

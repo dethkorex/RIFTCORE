@@ -2,7 +2,8 @@ extends Control
 
 const UpdateClient := preload("res://update_client.gd")
 
-const LAUNCHER_BUILD := 3
+const LAUNCHER_BUILD := 4
+const SteamArtwork := preload("res://steam_artwork.gd")
 
 var client := UpdateClient.new()
 var install_root := ""
@@ -50,6 +51,8 @@ func _ready() -> void:
 	client.repo = repo
 	client.preview_channel = preview_channel
 	installed = client.newest_installed()
+	if not installed.is_empty() and DisplayServer.get_name() != "headless":
+		SteamArtwork.apply.call_deferred(install_root)
 	var notes_path := install_root.path_join("PATCH_NOTES.md")
 	if installed == config.get_value("updates", "bundled_notes_tag", "") and FileAccess.file_exists(notes_path):
 		bundled_notes = FileAccess.get_file_as_string(notes_path)
@@ -140,6 +143,11 @@ func build_ui() -> void:
 	version.text = "LAUNCHER  0.2  /  BUILD %d" % LAUNCHER_BUILD
 	version.add_theme_color_override("font_color", Color("ff78cb"))
 	stack.add_child(version)
+	var description := Label.new()
+	description.text = FileAccess.get_file_as_string("res://branding/DESCRIPTION.txt").strip_edges()
+	description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	description.add_theme_color_override("font_color", Color("bfd8eb"))
+	stack.add_child(description)
 	stack.add_child(HSeparator.new())
 	status = Label.new()
 	status.text = "Checking for updates…"

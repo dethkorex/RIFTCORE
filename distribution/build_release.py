@@ -133,6 +133,9 @@ def main() -> None:
     out.mkdir(parents=True, exist_ok=True)
     launcher = DIST / "launcher"
     shutil.copy2(ROOT / "scripts/update_client.gd", launcher / "update_client.gd")
+    shutil.copy2(ROOT / "scripts/steam_artwork.gd", launcher / "steam_artwork.gd")
+    shutil.copytree(ROOT / "assets/ui/steam", launcher / "assets/ui/steam", dirs_exist_ok=True,
+                    ignore=shutil.ignore_patterns("*.import"))
     icon = launcher / "branding" / "riftcore-icon.svg"
     icon_cache = work / "riftcore.ico"
     godot(engine, launcher, work / "branding.log", "--script", str(DIST / "make_brand_icon.gd"), "--", str(icon), str(icon_cache))
@@ -148,6 +151,11 @@ def main() -> None:
     manifest = {"tag": a.tag, "assets": {}, "launcher": {}, "notes": notes}
     launcher_build = int(re.search(r"const LAUNCHER_BUILD := (\d+)", (launcher / "launcher.gd").read_text(encoding="utf-8"))[1])
     (out / "PATCH_NOTES.md").write_text(notes + "\n", encoding="utf-8")
+    with zipfile.ZipFile(out / "RIFTCORE-Steam-Artwork.zip", "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        for art in sorted((ROOT / "assets/ui/steam").iterdir()):
+            if art.suffix in {".jpg", ".png"}:
+                archive.write(art, arcname=art.name)
+        archive.write(launcher / "branding/DESCRIPTION.txt", arcname="DESCRIPTION.txt")
     with local_templates(ROOT / "export_presets.cfg", templates), local_templates(launcher / "export_presets.cfg", templates):
         for platform, (preset, binary, _) in ENGINE_ASSETS.items():
             payload = work / platform / "install"

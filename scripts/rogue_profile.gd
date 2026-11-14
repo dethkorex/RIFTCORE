@@ -406,25 +406,34 @@ func learn_blueprint(id: String) -> String:
 		return "Could not save the blueprint."
 	return "Learned " + String(GEAR[id].name) + "."
 
-func buy_supply(id: String) -> String:
-	if not stock.has(id):
+func supply_owned(id: String) -> int:
+	var item: Dictionary = stock[id]
+	return int(materials.get(item.material, 0)) if item.has("material") else int(inventory.get(id, 0))
+
+func supply_purchase_limit(id: String) -> int:
+	var item: Dictionary = stock[id]
+	return clampi(floori(float(STACK_MAX - supply_owned(id)) / int(item.get("quantity", 1))), 0, STACK_MAX)
+
+func buy_supply(id: String, bundles := 1) -> String:
+	if not stock.has(id) or bundles < 1:
 		return "Item unavailable."
 	var item: Dictionary = stock[id]
-	var qty: int = item.get("quantity", 1)
+	if bundles > supply_purchase_limit(id):
+		return "Stack full."
+	var cost: int = item.price * bundles
+	if credits < cost:
+		return "Not enough bolts."
+	var quantity: int = int(item.get("quantity", 1)) * bundles
 	var target := materials if item.has("material") else inventory
 	var key: String = item.get("material", id)
-	var before := int(target.get(key, 0))
-	if before + qty > STACK_MAX:
-		return "Stack full."
-	if credits < item.price:
-		return "Not enough bolts."
-	credits -= item.price
-	target[key] = before + qty
+	var before := supply_owned(id)
+	credits -= cost
+	target[key] = before + quantity
 	if save() != OK:
-		credits += item.price
+		credits += cost
 		target[key] = before
 		return "Could not save the purchase."
-	return "Purchased " + String(item.name) + "."
+	return "Purchased %s ×%d." % [item.name, quantity]
 
 func assign_quick(index: int, id: String) -> String:
 	if index < 0 or index >= quick_slots.size() or not stock.has(id) or stock[id].has("material"):
