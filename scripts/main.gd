@@ -1632,7 +1632,7 @@ func play_arena_intro() -> void:
 	player.cancel_charge()
 	player.velocity = Vector3.ZERO
 	player.facing = 1.0
-	player.invulnerable_time = maxf(player.invulnerable_time, 3.5)
+	player.invulnerable_time = maxf(player.invulnerable_time, 6.0)
 	player.set_physics_process(false)
 	player.model_root.rotation.y = PI * 0.5
 	var destination := player.global_position + Vector3.RIGHT * 1.75

@@ -11,15 +11,15 @@ func play(rig: SideCameraRig, boss: Node3D, floor_y: float, title: String, tint:
 	var height := maxf(1.5, landing.y - floor_y)
 	rig.set_process(false)
 	boss.set("collision_layer", 0)
-	boss.global_position = landing + Vector3.UP * 5.1
+	boss.global_position = landing + Vector3.UP * 6.8
 	boss.show()
 	var fall := create_tween().set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	fall.tween_property(boss, "global_position", landing, 0.70)
+	fall.tween_property(boss, "global_position", landing, 2.06)
 
 	var shots := [
-		[Vector3(landing.x - 0.65, landing.y + 3.45, 0.0), zoom * 0.81, 0.27],
-		[Vector3(landing.x + 0.55, landing.y + height + 1.35, 0.0), zoom * 0.69, 0.23],
-		[Vector3(landing.x, landing.y + height * 0.55, 0.0), zoom * 0.78, 0.27],
+		[Vector3(landing.x - 0.65, landing.y + 3.45, 0.0), zoom * 0.86, 0.78],
+		[Vector3(landing.x + 0.55, landing.y + height + 1.35, 0.0), zoom * 0.72, 0.71],
+		[Vector3(landing.x, landing.y + height * 0.55, 0.0), zoom * 0.81, 0.66],
 	]
 	for shot in shots:
 		rig.global_position = shot[0]
@@ -49,15 +49,15 @@ func play(rig: SideCameraRig, boss: Node3D, floor_y: float, title: String, tint:
 	label.add_theme_constant_override("outline_size", 12)
 	label.modulate.a = 0.0
 	var name_reveal := create_tween()
-	name_reveal.tween_property(label, "modulate:a", 1.0, 0.15)
-	name_reveal.tween_interval(0.67)
-	name_reveal.tween_property(label, "modulate:a", 0.0, 0.23)
+	name_reveal.tween_property(label, "modulate:a", 1.0, 0.23)
+	name_reveal.tween_interval(1.25)
+	name_reveal.tween_property(label, "modulate:a", 0.0, 0.33)
 	await name_reveal.finished
 	var target := rig.target
 	var position := target.global_position if is_instance_valid(target) else landing
 	var facing := target.facing if is_instance_valid(target) else 1.0
 	var pullback := create_tween().set_parallel().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
-	pullback.tween_property(rig, "global_position", Vector3(clampf(position.x + facing * rig.look_ahead, rig.min_x, rig.max_x), maxf(0.85, position.y + 0.35), 0.0), 0.45)
-	pullback.tween_property(camera, "position:z", zoom, 0.45)
+	pullback.tween_property(rig, "global_position", Vector3(clampf(position.x + facing * rig.look_ahead, rig.min_x, rig.max_x), maxf(0.85, position.y + 0.35), 0.0), 0.74)
+	pullback.tween_property(camera, "position:z", zoom, 0.74)
 	await pullback.finished
 	rig.set_process(true)

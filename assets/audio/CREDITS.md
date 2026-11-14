@@ -10,6 +10,7 @@
 
 ## Boss music (CC0)
 
-- nene — [Boss Battle #6 Metal Alternate](https://opengameart.org/content/boss-battle-6-metal-alternate), [Boss Battle #8 Metal](https://opengameart.org/content/boss-battle-8-metal), [Boss Battle #9 Metal](https://opengameart.org/content/boss-battle-9-metal), [Boss Battle #10 Metal](https://opengameart.org/content/boss-battle-10-metal)
-- MintoDog — [Heavy Boss Battle 1](https://opengameart.org/content/heavy-boss-battle-1)
-- Emma_MA — [Megasong](https://opengameart.org/content/megasong)
+- Zane Little Music — [Achilles](https://opengameart.org/content/achilles)
+- MintoDog — [Heavy Battle 1](https://opengameart.org/content/heavy-battle-1), [Bravery Demon](https://opengameart.org/content/bravery-demon), [Heavy Boss Battle 1](https://opengameart.org/content/heavy-boss-battle-1)
+- Vitalezzz — [Silver Bullet](https://opengameart.org/content/silver-bullet)
+- Ruskerdax — [Cybershaman](https://opengameart.org/content/cybershaman) (shortened)

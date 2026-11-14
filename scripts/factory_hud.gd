@@ -225,16 +225,21 @@ func _draw() -> void:
 	if boss_visible:
 		var center := hud_size.x * 0.5
 		var values := "%d / %d" % [roundi(boss_health), roundi(boss_max_health)]
-		var value_width := UI.DISPLAY.get_string_size(values, HORIZONTAL_ALIGNMENT_LEFT, -1, 17).x
-		var title_width := UI.DISPLAY.get_string_size(boss_name, HORIZONTAL_ALIGNMENT_LEFT, -1, 18).x
-		var half_width := maxf(180.0, (title_width + value_width + 50.0) * 0.5)
-		var bar_left := center - half_width + 17
-		var bar_right := center + half_width - 17
-		plate(Rect2(center - half_width, 14, half_width * 2.0, 47), 11, boss_tint)
-		caption(Vector2(bar_left, 36), boss_name, 18)
-		caption(Vector2(bar_right - value_width, 36), values, 17)
-		draw_rect(Rect2(bar_left, 44, bar_right - bar_left, 7), Color("482738"))
-		draw_rect(Rect2(bar_left, 44, (bar_right - bar_left) * clampf(boss_health / boss_max_health, 0.0, 1.0), 7), boss_tint)
+		var scale_factor := 1.2
+		var value_font := roundi(17 * scale_factor)
+		var title_font := roundi(18 * scale_factor)
+		var value_width := UI.DISPLAY.get_string_size(values, HORIZONTAL_ALIGNMENT_LEFT, -1, value_font).x
+		var title_width := UI.DISPLAY.get_string_size(boss_name, HORIZONTAL_ALIGNMENT_LEFT, -1, title_font).x
+		var half_width := maxf(180.0 * scale_factor, (title_width + value_width + 50.0 * scale_factor) * 0.5)
+		var bar_left := center - half_width + 17 * scale_factor
+		var bar_right := center + half_width - 17 * scale_factor
+		plate(Rect2(center - half_width, 14, half_width * 2.0, 47 * scale_factor), 11 * scale_factor, boss_tint)
+		caption(Vector2(bar_left, 14 + 22 * scale_factor), boss_name, title_font)
+		caption(Vector2(bar_right - value_width, 14 + 22 * scale_factor), values, value_font)
+		var meter := Rect2(bar_left, 14 + 30 * scale_factor, bar_right - bar_left, 7 * scale_factor)
+		draw_rect(meter, Color("482738"))
+		meter.size.x *= clampf(boss_health / boss_max_health, 0.0, 1.0)
+		draw_rect(meter, boss_tint)
 	if failed:
 		plate(Rect2(hud_size.x * 0.5 - 168, hud_size.y * 0.72, 336, 44), 10, Color("ff536c"))
 		caption(Vector2(hud_size.x * 0.5 - 151, hud_size.y * 0.72 + 28), "RUN OVER   /   BANKING CREDITS" if lives <= 0 else "SYSTEM FAILURE   /   RESPAWNING", 17)
