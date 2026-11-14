@@ -17,7 +17,7 @@ Use a work directory outside the game project. The launcher accepts a validated 
 
 ## Installer 0.2 and Steam shortcuts
 
-The installed launcher is the entry point for local play and GitHub updates on Windows and Linux. Its path stays the same when the game updates. To add it to Steam, use Games → Add a Non-Steam Game to My Library and select the installed RIFTCORE launcher. On Windows, the final installer page can open Steam's add-game dialog. On Linux, pass `--steam-shortcut` to the installer to open the same dialog. Both options leave confirmation to the player in Steam.
+The launcher and the game share the same release feed and installer. In 5.9.2 or newer, start the game executable directly and use Settings → Update Game. Installation and restart are available from title Settings. An old launcher that cannot install a download can be refreshed by running the current installer into the existing installation. Its path stays the same when the game updates. To add it to Steam, use Games → Add a Non-Steam Game to My Library and select the installed RIFTCORE launcher. On Windows, the final installer page can open Steam's add-game dialog. On Linux, pass `--steam-shortcut` to the installer to open the same dialog. Both options leave confirmation to the player in Steam.
 
 The PNG frames inside the Windows ICO come from the transparent RIFTCORE SVG. Game and launcher exports embed that ICO, and the installer uses it for the setup executable and Start menu shortcut.
 

@@ -64,6 +64,17 @@ var coop_mission: Node3D
 var coop_join_loading: CanvasLayer
 
 func _ready() -> void:
+	if not OS.has_feature("editor") and DisplayServer.get_name() != "headless":
+		var updater := preload("res://scripts/update_client.gd").new()
+		var running := updater.configure_game()
+		var latest := updater.newest_installed()
+		var forwarded := latest != running and not latest.is_empty() and updater.compare_tags(latest, running)
+		var started := forwarded and updater.start_version(latest)
+		updater.free()
+		if started:
+			get_tree().quit()
+			return
+	add_build_version()
 	var pointer := preload("res://scripts/menu_pointer.gd").new()
 	pointer.name = "MenuPointer"
 	pointer.menu_open = func(): return (is_instance_valid(menu) and menu.is_visible_in_tree()
@@ -102,6 +113,20 @@ func _ready() -> void:
 		load_game.call_deferred()
 	else:
 		show_main_menu()
+
+func add_build_version() -> void:
+	var layer := CanvasLayer.new()
+	layer.layer = 190
+	add_child(layer)
+	var label := UI.label(layer, "v%s" % ProjectSettings.get_setting("application/config/version"), 15, UI.MUTED)
+	label.add_theme_color_override("font_shadow_color", Color("050a16"))
+	label.add_theme_constant_override("shadow_offset_y", 1)
+	label.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+	label.offset_left = -105
+	label.offset_right = -12
+	label.offset_top = -23
+	label.offset_bottom = -7
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 
 func verify_social() -> void:
 	var valid := Engine.has_singleton("Steam")
@@ -217,10 +242,21 @@ func verify_coop_mission(host: bool) -> void:
 	var local_index := 0 if host else 1
 	var local_operator: RiftPlayer = mission.operators[local_index]
 	var spawn_x := local_operator.position.x
-	if mission.camera.target != local_operator or not is_equal_approx(local_operator.damage_taken_scale, 2.5):
+	if mission.camera.target != local_operator or not is_equal_approx(local_operator.damage_taken_scale, 2.5) or not mission.personal_hud.coop or not mission.personal_hud.is_visible_in_tree():
+		print("Campaign check failed local camera or HUD")
 		finish_relay_check(false)
 		return
+	if not host:
+		RiftRelay.relay.set_artificial_latency(200)
 	Input.action_press("move_right")
+	if not host:
+		await get_tree().create_timer(0.15).timeout
+		if local_operator.position.x <= spawn_x + 0.12:
+			Input.action_release("move_right")
+			print("Campaign check failed immediate local movement with simulated latency")
+			finish_relay_check(false)
+			return
+		RiftRelay.relay.set_artificial_latency(0)
 	await get_tree().create_timer(0.4).timeout
 	Input.action_release("move_right")
 	var moved := await wait_for_relay(func(): return is_instance_valid(local_operator) and local_operator.position.x > spawn_x + 0.5, 6.0)
@@ -772,7 +808,7 @@ func show_pause_save() -> void:
 	, true).grab_focus()
 	UI.button(stack, "Back to Pause", build_pause_menu)
 
-func overlay(sidebar := false) -> VBoxContainer:
+func overlay(sidebar := false, wide := false) -> VBoxContainer:
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	if is_instance_valid(pause_menu):
 		pause_menu.get_parent().remove_child(pause_menu)
@@ -798,6 +834,14 @@ func overlay(sidebar := false) -> VBoxContainer:
 	var panel := PanelContainer.new()
 	panel.custom_minimum_size.x = 348 if sidebar else 460
 	center.add_child(panel)
+	if wide:
+		center.remove_child(panel)
+		pause_menu.add_child(panel)
+		panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		panel.offset_left = 155
+		panel.offset_right = -155
+		panel.offset_top = 55
+		panel.offset_bottom = -55
 	return UI.column(panel, 12)
 
 func show_pause_coop_setup() -> void:
@@ -807,7 +851,7 @@ func show_pause_coop_setup() -> void:
 	CoopSetup.build(stack, build_pause_menu)
 
 func show_pause_settings() -> void:
-	var stack := overlay()
+	var stack := overlay(false, true)
 	pause_menu.back_action = build_pause_menu
 	UI.label(stack, "SETTINGS", 32, UI.CYAN)
 	var settings := UI.settings(stack)

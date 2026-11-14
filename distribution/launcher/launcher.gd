@@ -1,54 +1,50 @@
 extends Control
 
-const MAX_PACKAGE := 512 * 1024 * 1024
-const REPO_PATTERN := "^[A-Za-z0-9][A-Za-z0-9-]{0,38}/[A-Za-z0-9_.-]{1,90}$"
-const TAG_PATTERN := "^v[0-9]{1,5}[.][0-9]{1,5}[.][0-9]{1,5}(-preview)?$"
-const LEGACY_MIGRATION_TAG := "v0.4.100"
-const HASH_PATTERN := "^[0-9a-f]{64}$"
+const UpdateClient := preload("res://update_client.gd")
 
+var client := UpdateClient.new()
 var install_root := ""
 var repo := ""
 var installed := ""
 var next_tag := ""
+var update_manifest: Dictionary
 var bundled_notes := ""
 var preview_channel := false
-var download_asset: Dictionary = {}
 var status: Label
 var notes_title: Label
 var notes_body: RichTextLabel
 var update: Button
 var play: Button
 var progress: ProgressBar
-var transfer: HTTPRequest
 var busy := false
-var target_platform := ""
-var game_filename := ""
 var resume_upgrade := false
 
 func _ready() -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	var root_arg := OS.get_cmdline_user_args()
 	install_root = root_arg[0] if OS.has_feature("editor") and not root_arg.is_empty() else OS.get_executable_path().get_base_dir()
-	target_platform = "windows-x64" if OS.get_name() == "Windows" else "linux-x64"
-	game_filename = "RIFTCORE.exe" if OS.get_name() == "Windows" else "RIFTCORE"
+	add_child(client)
 	var config := ConfigFile.new()
 	if config.load(install_root.path_join("updates.cfg")) == OK:
 		repo = String(config.get_value("updates", "repository", ""))
 		preview_channel = config.get_value("updates", "preview_channel", false)
 	resume_upgrade = root_arg.has("--resume-upgrade")
-	if OS.get_executable_path().get_base_dir().get_file() == LEGACY_MIGRATION_TAG:
+	if OS.get_executable_path().get_base_dir().get_file() == UpdateClient.LEGACY_MIGRATION_TAG:
 		var bridge_root := install_root.get_base_dir().get_base_dir()
 		if install_root.get_base_dir().get_file() == "versions" and FileAccess.file_exists(bridge_root.path_join("updates.cfg")):
 			install_root = bridge_root
 			build_ui()
 			migrate_launcher.call_deferred()
 			return
-	installed = newest_installed()
+	client.install_root = install_root
+	client.repo = repo
+	client.preview_channel = preview_channel
+	installed = client.newest_installed()
 	var notes_path := install_root.path_join("PATCH_NOTES.md")
 	if installed == config.get_value("updates", "bundled_notes_tag", "") and FileAccess.file_exists(notes_path):
 		bundled_notes = FileAccess.get_file_as_string(notes_path)
 	build_ui()
-	if is_match(REPO_PATTERN, repo):
+	if client.is_match(UpdateClient.REPO_PATTERN, repo):
 		check_updates()
 	else:
 		status.text = "Installed build %s  /  no release channel configured." % installed
@@ -61,7 +57,7 @@ func _input(event: InputEvent) -> void:
 
 func migrate_launcher() -> void:
 	status.text = "Upgrading the RIFTCORE launcher…"
-	var target := install_root.path_join(game_filename)
+	var target := install_root.path_join(client.game_filename)
 	var staged := target + ".upgrade"
 	var backup := target + ".previous"
 	if DirAccess.copy_absolute(OS.get_executable_path(), staged, 493) != OK:
@@ -233,113 +229,30 @@ func launcher_button(host: Container, title: String, fill: Color, accent: Color)
 	return button
 
 func _process(_delta: float) -> void:
-	if busy and is_instance_valid(transfer) and not download_asset.is_empty():
-		progress.value = 100.0 * float(transfer.get_downloaded_bytes()) / float(download_asset.size)
-
-func is_match(pattern: String, value: String) -> bool:
-	var regex := RegEx.new()
-	return regex.compile(pattern) == OK and regex.search(value) != null
-
-func compare_tags(a: String, b: String) -> bool:
-	if b.is_empty():
-		return true
-	var left := a.trim_suffix("-preview").substr(1).split(".")
-	var right := b.trim_suffix("-preview").substr(1).split(".")
-	for i in range(3):
-		var n := int(left[i])
-		var m := int(right[i])
-		if n != m:
-			return n > m
-	return not a.ends_with("-preview") and b.ends_with("-preview")
-
-func newest_installed() -> String:
-	var best := ""
-	var versions := install_root.path_join("versions")
-	var dir := DirAccess.open(versions)
-	if dir == null:
-		return best
-	for tag in dir.get_directories():
-		if tag == LEGACY_MIGRATION_TAG or not is_match(TAG_PATTERN, tag):
-			continue
-		var folder := versions.path_join(tag)
-		if FileAccess.file_exists(folder.path_join(game_filename)) and FileAccess.file_exists(folder.path_join("RIFTCORE.pck")) and compare_tags(tag, best):
-			best = tag
-	return best
+	if busy:
+		progress.value = client.download_progress()
 
 func check_updates() -> void:
-	var release_tag := ""
-	if preview_channel:
-		release_tag = await find_preview_release()
-	var request := HTTPRequest.new()
-	request.timeout = 5.5
-	request.body_size_limit = 32768
-	add_child(request)
-	var url := "https://github.com/%s/releases/latest/download/update.json" % repo
-	if not release_tag.is_empty():
-		url = "https://github.com/%s/releases/download/%s/update.json" % [repo, release_tag]
-	if request.request(url) != OK:
-		request.queue_free()
-		show_fallback_notes("Patch notes are unavailable offline.")
-		status.text = "Update check unavailable. You can still play installed."
-		return
-	var response: Array = await request.request_completed
-	request.queue_free()
-	if response[0] != HTTPRequest.RESULT_SUCCESS or response[1] != 200:
+	var manifest: Variant = await client.fetch_manifest()
+	if manifest == null:
 		show_fallback_notes("Patch notes are unavailable offline.")
 		status.text = "Update server unavailable. You can still play installed."
 		return
-	apply_manifest(JSON.parse_string(response[3].get_string_from_utf8()))
-
-func find_preview_release() -> String:
-	var request := HTTPRequest.new()
-	request.timeout = 5.5
-	request.body_size_limit = 1024 * 1024
-	add_child(request)
-	var url := "https://api.github.com/repos/%s/releases?per_page=20" % repo
-	if request.request(url, ["Accept: application/vnd.github+json"]) != OK:
-		request.queue_free()
-		return ""
-	var response: Array = await request.request_completed
-	request.queue_free()
-	if response[0] != HTTPRequest.RESULT_SUCCESS or response[1] != 200:
-		return ""
-	return select_release(JSON.parse_string(response[3].get_string_from_utf8()))
-
-func select_release(releases: Variant) -> String:
-	var best := ""
-	if not releases is Array:
-		return best
-	for release in releases:
-		if not release is Dictionary or release.get("draft", false):
-			continue
-		var tag := String(release.get("tag_name", ""))
-		if not is_match(TAG_PATTERN, tag) or not compare_tags(tag, best):
-			continue
-		var assets = release.get("assets", [])
-		if assets is Array and assets.any(func(asset): return asset is Dictionary and asset.get("name", "") == "update.json"):
-			best = tag
-	return best
+	apply_manifest(manifest)
 
 func apply_manifest(info: Variant) -> void:
 	if not info is Dictionary or not info.get("assets", {}) is Dictionary:
 		status.text = "Invalid release manifest."
 		return
 	var tag := String(info.get("tag", ""))
-	var assets: Dictionary = info.get("assets", {})
-	if tag == LEGACY_MIGRATION_TAG:
+	if tag == UpdateClient.LEGACY_MIGRATION_TAG:
 		show_fallback_notes("The launcher migration is complete. Game updates are available on the preview channel.")
 		status.text = "Play your installed game or check again when the preview channel is available."
 		return
-	var entry = assets.get(target_platform)
-	if not is_match(TAG_PATTERN, tag) or not entry is Dictionary:
-		status.text = "This release does not match your platform."
+	if client.package_entry(info).is_empty():
+		status.text = "This release does not have a valid package for your platform."
 		return
-	var name := "RIFTCORE-%s.zip" % target_platform
-	var bytes := int(entry.get("size", 0))
-	if entry.get("file", "") != name or bytes < 1 or bytes > MAX_PACKAGE or not is_match(HASH_PATTERN, String(entry.get("sha256", ""))):
-		status.text = "Invalid release package details."
-		return
-	if not installed.is_empty() and compare_tags(installed, tag):
+	if not installed.is_empty() and client.compare_tags(installed, tag):
 		status.text = "%s is newer than the public release." % installed
 		return
 	var latest_notes = info.get("notes", "")
@@ -347,11 +260,11 @@ func apply_manifest(info: Variant) -> void:
 		show_notes(tag, latest_notes)
 	else:
 		show_fallback_notes("No patch notes were published for this build.")
-	if not compare_tags(tag, installed):
+	if not client.compare_tags(tag, installed):
 		status.text = "%s is up to date." % installed
 		return
 	next_tag = tag
-	download_asset = {"file": name, "size": bytes, "sha256": String(entry.sha256)}
+	update_manifest = info
 	status.text = "%s is available. Installed: %s." % [tag, installed if not installed.is_empty() else "none"]
 	update.disabled = false
 	if resume_upgrade:
@@ -367,87 +280,13 @@ func apply_update() -> void:
 	progress.show()
 	progress.value = 0
 	status.text = "Downloading %s…" % next_tag
-	var staging := install_root.path_join("downloads")
-	if DirAccess.make_dir_recursive_absolute(staging) != OK:
-		fail_update("Could not open the download directory.")
+	var error := await client.install(update_manifest)
+	if not error.is_empty():
+		fail_update(error)
 		return
-	var zip_path := staging.path_join(next_tag + ".zip")
-	transfer = HTTPRequest.new()
-	transfer.download_file = zip_path
-	transfer.timeout = 145.0
-	transfer.body_size_limit = MAX_PACKAGE
-	add_child(transfer)
-	var url := "https://github.com/%s/releases/download/%s/%s" % [repo, next_tag, download_asset.file]
-	if transfer.request(url) != OK:
-		transfer.queue_free()
-		fail_update("Could not start the download.")
-		return
-	var response: Array = await transfer.request_completed
-	transfer.queue_free()
-	if response[0] != HTTPRequest.RESULT_SUCCESS or response[1] != 200:
-		DirAccess.remove_absolute(zip_path)
-		fail_update("Download failed. Your installed game is unchanged.")
-		return
-	var file := FileAccess.open(zip_path, FileAccess.READ)
-	var correct_size: bool = file != null and file.get_length() == download_asset.size
-	if file:
-		file.close()
-	if not correct_size or FileAccess.get_sha256(zip_path) != download_asset.sha256:
-		DirAccess.remove_absolute(zip_path)
-		fail_update("The download did not pass the integrity check.")
-		return
-	if not unpack_version(zip_path, next_tag):
-		DirAccess.remove_absolute(zip_path)
-		fail_update("Could not install the update. Your installed game is unchanged.")
-		return
-	DirAccess.remove_absolute(zip_path)
 	installed = next_tag
 	busy = false
 	launch_game()
-
-func unpack_version(zip_path: String, tag: String) -> bool:
-	if not is_match(TAG_PATTERN, tag):
-		return false
-	var zip := ZIPReader.new()
-	if zip.open(zip_path) != OK:
-		return false
-	var expected := [game_filename, "RIFTCORE.pck", "GODOT_LICENSE.txt", "GODOT_COPYRIGHT.txt"]
-	var entries := zip.get_files()
-	var steam_runtime := ["GODOTSTEAM_LICENSE.md", "steam_api64.dll", "libgodotsteam.windows.template_release.x86_64.dll"] if game_filename.ends_with(".exe") else ["GODOTSTEAM_LICENSE.md", "libsteam_api.so", "libgodotsteam.linux.template_release.x86_64.so"]
-	if entries.size() == expected.size() + steam_runtime.size():
-		expected.append_array(steam_runtime)
-	if entries.size() != expected.size():
-		zip.close()
-		return false
-	for name in expected:
-		if not name in entries:
-			zip.close()
-			return false
-	var versions := install_root.path_join("versions")
-	var final_path := versions.path_join(tag)
-	var temporary := versions.path_join("%s-install-%d" % [tag, Time.get_ticks_usec()])
-	if DirAccess.make_dir_recursive_absolute(temporary) != OK:
-		zip.close()
-		return false
-	var ok := true
-	for name in expected:
-		var contents := zip.read_file(name)
-		var output := FileAccess.open(temporary.path_join(name), FileAccess.WRITE)
-		if contents.is_empty() or not output:
-			ok = false
-			break
-		output.store_buffer(contents)
-		output.close()
-	zip.close()
-	if ok and OS.get_name() != "Windows":
-		ok = FileAccess.set_unix_permissions(temporary.path_join(game_filename), 493) == OK
-	if ok:
-		ok = DirAccess.rename_absolute(temporary, final_path) == OK
-	if not ok:
-		for name in expected:
-			DirAccess.remove_absolute(temporary.path_join(name))
-		DirAccess.remove_absolute(temporary)
-	return ok
 
 func fail_update(message: String) -> void:
 	busy = false
@@ -459,12 +298,7 @@ func fail_update(message: String) -> void:
 func launch_game() -> void:
 	if installed.is_empty():
 		return
-	var executable := install_root.path_join("versions").path_join(installed).path_join(game_filename)
-	var arguments := PackedStringArray()
-	if OS.get_name() == "Linux" and DisplayServer.get_name().to_lower() == "wayland":
-		arguments = PackedStringArray(["--display-driver", "wayland"])
-	if OS.create_process(executable, arguments, false) <= 0:
-		fail_update("The installed game could not launch.")
+	if not client.start_version(installed):
+		fail_update("The installed game could not launch. Check its file permissions and dependencies.")
 	else:
 		get_tree().quit()
-

@@ -39,6 +39,17 @@ def local_templates(config: Path, templates: Path):
         config.write_bytes(original)
 
 
+@contextlib.contextmanager
+def embedded_release(tag: str, repo: str):
+    # The runtime reads this even when a standalone ZIP has no launcher config.
+    config = ROOT / "assets" / "update_channel.json"
+    config.write_text(json.dumps({"tag": tag, "repo": repo}), encoding="utf-8")
+    try:
+        yield
+    finally:
+        config.unlink()
+
+
 def godot(engine: Path, project: Path, log: Path, *flags: str) -> None:
     command = [str(engine), "--headless", "--path", str(project), "--log-file", str(log), *flags]
     proc = subprocess.run(command, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=240)
@@ -121,6 +132,7 @@ def main() -> None:
     work.mkdir(parents=True, exist_ok=True)
     out.mkdir(parents=True, exist_ok=True)
     launcher = DIST / "launcher"
+    shutil.copy2(ROOT / "scripts/update_client.gd", launcher / "update_client.gd")
     icon = launcher / "branding" / "riftcore-icon.svg"
     icon_cache = work / "riftcore.ico"
     godot(engine, launcher, work / "branding.log", "--script", str(DIST / "make_brand_icon.gd"), "--", str(icon), str(icon_cache))
@@ -139,7 +151,8 @@ def main() -> None:
         for platform, (preset, binary, _) in ENGINE_ASSETS.items():
             payload = work / platform / "install"
             version = payload / "versions" / a.tag
-            export(engine, ROOT, preset, version / binary, work / f"{platform}-game.log")
+            with embedded_release(a.tag, a.repo):
+                export(engine, ROOT, preset, version / binary, work / f"{platform}-game.log")
             export(engine, launcher, preset, payload / binary, work / f"{platform}-launcher.log")
             if platform == "windows-x64":
                 shutil.copy2(icon_cache, payload / "riftcore.ico")

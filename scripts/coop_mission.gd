@@ -4,6 +4,7 @@ signal exit_requested
 signal rewards_earned(xp: int, bolts: int, blueprints: Array, sector: int)
 
 const PLAYER := preload("res://scenes/actors/riftcore_player.tscn")
+const FactoryHUD := preload("res://scripts/factory_hud.gd")
 const UI := preload("res://scripts/rift_ui.gd")
 const Catalog := preload("res://scripts/sector_catalog.gd")
 const Miniboss := preload("res://scripts/sector_miniboss.gd")
@@ -12,6 +13,7 @@ const Loading := preload("res://scripts/act_loading_screen.gd")
 const Equipment := preload("res://scripts/equipment_stats.gd")
 const INPUTS := [&"jump", &"dash", &"crouch", &"crouch_stick", &"shoot", &"melee", &"climb_down", &"swap_weapon", &"previous_suit"]
 const TICK := 0.05
+const INPUT_INTERVAL := 1.0 / 30.0
 const DIFFICULTY := 2.5
 const XP_BONUS := 1.5
 const Blueprints := preload("res://scripts/blueprint_catalog.gd")
@@ -43,6 +45,7 @@ var remote_gear: Dictionary = {}
 var remote_upgrades: Dictionary = {}
 var remote_loadout_received := false
 var stage_title: Label
+var personal_hud: Control
 var return_timer: Timer
 var last_boss_health := -1.0
 var remote_checkpoint := Vector3.ZERO
@@ -65,7 +68,13 @@ var team_blueprints: Array = []
 var loot_rng := RandomNumberGenerator.new()
 var rewards_delivered := false
 var blueprint_count := 0
-var held: Dictionary = {}
+var last_sent_axis := Vector2.ZERO
+var input_sequence := 0
+var latest_input := -1
+var latest_edge := -1
+var state_sequence := 0
+var latest_state := -1
+var correction := Vector3.ZERO
 var pressed: Dictionary = {}
 var released: Dictionary = {}
 var targets: Array = []
@@ -164,11 +173,13 @@ func load_stage() -> void:
 			if operator.lives <= 0:
 				operator.lives = 1
 			operator.equip_sector_weapon(previous[index][3])
-		operator.set_physics_process(host)
+		operator.set_physics_process(host or index == 1)
 		if not host:
 			operator.set_process(false)
 			operator.collision_layer = 0
-			operator.collision_mask = 0
+			operator.local_prediction = index == 1
+			if index == 0:
+				operator.collision_mask = 0
 		else:
 			operator.coop_xp_pickup = award_pickup_xp
 			operator.fell_into_pit.connect(respawn_operator.bind(operator))
@@ -237,8 +248,10 @@ func load_stage() -> void:
 			platform.process_mode = Node.PROCESS_MODE_DISABLED
 	stage.get_node("ForgeHallDoor").target = first
 	Details.new().install(stage, first, sector, act)
+	correction = Vector3.ZERO
 	if stage_title:
 		update_hud_title()
+		update_personal_hud(first if host else second)
 
 func scale_opponent(enemy: Combatant) -> void:
 	enemy.max_health *= DIFFICULTY
@@ -410,10 +423,18 @@ func update_hud_title() -> void:
 func build_hud() -> void:
 	var layer := CanvasLayer.new()
 	add_child(layer)
+	personal_hud = FactoryHUD.new()
+	personal_hud.coop = true
+	personal_hud.player_level = local_profile.player_level()
+	layer.add_child(personal_hud)
+	personal_hud.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	var panel := PanelContainer.new()
 	panel.theme = UI.theme()
-	panel.position = Vector2(22, 18)
 	layer.add_child(panel)
+	panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+	panel.offset_left = -288
+	panel.offset_right = -16
+	panel.offset_top = 16
 	var content := UI.column(panel, 5)
 	stage_title = UI.label(content, "", 27, UI.CYAN)
 	update_hud_title()
@@ -423,6 +444,27 @@ func build_hud() -> void:
 	rewards_status = UI.label(content, "", 15, UI.CYAN)
 	return_button = UI.button(content, "Leave Mission", func(): exit_requested.emit(), false, 34)
 	return_button.focus_mode = Control.FOCUS_NONE
+	update_personal_hud(operators[0 if host else 1])
+
+func update_personal_hud(operator: RiftPlayer) -> void:
+	personal_hud.health = clampf(operator.health / operator.max_health, 0.0, 1.0)
+	personal_hud.energy = clampf(operator.energy / operator.max_energy, 0.0, 1.0)
+	personal_hud.health_capacity = operator.max_health
+	personal_hud.energy_capacity = operator.max_energy
+	personal_hud.lives = operator.lives
+	personal_hud.credits = team_bolts
+	var suit := Catalog.weapon(operator.equipped_suit())
+	personal_hud.weapon = String(suit.get("reward_name", "STANDARD FRAME")).to_upper()
+	personal_hud.suit_tint = Color(suit.get("color", UI.CYAN))
+	personal_hud.boss_visible = boss_started and not boss_defeated and is_instance_valid(boss)
+	if personal_hud.boss_visible:
+		personal_hud.boss_name = String(Miniboss.TITLES[sector - 1] if act == 1 else Catalog.info(sector).boss).to_upper()
+		personal_hud.boss_tint = Color(Catalog.info(sector).color)
+		personal_hud.boss_health = clampf(boss.health / boss.max_health, 0.0, 1.0)
+	if personal_hud.experience != team_xp:
+		personal_hud.set_experience(team_xp)
+	else:
+		personal_hud.queue_redraw()
 
 func get_player_axis() -> Vector2:
 	return Vector2(Input.get_axis("move_left", "move_right"), Input.get_axis("climb_down", "climb_up"))
@@ -431,6 +473,12 @@ func _physics_process(delta: float) -> void:
 	if not outcome.is_empty() or changing_act or not RiftRelay.mission_active:
 		return
 	if not host:
+		# Keep the guest responsive while the host remains authoritative.
+		var local := operators[1]
+		if local.health > 0.0 and correction.length_squared() > 0.0225:
+			var step := correction * (1.0 - exp(-9.0 * delta))
+			local.move_and_collide(step)
+			correction -= step
 		for action in INPUTS:
 			if Input.is_action_just_pressed(action):
 				pressed[action] = true
@@ -462,9 +510,11 @@ func _physics_process(delta: float) -> void:
 		if changing_act or not outcome.is_empty():
 			return
 	clock += delta
-	if clock < TICK:
+	var interval := TICK if host else INPUT_INTERVAL
+	var responsive_input := not host and (not pressed.is_empty() or not released.is_empty() or get_player_axis().distance_to(last_sent_axis) >= 0.15)
+	if clock < interval and not responsive_input:
 		return
-	clock = fmod(clock, TICK)
+	clock = 0.0 if responsive_input else fmod(clock, interval)
 	if host:
 		broadcast_state()
 	else:
@@ -495,33 +545,32 @@ func send_input() -> void:
 	pressed.clear()
 	released.clear()
 	var axis := get_player_axis()
+	last_sent_axis = axis
+	input_sequence += 1
 	if down != 0 or up != 0:
-		peer.call_func_on(peer.get_host(), receive_input, axis, current, down, up)
+		peer.call_func_on(peer.get_host(), receive_input, axis, current, down, up, input_sequence)
 	else:
-		peer.call_func_on_unreliable(peer.get_host(), receive_input, axis, current, down, up)
+		peer.call_func_on_unreliable(peer.get_host(), receive_input, axis, current, down, up, input_sequence)
 
-func receive_input(axis: Vector2, current: int, down: int, up: int) -> void:
+func receive_input(axis: Vector2, current: int, down: int, up: int, sequence: int) -> void:
 	if not host or not outcome.is_empty() or not axis.is_finite() or not peer.lobby_get_all_clients().has(peer.get_sender_id()) or peer.get_sender_id() == peer.get_client_id():
 		return
 	var operator := operators[1]
-	guest_timeout = 0.45
-	operator.remote_axis = axis.clamp(Vector2(-1, -1), Vector2(1, 1))
-	operator.remote_held.clear()
-	for index in INPUTS.size():
-		var action: StringName = INPUTS[index]
-		if current & (1 << index):
-			operator.remote_held[action] = true
-		if down & (1 << index):
-			operator.remote_pressed[action] = true
-		if up & (1 << index):
-			operator.remote_released[action] = true
-	clear_edges.call_deferred(operator)
-
-func clear_edges(operator: RiftPlayer) -> void:
-	await get_tree().physics_frame
-	await get_tree().process_frame
-	operator.remote_pressed.clear()
-	operator.remote_released.clear()
+	if sequence > latest_input:
+		latest_input = sequence
+		guest_timeout = 0.45
+		operator.remote_axis = axis.clamp(Vector2(-1, -1), Vector2(1, 1))
+		operator.remote_held.clear()
+		for index in INPUTS.size():
+			if current & (1 << index):
+				operator.remote_held[INPUTS[index]] = true
+	if (down != 0 or up != 0) and sequence > latest_edge:
+		latest_edge = sequence
+		for index in INPUTS.size():
+			if down & (1 << index):
+				operator.remote_pressed[INPUTS[index]] = true
+			if up & (1 << index):
+				operator.remote_released[INPUTS[index]] = true
 
 func award_pickup_xp(amount: int) -> void:
 	award_shared(amount, 0, "")
@@ -543,13 +592,16 @@ func award_shared(base_xp: int, bolts: int, source: String) -> void:
 	for operator in operators:
 		if operator.health > 0.0:
 			operator.gain_experience(xp)
+		else:
+			operator.gain_experience(xp, false)
+			operator.health = 0.0
 
 func broadcast_state() -> void:
 	var players := []
 	var security := []
 	props_consumed.clear()
 	for operator in operators:
-		players.append([operator.global_position, operator.model_root.rotation, operator.health, operator.energy, operator.current_animation, operator.facing, operator.equipped_suit(), operator.lives])
+		players.append([operator.global_position, operator.model_root.rotation, operator.health, operator.energy, operator.current_animation, operator.facing, operator.equipped_suit(), operator.lives, operator.max_health, operator.max_energy, operator.velocity, operator.fire_lock, operator.charge_held, operator.melee_lock])
 	for enemy in enemies:
 		if is_instance_valid(enemy) and enemy.health > 0:
 			security.append([enemy.global_position, enemy.robot.rotation, enemy.health])
@@ -566,14 +618,24 @@ func broadcast_state() -> void:
 		boss_state[0] = boss.global_position
 		boss_state[1] = boss.rotation
 		boss_state[2] = boss.health
-	peer.call_func_unreliable(receive_state, act, players, security, boss_state, props_consumed, team_xp, team_bolts, team_blueprints.size())
+	state_sequence += 1
+	peer.call_func_unreliable(receive_state, act, players, security, boss_state, props_consumed, team_xp, team_bolts, team_blueprints.size(), state_sequence)
 	if (not boss_started and operators.any(func(operator): return operator.lives <= 0)) or (boss_started and operators.all(func(operator): return operator.health <= 0.0) and operators.any(func(operator): return operator.lives <= 0)):
 		peer.call_func(receive_outcome, false, 0, 0, [])
 		finish_mission(false, 0, 0, [])
 
-func receive_state(remote_act: int, players: Array, security: Array, arena: Array, consumed: Array, xp: int, bolts: int, blueprints_found: int) -> void:
-	if host or changing_act or remote_act != act or not outcome.is_empty() or peer.get_sender_id() != peer.get_host() or players.size() != 2 or security.size() != enemies.size():
+func receive_state(remote_act: int, players: Array, security: Array, arena: Array, consumed: Array, xp: int, bolts: int, blueprints_found: int, sequence: int) -> void:
+	if host or changing_act or remote_act != act or not outcome.is_empty() or peer.get_sender_id() != peer.get_host() or sequence <= latest_state or players.size() != 2 or security.size() != enemies.size():
 		return
+	latest_state = sequence
+	var local := operators[1]
+	var local_data: Array = players[1]
+	var projected: Vector3 = local_data[0] + local_data[10] * TICK
+	correction = projected - local.global_position
+	if local_data[2] <= 0.0 or local.health <= 0.0 or correction.length() > 2.5:
+		local.global_position = local_data[0]
+		local.velocity = local_data[10]
+		correction = Vector3.ZERO
 	if is_instance_valid(boss):
 		boss.global_position = arena[0]
 		boss.rotation = arena[1]
@@ -585,6 +647,7 @@ func receive_state(remote_act: int, players: Array, security: Array, arena: Arra
 	boss_defeated = arena[4]
 	if is_instance_valid(boss):
 		boss.visible = boss_started and not boss_defeated
+	entrance_open = arena[7]
 	if boss_defeated:
 		room_status.text = "Enter the Act II gate." if act == 1 else "Reach the extraction pad."
 	elif boss_started:
@@ -592,7 +655,6 @@ func receive_state(remote_act: int, players: Array, security: Array, arena: Arra
 	else:
 		room_status.text = "Enter the boss room together." if entrance_open else "Both operators must reach the boss door."
 	gate.get_node("Door").position.y = arena[5]
-	entrance_open = arena[7]
 	if arena[8] != remote_checkpoint:
 		remote_checkpoint = arena[8]
 		for path_name in ["TERRAIN/MidpointCheckpoint", "TERRAIN/ForgeHallCheckpoint"]:
@@ -622,12 +684,19 @@ func _process(delta: float) -> void:
 			if data.is_empty():
 				continue
 			var operator := operators[index]
-			operator.global_position = operator.global_position.lerp(data[0], blend)
-			operator.model_root.rotation = data[1]
+			if index == 0:
+				operator.global_position = operator.global_position.lerp(data[0], blend)
+				operator.model_root.rotation = data[1]
+				operator.play_character_animation(data[4])
+				operator.facing = data[5]
+			else:
+				operator.fire_lock = data[11]
+				operator.charge_held = data[12]
+				operator.melee_lock = data[13]
 			operator.health = data[2]
 			operator.energy = data[3]
-			operator.play_character_animation(data[4])
-			operator.facing = data[5]
+			operator.max_health = data[8]
+			operator.max_energy = data[9]
 			operator.lives = data[7]
 			if operator.equipped_suit() != data[6]:
 				if String(data[6]).is_empty():
@@ -671,7 +740,8 @@ func _process(delta: float) -> void:
 		partner_status.text = "%s is nearby" % partner_name
 	else:
 		partner_status.text = "%s  %s  %.0f m" % ["←" if offset < 0.0 else "→", partner_name, absf(offset)]
-	stats.text = "HOST HP %d    PARTNER HP %d    SECURITY %d LEFT\nSHARED  %d XP  /  %d BOLTS  /  %d BLUEPRINTS" % [operators[0].health, operators[1].health, enemies.filter(func(enemy): return is_instance_valid(enemy) and enemy.health > 0 and enemy.visible).size(), team_xp, team_bolts, team_blueprints.size() if host else blueprint_count]
+	stats.text = "Security %d left  ·  %d blueprints" % [enemies.filter(func(enemy): return is_instance_valid(enemy) and enemy.health > 0 and enemy.visible).size(), team_blueprints.size() if host else blueprint_count]
+	update_personal_hud(operators[0 if host else 1])
 
 func send_shot(shot: RiftProjectile) -> void:
 	peer.call_func(receive_shot, shot.global_position, shot.direction, shot.speed, shot.palette, shot.is_charged, shot.is_magma, shot.owner_faction)

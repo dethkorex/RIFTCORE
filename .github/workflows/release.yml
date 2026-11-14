@@ -53,6 +53,10 @@ jobs:
       - name: Verify release notes
         run: |
           python3 -c 'import json, pathlib; p=pathlib.Path("release-tools/artifacts"); assert json.loads((p / "update.json").read_text())["notes"] == (p / "PATCH_NOTES.md").read_text().strip()'
+      - name: Recover an interrupted Linux update
+        run: |
+          engine="$PWD/release-tools/Godot_v4.7.2-stable_linux.x86_64"
+          "$engine" --headless --path "$PWD" --script "$PWD/distribution/verify_update.gd" -- "$PWD/release-tools/artifacts/RIFTCORE-linux-x64.zip" "$RUNNER_TEMP/in-game update QA"
       - name: Install and smoke-test Linux build
         run: |
           export XDG_DATA_HOME="$(mktemp -d)"

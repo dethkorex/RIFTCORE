@@ -1,6 +1,16 @@
-# RIFTCORE 5.9.1 — Fractured Connections (development preview)
+# RIFTCORE 5.9.2 — Fractured Connections
 
-## Game changes
+## 5.9.2
+
+- Added **Update Game** to Settings. Check releases and read patch notes in the game. From the title screen, install and restart without opening the launcher.
+- Reorganized Settings into Display & Audio, Controls, and Update Game. The binding list scrolls independently.
+- Fixed update installs that hit incomplete version folders. Updates verify the download and report the specific extraction, permission, or activation error when installation fails.
+- Restored the personal HUD in co-op and moved mission and partner information to the right.
+- Reduced guest movement delay with immediate local movement and faster input updates. The host still decides combat, damage and rewards. Both players need 5.9.2 to join the same room.
+- Added the game version in small text at the bottom right and removed the overlapping hub prompt frame.
+
+## 5.9.1
+
 
 - Choose a player name when creating a save. Names appear over operators in online sessions and in the partner direction indicator.
 - Guests enter the room leader’s Operations Station through a loading screen. Each player’s camera follows their own operator.

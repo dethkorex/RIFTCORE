@@ -193,7 +193,9 @@ static func column(parent: Node, spacing := 12) -> VBoxContainer:
 	parent.add_child(stack)
 	return stack
 
-static func settings(parent: VBoxContainer) -> Control:
+static func settings(parent: VBoxContainer, can_restart := false) -> Control:
 	var panel := preload("res://scripts/settings_panel.gd").new()
+	panel.name = "RiftSettingsPanel"
+	panel.can_restart = can_restart
 	parent.add_child(panel)
 	return panel

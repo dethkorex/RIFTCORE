@@ -24,6 +24,7 @@ var notice: Label
 var notice_tween: Tween
 var remaining := 0
 var act := 1
+var coop := false
 var reserve_lives := 0
 var reached_exit := false
 var weapon := "STANDARD FRAME"
@@ -153,22 +154,24 @@ func _draw() -> void:
 	var next_threshold := RiftPlayer.experience_threshold(shown_level + 1)
 	gauge(139, "XP", (animated_xp - threshold) / (next_threshold - threshold), Color("ab72ff"), 150.0)
 	var right := hud_size.x - 20.0
-	var x := right - 348.0
-	plate(Rect2(x, 21, 348, 105), 14)
-	for y in range(56, 120, 5):
-		draw_line(Vector2(x + 5, y), Vector2(right - 5, y), Color("102752"), 1.0)
-	caption(Vector2(x + 18, 49), "ACT %s  /  OBJECTIVE" % ("II" if act == 2 else "I"), 22)
-	draw_line(Vector2(x + 12, 55), Vector2(right - 12, 55), CYAN, 1.0)
-	task(Vector2(x + 20, 80), exit_task, reached_exit)
-	task(Vector2(x + 20, 106), "OPTIONAL: SECURITY   %d LEFT" % remaining, remaining == 0)
-	plate(Rect2(right - 222, 139, 222, 36), 11)
-	draw_texture_rect(CURRENCY, Rect2(right - 209, 144, 24, 24), false)
-	caption(Vector2(right - 175, 164), "BOLTS  %04d" % credits, 19)
-	plate(Rect2(right - 222, 181, 222, 33), 9)
+	if not coop:
+		var x := right - 348.0
+		plate(Rect2(x, 21, 348, 105), 14)
+		for y in range(56, 120, 5):
+			draw_line(Vector2(x + 5, y), Vector2(right - 5, y), Color("102752"), 1.0)
+		caption(Vector2(x + 18, 49), "ACT %s  /  OBJECTIVE" % ("II" if act == 2 else "I"), 22)
+		draw_line(Vector2(x + 12, 55), Vector2(right - 12, 55), CYAN, 1.0)
+		task(Vector2(x + 20, 80), exit_task, reached_exit)
+		task(Vector2(x + 20, 106), "OPTIONAL: SECURITY   %d LEFT" % remaining, remaining == 0)
+	var counters := Vector2(20, 247) if coop else Vector2(right - 222, 139)
+	plate(Rect2(counters, Vector2(222, 36)), 11)
+	draw_texture_rect(CURRENCY, Rect2(counters + Vector2(13, 5), Vector2(24, 24)), false)
+	caption(counters + Vector2(47, 25), "BOLTS  %04d" % credits, 19)
+	plate(Rect2(counters + Vector2(0, 42), Vector2(222, 33)), 9)
 	var life_text := "RX   LIVES   %02d" % lives
 	if reserve_lives > 0:
 		life_text += "  +%d" % reserve_lives
-	caption(Vector2(right - 207, 204), life_text, 17)
+	caption(counters + Vector2(15, 65), life_text, 17)
 	if boss_visible:
 		var center := hud_size.x * 0.5
 		plate(Rect2(center - 180, 14, 360, 47), 11, boss_tint)

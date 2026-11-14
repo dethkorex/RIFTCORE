@@ -31,7 +31,6 @@ var panel_open := false
 var pads: Array[Dictionary] = []
 var bank_label: Label
 var station_notice: Button
-var station_panel: PanelContainer
 var hud_layer: CanvasLayer
 const HUB_RUN_SPEED := 6.6
 var velocity_x := 0.0
@@ -144,7 +143,7 @@ func update_station() -> void:
 		RiftAudio.play_effect(&"menu_move")
 	current_station = nearest
 	prompt.visible = nearest >= 0 and not panel_open
-	station_panel.visible = nearest >= 0 and not panel_open
+	station_notice.visible = nearest >= 0 and not panel_open
 	if nearest >= 0:
 		prompt.text = STATIONS[nearest].name.to_upper()
 		prompt.modulate = STATIONS[nearest].color.lerp(Color.WHITE, 0.32)
@@ -348,17 +347,20 @@ func build_hud() -> void:
 	wallet.offset_left = -358
 	wallet.offset_right = -24
 	wallet.offset_top = 21
-	station_panel = PanelContainer.new()
-	station_panel.add_theme_stylebox_override("panel", UI.texture_frame("panel_active_small", 31, Vector2(22, 12)))
-	interface.add_child(station_panel)
-	station_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
-	station_panel.offset_left = -190
-	station_panel.offset_right = 190
-	station_panel.offset_top = -77
-	station_panel.offset_bottom = -22
-	station_notice = UI.button(station_panel, "", activate_station, false, 34)
+	station_notice = UI.button(interface, "", activate_station, false, 34, false)
 	station_notice.focus_mode = Control.FOCUS_NONE
 	station_notice.add_theme_font_size_override("font_size", 18)
+	station_notice.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
+	station_notice.offset_left = -190
+	station_notice.offset_right = 190
+	station_notice.offset_top = -77
+	station_notice.offset_bottom = -22
+	var idle := UI.texture_frame("panel_active_small", 31, Vector2(22, 12))
+	var active := idle.duplicate() as StyleBoxTexture
+	active.modulate_color = UI.VIOLET
+	var down := active.duplicate() as StyleBoxTexture
+	down.modulate_color = UI.VIOLET.darkened(0.22)
+	UI.set_button_states(station_notice, idle, active, down)
 
 func paint(tint: Color, emission: float, metallic := 0.0) -> StandardMaterial3D:
 	var finish := StandardMaterial3D.new()

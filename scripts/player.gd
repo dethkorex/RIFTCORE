@@ -279,6 +279,7 @@ func build_visuals() -> void:
 
 var coop_xp_pickup: Callable
 var remote_input := false
+var local_prediction := false
 var remote_axis := Vector2.ZERO
 var remote_held: Dictionary = {}
 var remote_pressed: Dictionary = {}
@@ -299,6 +300,11 @@ func action_released(action: StringName) -> bool:
 	return remote_released.has(action) if remote_input else Input.is_action_just_released(action)
 
 func _physics_process(delta: float) -> void:
+	simulate_movement(delta)
+	remote_pressed.clear()
+	remote_released.clear()
+
+func simulate_movement(delta: float) -> void:
 	resume_input_guard = maxf(0.0, resume_input_guard - delta)
 	if health <= 0.0:
 		cancel_charge()
@@ -350,13 +356,14 @@ func _physics_process(delta: float) -> void:
 	var stick_crouch := action_held("crouch_stick") and absf(axis) < 0.35
 	var wants_crouch := action_held("crouch") or stick_crouch
 	set_crouch(not dropping and wants_crouch and is_on_floor() and dash_left <= 0.0 and jump_buffer <= 0.0)
-	if melee_lock <= 0.0:
+	if not local_prediction and melee_lock <= 0.0:
 		if action_pressed("swap_weapon"):
 			cycle_weapon()
 		elif action_pressed("previous_suit"):
 			cycle_weapon(-1)
-	update_charge(delta)
-	update_melee(delta)
+	if not local_prediction:
+		update_charge(delta)
+		update_melee(delta)
 	if dash_left > 0.0:
 		update_dash(delta, axis)
 	if dash_left <= 0.0:
@@ -427,10 +434,10 @@ func _physics_process(delta: float) -> void:
 		landing_left = 0.16 if absf(velocity.x) < 3.0 else 0.09
 	for index in range(get_slide_collision_count()):
 		var collider := get_slide_collision(index).get_collider()
-		if is_instance_valid(collider) and collider.has_method("damage_on_contact"):
+		if not local_prediction and is_instance_valid(collider) and collider.has_method("damage_on_contact"):
 			collider.damage_on_contact(self)
 	update_character_visuals(axis)
-	if global_position.y < -3.4:
+	if not local_prediction and global_position.y < -3.4:
 		health = 0.0
 		cancel_charge()
 		health_changed.emit(health, max_health)
@@ -665,7 +672,8 @@ func update_ladder(delta: float, axis: float) -> bool:
 		buster_pose.crouched = false
 		var aiming := absf(axis) > 0.30 or charge_held or fire_lock > 0.0
 		buster_pose.influence = move_toward(buster_pose.influence, 1.0 if aiming else 0.0, 0.30)
-	update_charge(delta)
+	if not local_prediction:
+		update_charge(delta)
 	if is_instance_valid(charge_orb):
 		charge_orb.global_position = cannon_muzzle(facing)
 	if climb_pose:

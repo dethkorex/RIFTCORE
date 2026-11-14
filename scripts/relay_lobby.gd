@@ -13,6 +13,7 @@ const Client := preload("res://addons/GD-Sync/MultiplayerClient.gd")
 const RelayEnums := preload("res://addons/GD-Sync/Scripts/Enums/Enums.gd")
 const Codes := "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 const CodeLength := 10
+const ROOM_PREFIX := "riftcore-coop-v3-"
 const RELAY_UNAVAILABLE := "Online rooms are unavailable. Solo play is available."
 
 var status := "Create a room or enter a friend’s room code."
@@ -55,8 +56,8 @@ func _initialize_client() -> void:
 	relay.lobby_joined.connect(_room_joined)
 	relay.lobby_join_failed.connect(_room_failed)
 	relay.steam_join_request.connect(func(lobby_name: String, has_password: bool):
-		if not has_password and lobby_name.begins_with("riftcore-coop-v2-"):
-			join_room(lobby_name.trim_prefix("riftcore-coop-v2-"))
+		if not has_password and lobby_name.begins_with(ROOM_PREFIX):
+			join_room(lobby_name.trim_prefix(ROOM_PREFIX))
 	)
 	relay.client_joined.connect(_players_changed)
 	relay.client_left.connect(_peer_left)
@@ -162,7 +163,7 @@ func _room_joined(lobby_name: String) -> void:
 func _room_failed(lobby_name: String, error: int) -> void:
 	if pending.is_empty() or lobby_name != _room_name():
 		return
-	var message := "Could not create a room. Try again." if pending == "host" else "Could not join this room. Check the code and ask your friend to keep the room open."
+	var message := "Could not create a room. Try again." if pending == "host" else "Could not join this room. Check the code and make sure both players are on the same game version."
 	leave("%s (GD Sync code %d)" % [message, error])
 
 func _connection_failed(error: int) -> void:
@@ -250,7 +251,7 @@ func leave(message := "Create a room or enter a friend’s room code.") -> void:
 		mission_disconnected.emit(message)
 
 func _room_name() -> String:
-	return "riftcore-coop-v2-" + room_code
+	return ROOM_PREFIX + room_code
 
 func _update(message: String) -> void:
 	status = message

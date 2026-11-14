@@ -166,13 +166,8 @@ func show_page(next: String) -> void:
 			CoopSetup.build(card(columns, 1.75), leave_page)
 			portrait(card(columns))
 		"Settings":
-			var form := card(columns, 2.0)
-			UI.label(form, "Audio and display", 28, UI.CYAN)
-			var settings := UI.settings(form)
+			var settings := UI.settings(card(columns), not station_panel)
 			settings.initial_focus.grab_focus()
-			UI.label(form, "Default keyboard  /  A–D move · S crouch · W/S ladder · Space jump · J fire · K slash · Shift dash\nDefault controller  /  Left stick move · Down crouch · Up/Down ladder · A jump · X fire · Y slash · B dash · Start pause\nHold fire to charge, then release. Charged shots use 30 energy.", 16, UI.MUTED)
-			var art := card(columns)
-			portrait(art)
 	if page not in ["Title", "Co-op Setup Guide"]:
 		var back_title := "Back to Title"
 		if station_panel:
@@ -221,6 +216,8 @@ func open_station(next: String) -> void:
 	show_page(next)
 
 func leave_page() -> void:
+	if page == "Settings" and find_children("RiftSettingsPanel", "", true, false).any(func(panel): return panel.installing):
+		return
 	if page == "Co-op Setup Guide":
 		show_page("Social")
 		return
@@ -316,13 +313,6 @@ func build_start_screen() -> void:
 		button.focus_neighbor_top = button.get_path_to(buttons[posmod(i - 1, buttons.size())])
 		button.focus_neighbor_bottom = button.get_path_to(buttons[(i + 1) % buttons.size()])
 	UI.label(stack, "RX-07    //    SYSTEM READY", 13, UI.MUTED)
-	var version := UI.label(self, "v%s" % ProjectSettings.get_setting("application/config/version"), 15, UI.MUTED)
-	version.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
-	version.offset_left = -194
-	version.offset_top = -42
-	version.offset_right = -22
-	version.offset_bottom = -16
-	version.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	buttons[0].grab_focus()
 
 func build_archive(columns: HBoxContainer) -> void:
