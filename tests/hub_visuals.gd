@@ -34,13 +34,66 @@ func run() -> void:
 	Input.action_release("move_right")
 	await frames(8)
 	check(hub.current_station == 4 and hub.pads[4].beam.visible and hub.station_notice.text.contains("STORAGE"), "Walking onto Storage lights the correct pad")
-	hub.station_requested.emit("Storage")
+	game.profile.gear["vital_weave"] = "stored"
+	game.profile.gear["impact_liner"] = "stored"
+	var interact := InputEventKey.new()
+	interact.pressed = true
+	interact.physical_keycode = KEY_E
+	root.push_input(interact)
 	await frames(3)
 	check(game.menu.page == "Storage" and hub.panel_open, "Storage remains accessible from its pad")
+	var grid := game.menu.find_children("*", "GridContainer", true, false)[0] as GridContainer
+	check(grid.columns == 4 and grid.get_child_count() == 2, "Storage displays compact gear tiles")
+	var indices := grid.get_children()
+	indices[1].grab_focus()
+	check(game.menu.focused_item == "vital_weave", "Focusing a tile selects its details")
+	var action = game.menu.find_children("*", "Button", true, false).filter(func(button): return button.text == "Equip")[0]
+	action.pressed.emit()
+	await frames(2)
+	check(game.profile.equipped_for("frame") == "vital_weave", "Storage equips selected gear")
+	action = game.menu.find_children("*", "Button", true, false).filter(func(button): return button.text == "Stow")[0]
+	action.pressed.emit()
+	await frames(2)
+	check(game.profile.gear.get("vital_weave") == "stored" and game.profile.stored_count() == 2, "Storage stows selected gear and updates capacity")
+	if DisplayServer.get_name() != "headless" and OS.get_cmdline_user_args().size() > 1:
+		await RenderingServer.frame_post_draw
+		root.get_texture().get_image().save_png(OS.get_cmdline_user_args()[1])
 	game.menu.leave_page()
 	check(not hub.panel_open and hub.current_station == 4, "Back returns the player to the same bay")
 	hub.station_requested.emit("Fabrication")
 	await frames(2)
 	check(game.menu.find_children("*", "Button", true, false).any(func(button): return button.text == "Core Enhancements"), "Workshop has its own enhancement tab")
 	check(not game.menu.find_children("*", "Button", true, false).any(func(button): return button.text in ["Deploy", "Equipment", "Storage"]), "Other stations require their pads")
+	var shoulder := InputEventJoypadButton.new()
+	shoulder.pressed = true
+	shoulder.button_index = JOY_BUTTON_RIGHT_SHOULDER
+	root.push_input(shoulder)
+	check(game.menu.page == "Upgrades", "RB switches Workshop to Core Enhancements")
+	shoulder.button_index = JOY_BUTTON_LEFT_SHOULDER
+	root.push_input(shoulder)
+	check(game.menu.page == "Fabrication", "LB switches Workshop back to Blueprints")
+	game.menu.leave_page()
+	hub.avatar.position.x = -12.0
+	hub.update_station()
+	root.push_input(interact)
+	check(game.menu.page == "Save Game", "System pad opens Save Game")
+	shoulder.button_index = JOY_BUTTON_RIGHT_SHOULDER
+	root.push_input(shoulder)
+	check(game.menu.page == "Settings", "System pad also opens Settings with RB")
+	game.menu.leave_page()
+	hub.avatar.position.x = 9.0
+	hub.update_station()
+	root.push_input(interact)
+	check(game.menu.page == "Loadout", "Loadout still opens from its own pad")
+	check(game.menu.find_children("*", "GridContainer", true, false).size() == 1, "Loadout uses the same gear tile grid")
+	root.push_input(shoulder)
+	check(game.menu.equipment_view == "Boss Abilities", "RB switches Loadout to Boss Abilities")
+	root.push_input(shoulder)
+	check(game.menu.equipment_view == "Presets", "RB switches Loadout to Presets")
+	game.menu.leave_page()
+	hub.avatar.position.x = -18.0
+	hub.update_station()
+	root.push_input(interact)
+	check(game.menu.page == "Social", "Social opens from its own pad")
+	check(game.menu.find_children("*", "Button", true, false).any(func(button): return button.text == "Open Steam Friends"), "Social links to Steam Friends")
 	quit(failures)

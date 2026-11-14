@@ -69,10 +69,13 @@ jobs:
             export XDG_DATA_HOME="/tmp/riftcore user data"
             ./install.sh
             test -x "$XDG_DATA_HOME/riftcore/start-riftcore"
+            test -x "$XDG_DATA_HOME/riftcore/RIFTCORE"
+            "$XDG_DATA_HOME/riftcore/RIFTCORE" --headless --quit-after 30 --log-file /tmp/native.log
+            grep -F "Exec=\"$XDG_DATA_HOME/riftcore/RIFTCORE\"" "$XDG_DATA_HOME/applications/riftcore.desktop"
             "$XDG_DATA_HOME/riftcore/start-riftcore" --headless --quit-after 30 --log-file /tmp/installed.log
             build="$(find "$XDG_DATA_HOME/riftcore/versions" -name RIFTCORE -type f)"
             "$build" --headless --quit-after 60 --log-file /tmp/game.log
-            ! grep -E "SCRIPT ERROR:|Failed to load" /tmp/launcher.log /tmp/installed.log /tmp/game.log
+            ! grep -E "SCRIPT ERROR:|Failed to load" /tmp/launcher.log /tmp/native.log /tmp/installed.log /tmp/game.log
           '
       - uses: actions/upload-artifact@v4
         with:

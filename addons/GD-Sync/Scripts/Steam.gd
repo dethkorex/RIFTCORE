@@ -50,10 +50,11 @@ func init_steam() -> void:
 	GDSync.lobby_joined.connect(lobby_joined)
 
 func steam_initialized() -> bool:
-	return steam_integration_enabled and steam.loggedOn()
+	var social := get_node_or_null("/root/RiftSocial")
+	return steam_integration_enabled and (social == null or social.get("ready_to_query") == true) and steam.loggedOn()
 
 func _process(delta: float) -> void:
-	if steam_integration_enabled:
+	if steam_initialized():
 		steam.run_callbacks()
 
 func link_steam_account() -> int:
@@ -106,24 +107,26 @@ func steam_login(valid_time : float) -> Dictionary:
 
 func create_steam_lobby() -> void:
 	if !steam_initialized(): return
-	steam.createLobby(steam.LOBBY_TYPE_FRIENDS_ONLY, 250)
+	steam.createLobby(steam.LOBBY_TYPE_FRIENDS_ONLY, 2)
 	
 	var result : Array = await steam.lobby_created
 	
-	if result[0] == 1:
-		steam_lobby_id = result[1]
-		
-		steam.setLobbyJoinable(steam_lobby_id, true)
-		steam.setLobbyData(steam_lobby_id, "gdsyncid", session_controller.lobby_name)
-		steam.setLobbyData(steam_lobby_id, "haspassword", str(session_controller.lobby_password != ""))
+	if result[0] != 1:
+		return
+	if not session_controller.own_lobby:
+		steam.leaveLobby(result[1])
+		return
+	steam_lobby_id = result[1]
+	steam.setLobbyJoinable(steam_lobby_id, true)
+	steam.setLobbyData(steam_lobby_id, "gdsyncid", session_controller.lobby_name)
+	steam.setLobbyData(steam_lobby_id, "haspassword", str(session_controller.lobby_password != ""))
 
 func leave_steam_lobby() -> void:
-	if !steam_initialized(): return
+	if !steam_initialized() or steam_lobby_id == 0: return
 	steam.leaveLobby(steam_lobby_id)
 	steam_lobby_id = 0
 
-func _on_lobby_join_requested(lobby_id: int, friend_id: int) -> void:
-	var owner_name : String = steam.getFriendPersonaName(friend_id)
+func _on_lobby_join_requested(lobby_id: int, _friend_id: int) -> void:
 	
 	steam.requestLobbyData(lobby_id)
 	await steam.lobby_data_update

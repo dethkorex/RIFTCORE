@@ -23,6 +23,6 @@ icons="${XDG_DATA_HOME:-$HOME/.local/share}/icons/hicolor/scalable/apps"
 applications="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
 mkdir -p "$icons" "$applications"
 install -m 644 "$here/riftcore-icon.svg" "$icons/riftcore.svg"
-desktop_exec=$(printf '%s' "$base/start-riftcore" | sed 's/[\`"$]/\\&/g; s/%/%%/g')
+desktop_exec=$(printf '%s' "$base/RIFTCORE" | sed 's/[\`"$]/\\&/g; s/%/%%/g')
 printf '[Desktop Entry]\nType=Application\nName=RIFTCORE\nComment=RIFTCORE play and updates\nIcon=riftcore\nExec="%s"\nTerminal=false\nCategories=Game;\n' "$desktop_exec" > "$applications/riftcore.desktop"
 printf 'RIFTCORE installed. Open it from your app launcher or run: %s\n' "$base/start-riftcore"

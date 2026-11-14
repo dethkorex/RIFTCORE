@@ -31,12 +31,15 @@ func run() -> void:
 	session.profile.award_player_xp(100000000)
 	session.profile.memories.append(2)
 	check(session.profile.player_level() == 50, "Permanent rank stops at level 50")
-	session.profile.materials.merge(session.profile.recipe_materials("vital_weave"), true)
-	check(session.profile.craft("vital_weave").contains("sent to Storage"), "Fabrication spends materials and puts gear in storage")
+	var id := "bp_01_00"
+	session.profile.materials.merge(session.profile.recipe_materials(id), true)
+	check(session.profile.craft(id) == "Blueprint undiscovered.", "Undiscovered recipes cannot be crafted")
+	session.profile.blueprints[id] = true
+	check(session.profile.craft(id).contains("sent to Storage"), "Fabrication spends materials and puts gear in storage")
 	check(session.save_slot() == OK, "Current-format slot saves")
 	check(session.invalidate_defeated_run() == OK, "Permanent death invalidates disk checkpoint")
 	var restored = manual_save.new(1)
 	check(restored.load_slot() and not restored.run.has_section("checkpoint"), "A defeated deployment cannot be resumed")
-	check(restored.profile.gear.has("vital_weave") and restored.profile.gear.has("pulse_lens") and not restored.profile.gear.has("air_jets"), "Storage survives while equipped gear is lost")
+	check(restored.profile.gear.has(id) and restored.profile.blueprints.has(id) and restored.profile.gear.has("pulse_lens") and not restored.profile.gear.has("air_jets"), "Storage survives while equipped gear is lost")
 	check(restored.profile.player_level() == 50 and restored.profile.memories.has(2), "Permanent rank and memory fragments survive")
 	quit(failures)

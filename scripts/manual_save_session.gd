@@ -59,6 +59,8 @@ func invalidate_defeated_run() -> Error:
 	data.set_value("profile", "player_xp", profile.player_xp)
 	data.set_value("profile", "core_shards", profile.core_shards)
 	data.set_value("profile", "reserve_lives", profile.reserve_lives)
+	for id in profile.blueprints:
+		data.set_value("blueprints", id, true)
 	for index in profile.memories:
 		data.set_value("archive", "fragment_%d" % index, true)
 	for ending in profile.endings:

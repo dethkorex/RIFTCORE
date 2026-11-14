@@ -48,6 +48,7 @@ var act := 1
 var advancing_act := false
 var act_exit_retry := false
 var sector_deaths := 0
+var mission_stats := {"seconds": 0.0, "kills": 0, "operator_xp": 0, "player_xp": 0, "shards": 0}
 var run_weapons: Dictionary = {}
 
 const NEON_FACTORY_LEVEL := preload("res://scenes/levels/neon_factory_test.tscn")
@@ -400,6 +401,9 @@ func load_game(show_deployment := true) -> void:
 	player.health_changed.emit(player.health, player.max_health)
 	player.credits = maxi(int(save.get_value("checkpoint", "credits", 0)), 0)
 	player.salvage = save.get_value("checkpoint", "salvage", {})
+	player.recovered_blueprints = save.get_value("checkpoint", "blueprints", {})
+	mission_stats = {"seconds": 0.0, "kills": 0, "operator_xp": 0, "player_xp": 0, "shards": 0}
+	mission_stats.merge(save.get_value("checkpoint", "mission_stats", {}), true)
 	player.credits_changed.emit(player.credits)
 	player.lives = saved_lives
 	player.lives_changed.emit(player.lives)
@@ -608,9 +612,11 @@ func bind_boss_signals() -> void:
 	)
 	boss.died.connect(func():
 		boss_defeated = true
-		profile.award_player_xp((35 if act == 1 else 80) + sector * 8)
+		award_mission_xp((35 if act == 1 else 80) + sector * 8)
 		factory_hud.player_level = profile.player_level()
-		profile.core_shards += 1 + sector + (3 if act == 2 else 0)
+		var shards := 1 + sector + (3 if act == 2 else 0)
+		profile.core_shards += shards
+		mission_stats.shards += shards
 		Drop.roll_at(game_root.get_node("Actors"), boss.global_position + Vector3.UP * 0.25, sector, "boss" if act == 2 else "miniboss")
 		open_factory_gate()
 		var info := Catalog.info(sector)
@@ -695,6 +701,10 @@ func build_hud() -> void:
 		factory_hud.queue_redraw()
 	)
 	player.experience_changed.connect(factory_hud.set_experience)
+	player.blueprint_found.connect(func(id: String):
+		if not profile.blueprints.has(id) and profile.GEAR.has(id):
+			factory_hud.announce("BLUEPRINT RECOVERED  /  " + profile.GEAR[id].name, Color("ffda83"))
+	)
 	player.salvage_collected.connect(func(drop: Dictionary):
 		var recovered: Array[String] = []
 		for id in drop:
@@ -702,7 +712,8 @@ func build_hud() -> void:
 		factory_hud.announce("SALVAGE  /  " + "  ·  ".join(recovered), Color("ff8ada"))
 	)
 	player.experience_earned.connect(func(amount: int):
-		profile.award_player_xp(maxi(1, amount / 3))
+		mission_stats.operator_xp += amount
+		award_mission_xp(maxi(1, amount / 3))
 		factory_hud.player_level = profile.player_level()
 		factory_hud.queue_redraw()
 	)
@@ -747,6 +758,8 @@ func save_checkpoint(manual_combat_snapshot := false) -> void:
 	save.set_value("checkpoint", "experience", int(player.experience))
 	save.set_value("checkpoint", "credits", player.credits)
 	save.set_value("checkpoint", "salvage", player.salvage)
+	save.set_value("checkpoint", "blueprints", player.recovered_blueprints)
+	save.set_value("checkpoint", "mission_stats", mission_stats)
 	save.set_value("checkpoint", "lives", player.lives)
 	save.set_value("checkpoint", "sector_deaths", sector_deaths)
 	save.set_value("checkpoint", "life_taken", life_taken)
@@ -759,7 +772,13 @@ func save_checkpoint(manual_combat_snapshot := false) -> void:
 	if error != OK:
 		push_warning("Could not save Riftcore checkpoint: %s" % error_string(error))
 
+func award_mission_xp(amount: int) -> void:
+	var before: int = profile.player_xp
+	profile.award_player_xp(amount)
+	mission_stats.player_xp += profile.player_xp - before
+
 func _enemy_defeated() -> void:
+	mission_stats.kills += 1
 	remaining_enemies = maxi(0, remaining_enemies - 1)
 	factory_hud.remaining = remaining_enemies
 	factory_hud.queue_redraw()
@@ -896,9 +915,10 @@ func show_exit_confirmation() -> void:
 		, true)
 	UI.button(stack, "Return to title", return_to_title)
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if deploying or advancing_act or arena_intro or suit_reveal_active or sector_complete or not is_instance_valid(player) or player.health <= 0.0:
 		return
+	mission_stats.seconds += delta
 	if not gate_open and absf(player.global_position.x - gate.global_position.x) < 4.0:
 		open_factory_gate()
 	if gate_open and not arena_sealed and not boss_defeated and is_instance_valid(boss) and player.global_position.x >= gate.global_position.x + 1.35:
@@ -919,20 +939,28 @@ func _process(_delta: float) -> void:
 			advance_to_act_two.call_deferred()
 		return
 	sector_complete = true
-	profile.award_player_xp(65 + sector * 12)
+	award_mission_xp(65 + sector * 12)
 	var replay := sector <= run_cleared_through
 	run_cleared_through = maxi(run_cleared_through, sector)
 	var bonus := 160 + 25 * (sector - 1)
-	var recovered_types := player.salvage.size()
-	profile.deposit_materials(player.salvage)
+	var recovered := player.salvage.duplicate()
+	var recovered_blueprints: Array[String] = []
+	for id in player.recovered_blueprints:
+		if profile.GEAR.has(id) and not profile.blueprints.has(id):
+			profile.blueprints[id] = true
+			recovered_blueprints.append(profile.GEAR[id].name)
+	profile.deposit_materials(recovered)
 	player.salvage.clear()
+	player.recovered_blueprints.clear()
 	profile.core_shards += 4 + sector
+	mission_stats.shards += 4 + sector
 	bank_run_credits(bonus)
 	var final_sector := sector >= Catalog.SECTORS.size()
 	var tiers: Array[int] = [1]
 	if sector_deaths == 0:
 		tiers.append(2)
 	var reward: Dictionary = profile.complete_challenges(sector, tiers)
+	mission_stats.shards += int(reward.get("shards", 0))
 	if not final_sector:
 		profile.unlock_sector(sector + 1)
 	if banked_run and ResourceLoader.exists(Catalog.info(sector + 1).level):
@@ -950,24 +978,21 @@ func _process(_delta: float) -> void:
 		if error != OK:
 			push_warning("Could not save the next sector deployment: %s" % error_string(error))
 	get_tree().paused = true
-	var stack := overlay()
-	UI.label(stack, "CAMPAIGN COMPLETE" if final_sector else "SECTOR COMPLETE", 36, UI.CYAN)
-	UI.label(stack, Catalog.info(sector).title, 20)
+	var ending := ""
 	if final_sector:
 		var recovered_all := profile.memories.size() == Story.MEMORIES.size()
 		var ending_id := "secret" if recovered_all else "standard"
 		if not profile.endings.has(ending_id):
 			profile.endings.append(ending_id)
 			profile.save()
-		UI.label(stack, Story.ending(recovered_all), 17, UI.MUTED)
-	elif profile.memories.has(sector):
-		UI.label(stack, "Memory fragment recovered  /  %d of %d" % [profile.memories.size(), Story.MEMORIES.size()], 16, UI.MUTED)
-	UI.label(stack, "Bolts earned  %d + %d clear bonus" % [player.credits, bonus], 17, Color("ffcd61"))
-	UI.label(stack, "Operator XP  %d   /   Player Lv. %d" % [player.experience, profile.player_level()], 17, Color("ab72ff"))
-	UI.label(stack, "%d material types recovered   /   %d Core Shards banked" % [recovered_types, profile.core_shards], 16, UI.CYAN)
-	if not reward.is_empty():
-		UI.label(stack, "Challenges  /  +%d banked bolts  ·  +%d reserve %s" % [reward.credits, reward.lives, "life" if reward.lives == 1 else "lives"], 17, Color("ffe28e"))
-	UI.button(stack, "Return to Station", return_to_command_deck, true).grab_focus()
+		ending = Story.ending(recovered_all)
+	var stack := overlay()
+	stack.get_parent().custom_minimum_size.x = 1050
+	preload("res://scripts/mission_complete.gd").build(
+		stack, Catalog.info(sector).title, mission_stats, recovered, recovered_blueprints,
+		player.credits + bonus + int(reward.get("credits", 0)), int(reward.get("lives", 0)), sector_deaths,
+		ending, return_to_command_deck
+	)
 
 func advance_to_act_two() -> void:
 	var loading := ActLoadingScreen.new()
@@ -1001,6 +1026,8 @@ func advance_to_act_two() -> void:
 	save.set_value("checkpoint", "experience", player.experience)
 	save.set_value("checkpoint", "credits", player.credits)
 	save.set_value("checkpoint", "salvage", player.salvage)
+	save.set_value("checkpoint", "blueprints", player.recovered_blueprints)
+	save.set_value("checkpoint", "mission_stats", mission_stats)
 	save.set_value("checkpoint", "lives", player.lives)
 	save.set_value("checkpoint", "sector_deaths", sector_deaths)
 	save.set_value("checkpoint", "health", player.health)
@@ -1010,6 +1037,9 @@ func advance_to_act_two() -> void:
 		await cancel_act_transition(loading, "SAVE FAILED  /  RE-ENTER THE GATE")
 		return
 	var act_reward: Dictionary = profile.complete_challenges(sector, [0])
+	mission_stats.shards += int(act_reward.get("shards", 0))
+	save.set_value("checkpoint", "mission_stats", mission_stats)
+	write_checkpoint(save)
 	var previous := game_root
 	remove_child(previous)
 	previous.queue_free()
@@ -1143,8 +1173,8 @@ func toggle_pause() -> void:
 		build_pause_menu()
 	elif pause_menu:
 		player.resume_input_guard = 0.12
-		Input.action_release("dash")
-		Input.action_release("jump")
+		for action in RiftSettings.ACTIONS.keys() + ["crouch_stick"]:
+			Input.action_release(action)
 		pause_menu.queue_free()
 		pause_menu = null
 

@@ -16,6 +16,10 @@ ROOT = Path(__file__).resolve().parents[1]
 DIST = ROOT / "distribution"
 ENGINE_ASSETS = {"windows-x64": ("Windows x64", "RIFTCORE.exe", "windows_release_x86_64.exe"),
                  "linux-x64": ("Linux x64", "RIFTCORE", "linux_release.x86_64")}
+STEAM_RUNTIME = {
+    "windows-x64": ["libgodotsteam.windows.template_release.x86_64.dll", "steam_api64.dll"],
+    "linux-x64": ["libgodotsteam.linux.template_release.x86_64.so", "libsteam_api.so"],
+}
 LICENSES = ["GODOT_LICENSE.txt", "GODOT_COPYRIGHT.txt"]
 
 
@@ -135,9 +139,10 @@ def main() -> None:
                 encoding="utf-8", newline="\n"
             )
             shutil.copy2(out / "PATCH_NOTES.md", payload / "PATCH_NOTES.md")
+            shutil.copy2(ROOT / "addons/godotsteam/license.md", version / "GODOTSTEAM_LICENSE.md")
             game_zip = out / f"RIFTCORE-{platform}.zip"
             with zipfile.ZipFile(game_zip, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=5) as archive:
-                for name in [binary, "RIFTCORE.pck", *LICENSES]:
+                for name in [binary, "RIFTCORE.pck", *LICENSES, "GODOTSTEAM_LICENSE.md", *STEAM_RUNTIME[platform]]:
                     archive.write(version / name, arcname=name)
             with game_zip.open("rb") as handle:
                 checksum = hashlib.file_digest(handle, "sha256").hexdigest()

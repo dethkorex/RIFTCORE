@@ -38,6 +38,10 @@ func _initialize_client() -> void:
 	relay.lobby_creation_failed.connect(_room_failed)
 	relay.lobby_joined.connect(_room_joined)
 	relay.lobby_join_failed.connect(_room_failed)
+	relay.steam_join_request.connect(func(lobby_name: String, has_password: bool):
+		if not has_password and lobby_name.begins_with("riftcore-v05-"):
+			join_room(lobby_name.trim_prefix("riftcore-v05-"))
+	)
 	relay.client_joined.connect(_players_changed)
 	relay.client_left.connect(_players_changed)
 	relay.kicked.connect(func(_reason: String): leave("You were removed from the room."))
@@ -58,6 +62,23 @@ func join_room(entered_code: String) -> void:
 		_update("Enter the ten-character room code.")
 		return
 	_open("join", code)
+
+func listen_for_steam_invites() -> void:
+	if RiftSocial.ready_to_query and Keys.has_keys():
+		_initialize_client()
+
+func invite_friend(steam_id: int) -> void:
+	if connected_room.is_empty() or not RiftSocial.ready_to_query:
+		return
+	if room_size >= 2:
+		_update("Your room is full.")
+		return
+	var lobby: int = relay._steam.steam_lobby_id
+	if lobby == 0:
+		_update("Steam invite is unavailable. You can share your room code.")
+		return
+	var sent: bool = RiftSocial.steam.inviteUserToLobby(lobby, steam_id)
+	_update("Steam invitation sent." if sent else "Steam couldn't send the invite. You can share your room code.")
 
 func valid_code(code: String) -> bool:
 	if code.length() != CodeLength:

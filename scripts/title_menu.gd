@@ -20,6 +20,7 @@ var relay_host: Button
 var relay_join: Button
 var relay_copy: Button
 var relay_leave: Button
+var steam_invite_buttons: Array[Button] = []
 
 var can_load := false
 var saved_sector := 1
@@ -35,6 +36,7 @@ var challenge_sector := 1
 var inventory_slot := "frame"
 var inventory_status := ""
 var shop_item := ""
+var focused_item := ""
 var station_panel := false
 var deploy_error := ""
 
@@ -95,12 +97,20 @@ func show_page(next: String) -> void:
 		var section := UI.label(header, page.to_upper(), 18, UI.MUTED)
 		section.autowrap_mode = TextServer.AUTOWRAP_OFF
 	layout.add_child(HSeparator.new())
-	if station_panel and page in ["Fabrication", "Upgrades"]:
-		var workshop_tabs := HBoxContainer.new()
-		layout.add_child(workshop_tabs)
-		var fabrication := UI.button(workshop_tabs, "Blueprints", show_page.bind("Fabrication"), false, 35)
-		var enhancements := UI.button(workshop_tabs, "Core Enhancements", show_page.bind("Upgrades"), false, 35)
-		(fabrication if page == "Fabrication" else enhancements).add_theme_color_override("font_color", UI.CYAN)
+	var tabs := station_tabs()
+	if not tabs.is_empty():
+		var strip := HBoxContainer.new()
+		strip.add_theme_constant_override("separation", 8)
+		layout.add_child(strip)
+		for tab_page in tabs:
+			var label: String = tabs[tab_page]
+			var button := UI.button(strip, label, show_page.bind(tab_page), false, 35)
+			if page == tab_page:
+				button.add_theme_color_override("font_color", UI.CYAN)
+		var hint := UI.label(strip, "LB / RB   Switch tab", 14, UI.MUTED)
+		hint.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		hint.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	var columns := HBoxContainer.new()
 	columns.add_theme_constant_override("separation", 20)
 	columns.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -142,12 +152,12 @@ func show_page(next: String) -> void:
 			build_equipment_station(columns, next == "Fabrication")
 		"Craft Item":
 			build_purchase(columns)
+		"Social":
+			build_social(columns)
 		"Collection":
 			build_archive(columns)
 		"Challenges":
 			build_challenges(columns)
-		"Online Room":
-			build_online_room(columns)
 		"Co-op Setup Guide":
 			CoopSetup.build(card(columns, 1.75), leave_page)
 			portrait(card(columns))
@@ -169,6 +179,15 @@ func show_page(next: String) -> void:
 		if get_viewport().gui_get_focus_owner() == null:
 			back.grab_focus()
 
+func station_tabs() -> Dictionary:
+	if not station_panel:
+		return {}
+	if page in ["Fabrication", "Upgrades"]:
+		return {"Fabrication": "Blueprints", "Upgrades": "Core Enhancements"}
+	if page in ["Save Game", "Settings"]:
+		return {"Save Game": "Save Game", "Settings": "Settings"}
+	return {}
+
 func build_station_header(header: HBoxContainer) -> void:
 	header.add_theme_constant_override("separation", 9)
 	var wordmark := TextureRect.new()
@@ -180,6 +199,8 @@ func build_station_header(header: HBoxContainer) -> void:
 	var station_name := page.to_upper()
 	if page in ["Fabrication", "Upgrades", "Craft Item"]:
 		station_name = "WORKSHOP"
+	elif page in ["Save Game", "Settings"]:
+		station_name = "SYSTEM"
 	var heading := UI.label(header, station_name, 25, UI.CYAN)
 	heading.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var stats := UI.label(header, "%d bolts   ·   %d core shards" % [profile.credits, profile.core_shards], 16, Color("ffd079"))
@@ -190,14 +211,15 @@ func open_station(next: String) -> void:
 	deploy_error = ""
 	inventory_status = ""
 	shop_item = ""
+	focused_item = ""
 	show()
 	show_page(next)
 
 func leave_page() -> void:
 	if page == "Co-op Setup Guide":
-		show_page("Online Room")
+		show_page("Social")
 		return
-	if page == "Online Room":
+	if page == "Social":
 		RiftRelay.leave()
 	if station_panel:
 		if page == "Craft Item":
@@ -220,7 +242,7 @@ func card(parent: Container, ratio := 1.0) -> VBoxContainer:
 	var panel := PanelContainer.new()
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	panel.size_flags_stretch_ratio = ratio
-	panel.add_theme_stylebox_override("panel", UI.texture_frame("panel_base_large", 40, Vector2(22, 19)))
+	panel.add_theme_stylebox_override("panel", UI.texture_frame("panel_base_large", 40, Vector2(25, 22)))
 	parent.add_child(panel)
 	return UI.column(panel, 12)
 
@@ -276,7 +298,6 @@ func build_start_screen() -> void:
 		buttons.append(UI.button(stack, label, func(): hub_requested.emit(), true))
 	buttons.append(UI.button(stack, "New Game", open_slot_picker.bind("New Game"), buttons.is_empty()))
 	buttons.append(UI.button(stack, "Load Game", open_slot_picker.bind("Load Game")))
-	buttons.append(UI.button(stack, "Online Room", show_page.bind("Online Room")))
 	buttons.append(UI.button(stack, "Settings", show_page.bind("Settings")))
 	buttons.append(UI.button(stack, "Quit Game", get_tree().quit))
 	for i in range(buttons.size()):
@@ -312,9 +333,63 @@ func build_archive(columns: HBoxContainer) -> void:
 	UI.label(guide, "Pink salvage drops carry materials for Fabrication. Extract to bank them.", 17, UI.MUTED)
 	UI.label(guide, "Shoot cargo carriers to release their crates.", 17, UI.MUTED)
 
+func build_social(columns: HBoxContainer) -> void:
+	steam_invite_buttons.clear()
+	RiftSocial.connect_steam()
+	RiftRelay.listen_for_steam_invites()
+	var list := card(columns, 1.2)
+	UI.label(list, "STEAM FRIENDS", 30, UI.CYAN)
+	UI.label(list, RiftSocial.message, 16, UI.MUTED)
+	var rows := scroll_entries(list)
+	for friend in RiftSocial.contacts():
+		var row := HBoxContainer.new()
+		rows.add_child(row)
+		var tint := UI.CYAN if friend.priority == 0 else UI.MUTED
+		var label := UI.label(row, "%s  /  %s" % [friend.name, friend.status], 16, tint)
+		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		UI.button(row, "Profile", RiftSocial.open_profile.bind(friend.id), false, 34)
+		if friend.priority <= 1:
+			var invite := UI.button(row, "Invite", RiftRelay.invite_friend.bind(int(friend.id)), false, 34)
+			steam_invite_buttons.append(invite)
+		if friend.saved:
+			UI.button(row, "Remove", func():
+				var removed := RiftSocial.save_contact(friend.id, "")
+				inventory_status = "" if removed else "Could not remove contact."
+				show_page("Social")
+			, false, 34)
+	if rows.get_child_count() == 0:
+		UI.label(rows, "No friends or saved contacts to display.", 16, UI.MUTED)
+	var tools := card(columns, 0.8)
+	UI.label(tools, "CONTACTS", 27, UI.CYAN)
+	UI.button(tools, "Open Steam Friends", RiftSocial.open_friends, false, 36)
+	UI.button(tools, "Refresh Presence", show_page.bind("Social"), false, 36)
+	UI.label(tools, "Save a Steam contact", 19)
+	var steam_id := LineEdit.new()
+	steam_id.placeholder_text = "SteamID64"
+	steam_id.max_length = 17
+	tools.add_child(steam_id)
+	var alias := LineEdit.new()
+	alias.placeholder_text = "Display name (optional)"
+	alias.max_length = 40
+	tools.add_child(alias)
+	var notice := UI.label(tools, inventory_status, 15, UI.VIOLET)
+	UI.button(tools, "Save Contact", func():
+		var id := steam_id.text.strip_edges()
+		if not RiftSocial.valid_id(id):
+			notice.text = "Enter a valid 17-digit SteamID64 from their Steam profile."
+			return
+		if RiftSocial.save_contact(id, alias.text.strip_edges() if not alias.text.strip_edges().is_empty() else id):
+			inventory_status = "Contact saved."
+			show_page("Social")
+		else:
+			notice.text = "Could not save contact."
+	, false, 36)
+	UI.label(tools, "Steam supplies presence for Steam friends. Saved contacts are shortcuts to their profiles.", 15, UI.MUTED)
+	build_online_room(columns)
+
 func build_online_room(columns: HBoxContainer) -> void:
 	var form := card(columns, 1.35)
-	UI.label(form, "Online Room Preview", 34, UI.CYAN)
+	UI.label(form, "CO-OP ROOM", 27, UI.CYAN)
 	UI.label(form, "Share a room code to connect with a friend. Co-op deployment is still in development.", 18, UI.MUTED)
 	relay_host = UI.button(form, "Create Room", RiftRelay.host_room, true)
 	var join_row := HBoxContainer.new()
@@ -336,7 +411,7 @@ func build_online_room(columns: HBoxContainer) -> void:
 	relay_host.grab_focus()
 
 func refresh_online_room() -> void:
-	if page != "Online Room" or not is_instance_valid(relay_status):
+	if page != "Social" or not is_instance_valid(relay_status):
 		return
 	var joined := not RiftRelay.connected_room.is_empty()
 	var requesting := not RiftRelay.pending.is_empty()
@@ -346,6 +421,8 @@ func refresh_online_room() -> void:
 	relay_copy.visible = joined
 	relay_leave.visible = joined or requesting
 	relay_leave.text = "Leave Room" if joined else "Cancel Connection"
+	for invite in steam_invite_buttons:
+		invite.disabled = not joined or RiftRelay.room_size >= 2
 	relay_status.text = "%s   /   Code %s" % [RiftRelay.status, RiftRelay.connected_room] if joined else RiftRelay.status
 	if joined:
 		relay_copy.grab_focus()
@@ -612,32 +689,97 @@ func build_equipment_station(columns: HBoxContainer, shopping: bool) -> void:
 		UI.label(list, "Review a blueprint to check its materials.", 17, UI.MUTED)
 	else:
 		list = card(columns, 1.20)
-		UI.label(list, "Storage   %d / %d" % [profile.stored_count(), profile.storage_capacity()], 33, UI.CYAN)
-		UI.label(list, "Stowed gear survives defeat. Equipping an item stows the previous one automatically.", 17, UI.MUTED)
-		portrait(card(columns, 0.82))
-	var entries := scroll_entries(list)
-	var shown := 0
+		UI.label(list, "STORAGE", 33, UI.CYAN)
+		UI.label(list, "%d / %d stowed" % [profile.stored_count(), profile.storage_capacity()], 18, Color("ffd079"))
+		var display := EquipmentDisplay.new()
+		var operator := card(columns, 0.82)
+		UI.label(operator, "RX-07", 26, UI.CYAN)
+		operator.add_child(display)
+	var items: Array[String] = []
 	for id in Profile.GEAR:
-		var item: Dictionary = Profile.GEAR[id]
-		var state: String = profile.gear.get(id, "")
-		if (shopping and item.slot != inventory_slot) or (not shopping and state.is_empty()):
-			continue
-		shown += 1
-		var row := item_card(entries, id)
-		if shopping:
-			var header := row.get_child(0) as HBoxContainer
-			var action := UI.button(header, ("Blueprint  ›" if profile.player_level() >= Profile.recipe_level(id) else "Locked  /  Lv. %d" % Profile.recipe_level(id)) if state.is_empty() else "Owned", inspect_shop_item.bind(id) if state.is_empty() else Callable(), false, 36.0)
-			action.add_theme_font_size_override("font_size", 15)
-			action.tooltip_text = "Inspect blueprint" if state.is_empty() else "Available in Storage"
-			if id == shop_item and not action.disabled:
-				action.grab_focus()
-		else:
-			var action := "Stow" if state == "equipped" else "Equip"
-			UI.button(row, action, move_stored_gear.bind(id))
-	if shown == 0:
-		UI.label(entries, "No items in storage. Visit the Fabrication.", 17, UI.MUTED)
+		if (shopping and profile.blueprints.has(id) and Profile.GEAR[id].slot == inventory_slot) or (not shopping and profile.gear.has(id)):
+			items.append(id)
+	build_item_grid(list, items, shopping, 4)
 	if not inventory_status.is_empty():
-		UI.label(list, inventory_status, 17, UI.VIOLET)
+		UI.label(list, inventory_status, 16, UI.VIOLET)
+
+func build_item_grid(parent: VBoxContainer, items: Array[String], blueprints: bool, columns: int) -> void:
+	if items.is_empty():
+		UI.label(parent, "Storage is empty. Fabricated gear will appear here." if page == "Storage" else ("No blueprints discovered for this slot. Recover them during a deployment and extract." if blueprints else "Fabricate gear at the Workshop to fill your loadout."), 16, UI.MUTED)
+		return
+
+	var entries := scroll_entries(parent)
+	var grid := GridContainer.new()
+	grid.columns = columns
+	grid.add_theme_constant_override("h_separation", 8)
+	grid.add_theme_constant_override("v_separation", 8)
+	entries.add_child(grid)
+
+	var detail_card := UI.equipment_card(UI.CYAN)
+	parent.add_child(detail_card)
+	var details := UI.column(detail_card, 3)
+	var title := UI.label(details, "", 18)
+	title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	title.autowrap_mode = TextServer.AUTOWRAP_OFF
+	var state := UI.label(details, "", 14)
+	var perk := UI.label(details, "", 15, UI.MUTED)
+	var action := UI.button(details, "Inspect Blueprint" if blueprints else "Equip", func():
+		if blueprints:
+			inspect_shop_item(focused_item)
+		else:
+			inventory_status = profile.move_gear(focused_item)
+			show_page(page)
+	, false, 35)
+
+	var reveal := func(id: String):
+		focused_item = id
+		var item: Dictionary = Profile.GEAR[id]
+		var owned: String = profile.gear.get(id, "")
+		var status := item_status(id, blueprints)
+		title.text = item.name
+		title.tooltip_text = item.name
+		perk.text = item.perk
+		state.text = "%s  /  %s  /  %s" % [Profile.RARITY_NAMES[item.rarity], Profile.GEAR_SLOTS[item.slot], status]
+		state.add_theme_color_override("font_color", Profile.RARITY_COLORS[item.rarity])
+		action.text = ("Inspect Blueprint" if owned.is_empty() else "Owned") if blueprints else ("Stow" if owned == "equipped" else "Equip")
+		action.disabled = blueprints and not owned.is_empty()
+
+	var initial := focused_item if focused_item in items else items[0]
+	var tiles: Array[Button] = []
+	for id in items:
+		var item: Dictionary = Profile.GEAR[id]
+		var tint: Color = Profile.RARITY_COLORS[item.rarity]
+		var texture := EquipmentIcons.icon(id, item.slot)
+		var tile := UI.item_tile(grid, texture, tint, item.rarity, item_status(id, blueprints), func():
+			reveal.call(id)
+			if not action.disabled:
+				action.grab_focus()
+		)
+		tile.tooltip_text = "%s
+%s" % [item.name, item.perk]
+		tile.focus_entered.connect(reveal.bind(id))
+		tiles.append(tile)
+	for index in tiles.size():
+		var tile := tiles[index]
+		if index + columns >= tiles.size():
+			tile.focus_neighbor_bottom = tile.get_path_to(action)
+	for tile in tiles:
+		tile.focus_entered.connect(func(): action.focus_neighbor_top = action.get_path_to(tile))
+	action.focus_neighbor_top = action.get_path_to(tiles[items.find(initial)])
+	reveal.call(initial)
+	if page == "Storage":
+		tiles[items.find(initial)].grab_focus()
+
+func item_status(id: String, blueprints: bool) -> String:
+	var owned: String = profile.gear.get(id, "")
+	match owned:
+		"equipped": return "Equipped"
+		"stored": return "Stowed"
+		"carried": return "Carried"
+	if blueprints:
+		var required := Profile.recipe_level(id)
+		return "Lv. %d" % required if profile.player_level() < required else "Blueprint"
+	return ""
 
 func scroll_entries(parent: VBoxContainer) -> VBoxContainer:
 	var scroll := ScrollContainer.new()
@@ -678,12 +820,9 @@ func item_card(parent: VBoxContainer, id: String) -> VBoxContainer:
 
 func select_inventory_slot(slot: String) -> void:
 	shop_item = ""
+	focused_item = ""
 	inventory_slot = slot
 	show_page(page)
-
-func move_stored_gear(id: String) -> void:
-	inventory_status = profile.move_gear(id)
-	show_page("Storage")
 
 func inspect_shop_item(id: String) -> void:
 	shop_item = id
@@ -721,6 +860,9 @@ func build_loadout(columns: HBoxContainer) -> void:
 		if section == equipment_view:
 			tab.grab_focus()
 
+	if station_panel:
+		UI.label(sidebar, "LB / RB   Switch tab", 14, UI.MUTED)
+
 	var display := EquipmentDisplay.new()
 	display.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	display.size_flags_stretch_ratio = 1.10
@@ -747,18 +889,15 @@ func build_loadout(columns: HBoxContainer) -> void:
 	add_stat_group(details, "Movement", "Run %.1f   ·   Dash %.1f m/s" % [operator.move_speed, operator.dash_speed])
 	details.add_child(HSeparator.new())
 	UI.label(details, equipment_view.to_upper(), 22, UI.CYAN)
-	var entries := scroll_entries(details)
 	match equipment_view:
 		"Gear":
-			if profile.gear.is_empty():
-				UI.label(entries, "Fabricate equipment to fill your loadout.", 17, UI.MUTED)
+			var items: Array[String] = []
 			for id in Profile.GEAR:
-				if not profile.gear.has(id):
-					continue
-				var row := item_card(entries, id)
-				var action := "Stow" if profile.gear[id] == "equipped" else "Equip"
-				UI.button(row, action, change_loadout_gear.bind(id), false, 34)
+				if profile.gear.has(id):
+					items.append(id)
+			build_item_grid(details, items, false, 4)
 		"Boss Abilities":
+			var entries := scroll_entries(details)
 			if run_unlocks.is_empty():
 				UI.label(entries, "Defeat a sector boss to unlock its ability for this run.", 17, UI.MUTED)
 			for id in run_unlocks:
@@ -766,7 +905,7 @@ func build_loadout(columns: HBoxContainer) -> void:
 				if not info.is_empty():
 					loadout_line(entries, String(info.reward_name), EquipmentIcons.icon("core", "core"))
 		"Presets":
-			build_equipment_presets(entries)
+			build_equipment_presets(scroll_entries(details))
 	if not inventory_status.is_empty():
 		UI.label(details, inventory_status, 15, UI.VIOLET)
 
@@ -781,10 +920,6 @@ func add_stat_group(parent: VBoxContainer, category: String, values: String) -> 
 
 func open_equipment_view(section: String) -> void:
 	equipment_view = section
-	show_page("Loadout")
-
-func change_loadout_gear(id: String) -> void:
-	inventory_status = profile.move_gear(id)
 	show_page("Loadout")
 
 func loadout_line(parent: VBoxContainer, caption: String, icon: Texture2D) -> void:
@@ -850,6 +985,18 @@ func deploy() -> void:
 	start_requested.emit()
 
 func _unhandled_input(event: InputEvent) -> void:
+	if station_panel and event is InputEventJoypadButton and event.pressed and event.button_index in [JOY_BUTTON_LEFT_SHOULDER, JOY_BUTTON_RIGHT_SHOULDER]:
+		var step := 1 if event.button_index == JOY_BUTTON_RIGHT_SHOULDER else -1
+		var tabs := station_tabs().keys()
+		if not tabs.is_empty():
+			get_viewport().set_input_as_handled()
+			show_page(tabs[posmod(tabs.find(page) + step, tabs.size())])
+			return
+		if page == "Loadout":
+			var views := ["Gear", "Boss Abilities", "Presets"]
+			get_viewport().set_input_as_handled()
+			open_equipment_view(views[posmod(views.find(equipment_view) + step, views.size())])
+			return
 	if event.is_action_pressed("ui_cancel") and page != "Title":
 		RiftAudio.play_effect(&"menu_confirm")
 		leave_page()

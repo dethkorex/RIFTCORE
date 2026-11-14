@@ -7,6 +7,7 @@ signal energy_changed(current: float, maximum: float)
 signal credits_changed(total: int)
 signal experience_changed(total: int)
 signal experience_earned(amount: int)
+signal blueprint_found(id: String)
 signal salvage_collected(drop: Dictionary)
 
 const START_HEALTH := 80.0
@@ -71,6 +72,7 @@ var energy := START_ENERGY
 var max_energy := START_ENERGY
 var credits := 0
 var salvage: Dictionary = {}
+var recovered_blueprints: Dictionary = {}
 var experience := 0
 var coyote := 0.0
 var jump_buffer := 0.0

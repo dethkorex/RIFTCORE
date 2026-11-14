@@ -125,11 +125,15 @@ func run():
 		await frames(8)
 		if number >= 3:
 			check(info.reward in shots and is_equal_approx(previous_energy - p.energy, 30.0), "%02d charged reward fires and spends energy once" % number)
+		var blueprint := "bp_%02d_00" % number
+		p.recovered_blueprints[blueprint] = true
 		p.global_position = game.game_root.get_node("MARKERS/RoomExit").global_position
 		p.velocity = Vector3.ZERO
 		await frames(6)
 		var extracted := saved.load(save_path) == OK
 		check(game.sector_complete and game.run_weapons.has(info.reward) and extracted and saved.get_value("checkpoint", "sector", 0) == mini(10, number + 1) and saved.get_value("checkpoint", "act", 0) == (2 if number == 10 else 1), "%02d final boss rewards and extraction advance campaign" % number)
+		check(game.profile.blueprints.has(blueprint) and p.recovered_blueprints.is_empty(), "%02d extraction banks a discovered blueprint" % number)
+		check(game.pause_menu.find_children("*", "Label", true, false).any(func(label): return label.text == "DEPLOYMENT COMPLETE"), "%02d extraction displays the mission report" % number)
 		check(game.profile.completed_challenges.has("%d_2" % number) and game.profile.completed_challenges.has("%d_3" % number) == clean and game.profile.reserve_lives == reserves + (3 if clean else 2), "%02d completion tiers pay once and Clean Run requires zero deaths" % number)
 		var repeat: Array[int] = [0, 1]
 		if clean:

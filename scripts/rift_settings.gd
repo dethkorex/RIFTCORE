@@ -91,12 +91,14 @@ func configure_bindings() -> void:
 	apply_bindings()
 
 func device_of(event: InputEvent) -> String:
-	return "key" if event is InputEventKey else "pad"
+	return "key" if event is InputEventKey or event is InputEventMouseButton else "pad"
 
 func to_data(event: InputEvent) -> Dictionary:
 	if event is InputEventKey:
 		var code: int = event.physical_keycode if event.physical_keycode != 0 else event.keycode
 		return {"type": "key", "code": code}
+	if event is InputEventMouseButton and event.button_index in [MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT, MOUSE_BUTTON_MIDDLE, MOUSE_BUTTON_XBUTTON1, MOUSE_BUTTON_XBUTTON2]:
+		return {"type": "mouse", "code": event.button_index}
 	if event is InputEventJoypadButton:
 		return {"type": "button", "code": event.button_index}
 	if event is InputEventJoypadMotion:
@@ -112,6 +114,13 @@ func from_data(data: Dictionary) -> InputEvent:
 			var key := InputEventKey.new()
 			key.physical_keycode = code
 			return key
+		"mouse":
+			if code not in [MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT, MOUSE_BUTTON_MIDDLE, MOUSE_BUTTON_XBUTTON1, MOUSE_BUTTON_XBUTTON2]:
+				return null
+			var mouse := InputEventMouseButton.new()
+			mouse.button_index = code
+			mouse.device = -1
+			return mouse
 		"button":
 			var button := InputEventJoypadButton.new()
 			button.button_index = code
@@ -132,7 +141,7 @@ func set_binding(action: String, event: InputEvent, device: String) -> String:
 		return "Use a controller button for this action."
 	var data := to_data(event)
 	if data.is_empty():
-		return "Choose a keyboard key or controller input."
+		return "Choose a key, mouse button, or controller input."
 	for other in ACTIONS:
 		if other == action or (other in ["climb_down", "crouch"] and action in ["climb_down", "crouch"]):
 			continue
@@ -185,6 +194,9 @@ func binding_label(action: String, device: String) -> String:
 			continue
 		if event is InputEventKey:
 			names.append(OS.get_keycode_string(event.physical_keycode))
+		elif event is InputEventMouseButton:
+			var labels := {MOUSE_BUTTON_LEFT: "Left Mouse", MOUSE_BUTTON_RIGHT: "Right Mouse", MOUSE_BUTTON_MIDDLE: "Middle Mouse", MOUSE_BUTTON_XBUTTON1: "Mouse 4", MOUSE_BUTTON_XBUTTON2: "Mouse 5"}
+			names.append(labels.get(event.button_index, "Mouse %d" % event.button_index))
 		elif event is InputEventJoypadButton:
 			var labels := {0: "A", 1: "B", 2: "X", 3: "Y", 4: "Back", 6: "Start", 9: "LB", 10: "RB", 11: "D-pad up", 12: "D-pad down", 13: "D-pad left", 14: "D-pad right"}
 			names.append(str(labels.get(event.button_index, "Button %d" % event.button_index)))

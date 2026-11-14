@@ -19,7 +19,7 @@ payload="$(awk '/^__RIFTCORE_PAYLOAD__$/ { print NR + 1; exit }' "$0")"
 tail -n "+$payload" "$0" | tar -xzf - -C "$temp"
 sh "$temp/install.sh"
 if [ "$steam_shortcut" -eq 1 ]; then
-  printf 'In the Steam dialog, select: %s\n' "$base/start-riftcore"
+  printf 'In the Steam dialog, select: %s\n' "$base/RIFTCORE"
   if ! command -v xdg-open >/dev/null 2>&1 || ! xdg-open 'steam://AddNonSteamGame'; then
     printf '%s\n' 'Open Steam manually and select Games > Add a Non-Steam Game to My Library.'
   fi

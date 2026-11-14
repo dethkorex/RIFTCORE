@@ -1,12 +1,15 @@
 extends Area3D
 
 const Catalog := preload("res://scripts/fabrication_catalog.gd")
+const Blueprints := preload("res://scripts/blueprint_catalog.gd")
 static var rng := RandomNumberGenerator.new()
 var materials: Dictionary
+var blueprint_id := ""
 
 static func roll_at(host: Node3D, at: Vector3, sector: int, source: String) -> void:
 	var drop := new()
 	drop.materials = Catalog.roll(sector, source, rng)
+	drop.blueprint_id = Blueprints.roll(sector, source, rng)
 	drop.position = host.to_local(at)
 	host.add_child.call_deferred(drop)
 
@@ -20,7 +23,7 @@ func _ready() -> void:
 	add_child(collider)
 	var mesh := PrismMesh.new()
 	mesh.size = Vector3(0.36, 0.45, 0.34)
-	var shard := RiftProjectile.part(self, mesh, RiftProjectile.light_paint(Color("ff5ecc"), 1.5), Vector3.ZERO, Vector3.ONE)
+	var shard := RiftProjectile.part(self, mesh, RiftProjectile.light_paint((Color("ffde83") if not blueprint_id.is_empty() else Color("ff5ecc")), 1.5), Vector3.ZERO, Vector3.ONE)
 	var spin := create_tween().set_loops()
 	spin.tween_property(shard, "rotation:y", TAU, 1.8).from(0.0)
 	body_entered.connect(collect)
@@ -30,5 +33,8 @@ func collect(body: Node3D) -> void:
 	if not operator or operator.health <= 0.0 or is_queued_for_deletion():
 		return
 	operator.collect_salvage(materials)
+	if not blueprint_id.is_empty() and not operator.recovered_blueprints.has(blueprint_id):
+		operator.recovered_blueprints[blueprint_id] = true
+		operator.blueprint_found.emit(blueprint_id)
 	RiftAudio.play_effect(&"pickup")
 	queue_free()

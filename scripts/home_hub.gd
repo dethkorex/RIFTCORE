@@ -7,8 +7,8 @@ const UI := preload("res://scripts/rift_ui.gd")
 const AVATAR := preload("res://scenes/actors/riftcore_player.tscn")
 const WINDOW := preload("res://assets/hub/orbital_view.png")
 const STATIONS := [
-	{"x": -18.0, "name": "Save Game", "page": "Save Game", "color": Color("b465ff"), "prop": "save_terminal"},
-	{"x": -13.5, "name": "Settings", "page": "Settings", "color": Color("9cbbff"), "prop": "settings_terminal"},
+	{"x": -18.0, "name": "Social", "page": "Social", "color": Color("b883ff"), "prop": "save_terminal"},
+	{"x": -12.0, "name": "System", "page": "Save Game", "color": Color("9cbbff"), "prop": "settings_terminal"},
 	{"x": -4.5, "name": "Workshop", "page": "Fabrication", "color": Color("ffc465"), "prop": "forge_bay"},
 	{"x": 0.0, "name": "Deploy", "page": "Sector select", "color": Color("52edff"), "prop": "deploy_pad"},
 	{"x": 4.5, "name": "Storage", "page": "Storage", "color": Color("5ffcec"), "prop": "storage_bay"},
@@ -231,7 +231,13 @@ func build_pad(station: Dictionary) -> void:
 	add_child(at)
 	at.position.x = station.x
 	var deployment: bool = station.page == "Sector select"
-	place_asset(station.prop, Vector3(station.x, 0, 0 if deployment else -1.84))
+	var terminal := place_asset(station.prop, Vector3(station.x, 0, 0 if deployment else -1.84))
+	if station.name == "System":
+		terminal.set("caption", "SYSTEM / SAVE")
+	elif station.name == "Social":
+		terminal.set("caption", "SOCIAL")
+		terminal.set("icon", "icon_person")
+		terminal.set("accent", station.color)
 	var tint: Color = station.color
 	var glow := paint(tint, 0.37)
 	var footing := CylinderMesh.new()

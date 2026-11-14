@@ -21,7 +21,8 @@ const UPGRADE_SLOTS := {"armor": "frame", "capacitor": "core", "buster": "core",
 const RARITY_NAMES := ["Common", "Rare", "Epic", "Legendary"]
 const RARITY_COLORS := [Color("b5c9de"), Color("68c9ff"), Color("d0a0ff"), Color("ffca68")]
 const PRESET_COUNT := 3
-const GEAR := {
+const Blueprints := preload("res://scripts/blueprint_catalog.gd")
+const LEGACY_GEAR := {
 	"impact_liner": {"name": "Impact Liner", "slot": "frame", "price": 320, "rarity": 0, "perk": "12% damage resistance", "stats": {"resist": 0.12}},
 	"vital_weave": {"name": "Vital Weave", "slot": "frame", "price": 360, "rarity": 0, "perk": "+18 maximum HP", "stats": {"hp": 18}},
 	"pulse_lens": {"name": "Pulse Lens", "slot": "core", "price": 420, "rarity": 0, "perk": "+14% Buster and saber damage", "stats": {"attack": 1.14}},
@@ -58,6 +59,9 @@ const GEAR := {
 	"recovery_arm": {"name": "Recovery Arm", "slot": "arm", "price": 1790, "rarity": 2, "perk": "Health pickups restore 45% more and +10 HP", "stats": {"healing": 1.45, "hp": 10}},
 	"titan_servo": {"name": "Titan Servo", "slot": "arm", "price": 3500, "rarity": 3, "perk": "+18% attack and health pickups restore 30% more", "stats": {"attack": 1.18, "healing": 1.3}},
 }
+
+static var GEAR := Blueprints.all_gear(LEGACY_GEAR)
+var blueprints: Dictionary = {}
 
 var path := "user://riftcore_profile.cfg"
 const Materials := preload("res://scripts/fabrication_catalog.gd")
@@ -99,6 +103,11 @@ func storage_capacity() -> int:
 
 func decode_from(data: ConfigFile) -> void:
 	materials.clear()
+	blueprints.clear()
+	if data.has_section("blueprints"):
+		for id in data.get_section_keys("blueprints"):
+			if GEAR.has(id) and data.get_value("blueprints", id, false):
+				blueprints[id] = true
 	memories.clear()
 	for index in range(1, Story.MEMORIES.size() + 1):
 		if data.get_value("archive", "fragment_%d" % index, false):
@@ -137,6 +146,7 @@ func decode_from(data: ConfigFile) -> void:
 			state = "stored"
 		if state in ["stored", "equipped", "carried"]:
 			gear[id] = state
+			blueprints[id] = true
 	for upgrade in UPGRADES:
 		var id: String = upgrade.id
 		var saved_rank := clampi(int(data.get_value("upgrades", id, 0)), 0, 2)
@@ -161,6 +171,8 @@ func save() -> Error:
 	return data.save(path)
 
 func encode_into(data: ConfigFile) -> void:
+	for id in blueprints:
+		data.set_value("blueprints", id, true)
 	for index in memories:
 		data.set_value("archive", "fragment_%d" % index, true)
 	for ending in endings:
@@ -217,17 +229,17 @@ func equipped_for(slot: String) -> String:
 	return ""
 
 static func recipe_level(id: String) -> int:
-	var index := GEAR.keys().find(id)
+	var index := id.get_slice("_", 2).to_int() if GEAR[id].has("sector") else LEGACY_GEAR.keys().find(id)
 	var rarity := int(GEAR[id].rarity)
 	return [1, 5, 15, 30][rarity] + (index % 5 if rarity > 0 else 0)
 
 func recipe_materials(id: String) -> Dictionary:
-	var index := GEAR.keys().find(id)
+	var index := id.get_slice("_", 2).to_int() if GEAR[id].has("sector") else LEGACY_GEAR.keys().find(id)
 	var rarity := int(GEAR[id].rarity)
 	var bill := {"scrap": ceili((4 + rarity * 4) * (1.0 - rank("fabrication") * 0.2)),
 		["components", "circuits", "cells"][index % 3]: 2 + rarity * 2}
 	if rarity > 0:
-		bill[Materials.sector_key(index % 10 + 1)] = rarity
+		bill[Materials.sector_key(int(GEAR[id].get("sector", index % 10 + 1)))] = rarity
 	if rarity >= 2:
 		bill["core"] = rarity - 1
 	if rarity == 3:
@@ -238,6 +250,8 @@ func stored_count() -> int:
 	return gear.values().count("stored")
 
 func craft_limit(id: String) -> String:
+	if not blueprints.has(id):
+		return "Blueprint undiscovered."
 	if gear.has(id):
 		return "Blueprint already fabricated."
 	if player_level() < recipe_level(id):

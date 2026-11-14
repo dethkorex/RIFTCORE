@@ -130,7 +130,7 @@ static func set_button_states(item: Button, inactive: StyleBox, active: StyleBox
 	item.focus_entered.connect(func(): item.add_theme_stylebox_override("normal", active))
 	item.focus_exited.connect(func(): item.add_theme_stylebox_override("normal", inactive))
 
-static func button(parent: Node, value: String, action: Callable, primary := false, height := 44.0) -> Button:
+static func button(parent: Node, value: String, action: Callable, primary := false, height := 44.0, apply_default_style := true) -> Button:
 	var item := Button.new()
 	item.text = value
 	item.custom_minimum_size.y = height
@@ -145,8 +145,34 @@ static func button(parent: Node, value: String, action: Callable, primary := fal
 		item.disabled = true
 		item.focus_mode = Control.FOCUS_NONE
 	parent.add_child(item)
-	style_button(item)
+	if apply_default_style:
+		style_button(item)
 	return item
+
+static func item_tile(parent: GridContainer, icon: Texture2D, rarity: Color, rarity_index: int, caption: String, action: Callable) -> Button:
+	var tile := button(parent, "", action, false, 78, false)
+	tile.custom_minimum_size = Vector2(78, 78)
+	tile.icon = icon
+	tile.expand_icon = true
+	tile.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	tile.vertical_icon_alignment = VERTICAL_ALIGNMENT_TOP
+	tile.add_theme_constant_override("icon_max_width", 38)
+	var variants := ["common", "rare", "epic", "legendary"]
+	var idle := texture_frame("item_slot_" + variants[rarity_index], 16, Vector2(8, 7))
+	idle.content_margin_bottom = 26
+	var active := texture_frame("item_slot_epic", 16, Vector2(8, 7))
+	active.content_margin_bottom = 26
+	var down := active.duplicate() as StyleBoxTexture
+	down.modulate_color = Color("ccc0e4")
+	set_button_states(tile, idle, active, down)
+	var badge := label(tile, caption, 12, rarity)
+	badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	badge.autowrap_mode = TextServer.AUTOWRAP_OFF
+	badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	badge.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
+	badge.offset_top = -23
+	badge.offset_bottom = -4
+	return tile
 
 static func column(parent: Node, spacing := 12) -> VBoxContainer:
 	var stack := VBoxContainer.new()

@@ -63,7 +63,7 @@ func _ready() -> void:
 	grid.columns = 3
 	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	controls.add_child(grid)
-	for caption in ["Action", "Keyboard", "Controller"]:
+	for caption in ["Action", "Keyboard / Mouse", "Controller"]:
 		var item := Label.new()
 		item.text = caption
 		grid.add_child(item)
@@ -100,7 +100,7 @@ func begin_capture(action: String, device: String) -> void:
 	pending_action = action
 	pending_device = device
 	refresh()
-	note.text = "Press a key  /  Esc to cancel" if device == "key" else "Press a controller input  /  Esc to cancel"
+	note.text = "Press a key or mouse button  /  Esc to cancel" if device == "key" else "Press a controller input  /  Esc to cancel"
 
 func refresh() -> void:
 	for action in RiftSettings.ACTIONS:
@@ -116,7 +116,8 @@ func _input(event: InputEvent) -> void:
 		refresh()
 		note.text = "Binding canceled."
 		return
-	var usable: bool = (event is InputEventKey and event.pressed and not event.echo) or (event is InputEventJoypadButton and event.pressed) or (event is InputEventJoypadMotion and absf(event.axis_value) > 0.76)
+	var mouse_button: bool = event is InputEventMouseButton and event.pressed and not RiftSettings.to_data(event).is_empty()
+	var usable: bool = mouse_button or (event is InputEventKey and event.pressed and not event.echo) or (event is InputEventJoypadButton and event.pressed) or (event is InputEventJoypadMotion and absf(event.axis_value) > 0.76)
 	if not usable or RiftSettings.device_of(event) != pending_device:
 		return
 	get_viewport().set_input_as_handled()

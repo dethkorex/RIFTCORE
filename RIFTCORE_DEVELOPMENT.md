@@ -36,3 +36,11 @@ Status: in development. Baseline checkpoint: 970d50a. The playable v0.5.0-previe
 - Transparent SVG icon and wordmark added. The Windows launcher/game presets embed the derived ICO. The Windows and Linux installer sources use the updated branding and offer an optional shortcut handoff to Steam.
 - The title and Pause menu expose a co-op setup guide. Online rooms use the GD Sync relay path. A build without service configuration reports that the preview is unavailable.
 - A full Steam and remote gameplay test requires a configured service, host-authoritative synchronization, and two actual Steam accounts.
+
+
+## Social and extraction
+
+- Social owns the room controls, Steam Friends and saved Steam contacts. Live presence and invites need an app ID set at `riftcore/steam_app_id` or supplied by Steam at launch. Live invites also need GD Sync configured. The Windows and Linux x64 versions use GodotSteam 4.24.
+- The Steam runtime adds files to the updater package. The launcher accepts both the original package layout and the complete Steam runtime layout. Install this launcher once before using this update channel for builds that bundle GodotSteam.
+- Each sector has 12 blueprint variants for existing equipment slots and effects. A blueprint is banked on extraction and saved with the profile. Older saves retain access to the blueprints for equipment they already own.
+- The extraction report displays the current deployment's rewards and progress across both acts.

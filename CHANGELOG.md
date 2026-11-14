@@ -2,6 +2,12 @@
 
 ## Game changes
 
+- Social is now a hub pad. Find Steam Friends, save contacts, and create or join co-op preview rooms from there. Steam presence and invitations require a configured RIFTCORE Steam App ID and live services.
+- Discover 12 blueprints per sector. Rarer blueprints drop less often, and Workshop lists recipes after you recover and extract them.
+- Review mission stats and banked rewards after defeating the final boss of a sector and extracting.
+- Bind gameplay actions to mouse buttons. Gameplay inputs are cleared when resuming from Pause.
+- Storage, Loadout, and Workshop use compact gear tiles. LB and RB switch tabs within their stations, and Save and Settings share the System pad.
+
 - The hub has a continuous floor, ceiling, and rear bulkhead. Deploy stays on its own pad. Workshop combines blueprints and Core Enhancements.
 - The Loadout pad opens a redesigned screen with a live RX-07 display, actual equipped stats, gear, boss abilities, and presets.
 
@@ -19,6 +25,9 @@
 Online co-op missions and Steam invites are still in development. The full v0.5 overhaul has further campaign, visual, and competitive-mode work tracked in RIFTCORE_DEVELOPMENT.md.
 
 ## Installer and launcher 0.2
+
+- On Linux, add the native executable named RIFTCORE to Steam and leave Proton disabled. The launcher now defaults to Wayland with X11 fallback.
+- Install this launcher once to update to builds that include the Steam runtime.
 
 - Added an Arch Linux and Omarchy tarball with native Wayland startup, an optional app-menu installer, and updates through the launcher.
 

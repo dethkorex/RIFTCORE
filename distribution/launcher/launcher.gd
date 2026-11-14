@@ -343,6 +343,9 @@ func unpack_version(zip_path: String, tag: String) -> bool:
 		return false
 	var expected := [game_filename, "RIFTCORE.pck", "GODOT_LICENSE.txt", "GODOT_COPYRIGHT.txt"]
 	var entries := zip.get_files()
+	var steam_runtime := ["GODOTSTEAM_LICENSE.md", "steam_api64.dll", "libgodotsteam.windows.template_release.x86_64.dll"] if game_filename.ends_with(".exe") else ["GODOTSTEAM_LICENSE.md", "libsteam_api.so", "libgodotsteam.linux.template_release.x86_64.so"]
+	if entries.size() == expected.size() + steam_runtime.size():
+		expected.append_array(steam_runtime)
 	if entries.size() != expected.size():
 		zip.close()
 		return false
