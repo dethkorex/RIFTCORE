@@ -242,6 +242,19 @@ const SECTORS := [
  }
 ]
 
+const WEAPON_EFFECTS := {
+	"magma_breaker": "Fireballs ignite targets. A charged shot fires three fireballs in a spread.",
+	"thorn_swarm": "Fires two thorn projectiles. Charge to fire five in a wider spread.",
+	"frost_lance": "A fast lance pierces enemies and staggers susceptible targets. Charged shots pierce farther.",
+	"tidal_arc": "Fires a concentrated water projectile. Charging gives the single shot more damage.",
+	"data_lance": "A high-speed piercing beam. Charged shots pass through several enemies.",
+	"gale_edge": "Three wind blades push susceptible enemies back. Charge to fire five.",
+	"chimera_burst": "Fires a three-shot spread. Charge for five stronger projectiles.",
+	"singularity_shot": "Fires a slow-moving, concentrated projectile with a stronger charged shot.",
+	"scrap_reaver": "A slow, heavy projectile with high damage per hit. Charge for a stronger impact.",
+	"core_override": "Three piercing shots cover a wide angle. Charge for five stronger shots with extra piercing.",
+}
+
 static func info(number: int) -> Dictionary:
 	return SECTORS[clampi(number - 1, 0, SECTORS.size() - 1)]
 

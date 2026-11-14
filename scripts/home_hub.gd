@@ -12,7 +12,7 @@ const STATIONS := [
 	{"x": -4.5, "name": "Workshop", "page": "Fabrication", "color": Color("ffc465"), "prop": "forge_bay"},
 	{"x": 0.0, "name": "Deploy", "page": "Sector select", "color": Color("52edff"), "prop": "deploy_pad"},
 	{"x": 4.5, "name": "Social", "page": "Social", "color": Color("b883ff"), "prop": "save_terminal"},
-	{"x": 9.0, "name": "Storage", "page": "Storage", "color": Color("5ffcec"), "prop": "storage_bay"},
+	{"x": 9.0, "name": "Equipment", "page": "Storage", "color": Color("5ffcec"), "prop": "storage_bay"},
 	{"x": 13.5, "name": "Challenges", "page": "Challenges", "color": Color("bd8cff"), "prop": "challenge_terminal"},
 	{"x": -18.0, "name": "Shop", "page": "Shop", "color": Color("ffd076"), "prop": "storage_bay"},
 ]

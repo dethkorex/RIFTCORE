@@ -32,7 +32,6 @@ const GEAR_SLOTS := {"frame": "Frame", "core": "Core", "utility": "Utility", "vi
 const UPGRADE_SLOTS := {"armor": "frame", "capacitor": "core", "buster": "core", "dash": "utility", "storage": "utility", "fabrication": "core"}
 const RARITY_NAMES := ["Common", "Rare", "Epic", "Legendary"]
 const RARITY_COLORS := [Color("b5c9de"), Color("68c9ff"), Color("d0a0ff"), Color("ffca68")]
-const PRESET_COUNT := 3
 const Blueprints := preload("res://scripts/blueprint_catalog.gd")
 const LEGACY_GEAR := {
 	"impact_liner": {"name": "Impact Liner", "slot": "frame", "price": 320, "rarity": 0, "perk": "12% damage resistance", "stats": {"resist": 0.12}},
@@ -94,7 +93,6 @@ var completed_challenges: Dictionary = {}
 var reserve_lives := 0
 var gear := {}
 var manual_only := false
-var loadouts: Dictionary = {}
 
 static func clean_operator_name(value: String) -> String:
 	var cleaned := ""
@@ -196,16 +194,6 @@ func decode_from(data: ConfigFile) -> void:
 		if saved_rank > 0:
 			owned[id] = saved_rank
 
-	loadouts.clear()
-	for number in range(1, PRESET_COUNT + 1):
-		var record = data.get_value("loadouts", str(number), false)
-		if record is Dictionary:
-			loadouts[number] = {}
-			for slot in GEAR_SLOTS:
-				var id := String(record.get(slot, ""))
-				if GEAR.has(id) and GEAR[id].slot == slot:
-					loadouts[number][slot] = id
-
 func save() -> Error:
 	if manual_only:
 		return OK
@@ -237,37 +225,6 @@ func encode_into(data: ConfigFile) -> void:
 		data.set_value("challenges", id, true)
 	for id in gear:
 		data.set_value("equipment", id, gear[id])
-
-	for number in loadouts:
-		data.set_value("loadouts", str(number), loadouts[number])
-
-func record_loadout(number: int) -> String:
-	var previous := loadouts.duplicate()
-	var preset := {}
-	for slot in GEAR_SLOTS:
-		var id := equipped_for(slot)
-		if not id.is_empty():
-			preset[slot] = id
-	loadouts[number] = preset
-	if save() != OK:
-		loadouts = previous
-		return "Could not record this preset."
-	return "Preset %d updated. Use Save Game to keep it across launches." % number
-
-func apply_loadout(number: int) -> String:
-	if not loadouts.has(number):
-		return "This preset is empty."
-	var preset: Dictionary = loadouts[number]
-	for id in preset.values():
-		if not gear.has(id):
-			return "%s is missing. Rebuy it or update this preset." % GEAR[id].name
-	var previous := gear.duplicate()
-	for id in gear:
-		gear[id] = "equipped" if id in preset.values() else "stored"
-	if save() != OK:
-		gear = previous
-		return "Could not equip this preset."
-	return "Preset %d equipped." % number
 
 func equipped_for(slot: String) -> String:
 	for id in gear:

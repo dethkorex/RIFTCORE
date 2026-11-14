@@ -16,11 +16,12 @@ var buttons := {}
 var badges := {}
 var profile
 var selected := "frame"
+var preview_actor: RiftPlayer
 
 func install(data, active: String, action: Callable, workshop := false) -> void:
 	profile = data
 	selected = active
-	custom_minimum_size = Vector2(430, 290)
+	custom_minimum_size = Vector2(386, 260)
 	size_flags_vertical = Control.SIZE_EXPAND_FILL
 	var screen := SubViewportContainer.new()
 	screen.stretch = true
@@ -34,6 +35,7 @@ func install(data, active: String, action: Callable, workshop := false) -> void:
 	view.render_target_update_mode = SubViewport.UPDATE_WHEN_VISIBLE
 	screen.add_child(view)
 	var actor := AVATAR.instantiate() as RiftPlayer
+	preview_actor = actor
 	view.add_child(actor)
 	actor.position.y = 0.89
 	actor.set_physics_process(false)

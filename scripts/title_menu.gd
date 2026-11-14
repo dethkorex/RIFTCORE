@@ -57,6 +57,7 @@ const EquipmentBody := preload("res://scripts/equipment_body.gd")
 const EquipmentIcons := preload("res://scripts/equipment_icons.gd")
 
 var equipment_view := "Gear"
+var storage_filter := "All"
 var leaderboard_sector := 1
 var party_from_deploy := false
 var layout: VBoxContainer
@@ -232,6 +233,7 @@ func open_station(next: String) -> void:
 	shop_item = ""
 	focused_item = ""
 	equipment_view = "Gear"
+	storage_filter = "All"
 	party_from_deploy = false
 	show()
 	show_page(next)
@@ -1026,117 +1028,178 @@ func confirm_gear_purchase() -> void:
 	show_page("Fabrication")
 
 func build_storage(columns: HBoxContainer) -> void:
-	var equipment := card(columns, 1.25)
+	var fitted := card(columns, 0.92)
+	UI.label(fitted, "RX-07 Equipment", 28, UI.CYAN)
+	var body := EquipmentBody.new()
+	fitted.add_child(body)
+	body.install(profile, storage_filter, func(slot: String):
+		storage_filter = slot
+		focused_item = profile.equipped_for(slot)
+		open_equipment_view("Gear")
+	)
+	var actor := body.preview_actor
+	EquipmentStats.apply(actor, profile)
+	actor.gain_experience(saved_experience, false)
+	add_stat_group(fitted, "DMG", "%.1f buster  /  %.1f blade" % [actor.buster_power(), actor.buster_power() * actor.melee_multiplier])
+	add_stat_group(fitted, "DEF", "%.1f%% reduction" % (100.0 - actor.mitigate_damage(100.0)))
+	add_stat_group(fitted, "ENG  /  HP", "%.0f energy  /  %.0f max health" % [actor.max_energy, actor.max_health])
+	add_stat_group(fitted, "SPD", "%.1f run  /  %.1f dash" % [actor.move_speed, actor.dash_speed])
+
+	var equipment := card(columns, 1.15)
 	var tabs := HBoxContainer.new()
 	tabs.add_theme_constant_override("separation", 8)
 	equipment.add_child(tabs)
-	for section in ["Gear", "Inventory", "Boss Abilities", "Presets"]:
+	for section in ["Gear", "Boss Abilities"]:
 		var tab := UI.button(tabs, section, open_equipment_view.bind(section), false, 35)
 		if section == equipment_view:
 			tab.add_theme_color_override("font_color", UI.CYAN)
 			tab.grab_focus()
 	match equipment_view:
 		"Gear":
-			UI.label(equipment, "%d / %d stowed" % [profile.stored_count(), profile.storage_capacity()], 18, Color("ffd079"))
-			var items: Array[String] = []
-			for id in Profile.GEAR:
-				if profile.gear.has(id):
-					items.append(id)
-			build_item_grid(equipment, items, false, 8)
-		"Inventory":
-			build_inventory(equipment)
+			build_storage_grid(equipment)
 		"Boss Abilities":
-			var entries := scroll_entries(equipment)
-			if run_unlocks.is_empty():
-				UI.label(entries, "Defeat a sector boss to unlock its ability for this run.", 17, UI.MUTED)
-			for id in run_unlocks:
-				var info := Catalog.weapon(String(id))
-				if not info.is_empty():
-					loadout_line(entries, String(info.reward_name), EquipmentIcons.icon("core", "core"))
-		"Presets":
-			build_equipment_presets(scroll_entries(equipment))
+			build_boss_abilities(equipment)
+
 	if not inventory_status.is_empty():
 		UI.label(equipment, inventory_status, 16, UI.VIOLET)
-	var fitted := card(columns, 0.83)
-	UI.label(fitted, "Equipped Gear", 25, UI.CYAN)
-	for slot in Profile.GEAR_SLOTS:
-		var id: String = profile.equipped_for(slot)
-		var caption := String(Profile.GEAR_SLOTS[slot])
-		if id.is_empty():
-			add_stat_group(fitted, caption, "Empty")
-		else:
-			var item := UI.button(fitted, "%s  /  %s" % [caption, Profile.GEAR[id].name], focus_equipped.bind(id), false, 32)
-			item.icon = EquipmentIcons.icon(id, slot)
-			item.add_theme_constant_override("icon_max_width", 21)
-			item.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	UI.label(fitted, "Stowed gear is safe when a run ends.", 15, UI.MUTED)
-	fitted.add_child(HSeparator.new())
-	UI.label(fitted, "Operator Stats", 25, UI.CYAN)
-	var preview := card(columns, 0.70)
-	UI.label(preview, "RX-07  /  Lv. %d" % saved_level, 24, UI.CYAN)
-	var display := EquipmentDisplay.new()
-	preview.add_child(display)
-	var operator := display.actor
-	EquipmentStats.apply(operator, profile)
-	operator.gain_experience(saved_experience, false)
-	add_stat_group(fitted, "DMG", "%.1f buster  /  %.1f blade" % [operator.buster_power(), operator.buster_power() * operator.melee_multiplier])
-	add_stat_group(fitted, "DEF", "%.1f%% damage reduction" % (100.0 - operator.mitigate_damage(100.0)))
-	add_stat_group(fitted, "ENG", "%.0f max energy" % operator.max_energy)
-	add_stat_group(fitted, "HP", "%.0f max health" % operator.max_health)
-	add_stat_group(fitted, "SPD", "%.1f run  /  %.1f dash" % [operator.move_speed, operator.dash_speed])
 
-func build_inventory(parent: VBoxContainer) -> void:
-	var slots := HBoxContainer.new()
-	slots.add_theme_constant_override("separation", UI.ITEM_GAP)
-	parent.add_child(slots)
+func storage_items() -> Dictionary:
+	var items := {}
+	for id in Profile.GEAR:
+		var gear: Dictionary = Profile.GEAR[id]
+		if profile.gear.has(id):
+			items[id] = {"kind": "Equipment", "name": gear.name, "slot": gear.slot, "icon": EquipmentIcons.icon(id, gear.slot),
+				"rarity": gear.rarity, "detail": gear.perk, "badge": item_status(id, false)}
+		if profile.blueprint_items.has(id):
+			items["blueprint/" + id] = {"kind": "Blueprints", "name": gear.name + " Blueprint", "slot": "", "icon": EquipmentIcons.icon(id, gear.slot),
+				"rarity": gear.rarity, "detail": "Learn this blueprint to unlock its recipe in Crafting.", "badge": "Recipe", "id": id}
+	for upgrade in profile.all_upgrades():
+		var rank: int = profile.rank(upgrade.id)
+		if rank == 0:
+			continue
+		var slot := String(upgrade.get("slot", Profile.UPGRADE_SLOTS.get(upgrade.id, "")))
+		items[upgrade.id] = {"kind": "Augments", "name": upgrade.name, "slot": slot, "icon": EquipmentIcons.icon(slot, slot),
+			"rarity": upgrade.get("rarity", 0), "detail": upgrade.effects[rank - 1], "badge": "Active"}
+	for id in Profile.stock:
+		var item: Dictionary = Profile.stock[id]
+		var material: bool = item.has("material")
+		var quantity := int(profile.materials.get(item.material, 0)) if material else int(profile.inventory.get(id, 0))
+		if quantity > 0:
+			items[id] = {"kind": "Materials" if material else "Supplies", "name": item.name, "slot": "", "icon": EquipmentIcons.icon(item.icon, item.icon),
+				"rarity": item.rarity, "detail": "Used to fabricate equipment." if material else item.detail, "badge": "×%d" % quantity}
+	return items
+
+func build_storage_grid(parent: VBoxContainer) -> void:
+	var toolbar := HBoxContainer.new()
+	parent.add_child(toolbar)
+	var filter := OptionButton.new()
+	toolbar.add_child(filter)
+	UI.style_button(filter)
+	var categories := ["All", "Equipment", "Augments", "Supplies", "Blueprints", "Materials"]
+	if Profile.GEAR_SLOTS.has(storage_filter):
+		categories.append(storage_filter)
+	for category in categories:
+		filter.add_item(Profile.GEAR_SLOTS.get(category, category))
+	filter.select(categories.find(storage_filter))
+	filter.item_selected.connect(func(index: int):
+		storage_filter = categories[index]
+		focused_item = ""
+		show_page("Storage")
+	)
+	var capacity := UI.label(toolbar, "%d / %d stowed" % [profile.stored_count(), profile.storage_capacity()], 17, Color("ffd079"))
+	capacity.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	capacity.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	capacity.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+
+	var entries := scroll_entries(parent)
+	var grid := GridContainer.new()
+	grid.columns = 7
+	grid.add_theme_constant_override("h_separation", UI.ITEM_GAP)
+	grid.add_theme_constant_override("v_separation", UI.ITEM_GAP)
+	entries.add_child(grid)
+	var detail_card := UI.equipment_card(UI.CYAN)
+	parent.add_child(detail_card)
+	var detail := UI.column(detail_card, 4)
+	var title := UI.label(detail, "Stored Items", 20, UI.CYAN)
+	var description := UI.label(detail, "Select an item or choose a socket to filter gear.", 16, UI.MUTED)
+	var action := UI.button(detail, "", func(): apply_storage_item(focused_item), false, 34)
+	action.hide()
+	var items := storage_items()
+	var reveal := func(id: String):
+		var item: Dictionary = items[id]
+		focused_item = id
+		title.text = "%s  ·  %s" % [item.name, Profile.RARITY_NAMES[item.rarity]]
+		title.add_theme_color_override("font_color", Profile.RARITY_COLORS[item.rarity])
+		description.text = item.detail
+		action.visible = item.kind in ["Equipment", "Blueprints"]
+		if item.kind == "Equipment":
+			var current: String = profile.equipped_for(item.slot)
+			action.text = "Stow" if id == current else ("Equip" if current.is_empty() else "Replace " + String(Profile.GEAR[current].name))
+		elif item.kind == "Blueprints":
+			action.text = "Learn Blueprint"
+		elif item.kind == "Supplies":
+			description.text += "  ·  Choose a quick slot below."
+	var tiles := {}
+	for id in items:
+		var item: Dictionary = items[id]
+		if storage_filter not in ["All", item.kind, item.slot]:
+			continue
+		var tile := UI.item_tile(grid, item.icon, Profile.RARITY_COLORS[item.rarity], item.rarity, item.badge, func():
+			reveal.call(id)
+			if action.visible:
+				action.grab_focus()
+		)
+		tile.tooltip_text = item.name
+		tile.focus_entered.connect(reveal.bind(id))
+		tiles[id] = tile
+	if tiles.is_empty():
+		focused_item = ""
+		UI.label(entries, "No items in this category.", 17, UI.MUTED)
+	else:
+		var id: String = focused_item if tiles.has(focused_item) else tiles.keys()[0]
+		reveal.call(id)
+		tiles[id].grab_focus()
+		var fit := func():
+			grid.columns = clampi(floori((entries.size.x + UI.ITEM_GAP) / (UI.ITEM_SIZE + UI.ITEM_GAP)), 1, 9)
+		entries.resized.connect(fit)
+		fit.call_deferred()
+	build_quick_assignments(parent)
+
+func apply_storage_item(id: String) -> void:
+	if id.begins_with("blueprint/"):
+		inventory_status = profile.learn_blueprint(id.trim_prefix("blueprint/"))
+	elif profile.gear.has(id):
+		inventory_status = profile.move_gear(id)
+	show_page("Storage")
+
+func build_quick_assignments(parent: VBoxContainer) -> void:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", UI.ITEM_GAP)
+	parent.add_child(row)
 	for index in 4:
 		var stack: Dictionary = profile.quick_slots[index]
 		var id: String = stack.get("id", "")
 		var icon := EquipmentIcons.icon("utility", "utility") if id.is_empty() else EquipmentIcons.icon(profile.stock[id].icon, profile.stock[id].icon)
-		var button := UI.item_tile(slots, icon, UI.CYAN, 0, "%s %d/5" % [["↑", "←", "→", "↓"][index], stack.get("count", 0)], func():
-			if profile.stock.has(focused_item) and not profile.stock[focused_item].has("material"):
+		var direction: String = ["↑", "←", "→", "↓"][index]
+		var button := UI.item_tile(row, icon, UI.CYAN, 0, "%s %d/5" % [direction, stack.get("count", 0)], func():
+			if Profile.stock.has(focused_item) and not Profile.stock[focused_item].has("material"):
 				inventory_status = profile.assign_quick(index, focused_item)
 			else:
-				inventory_status = profile.clear_quick(index)
+				inventory_status = "Select a supply to assign."
 			show_page("Storage")
 		)
-		button.tooltip_text = "Assign the selected supply. With no supply selected, return this stack to inventory."
-	var selected := UI.label(parent, "Select a supply and choose a quick slot.", 16, UI.MUTED)
-	var actions := HBoxContainer.new()
-	parent.add_child(actions)
-	UI.button(actions, "Clear Selection", func():
-		focused_item = ""
+		button.tooltip_text = "Assign supply to %s" % direction
+	var clear := OptionButton.new()
+	row.add_child(clear)
+	clear.add_item("Clear quick slot")
+	clear.set_item_disabled(0, true)
+	for index in 4:
+		clear.add_item(["Up", "Left", "Right", "Down"][index])
+		clear.set_item_disabled(index + 1, int(profile.quick_slots[index].get("count", 0)) <= 0)
+	clear.item_selected.connect(func(index: int):
+		inventory_status = profile.clear_quick(index - 1)
 		show_page("Storage")
-	, false, 33)
-	var entries := scroll_entries(parent)
-	var supplies := GridContainer.new()
-	supplies.columns = 7
-	supplies.add_theme_constant_override("h_separation", UI.ITEM_GAP)
-	supplies.add_theme_constant_override("v_separation", UI.ITEM_GAP)
-	entries.add_child(supplies)
-	for id in profile.inventory:
-		var quantity: int = profile.inventory[id]
-		if quantity <= 0 or not profile.stock.has(id):
-			continue
-		var item: Dictionary = profile.stock[id]
-		var tile := UI.item_tile(supplies, EquipmentIcons.icon(item.icon, item.icon), Profile.RARITY_COLORS[item.rarity], item.rarity, "%d/100" % quantity, func():
-			focused_item = id
-			selected.text = "%s  ·  %s" % [item.name, item.detail]
-		)
-		tile.tooltip_text = "%s  ·  %s" % [item.name, item.detail]
-		if focused_item == id:
-			selected.text = tile.tooltip_text
-	if not profile.blueprint_items.is_empty():
-		UI.label(entries, "Unlearned Blueprints", 21, UI.CYAN)
-		for id in profile.blueprint_items:
-			UI.button(entries, "Learn " + String(Profile.GEAR[id].name), func():
-				inventory_status = profile.learn_blueprint(id)
-				show_page("Storage")
-			, false, 33)
-
-func focus_equipped(id: String) -> void:
-	focused_item = id
-	open_equipment_view("Gear")
+	)
 
 func add_stat_group(parent: VBoxContainer, category: String, values: String) -> void:
 	var row := HBoxContainer.new()
@@ -1151,58 +1214,37 @@ func open_equipment_view(section: String) -> void:
 	equipment_view = section
 	show_page("Storage")
 
-func loadout_line(parent: VBoxContainer, caption: String, icon: Texture2D) -> void:
+func build_boss_abilities(parent: VBoxContainer) -> void:
+	var unlocked: Array = run_unlocks.filter(func(id): return not Catalog.weapon(String(id)).is_empty())
+	if unlocked.is_empty():
+		UI.label(parent, "Defeat sector bosses to unlock their abilities for this run.", 17, UI.MUTED)
+		return
+	var grid := GridContainer.new()
+	grid.columns = 6
+	grid.add_theme_constant_override("h_separation", UI.ITEM_GAP)
+	grid.add_theme_constant_override("v_separation", UI.ITEM_GAP)
+	parent.add_child(grid)
 	var panel := UI.equipment_card(UI.CYAN)
 	parent.add_child(panel)
-	var row := HBoxContainer.new()
-	panel.add_child(row)
-	var image := TextureRect.new()
-	image.texture = icon
-	image.custom_minimum_size = Vector2(24, 24)
-	image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	image.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	row.add_child(image)
-	var item := UI.label(row, caption, 15)
-	item.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-
-func build_equipment_presets(entries: VBoxContainer) -> void:
-	for number in range(1, Profile.PRESET_COUNT + 1):
-		var panel := PanelContainer.new()
-		panel.add_theme_stylebox_override("panel", UI.frame(Color("0d2032"), Color("35566b"), 1))
-		entries.add_child(panel)
-		var row := UI.column(panel, 7)
-		UI.label(row, "Preset %02d" % number, 19, UI.CYAN)
-		var preset: Dictionary = profile.loadouts.get(number, {})
-		if preset.is_empty():
-			UI.label(row, "No gear recorded", 15, UI.MUTED)
-		var fitted := GridContainer.new()
-		fitted.columns = 2
-		row.add_child(fitted)
-		for slot in Profile.GEAR_SLOTS:
-			if not preset.has(slot):
-				continue
-			var id: String = preset[slot]
-			var entry := HBoxContainer.new()
-			fitted.add_child(entry)
-			var icon := TextureRect.new()
-			icon.texture = EquipmentIcons.icon(id, slot)
-			icon.custom_minimum_size = Vector2(24, 24)
-			icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-			icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-			entry.add_child(icon)
-			var item_name: String = Profile.GEAR[id].name
-			UI.label(entry, item_name if profile.gear.has(id) else item_name + "  /  Missing", 14, UI.WHITE).autowrap_mode = TextServer.AUTOWRAP_OFF
-		var actions := HBoxContainer.new()
-		row.add_child(actions)
-		var record := UI.button(actions, "Record", preset_action.bind(number, true), false, 34)
-		record.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		var apply := UI.button(actions, "Equip", preset_action.bind(number, false), false, 34)
-		apply.disabled = not profile.loadouts.has(number)
-		apply.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-
-func preset_action(number: int, record: bool) -> void:
-	inventory_status = profile.record_loadout(number) if record else profile.apply_loadout(number)
-	show_page("Storage")
+	var details := UI.column(panel, 8)
+	var title := UI.label(details, "", 24, UI.CYAN)
+	var origin := UI.label(details, "", 16, UI.MUTED)
+	var description := UI.label(details, "", 18)
+	var energy := UI.label(details, "", 16, UI.MUTED)
+	UI.label(details, "Use LB / RB in a mission to switch between unlocked abilities.", 16, UI.MUTED)
+	var reveal := func(id: String):
+		var info := Catalog.weapon(id)
+		title.text = info.reward_name
+		title.add_theme_color_override("font_color", Color(info.color))
+		origin.text = "Unlocked in " + String(info.title)
+		description.text = Catalog.WEAPON_EFFECTS[id]
+		energy.text = "Base energy cost   %d per shot  /  %d charged" % [8, 36] if id == "magma_breaker" else "Base energy cost   7 per shot  /  30 charged"
+	for id in unlocked:
+		var info := Catalog.weapon(id)
+		var tile := UI.item_tile(grid, EquipmentIcons.icon("arm", "arm"), Color(info.color), 2, "S%02d" % (Catalog.SECTORS.find(info) + 1), reveal.bind(id))
+		tile.tooltip_text = info.reward_name
+		tile.focus_entered.connect(reveal.bind(id))
+	reveal.call(unlocked[0])
 
 func build_info(columns: HBoxContainer, title: String, description: String) -> void:
 	var info := card(columns, 1.25)
@@ -1222,7 +1264,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			show_page(tabs[posmod(tabs.find(page) + step, tabs.size())])
 			return
 		if page == "Storage":
-			var views := ["Gear", "Inventory", "Boss Abilities", "Presets"]
+			var views := ["Gear", "Boss Abilities"]
 			get_viewport().set_input_as_handled()
 			open_equipment_view(views[posmod(views.find(equipment_view) + step, views.size())])
 			return
