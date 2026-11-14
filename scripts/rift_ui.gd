@@ -165,8 +165,8 @@ static func item_tile(parent: Container, icon: Texture2D, rarity: Color, rarity_
 	var variants := ["common", "rare", "epic", "legendary"]
 	var idle := tile_frame("item_slot_" + variants[rarity_index])
 	idle.content_margin_bottom = 19
-	var active := tile_frame("item_slot_epic")
-	active.content_margin_bottom = 19
+	var active := idle.duplicate() as StyleBoxTexture
+	active.modulate_color = Color("f1f7ff")
 	var down := active.duplicate() as StyleBoxTexture
 	down.modulate_color = Color("ccc0e4")
 	set_button_states(tile, idle, active, down)
@@ -177,7 +177,34 @@ static func item_tile(parent: Container, icon: Texture2D, rarity: Color, rarity_
 	badge.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
 	badge.offset_top = -18
 	badge.offset_bottom = -3
+	tile.draw.connect(func():
+		if not tile.has_focus():
+			return
+		var right := tile.size.x - 4.0
+		var bottom := tile.size.y - 4.0
+		var brackets := [
+			PackedVector2Array([Vector2(4, 14), Vector2(4, 4), Vector2(14, 4)]),
+			PackedVector2Array([Vector2(right - 10, 4), Vector2(right, 4), Vector2(right, 14)]),
+			PackedVector2Array([Vector2(4, bottom - 10), Vector2(4, bottom), Vector2(14, bottom)]),
+			PackedVector2Array([Vector2(right - 10, bottom), Vector2(right, bottom), Vector2(right, bottom - 10)]),
+		]
+		for bracket in brackets:
+			tile.draw_polyline(bracket, Color("071c2b"), 5.0, true)
+			tile.draw_polyline(bracket, Color("d7ffff"), 2.5, true)
+		tile.draw_colored_polygon(PackedVector2Array([
+			Vector2(right - 11, 6), Vector2(right - 2, 6), Vector2(right - 2, 15),
+		]), CYAN)
+	)
+	tile.focus_entered.connect(tile.queue_redraw)
+	tile.focus_exited.connect(tile.queue_redraw)
 	return tile
+
+static func make_readable_scroll(scroll: ScrollContainer) -> void:
+	scroll.focus_mode = Control.FOCUS_ALL
+	scroll.draw_focus_border = true
+	var edge := frame(Color.TRANSPARENT, CYAN, 2)
+	edge.draw_center = false
+	scroll.add_theme_stylebox_override("focus", edge)
 
 static func tile_frame(asset: String) -> StyleBoxTexture:
 	var style := StyleBoxTexture.new()

@@ -44,7 +44,7 @@ static func build(stack: VBoxContainer, sector_name: String, stats: Dictionary, 
 	scroll.custom_minimum_size.y = 117
 	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	scroll.follow_focus = true
-	scroll.focus_mode = Control.FOCUS_ALL
+	UI.make_readable_scroll(scroll)
 	results.add_child(scroll)
 	var rewards := HBoxContainer.new()
 	rewards.add_theme_constant_override("separation", 8)

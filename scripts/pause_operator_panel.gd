@@ -78,7 +78,7 @@ func _ready() -> void:
 	scroll.custom_minimum_size.y = 70
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	scroll.focus_mode = Control.FOCUS_ALL
+	UI.make_readable_scroll(scroll)
 	sections.add_child(scroll)
 	inventory = UI.label(scroll, "", 16)
 	inventory.size_flags_horizontal = Control.SIZE_EXPAND_FILL

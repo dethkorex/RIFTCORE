@@ -486,6 +486,7 @@ func build_archive(columns: HBoxContainer) -> void:
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	UI.make_readable_scroll(scroll)
 	archive.add_child(scroll)
 	var records := UI.column(scroll, 14)
 	records.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -1141,6 +1142,7 @@ func build_challenges(columns: HBoxContainer) -> void:
 	var list := UI.column(scroll, 8)
 	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var details := scroll_entries(card(columns, 1.65))
+	UI.make_readable_scroll(details.get_parent() as ScrollContainer)
 	var available: int = profile.unlocked_sector if profile else 1
 	challenge_sector = clampi(challenge_sector, 1, available)
 	var group := ButtonGroup.new()
@@ -1606,7 +1608,7 @@ func storage_items() -> Dictionary:
 func build_storage_grid(parent: VBoxContainer) -> Button:
 	var toolbar := HBoxContainer.new()
 	parent.add_child(toolbar)
-	UI.label(toolbar, "LB / RB   Filter items", 14, UI.MUTED).autowrap_mode = TextServer.AUTOWRAP_OFF
+	UI.label(toolbar, "LB / RB   Filter items   ·   Right stick scrolls", 14, UI.MUTED).autowrap_mode = TextServer.AUTOWRAP_OFF
 	var capacity := UI.label(toolbar, "%d / %d stowed" % [profile.stored_count(), profile.storage_capacity()], 17, Color("ffd079"))
 	capacity.autowrap_mode = TextServer.AUTOWRAP_OFF
 	capacity.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -1685,11 +1687,18 @@ func build_storage_grid(parent: VBoxContainer) -> Button:
 		var first_item: Button = tiles.values()[0]
 		for tab in category_tabs.slice(3):
 			tab.focus_neighbor_bottom = tab.get_path_to(first_item)
-		first_item.focus_neighbor_top = first_item.get_path_to(category_tabs[3])
 		var fit := func():
 			var scroll := entries.get_parent() as ScrollContainer
 			var usable := scroll.size.x - scroll.get_v_scroll_bar().get_combined_minimum_size().x
 			grid.columns = clampi(floori((usable + UI.ITEM_GAP) / (UI.ITEM_SIZE + UI.ITEM_GAP)), 1, 9)
+			var ordered := tiles.values()
+			for index in ordered.size():
+				var tile: Button = ordered[index]
+				if index < grid.columns:
+					var category := 3 + mini(2, index * 3 / grid.columns)
+					tile.focus_neighbor_top = tile.get_path_to(category_tabs[category])
+				else:
+					tile.focus_neighbor_top = NodePath()
 		entries.get_parent().resized.connect(fit)
 		fit.call_deferred()
 	build_quick_assignments(parent)
@@ -1729,6 +1738,7 @@ func build_quick_assignments(parent: VBoxContainer) -> void:
 	for index in 4:
 		clear.add_item(["Up", "Left", "Right", "Down"][index])
 		clear.set_item_disabled(index + 1, int(profile.quick_slots[index].get("count", 0)) <= 0)
+	clear.select(0)
 	clear.item_selected.connect(func(index: int):
 		inventory_status = profile.clear_quick(index - 1)
 		show_page("Storage")

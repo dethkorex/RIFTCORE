@@ -40,7 +40,8 @@ static func icon(id: String, slot: String) -> Texture2D:
 			var item: Dictionary = Profile.GEAR[id]
 			tint = Profile.RARITY_COLORS[item.rarity] if item.rarity > 0 else tint
 			if item.has("sector"):
-				symbol = BLUEPRINT_ICONS[id.get_slice("_", 2).to_int()]
+				var design := id.get_slice("_", 2).to_int()
+				symbol = BLUEPRINT_ICONS[design % BLUEPRINT_ICONS.size()]
 			elif not PATHS.has(id):
 				var stats: Dictionary = item.stats
 				for stat in STAT_ICONS:
