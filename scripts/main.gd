@@ -176,6 +176,7 @@ func refresh_menu_save() -> void:
 	menu.saved_sector = 1
 	menu.saved_act = 1
 	menu.saved_level = 1
+	menu.saved_experience = 0
 	menu.run_cleared_through = 0
 	menu.at_sector_start = false
 	menu.run_unlocks = []
@@ -184,7 +185,8 @@ func refresh_menu_save() -> void:
 		menu.run_cleared_through = clampi(int(save.get_value("checkpoint", "run_cleared_through", menu.saved_sector - 1)), 0, Catalog.SECTORS.size())
 		profile.unlock_sector(menu.saved_sector)
 		menu.saved_act = clampi(int(save.get_value("checkpoint", "act", 1)), 1, 2)
-		menu.saved_level = RiftPlayer.level_for_experience(int(save.get_value("checkpoint", "experience", 0)))
+		menu.saved_experience = clampi(int(save.get_value("checkpoint", "experience", 0)), 0, 1000000)
+		menu.saved_level = RiftPlayer.level_for_experience(menu.saved_experience)
 		menu.at_sector_start = bool(save.get_value("checkpoint", "at_start", false))
 		menu.run_unlocks = save.get_value("checkpoint", "weapons", [])
 

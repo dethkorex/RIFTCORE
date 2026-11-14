@@ -25,6 +25,7 @@ var can_load := false
 var saved_sector := 1
 var saved_act := 1
 var saved_level := 1
+var saved_experience := 0
 var run_cleared_through := 0
 var at_sector_start := false
 var run_unlocks: Array = []
@@ -738,23 +739,12 @@ func build_loadout(columns: HBoxContainer) -> void:
 
 	var details := card(columns, 1.52)
 	UI.label(details, "LOADOUT STATS", 25, UI.CYAN)
-	var operator := display.actor as RiftPlayer
+	var operator := display.actor
 	EquipmentStats.apply(operator, profile)
-	var stats := GridContainer.new()
-	stats.columns = 2
-	stats.add_theme_constant_override("h_separation", 16)
-	stats.add_theme_constant_override("v_separation", 2)
-	details.add_child(stats)
-	for stat in [
-		["Buster", "%.1f" % operator.buster_power()],
-		["Blade", "%.1f" % (operator.buster_power() * operator.melee_multiplier)],
-		["HP / Energy", "%.0f  /  %.0f" % [operator.max_health, operator.max_energy]],
-		["Armor / Dash", "%.0f%%  /  %.1f m/s" % [operator.armor_resistance * 100.0, operator.dash_speed]],
-	]:
-		UI.label(stats, stat[0], 16, UI.MUTED).size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		var reading := UI.label(stats, stat[1], 16, UI.WHITE)
-		reading.autowrap_mode = TextServer.AUTOWRAP_OFF
-		reading.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	operator.gain_experience(saved_experience, false)
+	add_stat_group(details, "Combat", "Buster %.1f   ·   Blade %.1f" % [operator.buster_power(), operator.buster_power() * operator.melee_multiplier])
+	add_stat_group(details, "Survival", "HP %.0f   ·   EN %.0f   ·   DEF %.0f%%" % [operator.max_health, operator.max_energy, 100.0 - operator.mitigate_damage(100.0)])
+	add_stat_group(details, "Movement", "Run %.1f   ·   Dash %.1f m/s" % [operator.move_speed, operator.dash_speed])
 	details.add_child(HSeparator.new())
 	UI.label(details, equipment_view.to_upper(), 22, UI.CYAN)
 	var entries := scroll_entries(details)
@@ -779,6 +769,15 @@ func build_loadout(columns: HBoxContainer) -> void:
 			build_equipment_presets(entries)
 	if not inventory_status.is_empty():
 		UI.label(details, inventory_status, 15, UI.VIOLET)
+
+func add_stat_group(parent: VBoxContainer, category: String, values: String) -> void:
+	var row := HBoxContainer.new()
+	parent.add_child(row)
+	var title := UI.label(row, category, 16, UI.MUTED)
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var reading := UI.label(row, values, 16, UI.WHITE)
+	reading.autowrap_mode = TextServer.AUTOWRAP_OFF
+	reading.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 
 func open_equipment_view(section: String) -> void:
 	equipment_view = section
