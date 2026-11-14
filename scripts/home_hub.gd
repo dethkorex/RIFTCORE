@@ -117,6 +117,8 @@ func set_bank(amount: int, shards: int, level: int) -> void:
 	bank_label.text = "RX-07   /   PLAYER %02d\n%04d BOLTS   ·   %03d CORE SHARDS" % [level, amount, shards]
 
 func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventMouse:
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	if panel_open:
 		return
 	if event.is_action_pressed("ui_cancel"):

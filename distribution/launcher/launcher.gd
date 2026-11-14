@@ -54,6 +54,11 @@ func _ready() -> void:
 		status.text = "Installed build %s  /  no release channel configured." % installed
 		show_fallback_notes("No release channel is configured for this installation.")
 
+func _input(event: InputEvent) -> void:
+	if event is InputEventMouse:
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+		Input.set_default_cursor_shape(Input.CURSOR_ARROW)
+
 func migrate_launcher() -> void:
 	status.text = "Upgrading the RIFTCORE launcher…"
 	var target := install_root.path_join(game_filename)

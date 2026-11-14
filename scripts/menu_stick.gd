@@ -14,6 +14,12 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 
 func _input(event: InputEvent) -> void:
+	if event is InputEventMouse:
+		var viewport := get_viewport()
+		if viewport.gui_get_focus_owner() or viewport.gui_get_hovered_control():
+			Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+			Input.set_default_cursor_shape(Input.CURSOR_ARROW)
+		return
 	if event is InputEventJoypadButton and event.pressed:
 		reset_stick()
 	if not event is InputEventJoypadMotion or event.axis not in [JOY_AXIS_LEFT_X, JOY_AXIS_LEFT_Y]:

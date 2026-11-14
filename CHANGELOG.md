@@ -2,7 +2,7 @@
 
 ## Game changes
 
-- The cursor is visible on the title screen, inside the station, and when paused.
+- Moving or clicking the mouse restores the cursor in menus, the station, and the launcher.
 - Quick Invite opens a room automatically for Steam friends playing RIFTCORE. Removed the redundant trader display from the station.
 - Two live Windows clients can create a GD Sync room, join, and exchange data when configured.
 
