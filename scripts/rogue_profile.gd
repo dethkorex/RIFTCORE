@@ -3,6 +3,7 @@ extends RefCounted
 signal quick_changed
 
 const Catalog := preload("res://scripts/sector_catalog.gd")
+const Difficulty := preload("res://scripts/mission_difficulty.gd")
 const CHALLENGES := [
 	{"name": "Gatebreaker", "objective": "Defeat the Act 1 miniboss and enter Act 2.", "credits": 120, "step": 15},
 	{"name": "Sector Clear", "objective": "Defeat the Act 2 boss and reach extraction.", "credits": 240, "step": 25},
@@ -32,7 +33,9 @@ static var stock := Stock.catalog()
 static var enhancements := Enhancements.catalog()
 const QUICK_MAX := 3
 const STACK_MAX := 100
+const BLUEPRINT_POUCH_SIZE := 8
 var blueprint_items := {}
+var blueprint_pouch: Array[String] = []
 var inventory := {}
 var quick_slots: Array[Dictionary] = [{}, {}, {}, {}]
 
@@ -100,6 +103,7 @@ var unlocked_sector := 1
 var completed_challenges: Dictionary = {}
 var challenge_cycles: Dictionary = {}
 var loot_clears: Dictionary = {}
+var hard_clears: Dictionary = {}
 var reserve_lives := 0
 var gear := {}
 var manual_only := false
@@ -147,6 +151,12 @@ func decode_from(data: ConfigFile) -> void:
 		for id in saved_blueprints:
 			if GEAR.has(id) and not blueprints.has(id):
 				blueprint_items[id] = true
+	blueprint_pouch.clear()
+	var pouch: Variant = data.get_value("inventory", "blueprint_pouch", [])
+	if pouch is Array:
+		for id in pouch:
+			if id is String and can_collect_blueprint(id) and blueprint_pouch.size() < BLUEPRINT_POUCH_SIZE:
+				blueprint_pouch.append(id)
 	var items: Variant = data.get_value("inventory", "stock", {})
 	if items is Dictionary:
 		for id in items:
@@ -191,6 +201,8 @@ func decode_from(data: ConfigFile) -> void:
 	challenge_cycles = cycles if cycles is Dictionary else {}
 	var clears: Variant = data.get_value("archive", "loot_clears", {})
 	loot_clears = clears if clears is Dictionary else {}
+	var hard: Variant = data.get_value("archive", "hard_clears", {})
+	hard_clears = hard if hard is Dictionary else {}
 	for number in memories:
 		if not loot_clears.has(number):
 			loot_clears[number] = 0
@@ -225,6 +237,7 @@ func encode_into(data: ConfigFile) -> void:
 	data.set_value("inventory", "stock", inventory)
 	data.set_value("inventory", "quick", quick_slots)
 	data.set_value("inventory", "blueprints", blueprint_items)
+	data.set_value("inventory", "blueprint_pouch", blueprint_pouch)
 	for id in blueprints:
 		data.set_value("blueprints", id, true)
 	for index in memories:
@@ -245,6 +258,7 @@ func encode_into(data: ConfigFile) -> void:
 		data.set_value("challenges", id, true)
 	data.set_value("challenge_cycles", "sectors", challenge_cycles)
 	data.set_value("archive", "loot_clears", loot_clears)
+	data.set_value("archive", "hard_clears", hard_clears)
 	for id in gear:
 		data.set_value("equipment", id, gear[id])
 
@@ -346,6 +360,21 @@ static func challenge_key(sector: int, tier: int) -> String:
 
 static func challenge_credits(sector: int, tier: int) -> int:
 	return CHALLENGES[tier].credits + (sector - 1) * CHALLENGES[tier].step
+
+func record_sector_clear(sector: int, mode: int) -> void:
+	loot_clears[sector] = maxi(int(loot_clears.get(sector, 0)), mode)
+	if mode == Difficulty.HARD:
+		hard_clears[sector] = true
+
+func hard_clear_count() -> int:
+	var count := 0
+	for sector in range(1, Catalog.SECTORS.size() + 1):
+		if hard_clears.get(sector, false):
+			count += 1
+	return count
+
+func nightmare_unlocked() -> bool:
+	return hard_clear_count() == Catalog.SECTORS.size()
 
 func challenge_cycle(sector: int) -> Dictionary:
 	var cycle: Dictionary = challenge_cycles.get(sector, {})
@@ -457,8 +486,34 @@ func deposit(amount: int) -> Error:
 func all_upgrades() -> Array:
 	return UPGRADES + enhancements
 
+func can_collect_blueprint(id: String) -> bool:
+	return GEAR.has(id) and not blueprints.has(id) and not blueprint_items.has(id) and not blueprint_pouch.has(id)
+
+func move_blueprint_to_pouch(id: String) -> String:
+	if not blueprint_items.has(id) or blueprint_pouch.size() >= BLUEPRINT_POUCH_SIZE:
+		return "Blueprint pouch is full or the item is unavailable."
+	blueprint_items.erase(id)
+	blueprint_pouch.append(id)
+	if save() != OK:
+		blueprint_pouch.erase(id)
+		blueprint_items[id] = true
+		return "Could not move the blueprint."
+	return "Moved to Blueprint Pouch."
+
+func stow_pouch_blueprint(id: String) -> String:
+	if not blueprint_pouch.has(id):
+		return "Blueprint is unavailable."
+	var slot := blueprint_pouch.find(id)
+	blueprint_pouch.remove_at(slot)
+	blueprint_items[id] = true
+	if save() != OK:
+		blueprint_items.erase(id)
+		blueprint_pouch.insert(slot, id)
+		return "Could not stow the blueprint."
+	return "Returned to Storage."
+
 func collect_blueprint(id: String) -> bool:
-	if not GEAR.has(id) or blueprints.has(id) or blueprint_items.has(id):
+	if not can_collect_blueprint(id):
 		return false
 	blueprint_items[id] = true
 	return true

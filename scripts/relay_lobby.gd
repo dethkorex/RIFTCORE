@@ -3,6 +3,8 @@ extends Node
 signal changed
 signal deploy_requested(host: bool, sector: int)
 signal partner_moved(id: int, x: float, facing: float, animation: String, display_name: String)
+signal blueprint_drop_changed(key: String, id: String, owner: int, x: float)
+signal blueprint_received(id: String)
 signal guest_joined
 signal mission_returned
 signal mission_disconnected(message: String)
@@ -14,7 +16,8 @@ const Client := preload("res://addons/GD-Sync/MultiplayerClient.gd")
 const RelayEnums := preload("res://addons/GD-Sync/Scripts/Enums/Enums.gd")
 const Codes := "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 const CodeLength := 10
-const ROOM_PREFIX := "riftcore-coop-v7-"
+const ROOM_PREFIX := "riftcore-coop-v9-"
+const Difficulty := preload("res://scripts/mission_difficulty.gd")
 const MAX_PLAYERS := 4
 const RELAY_UNAVAILABLE := "Online rooms are unavailable. Solo play is available."
 
@@ -28,10 +31,14 @@ var pending_invite := 0
 var mission_active := false
 var mission_roster: Array = []
 var mission_mode := 0
+var nightmare_unlocked := false
 var steam_invite_lobbies: Dictionary = {}
 var local_name := "RX-07"
 var unlocked_sector := 1
 
+var blueprint_drops: Dictionary = {}
+var station_positions: Dictionary = {}
+var drop_serial := 0
 var relay: Node
 var request_timeout: Timer
 
@@ -193,10 +200,15 @@ func _room_joined(lobby_name: String) -> void:
 	relay.expose_func(_receive_return, RelayEnums.EXPOSE_PERMISSION.HOST)
 	relay.expose_func(_receive_partner_position)
 	relay.expose_func(_receive_sector_records)
+	relay.expose_func(_request_blueprint_drop)
+	relay.expose_func(_request_blueprint_pickup)
+	relay.expose_func(_receive_blueprint_drop, RelayEnums.EXPOSE_PERMISSION.HOST)
+	relay.expose_func(_deliver_blueprint, RelayEnums.EXPOSE_PERMISSION.HOST)
 	var joined_as_guest := pending == "join"
 	connected_room = room_code
 	pending = ""
 	relay.player_set_data("operator_name", local_name)
+	relay.player_set_data("nightmare_unlocked", nightmare_unlocked)
 	if joined_as_guest:
 		guest_joined.emit.call_deferred()
 	_players_changed(0)
@@ -228,6 +240,10 @@ func _players_changed(_client_id: int) -> void:
 	_update("%d / %d players connected" % [room_size, MAX_PLAYERS])
 	if room_size >= 2 and not mission_active:
 		share_sector_records.call_deferred()
+		if _client_id != 0 and relay.is_host():
+			for key in blueprint_drops:
+				var drop: Dictionary = blueprint_drops[key]
+				relay.call_func_on(_client_id, _receive_blueprint_drop, key, drop.id, drop.owner, drop.x)
 
 func share_sector_records() -> void:
 	if room_size >= 2 and is_instance_valid(relay):
@@ -246,8 +262,24 @@ func _receive_sector_records(payload: Dictionary, alias: String) -> void:
 func can_deploy() -> bool:
 	return not mission_active and room_size >= 2 and is_instance_valid(relay) and relay.is_host()
 
+func set_nightmare_unlocked(value: bool) -> void:
+	nightmare_unlocked = value
+	if not connected_room.is_empty() and is_instance_valid(relay):
+		relay.player_set_data("nightmare_unlocked", value)
+
+func party_can_play_nightmare() -> bool:
+	if not nightmare_unlocked or not is_instance_valid(relay):
+		return false
+	for id in relay.lobby_get_all_clients():
+		if id != relay.get_client_id() and not relay.player_get_data(id, "nightmare_unlocked", false):
+			return false
+	return true
+
 func deploy(sector := 1, mode := 0) -> void:
 	if not can_deploy() or sector < 1 or sector > unlocked_sector:
+		return
+	if mode == Difficulty.NIGHTMARE and not party_can_play_nightmare():
+		_update("Everyone in the party must unlock Nightmare first.")
 		return
 	mission_roster = relay.lobby_get_all_clients().duplicate()
 	mission_roster.erase(relay.get_client_id())
@@ -255,6 +287,7 @@ func deploy(sector := 1, mode := 0) -> void:
 	mission_roster.push_front(relay.get_client_id())
 	if mission_roster.size() < 2 or mission_roster.size() > MAX_PLAYERS:
 		return
+	_clear_blueprint_drops()
 	mission_active = true
 	mission_mode = clampi(mode, 0, 2)
 	relay.lobby_close()
@@ -264,6 +297,8 @@ func deploy(sector := 1, mode := 0) -> void:
 func _receive_deploy(sector: int, roster: Array, mode: int) -> void:
 	if mission_active or connected_room.is_empty() or sector < 1 or sector > 10 or relay.get_sender_id() != relay.get_host():
 		return
+	if mode == Difficulty.NIGHTMARE and not nightmare_unlocked:
+		return
 	if roster.size() < 2 or roster.size() > MAX_PLAYERS or roster[0] != relay.get_host() or not roster.has(relay.get_client_id()):
 		return
 	var members: Array = relay.lobby_get_all_clients()
@@ -271,11 +306,13 @@ func _receive_deploy(sector: int, roster: Array, mode: int) -> void:
 		return
 	mission_roster = roster.duplicate()
 	mission_mode = clampi(mode, 0, 2)
+	_clear_blueprint_drops()
 	mission_active = true
 	deploy_requested.emit(false, sector)
 
 func send_station_position(x: float, facing: float, animation: String) -> void:
 	if room_size >= 2 and not mission_active and is_instance_valid(relay):
+		station_positions[relay.get_client_id()] = x
 		relay.call_func_unreliable(_receive_partner_position, x, facing, animation, local_name)
 
 func _receive_partner_position(x: float, facing: float, animation: String, display_name: String) -> void:
@@ -283,6 +320,7 @@ func _receive_partner_position(x: float, facing: float, animation: String, displ
 	if mission_active or room_size < 2 or sender == relay.get_client_id() or not relay.lobby_get_all_clients().has(sender):
 		return
 	if is_finite(x) and is_finite(facing) and animation in ["idle", "walk", "run"]:
+		station_positions[sender] = clampf(x, -19.15, 19.15)
 		partner_moved.emit(sender, clampf(x, -19.15, 19.15), clampf(facing, -1.57, 1.57), animation, Profile.clean_operator_name(display_name))
 
 func return_to_station() -> void:
@@ -302,12 +340,18 @@ func _finish_return() -> void:
 	mission_returned.emit()
 
 func _peer_left(client_id: int) -> void:
+	station_positions.erase(client_id)
+	if relay.is_host() and not mission_active:
+		for key in blueprint_drops.keys():
+			if blueprint_drops[key].owner == client_id:
+				_publish_blueprint_drop(key, "", client_id, 0.0)
 	if mission_active:
 		leave("Your partner left the mission.")
 	else:
 		_players_changed(client_id)
 
 func leave(message := "Create a room or enter a friend’s room code.") -> void:
+	_clear_blueprint_drops()
 	var was_in_mission := mission_active
 	mission_active = false
 	mission_roster.clear()
@@ -333,3 +377,79 @@ func _room_name() -> String:
 func _update(message: String) -> void:
 	status = message
 	changed.emit()
+
+func can_share_blueprints() -> bool:
+	return not connected_room.is_empty() and room_size >= 2 and not mission_active and is_instance_valid(relay)
+
+func drop_blueprint(id: String, x: float) -> bool:
+	if not can_share_blueprints() or not Profile.GEAR.has(id):
+		return false
+	if relay.is_host():
+		_create_blueprint_drop(relay.get_client_id(), id, x)
+	else:
+		relay.call_func_on(relay.get_host(), _request_blueprint_drop, id, x)
+	return true
+
+func _request_blueprint_drop(id: String, x: float) -> void:
+	_create_blueprint_drop(relay.get_sender_id(), id, x)
+
+func _create_blueprint_drop(owner: int, id: String, x: float) -> void:
+	if not can_share_blueprints() or not relay.is_host() or (owner != relay.get_client_id() and not relay.lobby_get_all_clients().has(owner)):
+		return
+	if not Profile.GEAR.has(id) or not is_finite(x):
+		return
+	var deck_x := clampf(x, -19.15, 19.15)
+	if absf(deck_x - float(station_positions.get(owner, deck_x))) > 2.5:
+		deck_x = float(station_positions[owner])
+	drop_serial += 1
+	_publish_blueprint_drop(str(drop_serial), id, owner, deck_x)
+
+func _publish_blueprint_drop(key: String, id: String, owner: int, x: float) -> void:
+	_apply_blueprint_drop(key, id, owner, x)
+	relay.call_func(_receive_blueprint_drop, key, id, owner, x)
+
+func _receive_blueprint_drop(key: String, id: String, owner: int, x: float) -> void:
+	if relay.get_sender_id() == relay.get_host() and not mission_active and not connected_room.is_empty():
+		_apply_blueprint_drop(key, id, owner, x)
+
+func _apply_blueprint_drop(key: String, id: String, owner: int, x: float) -> void:
+	if id.is_empty():
+		blueprint_drops.erase(key)
+	elif Profile.GEAR.has(id):
+		blueprint_drops[key] = {"id": id, "owner": owner, "x": x}
+	blueprint_drop_changed.emit(key, id, owner, x)
+
+func pick_up_blueprint(key: String) -> void:
+	if not can_share_blueprints():
+		return
+	if relay.is_host():
+		_grant_blueprint_drop(key, relay.get_client_id())
+	else:
+		relay.call_func_on(relay.get_host(), _request_blueprint_pickup, key)
+
+func _request_blueprint_pickup(key: String) -> void:
+	_grant_blueprint_drop(key, relay.get_sender_id())
+
+func _grant_blueprint_drop(key: String, receiver: int) -> void:
+	if not can_share_blueprints() or not relay.is_host() or (receiver != relay.get_client_id() and not relay.lobby_get_all_clients().has(receiver)):
+		return
+	var drop: Dictionary = blueprint_drops.get(key, {})
+	if drop.is_empty() or receiver == drop.owner or not station_positions.has(receiver):
+		return
+	if absf(float(station_positions[receiver]) - float(drop.x)) > 1.6:
+		return
+	_publish_blueprint_drop(key, "", drop.owner, 0.0)
+	if receiver == relay.get_client_id():
+		blueprint_received.emit(drop.id)
+	else:
+		relay.call_func_on(receiver, _deliver_blueprint, drop.id)
+
+func _deliver_blueprint(id: String) -> void:
+	if relay.get_sender_id() == relay.get_host() and can_share_blueprints():
+		blueprint_received.emit(id)
+
+func _clear_blueprint_drops() -> void:
+	for key in blueprint_drops:
+		blueprint_drop_changed.emit(key, "", 0, 0.0)
+	blueprint_drops.clear()
+	station_positions.clear()

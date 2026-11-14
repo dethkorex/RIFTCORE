@@ -14,6 +14,7 @@ const Loading := preload("res://scripts/act_loading_screen.gd")
 const Equipment := preload("res://scripts/equipment_stats.gd")
 const Materials := preload("res://scripts/fabrication_catalog.gd")
 const BossCache := preload("res://scripts/boss_loot_cache.gd")
+const BossIntro := preload("res://scripts/boss_intro.gd")
 const INPUTS := [&"jump", &"dash", &"crouch", &"crouch_stick", &"shoot", &"melee", &"climb_down", &"swap_weapon", &"previous_suit", &"quick_0", &"quick_1", &"quick_2", &"quick_3"]
 const INPUT_SUSPENDED := 1 << 30
 const PauseMenu := preload("res://scripts/coop_pause_menu.gd")
@@ -40,6 +41,7 @@ var boss: Combatant
 var gate: Node3D
 var exit_marker: Marker3D
 var boss_started := false
+var boss_intro_active := false
 var entrance_open := false
 var boss_defeated := false
 var changing_act := false
@@ -106,7 +108,7 @@ func _ready() -> void:
 		roster.sort()
 		roster.push_front(peer.get_host())
 	local_index = roster.find(peer.get_client_id())
-	difficulty = (1.0 + DIFFICULTY_PER_GUEST * (roster.size() - 1)) * Difficulty.COMBAT[mode]
+	difficulty = (1.0 + DIFFICULTY_PER_GUEST * (roster.size() - 1)) * Difficulty.combat_scale(sector, mode)
 	if host:
 		for id in roster.slice(1):
 			var loadout = Profile.new()
@@ -121,6 +123,7 @@ func _ready() -> void:
 	peer.expose_func(receive_challenge_results)
 	peer.expose_func(receive_cache_open)
 	peer.expose_func(receive_cache_pickup)
+	peer.expose_func(receive_boss_intro)
 	peer.expose_func(receive_shot)
 	peer.expose_func(receive_outcome)
 	peer.expose_func(receive_act)
@@ -175,6 +178,7 @@ func load_stage() -> void:
 	moving_platforms.clear()
 	props_consumed.clear()
 	boss_started = false
+	boss_intro_active = false
 	resetting_arena = false
 	entrance_open = false
 	boss_defeated = false
@@ -346,6 +350,7 @@ func restore_operator(operator: RiftPlayer, at: Vector3) -> void:
 	operator.set_physics_process(true)
 
 func reset_coop_arena() -> void:
+	RiftAudio.play_music(true, sector)
 	await get_tree().create_timer(1.2).timeout
 	if not outcome.is_empty() or changing_act:
 		resetting_arena = false
@@ -383,6 +388,7 @@ func reset_coop_arena() -> void:
 
 func on_boss_defeated() -> void:
 	boss_defeated = true
+	RiftAudio.play_music(true, sector)
 	for operator in operators:
 		if operator.has_meta("coop_down"):
 			operator.lives = maxi(1, operator.lives)
@@ -406,7 +412,7 @@ func create_boss_cache() -> void:
 	if host:
 		boss_cache.opened.connect(func():
 			cache_opened = true
-			var rewards := BossCache.roll_loot(sector, Difficulty.LOOT[mode])
+			var rewards := BossCache.roll_loot(sector, mode)
 			var at := boss_cache.global_position
 			cache_pickups = BossCache.spill(actors, at, rewards)
 			peer.call_func(receive_cache_open, at, rewards)
@@ -452,9 +458,9 @@ func check_campaign_progress() -> void:
 			entrance_open = true
 		if entrance_open and operators.all(func(operator): return operator.health > 0.0 and operator.global_position.x >= entry.x + 1.35):
 			boss_started = true
-			boss.show()
-			boss.active = true
-			boss.target = nearest_operator(boss.global_position)
+			var track := RiftAudio.choose_boss_track()
+			peer.call_func(receive_boss_intro, act, track)
+			play_boss_intro(track)
 	update_doors()
 	if not boss_defeated and not boss_started:
 		room_status.text = "Everyone must reach the boss door." if not entrance_open else "Enter the boss room together."
@@ -477,6 +483,30 @@ func check_campaign_progress() -> void:
 				peer.call_func(receive_outcome, true, team_xp, team_bolts, team_blueprints, sector_seconds)
 				finish_mission(true, team_xp, team_bolts, team_blueprints)
 			return
+
+func receive_boss_intro(remote_act: int, track: int) -> void:
+	if not host and remote_act == act and peer.get_sender_id() == peer.get_host() and not boss_intro_active:
+		boss_started = true
+		play_boss_intro(track)
+
+func play_boss_intro(track: int) -> void:
+	boss_intro_active = true
+	RiftAudio.play_boss_music(track)
+	for operator in operators:
+		operator.cancel_charge()
+		operator.velocity = Vector3.ZERO
+		operator.set_physics_process(false)
+	var cinematic := BossIntro.new()
+	stage.add_child(cinematic)
+	var title: String = Miniboss.TITLES[sector - 1] if act == 1 else Catalog.info(sector).boss
+	await cinematic.play(camera, boss, gate.global_position.y, title, Color(Catalog.info(sector).color))
+	cinematic.queue_free()
+	boss_intro_active = false
+	for index in operators.size():
+		operators[index].set_physics_process(host or index == local_index)
+	if host:
+		boss.target = nearest_operator(boss.global_position)
+		boss.active = true
 
 func receive_act(next: int, xp: int, bolts: int, weapons: Array) -> void:
 	if not host and not changing_act and act == 1 and next == 2 and peer.get_sender_id() == peer.get_host():
@@ -545,7 +575,7 @@ func is_pause_open() -> bool:
 	return is_instance_valid(pause_menu) and pause_menu.is_open()
 
 func open_pause() -> void:
-	if is_pause_open() or not outcome.is_empty() or changing_act:
+	if is_pause_open() or not outcome.is_empty() or changing_act or boss_intro_active:
 		return
 	pause_menu.open()
 	resume_controls_pending = false
@@ -569,11 +599,12 @@ func update_personal_hud(operator: RiftPlayer) -> void:
 	var suit := Catalog.weapon(operator.equipped_suit())
 	personal_hud.weapon = String(suit.get("reward_name", "STANDARD FRAME")).to_upper()
 	personal_hud.suit_tint = Color(suit.get("color", UI.CYAN))
-	personal_hud.boss_visible = boss_started and not boss_defeated and is_instance_valid(boss)
+	personal_hud.boss_visible = boss_started and not boss_intro_active and not boss_defeated and is_instance_valid(boss)
 	if personal_hud.boss_visible:
 		personal_hud.boss_name = String(Miniboss.TITLES[sector - 1] if act == 1 else Catalog.info(sector).boss).to_upper()
 		personal_hud.boss_tint = Color(Catalog.info(sector).color)
-		personal_hud.boss_health = clampf(boss.health / boss.max_health, 0.0, 1.0)
+		personal_hud.boss_health = boss.health
+		personal_hud.boss_max_health = boss.max_health
 	if personal_hud.experience != team_xp:
 		personal_hud.set_experience(team_xp)
 	else:
@@ -590,7 +621,7 @@ func _physics_process(delta: float) -> void:
 		# Let this physics tick finish before gameplay can read the dismiss action.
 		resume_controls.call_deferred()
 		return
-	if not outcome.is_empty() or changing_act or not RiftRelay.mission_active:
+	if not outcome.is_empty() or changing_act or boss_intro_active or not RiftRelay.mission_active:
 		return
 	if not host:
 		# Keep the guest responsive while the host remains authoritative.
@@ -634,7 +665,7 @@ func _physics_process(delta: float) -> void:
 				shot.set_meta(&"coop_sent", true)
 				send_shot(shot)
 		check_campaign_progress()
-		if changing_act or not outcome.is_empty():
+		if boss_intro_active or changing_act or not outcome.is_empty():
 			return
 	clock += delta
 	var interval := TICK if host else INPUT_INTERVAL
@@ -784,18 +815,21 @@ func receive_state(remote_act: int, security: PackedFloat32Array, arena: Array, 
 	if host or changing_act or remote_act != act or not outcome.is_empty() or peer.get_sender_id() != peer.get_host() or sequence <= latest_state or security.size() != enemies.size() * 6:
 		return
 	latest_state = sequence
-	if is_instance_valid(boss):
+	if is_instance_valid(boss) and not boss_intro_active:
 		boss.global_position = arena[0]
 		boss.rotation = arena[1]
 		boss.health = arena[2]
 		if last_boss_health != boss.health:
 			last_boss_health = boss.health
 			boss.health_changed.emit(boss.health, boss.max_health)
-	boss_started = arena[3]
+	if not boss_intro_active:
+		if (boss_started and not arena[3]) or (arena[4] and not boss_defeated):
+			RiftAudio.play_music(true, sector)
+		boss_started = arena[3]
 	if act == 2 and arena[4] and not cache_opened and not boss_defeated and not is_instance_valid(boss_cache):
 		create_boss_cache()
 	boss_defeated = arena[4]
-	if is_instance_valid(boss):
+	if is_instance_valid(boss) and not boss_intro_active:
 		boss.visible = boss_started and not boss_defeated
 	entrance_open = arena[7]
 	if boss_defeated:

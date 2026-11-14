@@ -7,6 +7,7 @@ const UI := preload("res://scripts/rift_ui.gd")
 const Orbs := preload("res://scripts/material_pickup.gd")
 const Materials := preload("res://scripts/fabrication_catalog.gd")
 const Blueprints := preload("res://scripts/blueprint_catalog.gd")
+const Difficulty := preload("res://scripts/mission_difficulty.gd")
 static var rng := RandomNumberGenerator.new()
 
 var authoritative := true
@@ -51,11 +52,13 @@ func finish_open() -> void:
 	RiftAudio.play_effect(&"enemy_break")
 	queue_free()
 
-static func roll_loot(sector: int, loot_scale: float) -> Dictionary:
+static func roll_loot(sector: int, mode: int) -> Dictionary:
+	var loot_scale: float = Difficulty.LOOT[mode]
 	var bonus := Materials.roll(sector, "boss", rng, loot_scale)
 	for item in ["scrap", Materials.sector_key(sector)]:
 		bonus[item] = int(bonus.get(item, 0)) + 2
-	return {"materials": bonus, "blueprint": Blueprints.roll(sector, "boss_cache", rng, loot_scale)}
+	var source := "nightmare_cache" if mode == Difficulty.NIGHTMARE else "boss_cache"
+	return {"materials": bonus, "blueprint": Blueprints.roll(sector, source, rng, loot_scale)}
 
 static func spill(parent: Node3D, at: Vector3, rewards: Dictionary) -> Array[Area3D]:
 	var pickups: Array[Area3D] = [Orbs.spawn(parent, at + Vector3(-0.36, 0.14, 0), rewards.materials)]

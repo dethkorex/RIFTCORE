@@ -67,8 +67,10 @@ func invalidate_defeated_run() -> Error:
 	data.set_value("inventory", "stock", profile.inventory)
 	data.set_value("inventory", "quick", profile.quick_slots)
 	data.set_value("inventory", "blueprints", profile.blueprint_items)
+	data.set_value("inventory", "blueprint_pouch", profile.blueprint_pouch)
 	data.set_value("challenge_cycles", "sectors", profile.challenge_cycles)
 	data.set_value("archive", "loot_clears", profile.loot_clears)
+	data.set_value("archive", "hard_clears", profile.hard_clears)
 	for id in profile.blueprints:
 		data.set_value("blueprints", id, true)
 	for index in profile.memories:
@@ -80,6 +82,18 @@ func invalidate_defeated_run() -> Error:
 			data.erase_section_key("equipment", id)
 		elif data.get_value("equipment", id, "") == "equipped":
 			data.set_value("equipment", id, "stored")
+	return write_slot(data)
+
+func persist_blueprint_trade() -> Error:
+	if not owns_slot:
+		return OK
+	var data := read_slot(slot)
+	if not data:
+		return ERR_FILE_NOT_FOUND
+	data.set_value("inventory", "blueprints", profile.blueprint_items)
+	data.set_value("inventory", "blueprint_pouch", profile.blueprint_pouch)
+	for id in profile.blueprints:
+		data.set_value("blueprints", id, true)
 	return write_slot(data)
 
 func write_slot(data: ConfigFile) -> Error:

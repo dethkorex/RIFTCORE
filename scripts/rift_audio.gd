@@ -3,6 +3,14 @@ extends Node
 const MENU_TRACK := preload("res://assets/audio/vintage_menu.mp3")
 const LEVEL_TRACK := preload("res://assets/audio/space_boss_battle.ogg")
 const JUNGLE_TRACK := preload("res://assets/audio/machine_jungle.ogg")
+const BOSS_TRACKS := [
+	preload("res://assets/audio/boss_metal_1.ogg"),
+	preload("res://assets/audio/boss_metal_2.ogg"),
+	preload("res://assets/audio/boss_metal_3.ogg"),
+	preload("res://assets/audio/boss_metal_4.ogg"),
+	preload("res://assets/audio/boss_metal_5.ogg"),
+	preload("res://assets/audio/boss_metal_6.ogg"),
+]
 const EFFECTS := {
 	&"menu_move": [preload("res://assets/audio/menu_move.ogg"), -20.0, 1],
 	&"menu_confirm": [preload("res://assets/audio/menu_confirm.ogg"), -13.0, 2],
@@ -20,6 +28,9 @@ const EFFECTS := {
 	&"checkpoint": [preload("res://assets/audio/checkpoint.ogg"), -10.0, 1],
 }
 
+var boss_tracks: Array[AudioStreamOggVorbis] = []
+var last_boss_track := -1
+var requested_track: AudioStream
 var music: AudioStreamPlayer
 var menu_track: AudioStreamMP3
 var level_track: AudioStreamOggVorbis
@@ -40,6 +51,10 @@ func _ready() -> void:
 	menu_track.loop = true
 	level_track.loop = true
 	jungle_track.loop = true
+	for source in BOSS_TRACKS:
+		var track := source.duplicate() as AudioStreamOggVorbis
+		track.loop = true
+		boss_tracks.append(track)
 	for cue in EFFECTS:
 		var voice := AudioStreamPlayer.new()
 		voice.bus = &"SFX"
@@ -51,9 +66,21 @@ func _ready() -> void:
 
 func play_music(in_level: bool, sector := 1) -> void:
 	var track: AudioStream = (jungle_track if sector == 2 else level_track) if in_level else menu_track
-	var volume := -16.0 if in_level else -14.0
-	if music.stream == track and music.playing:
+	switch_music(track, -16.0 if in_level else -14.0)
+
+func choose_boss_track() -> int:
+	if last_boss_track < 0:
+		return randi_range(0, boss_tracks.size() - 1)
+	return (last_boss_track + randi_range(1, boss_tracks.size() - 1)) % boss_tracks.size()
+
+func play_boss_music(index := -1) -> void:
+	last_boss_track = index if index >= 0 and index < boss_tracks.size() else choose_boss_track()
+	switch_music(boss_tracks[last_boss_track], -16.0)
+
+func switch_music(track: AudioStream, volume: float) -> void:
+	if requested_track == track:
 		return
+	requested_track = track
 	if music_fade and music_fade.is_valid():
 		music_fade.kill()
 	music_fade = create_tween()

@@ -182,7 +182,7 @@ func add_build_version() -> void:
 		var release: Variant = JSON.parse_string(FileAccess.get_file_as_string(metadata))
 		if release is Dictionary:
 			version = String(release.get("tag", version)).trim_prefix("v").trim_suffix("-preview")
-	var label := UI.label(layer, "Alpha %s" % (version.trim_suffix(".0") if version.ends_with(".0.0") else version), 15, UI.MUTED)
+	var label := UI.label(layer, "Alpha %s" % (version.trim_suffix(".0") if version.ends_with(".0") else version), 15, UI.MUTED)
 	label.add_theme_color_override("font_shadow_color", Color("050a16"))
 	label.add_theme_constant_override("shadow_offset_y", 1)
 	label.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
@@ -296,9 +296,22 @@ func verify_coop_mission(host: bool) -> void:
 		await get_tree().create_timer(0.8).timeout
 		Input.action_release("move_right")
 		RiftRelay.relay.lobby_set_data("coop_guest_in_hub", not RiftRelay.can_deploy())
+		if not await wait_for_relay(func(): return profile.blueprint_items.has("bp_01_02"), 10.0):
+			print("Campaign check failed blueprint pickup")
+			finish_relay_check(false)
+			return
+		RiftRelay.relay.lobby_set_data("coop_blueprint_received", true)
 	else:
 		var together := await wait_for_relay(func(): return home_hub.partners.values().any(func(entry): return entry.actor.position.x > 2.0) and RiftRelay.relay.lobby_get_data("coop_guest_in_hub", false), 8.0)
 		if not together:
+			finish_relay_check(false)
+			return
+		home_hub.avatar.position.x = home_hub.partners.values()[0].x
+		profile.collect_blueprint("bp_01_02")
+		profile.move_blueprint_to_pouch("bp_01_02")
+		drop_hub_blueprint("bp_01_02")
+		if profile.blueprint_pouch.has("bp_01_02") or not await wait_for_relay(func(): return RiftRelay.relay.lobby_get_data("coop_blueprint_received", false), 10.0):
+			print("Campaign check failed blueprint handoff")
 			finish_relay_check(false)
 			return
 		RiftRelay.deploy()
@@ -334,7 +347,7 @@ func verify_coop_mission(host: bool) -> void:
 		if not await wait_for_relay(func(): return RiftRelay.relay.lobby_get_data("coop_guest_moved", false), 10.0):
 			finish_relay_check(false)
 			return
-		if not clear_coop_test_boss(mission):
+		if not await clear_coop_test_boss(mission):
 			finish_relay_check(false)
 			return
 		if not await wait_for_relay(func(): return is_instance_valid(mission) and mission.act == 2 and not mission.changing_act and RiftRelay.relay.lobby_get_data("coop_guest_act_two", false), 15.0):
@@ -342,7 +355,7 @@ func verify_coop_mission(host: bool) -> void:
 			finish_relay_check(false)
 			return
 		mission.team_blueprints.append("bp_01_00")
-		if not clear_coop_test_boss(mission):
+		if not await clear_coop_test_boss(mission):
 			finish_relay_check(false)
 			return
 	var returned := await wait_for_relay(func(): return is_instance_valid(home_hub) and not RiftRelay.mission_active, 18.0)
@@ -373,7 +386,7 @@ func clear_coop_test_boss(mission: Node) -> bool:
 		return false
 	mission.operators[1].global_position = gate_position + Vector3(4.0, 1.0, 0.0)
 	mission.check_campaign_progress()
-	if not mission.boss_started:
+	if not mission.boss_started or not await wait_for_relay(func(): return not mission.boss_intro_active, 8.0):
 		return false
 	mission.boss.take_damage(100000.0)
 	mission.operators[0].global_position = mission.exit_marker.global_position
@@ -480,6 +493,7 @@ func show_main_menu() -> void:
 	menu.start_requested.connect(start_game)
 	menu.load_requested.connect(load_game)
 	menu.hub_requested.connect(open_home_hub)
+	menu.blueprint_drop_requested.connect(drop_hub_blueprint)
 	menu.station_closed.connect(close_station_panel)
 	menu.sector_requested.connect(deploy_selected_sector)
 	menu.slot_requested.connect(select_save_slot)
@@ -536,7 +550,7 @@ func start_coop_mission(is_host: bool, number: int) -> void:
 	RiftAudio.play_music(true, number)
 
 func bank_coop_rewards(xp: int, bolts: int, blueprints: Array, number: int) -> void:
-	profile.loot_clears[number] = maxi(int(profile.loot_clears.get(number, 0)), RiftRelay.mission_mode)
+	profile.record_sector_clear(number, RiftRelay.mission_mode)
 	var results: Dictionary = coop_mission.challenge_results()
 	profile.record_challenges(number, results)
 	profile.deposit_materials(results.get("recovered", {}))
@@ -575,6 +589,7 @@ func refresh_menu_save() -> void:
 	menu.can_load = save != null
 	menu.saved_sector = 1
 	menu.saved_act = 1
+	menu.saved_difficulty = Difficulty.NORMAL
 	menu.saved_level = 1
 	menu.saved_experience = 0
 	menu.run_cleared_through = 0
@@ -585,6 +600,7 @@ func refresh_menu_save() -> void:
 		menu.run_cleared_through = clampi(int(save.get_value("checkpoint", "run_cleared_through", menu.saved_sector - 1)), 0, Catalog.SECTORS.size())
 		profile.unlock_sector(menu.saved_sector)
 		menu.saved_act = clampi(int(save.get_value("checkpoint", "act", 1)), 1, 2)
+		menu.saved_difficulty = Difficulty.index(int(save.get_value("checkpoint", "difficulty", 0)))
 		menu.saved_experience = clampi(int(save.get_value("checkpoint", "experience", 0)), 0, 1000000)
 		menu.saved_level = RiftPlayer.level_for_experience(menu.saved_experience)
 		menu.at_sector_start = bool(save.get_value("checkpoint", "at_start", false))
@@ -643,6 +659,7 @@ func write_checkpoint(data: ConfigFile) -> Error:
 func open_home_hub() -> void:
 	RiftRelay.local_name = profile.operator_name
 	RiftRelay.unlocked_sector = profile.unlocked_sector
+	RiftRelay.set_nightmare_unlocked(profile.nightmare_unlocked())
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	if is_instance_valid(home_hub):
 		return
@@ -651,6 +668,8 @@ func open_home_hub() -> void:
 	menu.hide()
 	menu.process_mode = Node.PROCESS_MODE_DISABLED
 	home_hub = HOME_HUB.instantiate() as Node3D
+	home_hub.profile = profile
+	home_hub.persist_blueprint_trade = persist_blueprint_trade
 	add_child(home_hub)
 	home_hub.set_bank(profile.credits, profile.core_shards, profile.player_level())
 	home_hub.station_requested.connect(func(page: String):
@@ -666,6 +685,24 @@ func open_home_hub() -> void:
 		menu.show()
 		menu.show_page("Title")
 	)
+
+func drop_hub_blueprint(id: String) -> void:
+	if not is_instance_valid(home_hub) or not profile.blueprint_pouch.has(id) or not RiftRelay.can_share_blueprints():
+		return
+	var slot := profile.blueprint_pouch.find(id)
+	profile.blueprint_pouch.remove_at(slot)
+	RiftRelay.send_station_position(home_hub.avatar.position.x, home_hub.avatar.model_root.rotation.y, "idle")
+	if persist_blueprint_trade() != OK or not RiftRelay.drop_blueprint(id, home_hub.avatar.position.x):
+		profile.blueprint_pouch.insert(slot, id)
+		persist_blueprint_trade()
+		menu.inventory_status = "Could not drop the blueprint."
+		menu.show_page("Storage")
+		return
+	menu.hide()
+	close_station_panel()
+
+func persist_blueprint_trade() -> Error:
+	return save_session.persist_blueprint_trade() if save_session else profile.save()
 
 func close_station_panel() -> void:
 	menu.process_mode = Node.PROCESS_MODE_DISABLED
@@ -685,6 +722,8 @@ func remove_home_hub() -> void:
 
 func deploy_selected_sector(number: int, selected_difficulty := 0) -> void:
 	var mode := Difficulty.index(selected_difficulty)
+	if mode == Difficulty.NIGHTMARE and not profile.nightmare_unlocked():
+		return
 	if not RiftRelay.connected_room.is_empty():
 		RiftRelay.deploy(number, mode)
 		return
@@ -794,6 +833,8 @@ func load_game(show_deployment := true) -> void:
 			start_game()
 		return
 	mission_difficulty = Difficulty.index(int(save.get_value("checkpoint", "difficulty", 0)))
+	if mission_difficulty == Difficulty.NIGHTMARE and not profile.nightmare_unlocked():
+		mission_difficulty = Difficulty.HARD
 	sector = clampi(int(save.get_value("checkpoint", "sector", 1)), 1, Catalog.SECTORS.size())
 	run_cleared_through = clampi(int(save.get_value("checkpoint", "run_cleared_through", sector - 1)), 0, Catalog.SECTORS.size())
 	act = clampi(int(save.get_value("checkpoint", "act", 1)), 1, 2)
@@ -957,7 +998,8 @@ func build_level() -> void:
 		add_child(game_root)
 	player = game_root.get_node("Actors/RiftcoreMecha") as RiftPlayer
 	game_root.get_node("Actors").set_meta("loot_scale", Difficulty.LOOT[mission_difficulty])
-	player.damage_taken_scale = Difficulty.COMBAT[mission_difficulty]
+	var combat_scale := Difficulty.combat_scale(sector, mission_difficulty)
+	player.damage_taken_scale = combat_scale
 	player.experience = 0
 	player.quick_profile = profile
 	player_collision_layer = player.collision_layer
@@ -971,7 +1013,7 @@ func build_level() -> void:
 			continue
 		enemy.target = player
 		enemy.scale_for_sector(sector, act)
-		enemy.max_health *= Difficulty.COMBAT[mission_difficulty]
+		enemy.max_health *= combat_scale
 		enemy.health = enemy.max_health
 		enemy.health_changed.emit(enemy.health, enemy.max_health)
 		enemy.died.connect(_enemy_defeated)
@@ -991,7 +1033,7 @@ func build_level() -> void:
 		boss = create_miniboss()
 		actors.add_child(boss)
 		decorate_miniboss_room()
-	boss.max_health *= Difficulty.COMBAT[mission_difficulty]
+	boss.max_health *= combat_scale
 	boss.health = boss.max_health
 	boss.hide()
 	build_hud()
@@ -1055,11 +1097,13 @@ func apply_permanent_upgrades() -> void:
 
 func bind_boss_signals() -> void:
 	boss.health_changed.connect(func(current: float, maximum: float):
-		factory_hud.boss_health = current / maximum
+		factory_hud.boss_health = current
+		factory_hud.boss_max_health = maximum
 		factory_hud.queue_redraw()
 	)
 	boss.died.connect(func():
 		boss_defeated = true
+		RiftAudio.play_music(true, sector)
 		award_mission_xp((35 if act == 1 else 80) + sector * 8)
 		var shards := 1 + sector + (3 if act == 2 else 0)
 		profile.core_shards += shards
@@ -1070,7 +1114,7 @@ func bind_boss_signals() -> void:
 			var cache := BossCache.new()
 			cache.position = actors.to_local(Vector3(boss_spawn.x, gate.global_position.y + 0.52, 0.0))
 			actors.add_child.call_deferred(cache)
-			cache.opened.connect(func(): BossCache.spill(actors, cache.global_position, BossCache.roll_loot(sector, Difficulty.LOOT[mission_difficulty])))
+			cache.opened.connect(func(): BossCache.spill(actors, cache.global_position, BossCache.roll_loot(sector, mission_difficulty)))
 		else:
 			Drop.roll_at(actors, boss.global_position + Vector3.UP * 0.25, sector, "miniboss")
 		open_factory_gate()
@@ -1135,6 +1179,8 @@ func build_hud() -> void:
 	factory_hud = FactoryHUD.new()
 	factory_hud.exit_task = "DEFEAT THE MINIBOSS" if act == 1 else "REACH SECTOR EXTRACTION"
 	factory_hud.boss_name = String(Miniboss.TITLES[sector - 1] if act == 1 else Catalog.info(sector).boss).to_upper()
+	factory_hud.boss_health = boss.health
+	factory_hud.boss_max_health = boss.max_health
 	factory_hud.act = act
 	factory_hud.boss_tint = Color(Catalog.info(sector).color)
 	hud.add_child(factory_hud)
@@ -1327,6 +1373,7 @@ func expire_run_on_death() -> void:
 	run_weapons.clear()
 
 func reset_boss_room() -> void:
+	RiftAudio.play_music(true, sector)
 	if gate_motion and gate_motion.is_valid():
 		gate_motion.kill()
 	if is_instance_valid(boss):
@@ -1347,7 +1394,7 @@ func reset_boss_room() -> void:
 		boss = (load(Catalog.info(sector).boss_scene) as PackedScene).instantiate() as Combatant
 		boss.position = boss_spawn
 	game_root.get_node("Actors").add_child(boss)
-	boss.max_health *= Difficulty.COMBAT[mission_difficulty]
+	boss.max_health *= Difficulty.combat_scale(sector, mission_difficulty)
 	boss.health = boss.max_health
 	boss.hide()
 	bind_boss_signals()
@@ -1356,7 +1403,8 @@ func reset_boss_room() -> void:
 	gate.get_node("Door").position.y = 0.0
 	gate.get_node("Blocker/CollisionShape3D").set_deferred("disabled", false)
 	factory_hud.boss_visible = false
-	factory_hud.boss_health = 1.0
+	factory_hud.boss_health = boss.health
+	factory_hud.boss_max_health = boss.max_health
 
 func clear_checkpoint() -> void:
 	if save_session:
@@ -1419,7 +1467,7 @@ func _process(delta: float) -> void:
 	var replay := sector <= run_cleared_through
 	run_cleared_through = maxi(run_cleared_through, sector)
 	var bonus := 160 + 25 * (sector - 1)
-	profile.loot_clears[sector] = maxi(int(profile.loot_clears.get(sector, 0)), mission_difficulty)
+	profile.record_sector_clear(sector, mission_difficulty)
 	var recovered := player.salvage.duplicate()
 	var recovered_blueprints: Array[String] = []
 	for id in player.recovered_blueprints:
@@ -1580,6 +1628,7 @@ func seal_arena() -> void:
 	play_arena_intro()
 
 func play_arena_intro() -> void:
+	RiftAudio.play_boss_music()
 	player.cancel_charge()
 	player.velocity = Vector3.ZERO
 	player.facing = 1.0
@@ -1592,40 +1641,10 @@ func play_arena_intro() -> void:
 	player.play_character_animation("walk", true)
 	await player.create_tween().tween_property(player, "global_position", destination, 0.46).finished
 	player.play_character_animation("idle", true)
-	camera_rig.set_process(false)
-	var landing := boss.global_position
-	var look := Vector3(landing.x, maxf(0.85, landing.y + 1.05), 0.0)
-	var camera := camera_rig.get_node("Camera3D") as Camera3D
-	var start_zoom := camera.position.z
-	var reveal := create_tween().set_parallel().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
-	reveal.tween_property(camera_rig, "global_position", look, 0.55)
-	reveal.tween_property(camera, "position:z", start_zoom + 1.3, 0.55)
-	await reveal.finished
-	var layer := boss.collision_layer
-	boss.collision_layer = 0
-	boss.global_position = landing + Vector3.UP * 5.3
-	boss.show()
-	var fall := boss.create_tween().set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	fall.tween_property(boss, "global_position", landing, 0.37)
-	await fall.finished
-	boss.collision_layer = layer
-	var impact := Node3D.new()
-	game_root.add_child(impact)
-	impact.global_position = Vector3(landing.x, gate.global_position.y + 0.21, 0.0)
-	COMBAT_VFX.explosion(impact, Color(Catalog.info(sector).color))
-	get_tree().create_timer(0.50, false).timeout.connect(impact.queue_free)
-	RiftAudio.play_effect(&"enemy_break")
-	var shake := create_tween()
-	shake.tween_property(camera_rig, "global_position:y", look.y - 0.18, 0.055)
-	shake.tween_property(camera_rig, "global_position:y", look.y + 0.10, 0.07)
-	shake.tween_property(camera_rig, "global_position:y", look.y, 0.09)
-	await shake.finished
-	var back := create_tween().set_parallel().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
-	var player_view := destination + Vector3(camera_rig.look_ahead, 0.35, 0)
-	back.tween_property(camera_rig, "global_position", player_view, 0.48)
-	back.tween_property(camera, "position:z", start_zoom, 0.48)
-	await back.finished
-	camera_rig.set_process(true)
+	var cinematic := preload("res://scripts/boss_intro.gd").new()
+	game_root.add_child(cinematic)
+	await cinematic.play(camera_rig, boss, gate.global_position.y, factory_hud.boss_name, Color(Catalog.info(sector).color))
+	cinematic.queue_free()
 	player.set_physics_process(true)
 	boss.target = player
 	boss.active = true

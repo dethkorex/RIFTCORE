@@ -33,7 +33,8 @@ var suit_tint := Color("55e7ff")
 var lives := 3
 var failed := false
 var boss_visible := false
-var boss_health := 1.0
+var boss_health := 0.0
+var boss_max_health := 1.0
 var boss_name := "FORGE TITAN"
 var boss_tint := Color("ff8c36")
 var exit_task := "REACH THE FACTORY EXIT"
@@ -223,10 +224,17 @@ func _draw() -> void:
 	caption(counters + Vector2(15, 94), life_text, 17)
 	if boss_visible:
 		var center := hud_size.x * 0.5
-		plate(Rect2(center - 180, 14, 360, 47), 11, boss_tint)
-		caption(Vector2(center - 163, 36), boss_name, 18)
-		draw_rect(Rect2(center - 163, 44, 326, 7), Color("482738"))
-		draw_rect(Rect2(center - 163, 44, 326 * boss_health, 7), boss_tint)
+		var values := "%d / %d" % [roundi(boss_health), roundi(boss_max_health)]
+		var value_width := UI.DISPLAY.get_string_size(values, HORIZONTAL_ALIGNMENT_LEFT, -1, 17).x
+		var title_width := UI.DISPLAY.get_string_size(boss_name, HORIZONTAL_ALIGNMENT_LEFT, -1, 18).x
+		var half_width := maxf(180.0, (title_width + value_width + 50.0) * 0.5)
+		var bar_left := center - half_width + 17
+		var bar_right := center + half_width - 17
+		plate(Rect2(center - half_width, 14, half_width * 2.0, 47), 11, boss_tint)
+		caption(Vector2(bar_left, 36), boss_name, 18)
+		caption(Vector2(bar_right - value_width, 36), values, 17)
+		draw_rect(Rect2(bar_left, 44, bar_right - bar_left, 7), Color("482738"))
+		draw_rect(Rect2(bar_left, 44, (bar_right - bar_left) * clampf(boss_health / boss_max_health, 0.0, 1.0), 7), boss_tint)
 	if failed:
 		plate(Rect2(hud_size.x * 0.5 - 168, hud_size.y * 0.72, 336, 44), 10, Color("ff536c"))
 		caption(Vector2(hud_size.x * 0.5 - 151, hud_size.y * 0.72 + 28), "RUN OVER   /   BANKING CREDITS" if lives <= 0 else "SYSTEM FAILURE   /   RESPAWNING", 17)

@@ -18,6 +18,11 @@ const STATIONS := [
 	{"x": 18.0, "name": "NOVA Archive", "page": "Collection", "color": Color("81ffe8"), "prop": "archive_terminal"},
 ]
 
+const BlueprintOrb := preload("res://scripts/pickup_orb_visual.gd")
+var profile: RefCounted
+var persist_blueprint_trade: Callable
+var blueprint_visuals: Dictionary = {}
+var blueprint_requests: Dictionary = {}
 var avatar: RiftPlayer
 var partners: Dictionary = {}
 var local_online_label: Label3D
@@ -75,6 +80,11 @@ func _ready() -> void:
 		RiftRelay.leave()
 	)
 	add_child(pause_menu)
+	RiftRelay.blueprint_drop_changed.connect(update_blueprint_drop)
+	RiftRelay.blueprint_received.connect(receive_blueprint)
+	for key in RiftRelay.blueprint_drops:
+		var offer: Dictionary = RiftRelay.blueprint_drops[key]
+		update_blueprint_drop(key, offer.id, offer.owner, offer.x)
 	RiftRelay.partner_moved.connect(update_partner)
 	RiftRelay.changed.connect(refresh_partner_room)
 	refresh_partner_room()
@@ -125,6 +135,7 @@ func _process(delta: float) -> void:
 		station_sync = 0.0
 		var animation := avatar.current_animation if avatar.current_animation in ["idle", "walk", "run"] else "idle"
 		RiftRelay.send_station_position(avatar.position.x, avatar.model_root.rotation.y, animation)
+		check_blueprint_pickups()
 	for index in range(pads.size()):
 		var pad := pads[index]
 		var active := index == current_station
@@ -446,3 +457,37 @@ func label_in_space(parent: Node3D, text: String, at: Vector3, pixels: int, tint
 	label.position = at
 	parent.add_child(label)
 	return label
+
+func update_blueprint_drop(key: String, id: String, _owner: int, x: float) -> void:
+	if blueprint_visuals.has(key):
+		blueprint_visuals[key].queue_free()
+		blueprint_visuals.erase(key)
+	blueprint_requests.erase(key)
+	if id.is_empty():
+		return
+	var orb := BlueprintOrb.new()
+	orb.tint = Color("2abbff")
+	orb.mark = BlueprintOrb.Mark.BLUEPRINT
+	orb.position = Vector3(x, 0.54, 0.50)
+	add_child(orb)
+	blueprint_visuals[key] = orb
+	var title := label_in_space(orb, "BLUEPRINT", Vector3(0, 0.57, 0), 22, Color("82eaff"))
+	title.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+
+func check_blueprint_pickups() -> void:
+	if not profile or panel_open or not RiftRelay.can_share_blueprints():
+		return
+	for key in RiftRelay.blueprint_drops.keys():
+		var drop: Dictionary = RiftRelay.blueprint_drops[key]
+		if absf(avatar.position.x - float(drop.x)) > 0.66 or drop.owner == RiftRelay.relay.get_client_id():
+			continue
+		var now := Time.get_ticks_msec()
+		if profile.can_collect_blueprint(drop.id) and now >= int(blueprint_requests.get(key, 0)):
+			blueprint_requests[key] = now + 1000
+			RiftRelay.pick_up_blueprint(key)
+
+func receive_blueprint(id: String) -> void:
+	if profile and profile.collect_blueprint(id):
+		if persist_blueprint_trade.is_valid():
+			persist_blueprint_trade.call()
+		RiftAudio.play_effect(&"pickup")

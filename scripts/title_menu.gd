@@ -1,6 +1,7 @@
 class_name RiftTitleMenu
 extends Control
 
+signal blueprint_drop_requested(id: String)
 signal start_requested
 signal load_requested
 signal hub_requested
@@ -29,6 +30,7 @@ var steam_invite_buttons: Array[Button] = []
 var can_load := false
 var saved_sector := 1
 var saved_act := 1
+var saved_difficulty := 0
 var saved_level := 1
 var saved_experience := 0
 var run_cleared_through := 0
@@ -37,10 +39,12 @@ var run_unlocks: Array = []
 var profile
 var shop_status := ""
 var shop_category := "All Items"
+const SHOP_FILTERS := {"All Items": "visor", "Supplies": "frame", "Materials": "core", "Buffs": "utility", "Cores": "core"}
 var challenge_sector := 1
 var selected_sector := 1
 var selected_difficulty := 0
 var archive_sector := 1
+var pending_blueprint := ""
 var whisper_contact := 0
 var inventory_slot := "frame"
 var inventory_status := ""
@@ -188,6 +192,21 @@ func show_page(next: String) -> void:
 			build_fabrication(columns)
 		"Storage":
 			build_storage(columns)
+		"Learn Blueprint":
+			var confirm := card(columns)
+			UI.label(confirm, "Learn Blueprint?", 32, UI.CYAN)
+			if Profile.GEAR.has(pending_blueprint):
+				UI.label(confirm, Profile.GEAR[pending_blueprint].name, 22)
+			UI.label(confirm, "This consumes the item and unlocks its recipe in Crafting.", 17, UI.MUTED)
+			UI.button(confirm, "No", show_page.bind("Storage")).grab_focus()
+			UI.button(confirm, "Yes, Learn Blueprint", func():
+				inventory_status = profile.learn_blueprint(pending_blueprint)
+				show_page("Storage")
+			, true)
+			UI.button(confirm, "Move to Blueprint Pouch", func():
+				inventory_status = profile.move_blueprint_to_pouch(pending_blueprint)
+				open_equipment_view("Blueprint Pouch")
+			)
 		"Shop":
 			build_shop(columns)
 		"Craft Item":
@@ -361,6 +380,9 @@ func leave_page() -> void:
 		if page == "Craft Item":
 			show_page("Fabrication")
 			return
+		if page == "Learn Blueprint":
+			show_page("Storage")
+			return
 		if page in ["Level select", "New run"]:
 			show_page("Sector select")
 			return
@@ -494,9 +516,9 @@ func show_sector_loot(entries: VBoxContainer) -> void:
 		var boost: float = Difficulty.LOOT[index]
 		var lines := PackedStringArray()
 		for rarity in Profile.RARITY_NAMES.size():
-			var chance := 100.0 * float(Blueprints.RATES.boss_cache[rarity]) * (1.0 + (boost - 1.0) * (0.5 + 0.25 * rarity))
+			var chance := 100.0 * float(Blueprints.RATES["nightmare_cache" if index == Difficulty.NIGHTMARE else "boss_cache"][rarity]) * (1.0 + (boost - 1.0) * (0.5 + 0.25 * rarity))
 			lines.append("%s %.2f%%" % [Profile.RARITY_NAMES[rarity], chance])
-		odds.text = "Boss cache blueprint chances\n" + "  /  ".join(lines) + "\nCache Fracture Crystal: %.1f%%" % (22.0 * boost)
+		odds.text = "Boss cache blueprint chances\n" + "  /  ".join(lines)
 	mode.item_selected.connect(refresh)
 	refresh.call(0)
 	UI.label(entries, "Materials", 21, UI.CYAN)
@@ -508,10 +530,18 @@ func show_sector_loot(entries: VBoxContainer) -> void:
 		if item.get("sector", 0) == archive_sector and not item.get("boss_only", false):
 			UI.label(entries, item.name + "  ·  " + Profile.RARITY_NAMES[item.rarity], 16, Profile.RARITY_COLORS[item.rarity])
 	UI.label(entries, "Boss Cache Exclusives", 21, UI.CYAN)
-	for id in Profile.GEAR:
-		var item: Dictionary = Profile.GEAR[id]
-		if item.get("sector", 0) == archive_sector and item.get("boss_only", false):
-			UI.label(entries, item.name + "  ·  " + Profile.RARITY_NAMES[item.rarity], 16, Profile.RARITY_COLORS[item.rarity])
+	var cache_entries := VBoxContainer.new()
+	entries.add_child(cache_entries)
+	var show_cache := func(index: int):
+		for child in cache_entries.get_children():
+			cache_entries.remove_child(child)
+			child.queue_free()
+		for id in Profile.GEAR:
+			var item: Dictionary = Profile.GEAR[id]
+			if item.get("sector", 0) == archive_sector and item.get("boss_only", false) and item.get("nightmare_only", false) == (index == Difficulty.NIGHTMARE):
+				UI.label(cache_entries, item.name + "  ·  " + Profile.RARITY_NAMES[item.rarity], 16, Profile.RARITY_COLORS[item.rarity])
+	mode.item_selected.connect(show_cache)
+	show_cache.call(0)
 
 func build_social(columns: HBoxContainer) -> void:
 	steam_invite_buttons.clear()
@@ -896,15 +926,14 @@ func build_shop(columns: HBoxContainer) -> void:
 	var filters := HBoxContainer.new()
 	filters.add_theme_constant_override("separation", 6)
 	catalog.add_child(filters)
-	var categories := {"All Items": "visor", "Supplies": "frame", "Materials": "core", "Buffs": "utility", "Cores": "core"}
-	for category in categories:
+	for category in SHOP_FILTERS:
 		var tab := UI.button(filters, category, func():
 			shop_category = category
 			show_page("Shop")
 		, false, 34)
 		if category == shop_category:
 			tab.add_theme_color_override("font_color", UI.CYAN)
-		tab.icon = EquipmentIcons.icon(categories[category], categories[category])
+		tab.icon = EquipmentIcons.icon(SHOP_FILTERS[category], SHOP_FILTERS[category])
 		tab.expand_icon = true
 		tab.add_theme_constant_override("icon_max_width", 16)
 
@@ -1165,7 +1194,7 @@ func build_level_select(columns: HBoxContainer) -> void:
 	scroll.add_child(entries)
 	var intel := card(columns)
 	for number in range(1, last_sector + 1):
-		var choice := sector_card(entries, number, "Cleared" if profile.loot_clears.has(number) else "Unlocked")
+		var choice := sector_card(entries, number, "Normal  /  Lv. %d" % Difficulty.recommended_level(number, Difficulty.NORMAL))
 		choice.custom_minimum_size.y = 112
 		choice.pressed.connect(func():
 			selected_sector = number
@@ -1202,21 +1231,35 @@ func show_mission_intel(panel: VBoxContainer, connected: bool, can_deploy: bool)
 		return
 	if not connected and can_load and selected_sector == saved_sector and not at_sector_start:
 		UI.label(panel, "This checkpoint resumes with its saved difficulty.", 16, UI.MUTED)
+		add_stat_group(panel, "RECOMMENDED", "%s  /  Lv. %d" % [Difficulty.NAMES[saved_difficulty], Difficulty.recommended_level(selected_sector, saved_difficulty)])
 		var resume := UI.button(panel, "Resume Checkpoint", func(): load_requested.emit(), true)
 		resume.name = "Deploy"
 		return
 	var mode := OptionButton.new()
-	for title in Difficulty.NAMES:
-		mode.add_item(title)
+	var nightmare_available: bool = profile.nightmare_unlocked() and (not connected or RiftRelay.party_can_play_nightmare())
+	for index in Difficulty.NAMES.size():
+		var locked := index == Difficulty.NIGHTMARE and not nightmare_available
+		mode.add_item("%s  /  Lv. %d%s" % [Difficulty.NAMES[index], Difficulty.recommended_level(selected_sector, index), "  /  Locked" if locked else ""])
+		mode.set_item_disabled(index, locked)
+	if not nightmare_available and selected_difficulty == Difficulty.NIGHTMARE:
+		selected_difficulty = Difficulty.HARD
 	mode.select(selected_difficulty)
 	panel.add_child(mode)
 	UI.style_button(mode)
 	var difficulty_hint := UI.label(panel, "", 16, UI.MUTED)
 	var refresh := func(index: int):
 		selected_difficulty = index
-		difficulty_hint.text = "%.2f× enemy health and damage · improved rare loot" % Difficulty.COMBAT[index] if index > 0 else "Standard enemy health, damage, and loot."
+		difficulty_hint.text = "Recommended Lv. %d  ·  %.2f× sector health and damage%s" % [
+			Difficulty.recommended_level(selected_sector, index), Difficulty.combat_scale(selected_sector, index),
+			"  ·  Better rare loot" if index > Difficulty.NORMAL else "",
+		]
 	refresh.call(selected_difficulty)
 	mode.item_selected.connect(refresh)
+	if not nightmare_available:
+		var unlock_text := "Nightmare requires every party member to clear all sectors on Hard." if connected else "Nightmare unlocks at %d / %d Hard clears." % [Catalog.SECTORS.size(), Catalog.SECTORS.size()]
+		if not connected:
+			unlock_text += "  %d complete." % profile.hard_clear_count()
+		UI.label(panel, unlock_text, 15, UI.MUTED)
 	var button := UI.button(panel, "Deploy", func(): sector_requested.emit(selected_sector, selected_difficulty), true)
 	button.name = "Deploy"
 
@@ -1487,7 +1530,7 @@ func build_storage(columns: HBoxContainer) -> void:
 	var tabs := HBoxContainer.new()
 	tabs.add_theme_constant_override("separation", 8)
 	equipment.add_child(tabs)
-	for section in ["Gear", "Boss Abilities"]:
+	for section in ["Gear", "Boss Abilities", "Blueprint Pouch"]:
 		var tab := UI.button(tabs, section, open_equipment_view.bind(section), false, 35)
 		if section == equipment_view:
 			tab.add_theme_color_override("font_color", UI.CYAN)
@@ -1502,6 +1545,8 @@ func build_storage(columns: HBoxContainer) -> void:
 			first_filter.focus_neighbor_left = first_filter.get_path_to(body.buttons.core)
 		"Boss Abilities":
 			build_boss_abilities(equipment)
+		"Blueprint Pouch":
+			build_blueprint_pouch(equipment)
 
 	if not inventory_status.is_empty():
 		UI.label(equipment, inventory_status, 16, UI.VIOLET)
@@ -1581,12 +1626,10 @@ func build_storage_grid(parent: VBoxContainer) -> Button:
 		title.text = "%s  ·  %s" % [item.name, Profile.RARITY_NAMES[item.rarity]]
 		title.add_theme_color_override("font_color", Profile.RARITY_COLORS[item.rarity])
 		description.text = item.detail
-		action.visible = item.kind in ["Equipment", "Blueprints"]
+		action.visible = item.kind == "Equipment"
 		if item.kind == "Equipment":
 			var current: String = profile.equipped_for(item.slot)
 			action.text = "Stow" if id == current else ("Equip" if current.is_empty() else "Replace " + String(Profile.GEAR[current].name))
-		elif item.kind == "Blueprints":
-			action.text = "Learn Blueprint"
 		elif item.kind == "Supplies":
 			description.text += "  ·  Choose a direction below to assign up to three."
 	var tiles := {}
@@ -1596,7 +1639,10 @@ func build_storage_grid(parent: VBoxContainer) -> Button:
 			continue
 		var tile := UI.item_tile(grid, item.icon, Profile.RARITY_COLORS[item.rarity], item.rarity, item.badge, func():
 			reveal.call(id)
-			if action.visible:
+			if item.kind == "Blueprints":
+				pending_blueprint = id.trim_prefix("blueprint/")
+				show_page("Learn Blueprint")
+			elif action.visible:
 				action.grab_focus()
 		)
 		tile.tooltip_text = item.name
@@ -1629,9 +1675,7 @@ func select_storage_filter(category: String) -> void:
 	show_page("Storage")
 
 func apply_storage_item(id: String) -> void:
-	if id.begins_with("blueprint/"):
-		inventory_status = profile.learn_blueprint(id.trim_prefix("blueprint/"))
-	elif profile.gear.has(id):
+	if profile.gear.has(id):
 		inventory_status = profile.move_gear(id)
 	show_page("Storage")
 
@@ -1677,6 +1721,41 @@ func add_stat_group(parent: VBoxContainer, category: String, values: String) -> 
 func open_equipment_view(section: String) -> void:
 	equipment_view = section
 	show_page("Storage")
+
+func build_blueprint_pouch(parent: VBoxContainer) -> void:
+	UI.label(parent, "Blueprint Pouch   %d / %d" % [profile.blueprint_pouch.size(), Profile.BLUEPRINT_POUCH_SIZE], 22, UI.CYAN)
+	UI.label(parent, "Move blueprints here from Gear to share them. Partners pick up drops in the hub. Unclaimed drops expire when you deploy or leave.", 15, UI.MUTED)
+	var grid := GridContainer.new()
+	grid.columns = 4
+	grid.add_theme_constant_override("h_separation", UI.ITEM_GAP)
+	grid.add_theme_constant_override("v_separation", UI.ITEM_GAP)
+	parent.add_child(grid)
+	var selection := UI.label(parent, "Select a blueprint.", 18, UI.CYAN)
+	var selected := [""]
+	var drop := UI.button(parent, "Drop for Party", func(): blueprint_drop_requested.emit(selected[0]), true)
+	var stow := UI.button(parent, "Return to Storage", func():
+		inventory_status = profile.stow_pouch_blueprint(selected[0])
+		show_page("Storage")
+	)
+	drop.disabled = true
+	stow.disabled = true
+	for index in Profile.BLUEPRINT_POUCH_SIZE:
+		var id: String = profile.blueprint_pouch[index] if index < profile.blueprint_pouch.size() else ""
+		if id.is_empty():
+			UI.item_tile(grid, EquipmentIcons.icon("blueprints", "core"), UI.MUTED, 0, "Empty", Callable()).focus_mode = Control.FOCUS_NONE
+			continue
+		var item: Dictionary = Profile.GEAR[id]
+		var activate := func():
+			selected[0] = id
+			selection.text = item.name + " Blueprint"
+			drop.disabled = not RiftRelay.can_share_blueprints()
+			stow.disabled = false
+		var tile := UI.item_tile(grid, EquipmentIcons.icon(id, item.slot), Profile.RARITY_COLORS[item.rarity], item.rarity, "Recipe", func():
+			activate.call()
+			(drop if not drop.disabled else stow).grab_focus()
+		)
+		tile.focus_entered.connect(activate)
+		tile.tooltip_text = item.name
 
 func build_boss_abilities(parent: VBoxContainer) -> void:
 	var unlocked: Array = run_unlocks.filter(func(id): return not Catalog.weapon(String(id)).is_empty())
@@ -1747,6 +1826,12 @@ func _unhandled_input(event: InputEvent) -> void:
 				select_storage_filter(filters[posmod(index + step, filters.size())] if index >= 0 else filters[0 if step > 0 else filters.size() - 1])
 			else:
 				open_equipment_view("Gear")
+			return
+		if page == "Shop":
+			var categories := SHOP_FILTERS.keys()
+			get_viewport().set_input_as_handled()
+			shop_category = categories[posmod(categories.find(shop_category) + step, categories.size())]
+			show_page("Shop")
 			return
 	if event.is_action_pressed("ui_cancel") and page != "Title":
 		RiftAudio.play_effect(&"menu_confirm")

@@ -17,8 +17,12 @@ const PARTS := [
 	["Commander Plating", "frame", "resist", 2, 0.105, 0.006],
 	["Overseer Core", "core", "attack", 3, 1.18, 0.014],
 	["Boss Relay", "utility", "dash", 1, 1.13, 0.008],
+	["Riftbreaker Core", "core", "attack", 3, 1.58, 0.016],
+	["Singularity Shell", "frame", "resist", 3, 0.27, 0.010],
+	["Phase Runner", "utility", "dash", 3, 1.39, 0.016],
 ]
 const FIRST_BOSS_PART := 12
+const FIRST_NIGHTMARE_PART := 15
 const EFFECTS := {
 	"resist": "%.0f%% damage resistance", "hp": "+%.0f maximum HP",
 	"attack": "+%.0f%% Buster and saber damage", "energy": "+%.0f maximum energy",
@@ -34,6 +38,7 @@ const RATES := {
 	"miniboss": [0.034, 0.012, 0.004, 0.001],
 	"boss": [0.060, 0.024, 0.008, 0.002],
 	"boss_cache": [0.0, 0.105, 0.045, 0.012],
+	"nightmare_cache": [0.0, 0.0, 0.0, 0.15],
 }
 
 static func all_gear(legacy: Dictionary) -> Dictionary:
@@ -48,6 +53,7 @@ static func all_gear(legacy: Dictionary) -> Dictionary:
 				"name": "%s %s" % [SECTOR_NAMES[sector], definition[0]], "slot": definition[1],
 				"rarity": definition[3], "sector": sector + 1, "perk": EFFECTS[stat] % amount,
 				"boss_only": part >= FIRST_BOSS_PART,
+				"nightmare_only": part >= FIRST_NIGHTMARE_PART,
 				"stats": {stat: value},
 			}
 	return result
@@ -63,7 +69,8 @@ static func roll(sector: int, source: String, rng: RandomNumberGenerator, loot_s
 		if chance < 0:
 			var pool: Array[int] = []
 			for index in PARTS.size():
-				if PARTS[index][3] == rarity and (index >= FIRST_BOSS_PART) == (source == "boss_cache"):
+				var eligible := index >= FIRST_NIGHTMARE_PART if source == "nightmare_cache" else (index >= FIRST_BOSS_PART and index < FIRST_NIGHTMARE_PART if source == "boss_cache" else index < FIRST_BOSS_PART)
+				if PARTS[index][3] == rarity and eligible:
 					pool.append(index)
-			return blueprint_id(sector, pool[rng.randi_range(0, pool.size() - 1)])
+			return "" if pool.is_empty() else blueprint_id(sector, pool[rng.randi_range(0, pool.size() - 1)])
 	return ""
