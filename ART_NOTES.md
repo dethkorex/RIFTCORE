@@ -4,11 +4,12 @@ The concept images and trim sheets were made with the built-in image generation 
 
 | Asset | Project file |
 | --- | --- |
-| Five robot models | `assets/enemies/*_armored.glb` |
+| Ember Foundry enemies and source rigs | `assets/neon_factory/foundry/foundry_robots.blend` and five role-specific GLBs |
 | Robot and environment trim | `assets/neon_factory/factory_trim.png` |
 | Platform trim | `assets/neon_factory/platform_trim.png` |
-| Forge Titan mesh and trim | `assets/enemies/forge_titan_armored.glb`, `assets/enemies/forge_titan_trim.png` |
-| Repeating background | `assets/neon_factory/factory_panorama.png` |
+| Kiln Warden and Forge Titan | `assets/neon_factory/foundry/kiln_warden.glb` and `assets/neon_factory/foundry/forge_titan.glb` |
+| Foundry terrain and flame nozzles | `assets/neon_factory/foundry/foundry_terrain.blend` |
+| Ember Foundry panorama | `assets/neon_factory/foundry/foundry_panorama.jpg` |
 | Title background | `assets/ui/riftcore_title_art.png` |
 | Updated security armor and height relief | `assets/enemies/security_trim.png`, `assets/enemies/security_height.png` |
 

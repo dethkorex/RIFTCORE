@@ -17,6 +17,8 @@ var pad_keys: Dictionary = {}
 var assign_popup: PopupMenu
 var assigning_button := -1
 var controller_layout: OptionButton
+var controller_reset: Button
+var capture_origin: Control
 var can_restart := false
 var updater: Node
 var current_version := ""
@@ -109,13 +111,14 @@ func add_selector(panel: VBoxContainer, title: String, options: Array, index: in
 	choice.select(index)
 	return choice
 
-func add_toggle(panel: VBoxContainer, title: String, state: bool, action: Callable) -> void:
+func add_toggle(panel: Control, title: String, state: bool, action: Callable) -> CheckButton:
 	var toggle := CheckButton.new()
 	toggle.text = title
 	toggle.button_pressed = state
 	panel.add_child(toggle)
 	UI.style_button(toggle)
 	toggle.toggled.connect(action)
+	return toggle
 
 func add_slider(panel: VBoxContainer, title: String, value: float, minimum: int, maximum: int, increment: int, action: Callable) -> void:
 	var row := HBoxContainer.new()
@@ -140,22 +143,10 @@ func add_slider(panel: VBoxContainer, title: String, value: float, minimum: int,
 		initial_focus = slider
 
 func build_bindings(title: String, device: String) -> void:
-	var panel := settings_tab(title, "Bindings")
 	if device == "pad":
-		panel.get_child(0).text = "Controller Layout"
-		controller_layout = add_selector(panel, "Button Layout", RiftSettings.CONTROLLER_STYLES, RiftSettings.controller_style)
-		controller_layout.item_selected.connect(func(index: int):
-			RiftSettings.controller_style = index
-			RiftSettings.save()
-			refresh()
-		)
-		add_toggle(panel, "Controller vibration", RiftSettings.vibration, func(enabled: bool):
-			RiftSettings.vibration = enabled
-			if not enabled:
-				for id in Input.get_connected_joypads():
-					Input.stop_joy_vibration(id)
-			RiftSettings.save()
-		)
+		build_controller_bindings()
+		return
+	var panel := settings_tab(title, "Bindings")
 	notes[device] = UI.label(panel, "Select an action to change its binding.", 16, UI.MUTED)
 	var cancel := UI.button(panel, "Cancel Binding", cancel_remap, false, 34)
 	cancel.hide()
@@ -165,14 +156,7 @@ func build_bindings(title: String, device: String) -> void:
 	scroll.custom_minimum_size.y = 170
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	scroll.follow_focus = true
-	var sections := HBoxContainer.new()
-	sections.add_theme_constant_override("separation", 22)
-	sections.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	panel.add_child(sections)
-	if device == "pad":
-		build_controller_buttons(sections)
-	sections.add_child(scroll)
-	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	panel.add_child(scroll)
 	var grid := GridContainer.new()
 	grid.columns = 2
 	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -191,19 +175,134 @@ func build_bindings(title: String, device: String) -> void:
 		notes[device].text = "Default bindings restored."
 	, false, 34)
 
-func build_controller_buttons(parent: HBoxContainer) -> void:
-	var board := Panel.new()
-	board.custom_minimum_size = Vector2(346, 244)
-	board.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
-	board.add_theme_stylebox_override("panel", UI.frame(Color("101d31"), Color("2d6588"), 1))
+func build_controller_bindings() -> void:
+	var panel := settings_tab("Controller", "Controller Bindings")
+	panel.add_theme_constant_override("separation", 7)
+	var options := HBoxContainer.new()
+	options.add_theme_constant_override("separation", 12)
+	panel.add_child(options)
+	UI.label(options, "Layout", 15, UI.MUTED).autowrap_mode = TextServer.AUTOWRAP_OFF
+	controller_layout = OptionButton.new()
+	controller_layout.custom_minimum_size = Vector2(132, 28)
+	options.add_child(controller_layout)
+	UI.style_button(controller_layout)
+	for style in RiftSettings.CONTROLLER_STYLES:
+		controller_layout.add_item(style)
+	controller_layout.item_selected.connect(func(index: int):
+		RiftSettings.controller_style = index
+		RiftSettings.save()
+		refresh()
+	)
+	var vibration := add_toggle(options, "Vibration", RiftSettings.vibration, func(enabled: bool):
+		RiftSettings.vibration = enabled
+		if not enabled:
+			for id in Input.get_connected_joypads():
+				Input.stop_joy_vibration(id)
+		RiftSettings.save()
+	)
+	vibration.custom_minimum_size = Vector2(124, 28)
+
+	var groups := HBoxContainer.new()
+	groups.add_theme_constant_override("separation", 22)
+	groups.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	panel.add_child(groups)
+	var movement := build_action_column(groups, "Movement", ["move_left", "move_right", "jump", "crouch", "climb_up", "climb_down"])
+	var combat := build_action_column(groups, "Combat and suits", ["dash", "shoot", "melee", "swap_weapon", "previous_suit", "pause"])
+	var shortcuts := build_controller_buttons(groups)
+
+	var footer := HBoxContainer.new()
+	footer.add_theme_constant_override("separation", 10)
+	panel.add_child(footer)
+	var status := UI.label(footer, "Select a binding to change it.", 15, UI.MUTED)
+	status.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	notes["pad"] = status
+	controller_reset = UI.button(footer, "Reset Controller Bindings", func():
+		RiftSettings.reset_bindings("pad")
+		refresh()
+		status.text = "Default controller bindings restored."
+	, false, 28)
+	var cancel := UI.button(footer, "Cancel Binding", cancel_remap, false, 28)
+	cancel.hide()
+	cancel_buttons["pad"] = cancel
+	link_controller_focus(controller_layout, SIDE_RIGHT, vibration)
+	link_controller_focus(controller_layout, SIDE_BOTTOM, movement[0])
+	link_controller_focus(vibration, SIDE_BOTTOM, combat[0])
+	for index in movement.size():
+		link_controller_focus(movement[index], SIDE_RIGHT, combat[index])
+	for index in range(2):
+		var column: Array[Control] = []
+		for row in range(5):
+			var chip := shortcuts[row * 2 + index]
+			column.append(chip)
+			if index == 0:
+				link_controller_focus(combat[row], SIDE_RIGHT, chip)
+				link_controller_focus(chip, SIDE_RIGHT, shortcuts[row * 2 + 1])
+			else:
+				chip.focus_neighbor_right = chip.get_path_to(chip)
+		link_controller_column(column, vibration, controller_reset)
+	link_controller_column(movement, controller_layout, controller_reset)
+	link_controller_column(combat, vibration, controller_reset)
+	controller_reset.focus_neighbor_top = controller_reset.get_path_to(combat.back())
+	tabs.tab_changed.connect(func(index: int):
+		tabs.get_tab_bar().focus_neighbor_bottom = tabs.get_tab_bar().get_path_to(controller_layout) if index == panel.get_index() else NodePath()
+	)
+
+func build_action_column(parent: HBoxContainer, heading: String, actions: Array) -> Array[Control]:
+	var column := VBoxContainer.new()
+	column.custom_minimum_size.x = 305
+	column.add_theme_constant_override("separation", 4)
+	parent.add_child(column)
+	UI.label(column, heading, 16, UI.CYAN)
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("v_separation", 4)
+	grid.add_theme_constant_override("h_separation", 8)
+	column.add_child(grid)
+	var buttons: Array[Control] = []
+	for action: String in actions:
+		var caption := UI.label(grid, RiftSettings.ACTIONS[action], 15)
+		caption.autowrap_mode = TextServer.AUTOWRAP_OFF
+		caption.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		caption.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		var button := UI.button(grid, RiftSettings.binding_label(action, "pad"), begin_capture.bind(action, "pad"), false, 28)
+		button.custom_minimum_size.x = 124
+		button.add_theme_font_size_override("font_size", 15)
+		slots[action + ":pad"] = button
+		buttons.append(button)
+	return buttons
+
+func link_controller_focus(first: Control, side: Side, second: Control) -> void:
+	first.set_focus_neighbor(side, first.get_path_to(second))
+	var opposite := SIDE_LEFT if side == SIDE_RIGHT else SIDE_TOP
+	second.set_focus_neighbor(opposite, second.get_path_to(first))
+
+func link_controller_column(column: Array[Control], options: Control, reset: Control) -> void:
+	column[0].focus_neighbor_top = column[0].get_path_to(options)
+	for index in range(1, column.size()):
+		link_controller_focus(column[index - 1], SIDE_BOTTOM, column[index])
+	column.back().focus_neighbor_bottom = column.back().get_path_to(reset)
+
+func build_controller_buttons(parent: HBoxContainer) -> Array[Control]:
+	var board := VBoxContainer.new()
+	board.add_theme_constant_override("separation", 4)
 	parent.add_child(board)
+	UI.label(board, "Assign by button", 16, UI.CYAN)
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 4)
+	grid.add_theme_constant_override("v_separation", 4)
+	board.add_child(grid)
+	var chips: Array[Control] = []
 	for button_index in RiftSettings.PAD_BUTTONS:
-		var chip := UI.button(board, "", pick_controller_action.bind(button_index), false, 28)
-		chip.custom_minimum_size = Vector2(44 if button_index in [0,1,2,3,11,12,13,14] else 68, 28)
-		chip.size = chip.custom_minimum_size
 		if button_index in RiftSettings.QUICK_DEFAULTS:
-			chip.disabled = true
+			continue
+		var chip := UI.button(grid, "", pick_controller_action.bind(button_index), false, 28)
+		chip.custom_minimum_size.x = 82
+		chip.add_theme_font_size_override("font_size", 15)
 		pad_keys[button_index] = chip
+		chips.append(chip)
+	UI.label(board, "D-pad  /  Quick items", 14, UI.MUTED)
 	assign_popup = PopupMenu.new()
 	add_child(assign_popup)
 	assign_popup.id_pressed.connect(func(id: int):
@@ -213,6 +312,7 @@ func build_controller_buttons(parent: HBoxContainer) -> void:
 		refresh()
 	)
 	refresh_controller_buttons()
+	return chips
 
 func pick_controller_action(button_index: int) -> void:
 	assigning_button = button_index
@@ -227,29 +327,15 @@ func pick_controller_action(button_index: int) -> void:
 func refresh_controller_buttons() -> void:
 	if is_instance_valid(controller_layout):
 		controller_layout.select(RiftSettings.controller_style)
-	var playstation := RiftSettings.controller_style == 1
-	var left_cluster := Vector2(73, 110) if playstation else Vector2(96, 159)
-	var right_cluster := Vector2(249, 110)
-	var button_layout := {
-		0: right_cluster + Vector2(0, 31), 1: right_cluster + Vector2(46, 0),
-		2: right_cluster + Vector2(-46, 0), 3: right_cluster + Vector2(0, -31),
-		9: Vector2(76,37), 10: Vector2(268,37), 4: Vector2(131,82), 6: Vector2(204,82),
-		7: Vector2(124,200) if playstation else Vector2(62,90), 8: Vector2(205,200),
-		11: left_cluster + Vector2(0,-30), 12: left_cluster + Vector2(0,30),
-		13: left_cluster + Vector2(-43,0), 14: left_cluster + Vector2(43,0),
-	}
 	for index in pad_keys:
 		var input := InputEventJoypadButton.new()
 		input.button_index = index
-		var name := RiftSettings.pad_label(input)
+		var button_name := RiftSettings.pad_label(input)
 		var action := RiftSettings.action_for_button(index)
-		var quick := RiftSettings.QUICK_DEFAULTS.find(index)
-		var purpose: String = "Quick Slot %d" % (quick+1) if quick >= 0 else RiftSettings.ACTIONS.get(action, "Assign an action")
+		var purpose: String = RiftSettings.ACTIONS.get(action, "Assign an action")
 		var chip: Button = pad_keys[index]
-		chip.text = name.trim_prefix("D-pad ") if quick >= 0 else name
-		chip.tooltip_text = "%s  /  %s" % [name, purpose]
-		chip.size = Vector2(maxf(chip.custom_minimum_size.x, chip.get_minimum_size().x),28)
-		chip.position = button_layout[index] - chip.size * .5
+		chip.text = button_name
+		chip.tooltip_text = "%s  /  %s" % [button_name, purpose]
 
 func _unhandled_input(event: InputEvent) -> void:
 	var step := ControllerOverlay.shoulder_step(event)
@@ -336,9 +422,12 @@ func begin_capture(action: String, device: String) -> void:
 	pending_device = device
 	note = notes[device]
 	cancel_capture = cancel_buttons[device]
+	capture_origin = slots[action + ":" + device]
 	cancel_capture.show()
+	if device == "pad":
+		controller_reset.hide()
 	refresh()
-	note.text = "Press a key or mouse button. For left click, use an empty area. Esc cancels." if device == "key" else "Press a controller input  /  Esc to cancel"
+	note.text = "Press a key or mouse button. For left click, use an empty area. Esc cancels." if device == "key" else "Press a controller input. D-pad down or Esc to cancel."
 
 func refresh() -> void:
 	for action in RiftSettings.ACTIONS:
@@ -353,6 +442,16 @@ func _input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		cancel_remap()
 		return
+	if pending_device == "pad" and event is InputEventJoypadButton:
+		if event.pressed and event.button_index == JOY_BUTTON_DPAD_DOWN:
+			get_viewport().set_input_as_handled()
+			cancel_capture.grab_focus()
+			return
+		if cancel_capture.has_focus():
+			if event.pressed and event.button_index == JOY_BUTTON_DPAD_UP:
+				get_viewport().set_input_as_handled()
+				capture_origin.grab_focus()
+			return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		for control in [cancel_capture, get_viewport().gui_get_hovered_control()]:
 			if control == null or not control.get_global_rect().has_point(event.position):
@@ -372,6 +471,10 @@ func cancel_remap() -> void:
 	end_capture()
 
 func end_capture() -> void:
+	if pending_device == "pad":
+		controller_reset.show()
+	if cancel_capture.has_focus() and is_instance_valid(capture_origin):
+		capture_origin.grab_focus()
 	pending_action = ""
 	cancel_capture.hide()
 	refresh()

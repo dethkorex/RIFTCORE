@@ -2,7 +2,7 @@ from pathlib import Path
 import json,sys
 root=Path(sys.argv[-1])
 rows=[
-('neon_factory','Neon Factory','forge_titan','Forge Titan','Fire / Mechanical','magma_breaker','Magma Breaker','ff8b36','fire',1040,'',''),
+('neon_factory','Ember Foundry','forge_titan','Forge Titan','Fire / Mechanical','magma_breaker','Magma Breaker','ff8b36','fire',1040,'',''),
 ('machine_jungle','Machine Jungle','verdant_colossus','Verdant Colossus','Nature / Poison','thorn_swarm','Thorn Swarm','a5ff71','nature',1700,'magma_breaker','Toxic root flood'),
 ('frozen_reactor','Frozen Reactor','cryo_warden','Cryo Warden','Ice','frost_lance','Frost Lance','63dfff','ice',1875,'magma_breaker','Ice traction and coolant vents'),
 ('abyssal_plant','Abyssal Plant','volt_kraken','Volt Kraken','Electric / Water','tidal_arc','Tidal Arc','70e9ef','electric',2075,'frost_lance','Buoyant water and live electrode grids'),

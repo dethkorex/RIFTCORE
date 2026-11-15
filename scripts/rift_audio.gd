@@ -32,6 +32,25 @@ const EFFECTS := {
 	&"checkpoint": [preload("res://assets/audio/checkpoint.ogg"), -10.0, 1],
 }
 
+const FOUNDRY_SOUNDS := {
+	&"fire_jet": preload("res://assets/neon_factory/foundry/fire_jet.wav"),
+	&"boulder_roll": preload("res://assets/neon_factory/foundry/boulder_roll.wav"),
+	&"barricade_crack": preload("res://assets/audio/barricade_crack.wav"),
+}
+
+func foundry_sound(cue: StringName, at: Vector3) -> void:
+	if not get_viewport().get_camera_3d() or absf(get_viewport().get_camera_3d().global_position.x - at.x) > 27.0:
+		return
+	var voice := AudioStreamPlayer3D.new()
+	voice.stream = FOUNDRY_SOUNDS[cue]
+	voice.bus = &"SFX"
+	voice.volume_db = -11.0
+	voice.max_distance = 30.0
+	add_child(voice)
+	voice.global_position = at
+	voice.finished.connect(voice.queue_free)
+	voice.play()
+
 var boss_tracks: Array[AudioStreamOggVorbis] = []
 var last_boss_track := -1
 var requested_track: AudioStream

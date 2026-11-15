@@ -1,6 +1,7 @@
 extends CharacterBody3D
 
 var reward: PackedScene
+var supplies_only := false
 var sector := 1
 
 func _ready() -> void:
@@ -22,13 +23,14 @@ static func make_visual() -> Node3D:
 func _physics_process(delta: float) -> void:
 	velocity.y -= 24.0 * delta
 	move_and_slide()
-	if global_position.y < -5.0:
+	if global_position.y < (-14.0 if supplies_only else -5.0):
 		queue_free()
 	elif is_on_floor():
 		break_open()
 
 func break_open() -> void:
-	preload("res://scripts/material_pickup.gd").roll_at(get_parent_node_3d(), global_position, sector, "container")
+	if not supplies_only:
+		preload("res://scripts/material_pickup.gd").roll_at(get_parent_node_3d(), global_position, sector, "container")
 	if reward:
 		var pickup := reward.instantiate() as Area3D
 		pickup.position = position + Vector3.UP * 0.15

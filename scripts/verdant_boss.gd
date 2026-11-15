@@ -125,8 +125,7 @@ func _physics_process(delta: float) -> void:
 	var width := (arena_right - arena_left) * 0.55 if attack == 3 else (4.15 if attack == 0 else 1.45)
 	if attack == 3:
 		warning.global_position.x = (arena_left + arena_right) * 0.5
-	var marker := RiftProjectile.part(warning, RiftProjectile.cached_mesh("Orb"), RiftProjectile.light_paint(TOXIN if attack in [1, 3] else THORN, 1.3), Vector3.ZERO, Vector3(width, 0.024, 0.59))
-	marker.create_tween().tween_property(marker, "scale:z", 0.96, phase_time)
+	preload("res://scripts/attack_fx.gd").telegraph(warning, width, TOXIN if attack in [1, 3] else THORN, phase_time)
 	RiftAudio.play_effect(&"titan_windup")
 
 func _release() -> void:

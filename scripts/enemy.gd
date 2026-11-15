@@ -120,9 +120,19 @@ func build_visuals() -> void:
 	mesh.material_override = mat
 	add_child(mesh)
 
+const FOUNDRY_MODELS := [
+	preload("res://assets/neon_factory/foundry/scorch_scout.glb"),
+	preload("res://assets/neon_factory/foundry/slag_crawler.glb"),
+	preload("res://assets/neon_factory/foundry/crucible_guard.glb"),
+	preload("res://assets/neon_factory/foundry/flue_sentry.glb"),
+	preload("res://assets/neon_factory/foundry/ember_drone.glb"),
+]
+
 func install_model() -> void:
 	var visual := model_override if model_override else MODELS[variant] as PackedScene
-	if detachment_sector > 0:
+	if detachment_sector == 1:
+		visual = FOUNDRY_MODELS[variant]
+	elif detachment_sector > 0:
 		var model_name := "sector_%02d_%d" % [detachment_sector, variant] if patrol_model < 0 else "patrol_%d" % patrol_model
 		var polished := load("res://assets/enemies/detachments/%s.glb" % model_name) as PackedScene
 		if polished:
@@ -130,10 +140,11 @@ func install_model() -> void:
 	robot = visual.instantiate() as Node3D
 	add_child(robot)
 	robot.scale = Vector3.ONE * 1.16
-	if detachment_sector > 0:
+	if detachment_sector > 1:
 		finish_armor()
+	var gait_prefix := visual.resource_path.get_file().get_basename() + "_Gait_" if detachment_sector == 1 else "Gait_"
 	for index in range(4):
-		var limb := robot.find_child("Gait_%d" % index, true, false) as Node3D
+		var limb := robot.find_child(gait_prefix + str(index), true, false) as Node3D
 		if limb:
 			gait_joints.append(limb)
 	$BodyMesh.hide()

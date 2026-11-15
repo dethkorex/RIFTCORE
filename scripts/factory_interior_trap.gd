@@ -15,6 +15,7 @@ const RETRACT := 4.27
 
 @export var kind: Kind
 @export var offset := 0.0
+@export_range(0.8, 1.0) var crossing_window_scale := 1.0
 
 var hazard: Node3D
 var collar: MeshInstance3D
@@ -61,9 +62,10 @@ func part(parent: Node3D, dimensions: Vector3, coordinates: Vector3, tint: Color
 	return RiftProjectile.part(parent, mesh, RiftProjectile.light_paint(tint, emission), coordinates, Vector3.ONE)
 
 func _physics_process(delta: float) -> void:
-	clock = fposmod(float(phase_time.call()) + offset if phase_time.is_valid() else clock + delta, PERIOD)
-	var active := clock >= ACTIVATE and clock < RETRACT
-	var warning := clock >= WARNING and clock < ACTIVATE
+	var reduction := (PERIOD - (RETRACT - ACTIVATE)) * (1.0 - crossing_window_scale)
+	clock = fposmod(float(phase_time.call()) + offset if phase_time.is_valid() else clock + delta, PERIOD - reduction)
+	var active := clock >= ACTIVATE - reduction and clock < RETRACT - reduction
+	var warning := clock >= WARNING - reduction and clock < ACTIVATE - reduction
 	if active and rotor:
 		rotor.rotate_z(delta * 27)
 	if active and not active_last_tick:

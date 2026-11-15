@@ -1,7 +1,15 @@
 from pathlib import Path
+import math
 import re
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "campaign"))
+from interior_rhythm import break_up_walk
+from folded_rooms import FOLDS, FOLD_TIMED_FIXTURE, folded_route
+from build_doorways import outfit
+
 base=Path(__file__).resolve().parents[3] / "scenes/levels"
-kit="res://assets/neon_factory/interiors/"
+kit="res://assets/neon_factory/foundry/"
 def make(act):
     file=base/("neon_factory_test.tscn" if act==1 else "neon_factory_act_2.tscn")
     old=file.read_text(encoding="utf8")
@@ -12,13 +20,13 @@ def make(act):
         ("Floor",kit+"interior_deck.tscn","PackedScene"),("Wall",kit+"shaft_column.tscn","PackedScene"),
         ("Lining",kit+"interior_bulkhead.tscn","PackedScene"),("Cave",kit+"cave_lining.tscn","PackedScene"),
         ("PressureBank",kit+"pressure_bank.glb","PackedScene"),
+        ("Threshold",kit+"zone_threshold.glb","PackedScene"),
         ("FactorySky","res://scripts/jungle_backdrop.gd","Script"),
-        ("FactoryPanorama","res://assets/neon_factory/factory_panorama.png","Texture2D"),
-        ("Bridge",kit+"powered_bridge.tscn","PackedScene"),("Shutter",kit+"service_shutter.tscn","PackedScene"),("Relay",kit+"shot_relay.glb","PackedScene"),
-        ("Chest",kit+"salvage_chest.glb","PackedScene"),("RelayCode","res://scripts/factory_interior_relay.gd","Script"),
-        ("ChestCode","res://scripts/factory_salvage_chest.gd","Script"),("Hazard","res://scripts/factory_interior_trap.gd","Script"),
+        ("FactoryPanorama","res://assets/neon_factory/foundry/foundry_panorama.jpg","Texture2D"),
+        ("Bridge",kit+"powered_bridge.tscn","PackedScene"),("Shutter","res://assets/neon_factory/interiors/service_shutter.tscn","PackedScene"),("Relay","res://assets/neon_factory/foundry/power_coupler.tscn","PackedScene"),
+        ("Supply","res://scripts/cargo_carrier.gd","Script"),("Chest",kit+"salvage_chest.glb","PackedScene"),("RelayCode","res://scripts/factory_interior_relay.gd","Script"),
+        ("ChestCode","res://scripts/factory_salvage_chest.gd","Script"),("Hazard","res://scripts/foundry_vent.gd","Script"),("Boulder","res://scripts/foundry_boulder.gd","Script"),
         ("Pit","res://scripts/spike_pit.gd","Script"),
-        ("Biome","res://scripts/biome_zone.gd","Script"),
         ("player","res://scenes/actors/riftcore_player.tscn","PackedScene"),
         ("enemy","res://scripts/enemy.gd","Script"),("camera","res://scripts/camera_rig.gd","Script"),
         ("Boss","res://scenes/levels/forge_titan.tscn","PackedScene"),
@@ -28,19 +36,18 @@ def make(act):
         ("gate","res://assets/neon_factory/boss_gate_door.tscn","PackedScene"),
         ("arch","res://assets/neon_factory/door_frame.tscn","PackedScene"),
         ("beacon","res://assets/neon_factory/checkpoint_beacon.tscn","PackedScene"),
-        ("reactor","res://assets/neon_factory/reactor_core.tscn","PackedScene"),
         ("energy","res://assets/pickups/energy_large.tscn","PackedScene"),("repair","res://assets/pickups/health_large.tscn","PackedScene"),
         ("life","res://assets/pickups/extra_life.tscn","PackedScene"),
         ("Barricade","res://scripts/breakable_barricade.gd","Script"),
-        ("arena_hatch","res://assets/campaign/neon_factory/terrain/climb_platform_center.tscn","PackedScene"),
+        ("arena_hatch",kit+"climb_platform_center.tscn","PackedScene"),
     ]:
         header.append(f'[ext_resource type="{typ}" path="{path}" id="{id}"]')
     header.append("""
 [sub_resource type="Environment" id="Interior"]
 background_mode = 1
-background_color = Color(0.025, 0.033, 0.057, 1)
+background_color = Color(0.043, 0.021, 0.016, 1)
 ambient_light_source = 3
-ambient_light_color = Color(0.47, 0.61, 0.78, 1)
+ambient_light_color = Color(0.79, 0.59, 0.48, 1)
 ambient_light_energy = 0.82
 
 [sub_resource type="BoxShape3D" id="GateShape"]
@@ -75,7 +82,7 @@ height = 0.44
         node(name,parent,inst=scene,pos=(x,y,z),**props)
     node("NeonFactoryTest" if act==1 else "ForgeTitanSector",None,**{"metadata/interior_layout":"true","metadata/pit_floor_y":-12.8})
     node("WorldEnvironment",typ="WorldEnvironment",environment=s("Interior"))
-    node("KeyLight",typ="DirectionalLight3D",rotation=v((-.56,-.30,0)),light_color="Color(0.79, 0.90, 1, 1)",light_energy="1.30",shadow_enabled="true")
+    node("KeyLight",typ="DirectionalLight3D",rotation=v((-.56,-.30,0)),light_color="Color(1, 0.80, 0.61, 1)",light_energy="1.30",shadow_enabled="true")
     for folder in ["TERRAIN","DECOR","Actors","MARKERS"]: node(folder)
     def deck(name,a,b,y,depth=1,drop=False,thickness=1):
         span=b-a
@@ -87,27 +94,39 @@ height = 0.44
             end=min(a+6,b)
             deck(name+str(i).zfill(2),a,end,y,drop=drop)
             a=end;i+=1
-    def ramp(name,start,end,y,dy):
+    def travel(name,a,b,y,drop=False,low_ceiling=False):
+        break_up_walk(name,a,b,y,act+len(name),
+            lambda key,left,right,top: decks(key,left,right,top,drop),
+            lambda key,left,right,low,high: ramp(key,left,right,low,high-low,drop),
+            low_ceiling=low_ceiling)
+    def ramp(name,start,end,y,dy,drop=False):
         import math
         width=end-start
         angle=math.atan2(dy,width)
         h=math.hypot(width,dy)/6
-        asset(name,"TERRAIN","Floor",(start+end)/2,y+dy/2,scale=(h,1,1),rotation=v((0,0,angle)))
+        asset(name,"TERRAIN","Floor",(start+end)/2,y+dy/2,scale=(h,1,1),rotation=v((0,0,angle)),
+              group=["factory_drop_through"] if drop else None)
     def wall(name,x,base,h,z=0):
         asset(name,"TERRAIN","Wall",x,base+h/2,z,scale=(1,h/4,1))
     def shell(end,boss,descent):
         exterior = [(-12,30,0.0,"COOLING INTAKE"),(96,150,6.15,"MAINTENANCE SHAFT"),
                     (366,411,1.2,"FORGE ACCESS")] if act==1 else [
                         (132,186,1.42,"FREIGHT WORKS"),(396,462,.16,"SMELTER ACCESS")]
-        node("SectorPanorama","DECOR",script=e("FactorySky"),panorama_texture=e("FactoryPanorama"))
-        for i,(a,b,y,title) in enumerate(exterior):
-            asset(f"IntakeArch{i}","DECOR","arch",b-.65,y,0,rotation=v((0,-1.5708,0)),scale=(1.7,1.43,1.12))
+        node("SectorPanorama","DECOR",script=e("FactorySky"),panorama_texture=e("FactoryPanorama"),
+             shadow_tint="Vector3(0.056, 0.019, 0.014)", panorama_filter="Vector3(0.70, 0.70, 0.71)")
+        for i,(a,b,y,_) in enumerate(exterior):
+            asset(f"EntryThreshold{i}","DECOR","Threshold",b+1.15,y+.04,-.63)
+            # Bend the rear wall around the entry, leaving the play lane clear.
+            asset(f"EntryReturnWall{i}","DECOR","Lining",b+4.2,y-1.45,-2.60)
             for n in range(a+5,b,15):
                 asset(f"IndustrialButtress{i}_{n}","DECOR","Wall",n,y-5.2,-3.25,scale=(2.75,1.4,.79))
+        for i,(mouth,_,floor) in enumerate(descent):
+            asset(f"CaveThreshold{i}","DECOR","Threshold",mouth+1.35,floor,-.48)
+            asset(f"CaveReturnWall{i}","DECOR","Cave",mouth+3.3,floor-2.15,-2.57)
         for index,x in enumerate(range(-9,end+6,6)):
             if any(a<=x<b for a,b,_,_ in exterior):
                 continue
-            cave=any(a<=x<b for a,b in descent)
+            cave=any(a<=x<b for a,b,_ in descent)
             if index%8==0: z=-3.6
             else: z=-3.28
             asset(f"Rear{index:03}","DECOR","Cave" if cave else "Lining",x,-2.35,z)
@@ -117,7 +136,7 @@ height = 0.44
             for tier, height in enumerate((13.65,21.65) if x<boss else (14.9,22.9)):
                 asset(f"HighWall{tier}_{index:03}","DECOR","Cave" if cave else "Lining",x,height,z)
             if x%24==15:
-                node(f"BayLight{index}","DECOR","OmniLight3D",(x,4.2,-1.35),light_color=f'Color({ "1, 0.39, 0.17" if cave else "0.19, 0.62, 1"}, 1)',light_energy="1.60",omni_range="9.0")
+                node(f"BayLight{index}","DECOR","OmniLight3D",(x,4.2,-1.35),light_color=f'Color({ "1, 0.39, 0.17" if cave else "1, 0.55, 0.24"}, 1)',light_energy="1.60",omni_range="9.0")
         for i,x in enumerate(range(-6,end+10,12)):
             asset("BedrockBase"+str(i),"DECOR","Cave",x,-10.35,-2.85,scale=(2,1,1))
         for i,x in enumerate(range(-6,end,12)):
@@ -141,21 +160,30 @@ height = 0.44
         node(name+"Barricade","TERRAIN","StaticBody3D",(x+2.25,shelf,0),script=e("Barricade"))
         chest(name+"Cache",x+5.4,shelf,index)
 
-    def hazard(name,x,y,kind,offset=0):
-        node(name,"TERRAIN","Area3D",(x,y,0),script=e("Hazard"),collision_layer=0,kind=kind,offset=offset)
+    def hazard(name,x,y,kind,offset=0,tighter=False,purge=None):
+        node(name,"TERRAIN","Area3D",(x,y,0),script=e("Hazard"),collision_layer=0,
+             flame_height=(2.22,3.0,3.55)[kind], nozzle_width=(1.52,1.74,1.90)[kind], damage=(17.0,23.0,28.0)[kind],
+             period=(3.23 if tighter else 3.8), offset=offset,
+             **({"purge_relay":f'NodePath("../{purge}")'} if purge else {}))
     def spikes(name,left,right,height):
         node(name,"TERRAIN","Area3D",((left+right)/2,height,0),
              script=e("Pit"),width=right-left,tint="Color(1, 0.49, 0.19, 1)")
 
-    def relay(trigger,platform,x,y,mx,my,dy,lift=False,art="Bridge",operation=None,dx=0,projectile_only=False):
+    def supply(name,x,y,reward):
+        node(name,"TERRAIN","CharacterBody3D",(x,y,0),script=e("Supply"),
+             group=["factory_supply_carrier"],supplies_only="true",reward=e(reward))
+
+    def relay(trigger,platform,x,y,mx,my,dy,lift=False,art="Bridge",operation=None,dx=0,projectile_only=True,delay=None):
+        if delay is None: delay = 1.15 if lift else 0.0
         asset(platform,"TERRAIN",art,mx,my)
         node(trigger,"TERRAIN","StaticBody3D",(x,y,0),group=["factory_shot_relay"],script=e("RelayCode"),
             **({"collision_layer": 2, "collision_mask": 0} if projectile_only else {}),
-            platform_path=f'NodePath("../{platform}")',travel=v((dx,dy,0)),operation=f'"{operation or ("FREIGHT LIFT" if lift else "DROP BRIDGE")}"',lift=str(lift).lower())
+            **({"departure_delay": delay} if delay else {}),
+            floating="true",platform_path=f'NodePath("../{platform}")',travel=v((dx,dy,0)),operation=f'"{operation or ("FREIGHT LIFT" if lift else "DROP BRIDGE")}"',lift=str(lift).lower())
         path="TERRAIN/"+trigger
-        asset("Art",path,"Relay",0,-.26,0)
+        asset("Art",path,"Relay",0,0,0)
         node("Collider",path,"CollisionShape3D",shape=s("RelayShape"))
-        node("Lamp",path,"MeshInstance3D",(0,0,.26),mesh=s("LampMesh"))
+        node("Lamp",path,"MeshInstance3D",(0,0,0),mesh=s("LampMesh"))
     def switchback(prefix,x,y,index):
         # From the main route, ascend left to a wall-kick shaft, then cross right to the cache.
         decks(prefix+"Approach",x-3,x+2,y+1.85)
@@ -190,6 +218,30 @@ height = 0.44
             node(f"Security{i+1:02}","Actors","CharacterBody3D",(x,y+(2.85 if flying else .91),0),
                  group=["level_enemies","damageable_enemies"],script=e("enemy"),variant=variant,
                  detachment_sector=1,patrol_model=common,patrol_right_limit=gate-12.0)
+
+    def basement_approach(start, floor):
+        fold = FOLDS["neon_factory"][act-1]
+        fixture = (lambda x,y: hazard("TurnbackFlare",x,y,2,1.15,tighter=True)) if ("neon_factory",act) in FOLD_TIMED_FIXTURE else None
+        def fold_deck(name,a,b,y,high):
+            if y != high:
+                ramp("Turnback"+name,a,b,y,high-y)
+            elif name == "IngressLane":
+                travel("Turnback"+name,a,b,y)
+            else:
+                decks("Turnback"+name,a,b,y)
+        end, bottom = folded_route(fold,start,floor,0.0,
+            fold_deck,
+            lambda name,x,y,top: wall("Turnback"+name,x,y,top),
+            lambda name,a,b,y: spikes("Turnback"+name,a,b,y),
+            fixture,
+            passage_hazard=lambda name,x,y: hazard("Turnback"+name,x,y,0 if act==1 else 2,.85,tighter=act==2),
+            bottom_limit=-10.1)
+        for index,x in enumerate(range(int(start),int(end),6)):
+            asset(f"TurnbackCladding{index}","DECOR","Cave",x,bottom-1.4,-3.18,scale=(1.0,1.25,1.0))
+        hall = math.ceil(end) + 9
+        decks("HallRecovery",end,hall-3,0)
+        return hall,hall+13,hall+64
+
     def arena(hallx,gx,exitx,start):
         decks("ArmorFloor",hallx-3,exitx+6,0)
         for name,x in [("ForgeHallDoor",hallx),("Gate",gx)]:
@@ -209,20 +261,18 @@ height = 0.44
         checkpoint("ForgeHallCheckpoint",gx-6.4,0)
         asset("RepairBayHeal","TERRAIN","repair",gx-3.6,.40)
         for index,x in enumerate([gx+9,gx+22,gx+34]):
-            asset("ReactorBank"+str(index),"DECOR","reactor",x,0,-2.1)
+            asset("FurnaceBackplate"+str(index),"DECOR","PressureBank",x,0,-2.65,scale=(1.1,1.15,.9))
         if act == 1:
-            deck("SergeantEntryStep",gx+5,gx+9,2.72,drop=True,thickness=.6)
-            deck("SergeantSideShelf",gx+10.5,gx+17,3.45,drop=True)
-            deck("SergeantRecoveryIsland",gx+34,gx+41,2.75,drop=True,thickness=.6)
-            relay("SergeantLiftRelay","SergeantEvadeLift",gx+24.0,1.98,gx+30.6,.02,3.65,
+            deck("WardenEntryStep",gx+5,gx+9,2.72,drop=True,thickness=.6)
+            deck("WardenSideShelf",gx+10.5,gx+17,3.45,drop=True)
+            deck("WardenRecoveryIsland",gx+34,gx+41,2.75,drop=True,thickness=.6)
+            relay("WardenLiftRelay","WardenEvadeLift",gx+24.0,1.27,gx+30.6,2.70,2.25,
                   True,operation="EVADE LIFT",projectile_only=True)
         else:
             asset("TitanWestHatch","TERRAIN","arena_hatch",gx+11,4.25,
                   deck_width=6.2,climb_height=4.25)
             deck("TitanHighRun",gx+19,gx+28,6.45,drop=True)
             deck("TitanEastDrop",gx+38,gx+44,3.95,drop=True)
-            node("TitanVent","TERRAIN","Area3D",(gx+34,1.4,0),script=e("Biome"),
-                 kind=6,dimensions=v((5.2,2.8,2.8)),tint="Color(1, 0.62, 0.28, 1)",period=3.8,offset=.8)
         node("PlayerSpawn","MARKERS","Marker3D",(start,.87,0))
         asset("SpawnPad","MARKERS/PlayerSpawn","Pad",0,-.87)
         node("RoomExit","MARKERS","Marker3D",(exitx+1.4,.87,0))
@@ -240,29 +290,30 @@ height = 0.44
         width=4.2 if act==1 else 4.25
         decks(prefix+"LowerWest",a+10,edge,low)
         spikes(prefix+"TunnelSpikes",edge,edge+width,low-3.05)
-        decks(prefix+"LowerEast",edge+width,b-9,low)
+        travel(prefix+"LowerEast",edge+width,b-9,low,low_ceiling=True)
         ramp(prefix+"ReturnRamp",b-9,b,low,-low)
         height = 6.25 if three_way else (3.55 if raised else 3.35)
         if three_way:
             deck(prefix+"ServiceStep",a+2,a+6,2.32,drop=True)
-            deck(prefix+"ServiceWest",a+7,a+19,2.95,drop=True)
-            decks(prefix+"ServiceEast",a+24,b-10,2.95,drop=True)
-            deck(prefix+"ServiceExit",b-9,b-4,2.5,drop=True)
-            deck(prefix+"UpperStep",a+12,a+17,5.1,drop=True)
+            deck(prefix+"ServiceWest",a+7,a+18,2.95,drop=True)
+            if act == 2:
+                deck(prefix+"ServiceEast",a+24,b-10,2.95,drop=True)
+                deck(prefix+"ServiceExit",b-9,b-4,2.5,drop=True)
+            deck(prefix+"UpperStep",a+12,a+17,5.73,drop=True)
             deck(prefix+"UpperWest",a+18,a+26,height,drop=True)
             if act == 1:
                 deck(prefix+"UpperSpan",a+30,a+35,height+.35,drop=True)
-                deck(prefix+"UpperDip",a+38,a+42,height-1.0,drop=True)
+                deck(prefix+"UpperDip",a+38,a+42,height-.54,drop=True)
                 deck(prefix+"UpperReturn",a+44,b-8,height,drop=True)
-                deck(prefix+"UpperEast",b-5,b-1,4.45,drop=True)
+                deck(prefix+"UpperEast",b-3.8,b-1,4.75,drop=True)
             else:
                 decks(prefix+"UpperSpan",a+30,b-13,height,drop=True)
-                deck(prefix+"UpperEast",b-10,b-3,4.95,drop=True)
-            asset(prefix+"ServiceSupply","TERRAIN","repair",b-14,3.35)
+                deck(prefix+"UpperEast",b-10,b-3,5.24,drop=True)
+            asset(prefix+"ServiceSupply","TERRAIN","repair",b-14,3.35 if act==2 else height+.4)
         else:
             deck(prefix+"UpperStep",a+2,a+6,2.32,drop=True)
             deck(prefix+"UpperWest",a+7,a+16,3.15,drop=True)
-            decks(prefix+"UpperSpan",a+20,b-15,height,drop=True)
+            travel(prefix+"UpperSpan",a+20,b-15,height,drop=True)
             deck(prefix+"UpperEast",b-11,b-3,2.7,drop=True)
         chest(prefix+"UpperCache",b-11 if three_way and act==1 else max(a+31,b-18) if three_way else b-18,height,index)
         asset(prefix+"LowerSupply","TERRAIN","energy",a+21,low+.40)
@@ -295,7 +346,7 @@ height = 0.44
         wall(prefix+"UnderpassShield",western_end-.39,return_y,3.2)
         asset(prefix+"LadderHatch","TERRAIN","arena_hatch",western_end+5.4,return_y,
               deck_width=4.0,climb_height=return_y-floor)
-        decks(prefix+"Return",western_end+7.4,entry-5,return_y)
+        travel(prefix+"Return",western_end+7.4,entry-5,return_y,low_ceiling=True)
         deck(prefix+"ReturnTakeoff",entry-5,entry-3,return_y)
         decks(prefix+"ShutterApron",entry+2,gate_x-5,return_y)
         ramp(prefix+"ShutterRamp",gate_x-5,gate_x-1,return_y,-.4-return_y)
@@ -329,39 +380,40 @@ height = 0.44
         deck("GantryWestLanding",47.3,52.1,14.45,drop=True)
         deck("GantrySalvage",38.3,44.0,15.55,drop=True)
         chest("CoolingOverheadCache",40.3,15.55,8)
-        deck("GantryTurnWest",31.8,36.15,12.7,drop=True)
-        ramp("GantryReturnDown",32.8,50.9,10.15,-.8)
-        deck("GantryPipeUnderpass",50.9,57.2,9.35,drop=True)
-        deck("GantryReturnEast",61.0,71.5,8.95,drop=True)
-        # The lower return meets the service deck under the launch side.
-        hazard("GantryLaser",48.8,14.45,1,1.8)
+        # The gantry returns through a west-side drop instead of duplicating
+        # the route underneath. Two staggered shelves guide the descent.
+        deck("GantryTurnWest",31.75,36.05,11.75,drop=True)
+        deck("GantryDescentShelf",28.85,33.5,6.05,drop=True)
+        hazard("GantryFlare",48.8,14.45,1,1.8)
         for index,(x,y) in enumerate([(80.05,12.1),(64.4,14.7),(49.1,14.45),(40.3,15.55)]):
             overhead_brace("CoolingGantryBrace"+str(index),x,y)
 
     def refinery_high_route():
         # The lift rises from the forge riser. The eastbound crane level
         # returns west along the lower inspection decks and drops onto slag ramp.
-        relay("HighFreightRelay","HighFreightLift",323.7,7.25,331.5,6.15,10.1,
+        relay("HighFreightRelay","HighFreightLift",323.7,7.25,331.5,8.86,7.39,
               True,operation="RAISE CRANE LIFT")
         deck("CraneDisembark",337.7,346.6,16.25,drop=True)
         deck("CraneEastSpan",354.8,362.4,17.05,drop=True)
         deck("CraneVault",368.5,377.1,16.95,drop=True)
         chest("CraneLevelCache",373.5,16.95,4)
         deck("CraneTurnDown",379.15,383.8,14.2,drop=True)
-        deck("CraneInspectionEast",374.0,378.8,11.85,drop=True)
-        deck("CraneInspectionWest",362.8,369.9,10.6,drop=True)
+        deck("CraneInspectionWest",364.65,369.9,11.15,drop=True)
         deck("CraneExitChute",353.7,360.4,8.45,drop=True)
         deck("RefineryReturnLanding",350.3,353.3,6.95)
-        hazard("CranePress",358.5,17.05,2,.95)
+        hazard("CraneFlare",358.5,17.05,2,.95,purge="HighFreightRelay")
         for index,(x,y) in enumerate([(341.5,16.25),(359,17.05),(373.6,16.95)]):
             overhead_brace("CraneBrace"+str(index),x,y)
 
     if act==1:
-        hall,gate,exit=419,432,483
-        shell(exit,gate,[(39,103),(165,231),(270,324)])
-        decks("Intake",-14,14,0)
-        decks("IntakeLanding",19,35,0)
-        spikes("IntakeSpikes",14,19,-4.0)
+        hall,gate,exit=basement_approach(412,1.2)
+        shell(exit,gate,[(39,103,-.82),(165,231,6.15),(270,324,-1.35)])
+        decks("Intake",-14,3.4,0)
+        ramp("IntakeDrain",3.4,7.5,0,-.64)
+        ramp("IntakeDrainReturn",7.5,10.8,-.64,.64)
+        deck("IntakeLip",10.8,14,0)
+        decks("IntakeLanding",20,35,0)
+        spikes("IntakeSpikes",14,20,-4.0)
         fork("Cooling",35,93,1,three_way=True)
         cooling_gantry()
         # Freight viaduct. Thick ramps carry the apron, with a deliberate
@@ -375,8 +427,8 @@ height = 0.44
         riser("ConduitShaft",117,158,3)
         decks("ChannelLeft",158,170.5,6.15)
         decks("ChannelRight",176.5,189,6.15)
-        decks("MaintenanceCatch",170.5,176.5,3.45)
-        deck("CatchStair",174.2,176.5,4.75)
+        deck("MaintenanceCatch",170.5,172.6,3.45)
+        ramp("CatchStair",172.6,176.5,3.45,1.30)
         relay("DropBridgeRelay","DropBridge",166.5,7.15,173.5,9.3,-3.15)
         # The bridge gives a straight crossing. The service passage bypasses it below.
         deck("DropLip",189,191,6.15)
@@ -398,18 +450,24 @@ height = 0.44
         deck("ForgeApproachRamp",403,409,-1.1,1.2)
         deck("ForgeApproachLanding",409,412,1.2)
         sealed_cache("ForgeService",371.5,0,13)
-        ramp("ForgeHallSlope",412,hall-3,1.2,-1.2)
-        for i,(x,y,kind) in enumerate([(28,0,0),(66,-2.05,1),(149,6.15,2),(184,-8.5,0),(253,-1.35,1),(300,0,2),(344,6.15,1)]):
-            hazard("SafetyHazard"+str(i+1),x,y,kind,i*.37)
-        enemies([(22,0,0),(47,-2.05,1),(59,6.25,4),(107.4,.72,2),(150,6.15,0),(181,6.15,3),(176,-8.5,4),(219,-.4,2),(245,-1.35,1),(273,3.55,3),(291,0,2),(336,6.15,4),(365,1.1,0)],gate)
+        for i,(x,y,kind) in enumerate([(28,0,0),(69.5,-2.05,1),(149,6.15,2),(197,-8.5,0),(253,-1.35,1),(295.0,0,2),(344,6.15,1)]):
+            hazard("FoundryFlare"+str(i+1),x,y,kind,i*.37,tighter=i in (0,2))
+        for name,x,y,reward in [
+            ("IntakeSupplyDrone",26.0,1.63,"repair"),("ConduitSupplyDrone",155.1,7.80,"energy"),
+            ("FoundrySupplyDrone",315.7,1.61,"repair"),
+        ]: supply(name,x,y,reward)
+        enemies([(22,0,0),(47,-2.05,1),(59,6.25,4),(107.4,.72,2),(150,6.15,0),(181,6.15,3),(176,-8.5,4),(219,-.4,2),(245,-1.35,1),(273,3.55,3),(291,0,2),(336,6.15,4),(423.5,1.2,0)],gate)
     else:
-        hall,gate,exit=467,480,531
-        shell(exit,gate,[(49,110),(196,264),(327,372)])
-        decks("SmelterIntake",-14,12,0)
-        deck("OverfeedPier",17.3,21,0.6)
-        spikes("IntakeFirstSpikes",12,17.3,-4.1)
-        spikes("IntakeSecondSpikes",21,26.5,-3.9)
-        ramp("OverfeedLanding",26.5,30,0.6,-0.6)
+        hall,gate,exit=basement_approach(454,.6)
+        shell(exit,gate,[(49,110,-1.35),(196,264,0),(327,372,6.15)])
+        decks("SmelterIntake",-14,2.4,0)
+        ramp("SmelterManifold",2.4,5.4,0,1.03)
+        ramp("SmelterManifoldReturn",5.4,8.15,1.03,-1.03)
+        deck("SmelterIntakeLip",8.15,12,0)
+        deck("OverfeedPier",18.25,22,0.6)
+        spikes("IntakeFirstSpikes",12,18.25,-4.1)
+        spikes("IntakeSecondSpikes",22,27.5,-3.9)
+        ramp("OverfeedLanding",27.5,30,0.6,-0.6)
         fork("CoolingDeck",30,83,6,True)
         # The smelter route drops under the intake baffle, then opens into a
         # different jump from the bridge approach in Act I.
@@ -425,14 +483,14 @@ height = 0.44
         ramp("HotApronDown",169.5,191,5.4,-5.4)
         deck("IntakeLip",191,196,0)
         basement("SlagBasement",160,201,234,240,0,(25.4,30.4))
-        relay("FreightRelay","FreightLift",210,-1.6,216,-2.6,7.6,True)
-        decks("FreightLanding",218,230,5)
+        relay("FreightRelay","FreightLift",210,-1.6,215.3,.11,4.89,True)
+        decks("FreightLanding",218.5,230,5)
         deck("FreightReturn",230.3,234,3.1)
         chest("FreightVaultChest",225,5,9)
         decks("TransferApron",244,248,0)
         checkpoint("MidpointCheckpoint",245,0)
         fork("FuelLine",248,293,10,three_way=True)
-        decks("RiserApproach",293,297,0)
+        decks("FuelRiserLanding",293,297,0)
         riser("Riser",297,344,11)
         refinery_high_route()
         deck("RightStairA",344,348,4.45)
@@ -440,24 +498,29 @@ height = 0.44
         ramp("SlagRamp",353,362,2.65,-2.65)
         fork("Refinery",362,405,5,True)
         decks("SmelterExit",405,418,0)
+        node("SlagBoulder","TERRAIN","AnimatableBody3D",(416.7,.82,0),
+             script=e("Boulder"),group=["foundry_boulder"],runway_length=11.0)
+        hazard("SlagFerryReliefVent",449.9,.6,1,1.35,purge="SlagFerryRelay")
         deck("SlagBridgeLanding",427.4,431.4,0)
-        deck("SlagBridgeRiser",431.4,435.2,.92)
+        ramp("SlagBridgeRiser",431.4,435.2,0,.92)
         ramp("SlagBridgeReturn",435.2,441,.92,-.92)
         spikes("SmelterSpikes",418,427.4,-4.25)
         spikes("SlagGapSpikes",441,448.7,-4.15)
         deck("SlagVentIsland",448.7,454,.6)
-        deck("SlagFerryApproach",430.3,433.8,2.28)
-        relay("SlagFerryRelay","SlagFerry",432.2,4.7,437.8,4.1,2.45,True,operation="SEND SLAG FERRY",dx=7.6)
-        deck("SlagVaultWestboundLedge",441.9,445.5,6.55,drop=True)
-        deck("SlagVaultReturn",437.4,440,7.15,drop=True)
-        deck("SlagVaultTurn",430.2,434.9,7.55,drop=True)
-        chest("SlagFerryCache",432.6,7.55,3)
-        ramp("SlagHallRamp",454,hall-3,.6,-.6)
+        relay("SlagFerryRelay","SlagFerry",436.65,4.62,432.10,3.62,2.60,True,
+              operation="SEND SLAG FERRY",dx=15.6,projectile_only=True,delay=.46)
+        deck("SlagVaultWestboundLedge",441.8,444.25,8.32,drop=True)
+        deck("SlagVaultTurn",429.1,435.87,9.25,drop=True)
+        chest("SlagFerryCache",431.7,9.25,3)
         sealed_cache("RefineryService",405.3,0,14)
-        for i,(x,y,k) in enumerate([(37,-.94,2),(57,-1.35,1),(99.45,-.52,0),(135,6.15,2),(177,-8.5,1),(223,-2.6,2),(333,6.15,0),(389,-1.35,1),(401,-.6,2)]):
-            hazard("SafetyHazard"+str(i+1),x,y,k,i*.42)
-        enemies([(29,.18,0),(46,-1.35,2),(69,3.55,4),(87.2,-1.25,1),(144,6.15,0),(165,6,4),(202,-8.5,3),(224,5,2),(231,-2.1,3),(260,-1.87,2),(280,6.25,1),(322,6.15,2),(374,-1.35,0),(397,2.4,4)],gate)
+        for i,(x,y,k) in enumerate([(37,-.94,2),(57,-1.35,1),(99.45,-.52,0),(135,6.15,2),(177,-8.5,1),(223,-2.6,2),(333,6.15,0),(391.0,-1.35,1),(401,-.6,2)]):
+            hazard("FoundryFlare"+str(i+1),x,y,k,i*.42)
+        for name,x,y,reward in [
+            ("ManifoldSupplyDrone",35.4,1.18,"energy"),("ApronSupplyDrone",149.0,7.78,"repair"),
+            ("RiserSupplyDrone",294.7,1.62,"energy"),
+        ]: supply(name,x,y,reward)
+        enemies([(29,.18,0),(46,-1.35,2),(69,3.55,4),(87.2,-1.25,1),(144,6.15,0),(165,6,4),(202,-8.5,3),(224,5,2),(231,-2.1,3),(260,-1.87,2),(280,6.25,1),(322,6.15,2),(374,-1.35,0),(466.1,.6,4)],gate)
     wall("AirlockEnd",-13,0,14)
     arena(hall,gate,exit,0)
-    file.write_text('\n'.join(header)+'\n\n'+'\n\n'.join(nodes)+'\n',encoding="utf8")
+    file.write_text(outfit("neon_factory", '\n'.join(header)+'\n\n'+'\n\n'.join(nodes)+'\n'),encoding="utf8")
 for act in [1,2]: make(act)

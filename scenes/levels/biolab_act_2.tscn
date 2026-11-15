@@ -2,9 +2,9 @@
 
 [ext_resource type="PackedScene" path="res://assets/campaign/biolab/terrain/relay.tscn" id="relay"]
 
-[ext_resource type="PackedScene" path="res://assets/campaign/biolab/terrain/gate.tscn" id="gate"]
+[ext_resource type="PackedScene" path="res://assets/campaign/doorways/lab_gate.tscn" id="gate"]
 
-[ext_resource type="PackedScene" path="res://assets/campaign/biolab/terrain/arch.tscn" id="arch"]
+[ext_resource type="PackedScene" path="res://assets/campaign/doorways/lab_arch.tscn" id="arch"]
 
 [ext_resource type="PackedScene" path="res://assets/campaign/biolab/enemies/scout.tscn" id="scout"]
 
@@ -47,7 +47,7 @@
 [ext_resource type="Script" path="res://scripts/spike_pit.gd" id="RCPit"]
 [ext_resource type="Script" path="res://scripts/jungle_backdrop.gd" id="RCSky"]
 [ext_resource type="Texture2D" path="res://assets/campaign/biolab/panorama.png" id="RCPanorama"]
-[ext_resource type="PackedScene" path="res://assets/campaign/biolab/terrain/arch.tscn" id="RCExteriorFrame"]
+[ext_resource type="PackedScene" path="res://assets/campaign/doorways/lab_arch.tscn" id="RCExteriorFrame"]
 
 [sub_resource type="BoxShape3D" id="Checkpoint"]
 size = Vector3(2.1, 1.9, 1.8)
@@ -95,7 +95,7 @@ size = Vector3(3.921, 0.84, 4.8)
 size = Vector3(6.006, 0.84, 4.8)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_0020"]
-size = Vector3(7.576, 0.84, 4.8)
+size = Vector3(6.736, 0.84, 4.8)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_0023"]
 size = Vector3(4.006, 0.84, 4.8)
@@ -104,546 +104,756 @@ size = Vector3(4.006, 0.84, 4.8)
 size = Vector3(4.006, 0.84, 4.8)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_0040"]
-size = Vector3(7.006, 0.84, 4.8)
+size = Vector3(1.406, 0.84, 4.8)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_0043"]
-size = Vector3(5.006, 0.84, 4.8)
+size = Vector3(2.0776, 0.84, 4.8)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_0046"]
-size = Vector3(5.706, 0.46, 4.8)
+size = Vector3(1.406, 0.84, 4.8)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_0049"]
-size = Vector3(4.606, 0.46, 4.8)
+size = Vector3(2.2713, 0.84, 4.8)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_0052"]
-size = Vector3(4.606, 0.46, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0055"]
-size = Vector3(1.741, 0.46, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0058"]
-size = Vector3(5.806, 0.46, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0061"]
-size = Vector3(5.74, 0.46, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0064"]
-size = Vector3(5.3944, 0.46, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0067"]
-size = Vector3(3.4372, 0.46, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0070"]
-size = Vector3(3.9703, 0.46, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0073"]
-size = Vector3(4.406, 0.46, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0080"]
-size = Vector3(6.756, 0.46, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0083"]
-size = Vector3(6.756, 0.46, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0086"]
-size = Vector3(6.756, 0.46, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0089"]
-size = Vector3(6.756, 0.46, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0092"]
-size = Vector3(5.006, 0.46, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0098"]
-size = Vector3(6.2157, 0.84, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0101"]
-size = Vector3(5.1927, 0.84, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0104"]
-size = Vector3(5.1927, 0.84, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0107"]
-size = Vector3(5.1927, 0.84, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0110"]
-size = Vector3(6.726, 0.84, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0113"]
-size = Vector3(6.726, 0.84, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0116"]
-size = Vector3(6.726, 0.84, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0120"]
-size = Vector3(6.2157, 0.84, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0124"]
-size = Vector3(4.006, 0.84, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0127"]
-size = Vector3(4.006, 0.84, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0131"]
-size = Vector3(4.006, 0.84, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0134"]
-size = Vector3(4.006, 0.84, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0171"]
-size = Vector3(2.156, 0.84, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0175"]
-size = Vector3(0.456, 0.84, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0178"]
-size = Vector3(6.3219, 0.84, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0181"]
-size = Vector3(5.7393, 0.84, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0184"]
-size = Vector3(5.7393, 0.84, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0187"]
-size = Vector3(5.7393, 0.84, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0191"]
-size = Vector3(6.801, 0.84, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0194"]
-size = Vector3(6.801, 0.84, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0197"]
-size = Vector3(6.6468, 0.84, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0200"]
-size = Vector3(5.556, 0.46, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0203"]
-size = Vector3(6.966, 0.46, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0206"]
-size = Vector3(6.966, 0.46, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0209"]
-size = Vector3(6.966, 0.46, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0212"]
-size = Vector3(6.966, 0.46, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0215"]
-size = Vector3(6.966, 0.46, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0222"]
-size = Vector3(4.006, 0.84, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0225"]
-size = Vector3(4.006, 0.84, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0254"]
-size = Vector3(7.006, 0.84, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0257"]
-size = Vector3(6.426, 0.84, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0260"]
-size = Vector3(2.5532, 0.46, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0263"]
-size = Vector3(1.031, 0.46, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0266"]
-size = Vector3(0.79, 6.48, 4)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0269"]
-size = Vector3(0.79, 6.15, 4)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0272"]
-size = Vector3(5.656, 0.84, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0275"]
-size = Vector3(5.656, 0.84, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0278"]
-size = Vector3(5.656, 0.84, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0281"]
-size = Vector3(5.656, 0.84, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0284"]
-size = Vector3(4.006, 0.84, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0287"]
-size = Vector3(4.006, 0.84, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0310"]
-size = Vector3(6.7393, 0.84, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0313"]
-size = Vector3(6.7393, 0.84, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0316"]
-size = Vector3(6.7393, 0.84, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0320"]
-size = Vector3(4.8835, 0.84, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0323"]
-size = Vector3(4.8835, 0.84, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0326"]
-size = Vector3(4.506, 0.84, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0330"]
-size = Vector3(3.7609, 0.84, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0333"]
-size = Vector3(5.961, 0.84, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0337"]
-size = Vector3(3.806, 0.84, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0340"]
-size = Vector3(3.6127, 0.84, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0343"]
-size = Vector3(6.1227, 0.84, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0346"]
-size = Vector3(6.1227, 0.84, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0349"]
-size = Vector3(6.1227, 0.84, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0353"]
-size = Vector3(3.106, 0.46, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0357"]
-size = Vector3(7.856, 0.46, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0362"]
-size = Vector3(6.756, 0.46, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0365"]
-size = Vector3(8.106, 0.46, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0368"]
-size = Vector3(7.306, 0.46, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0375"]
-size = Vector3(5.356, 0.46, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0378"]
-size = Vector3(14.618, 0.46, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0421"]
-size = Vector3(7.006, 0.84, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0424"]
-size = Vector3(13.901, 0.84, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0427"]
-size = Vector3(3.506, 0.84, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0431"]
-size = Vector3(3.006, 0.84, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0434"]
-size = Vector3(17.387, 0.84, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0437"]
-size = Vector3(15.226, 0.46, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0440"]
-size = Vector3(13.226, 0.46, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0443"]
-size = Vector3(0.79, 2.1, 4)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0449"]
-size = Vector3(4.006, 0.84, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0452"]
-size = Vector3(4.006, 0.84, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0477"]
-size = Vector3(7.006, 0.84, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0480"]
 size = Vector3(5.006, 0.84, 4.8)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_0483"]
-size = Vector3(5.706, 0.46, 4.8)
+[sub_resource type="BoxShape3D" id="BoxShape3D_0055"]
+size = Vector3(4.906, 0.46, 4.8)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_0486"]
-size = Vector3(6.7148, 0.46, 4.8)
+[sub_resource type="BoxShape3D" id="BoxShape3D_0058"]
+size = Vector3(4.606, 0.46, 4.8)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_0489"]
-size = Vector3(6.7147, 0.46, 4.8)
+[sub_resource type="BoxShape3D" id="BoxShape3D_0061"]
+size = Vector3(4.606, 0.46, 4.8)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_0492"]
-size = Vector3(6.7148, 0.46, 4.8)
+[sub_resource type="BoxShape3D" id="BoxShape3D_0064"]
+size = Vector3(1.741, 0.46, 4.8)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_0495"]
-size = Vector3(6.7148, 0.46, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0498"]
+[sub_resource type="BoxShape3D" id="BoxShape3D_0067"]
 size = Vector3(5.806, 0.46, 4.8)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_0501"]
-size = Vector3(5.006, 0.46, 4.8)
+[sub_resource type="BoxShape3D" id="BoxShape3D_0070"]
+size = Vector3(5.74, 0.46, 4.8)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_0504"]
-size = Vector3(5.5, 0.46, 4.8)
+[sub_resource type="BoxShape3D" id="BoxShape3D_0073"]
+size = Vector3(5.3944, 0.46, 4.8)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_0507"]
-size = Vector3(5.1256, 0.46, 4.8)
+[sub_resource type="BoxShape3D" id="BoxShape3D_0076"]
+size = Vector3(3.4372, 0.46, 4.8)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_0510"]
-size = Vector3(3.2253, 0.46, 4.8)
+[sub_resource type="BoxShape3D" id="BoxShape3D_0079"]
+size = Vector3(4.406, 0.46, 4.8)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_0513"]
-size = Vector3(6.181, 0.46, 4.8)
+[sub_resource type="BoxShape3D" id="BoxShape3D_0086"]
+size = Vector3(4.931, 0.46, 4.8)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_0516"]
-size = Vector3(6.181, 0.46, 4.8)
+[sub_resource type="BoxShape3D" id="BoxShape3D_0089"]
+size = Vector3(4.931, 0.46, 4.8)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_0519"]
-size = Vector3(6.181, 0.46, 4.8)
+[sub_resource type="BoxShape3D" id="BoxShape3D_0092"]
+size = Vector3(3.2551, 0.46, 4.8)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_0522"]
-size = Vector3(6.181, 0.46, 4.8)
+[sub_resource type="BoxShape3D" id="BoxShape3D_0095"]
+size = Vector3(2.056, 0.46, 4.8)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_0525"]
-size = Vector3(2.706, 0.46, 4.8)
+[sub_resource type="BoxShape3D" id="BoxShape3D_0098"]
+size = Vector3(2.4747, 0.46, 4.8)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_0528"]
-size = Vector3(3.906, 0.46, 4.8)
+[sub_resource type="BoxShape3D" id="BoxShape3D_0101"]
+size = Vector3(4.931, 0.46, 4.8)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_0531"]
-size = Vector3(3.406, 0.46, 4.8)
+[sub_resource type="BoxShape3D" id="BoxShape3D_0104"]
+size = Vector3(4.931, 0.46, 4.8)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_0534"]
-size = Vector3(3.356, 0.46, 4.8)
+[sub_resource type="BoxShape3D" id="BoxShape3D_0110"]
+size = Vector3(6.2157, 0.84, 4.8)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_0537"]
+[sub_resource type="BoxShape3D" id="BoxShape3D_0113"]
+size = Vector3(5.1927, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0116"]
+size = Vector3(5.1927, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0119"]
+size = Vector3(5.1927, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0122"]
+size = Vector3(6.686, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0125"]
+size = Vector3(2.8805, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0128"]
+size = Vector3(1.256, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0131"]
+size = Vector3(2.8318, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0134"]
+size = Vector3(6.686, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0138"]
+size = Vector3(6.2157, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0142"]
+size = Vector3(4.006, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0145"]
+size = Vector3(4.006, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0149"]
+size = Vector3(4.006, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0152"]
+size = Vector3(4.006, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0189"]
+size = Vector3(2.156, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0193"]
+size = Vector3(0.456, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0196"]
+size = Vector3(6.3219, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0199"]
+size = Vector3(5.7393, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0202"]
+size = Vector3(5.7393, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0205"]
+size = Vector3(5.7393, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0209"]
+size = Vector3(6.801, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0212"]
+size = Vector3(6.801, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0215"]
+size = Vector3(6.6468, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0218"]
+size = Vector3(5.556, 0.46, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0221"]
+size = Vector3(7.156, 0.46, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0224"]
+size = Vector3(7.156, 0.46, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0227"]
+size = Vector3(2.1253, 0.46, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0230"]
+size = Vector3(1.806, 0.46, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0233"]
+size = Vector3(2.5928, 0.46, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0236"]
+size = Vector3(7.156, 0.46, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0239"]
+size = Vector3(7.156, 0.46, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0246"]
+size = Vector3(4.006, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0249"]
+size = Vector3(4.006, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0278"]
+size = Vector3(1.406, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0281"]
+size = Vector3(2.125, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0284"]
+size = Vector3(1.406, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0287"]
+size = Vector3(2.3147, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0290"]
+size = Vector3(6.426, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0293"]
+size = Vector3(2.5532, 0.46, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0296"]
+size = Vector3(1.031, 0.46, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0299"]
+size = Vector3(0.79, 6.48, 4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0302"]
+size = Vector3(0.79, 6.15, 4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0305"]
+size = Vector3(4.106, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0308"]
+size = Vector3(4.106, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0311"]
+size = Vector3(2.1253, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0314"]
+size = Vector3(1.806, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0317"]
+size = Vector3(2.5928, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0320"]
+size = Vector3(4.106, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0323"]
+size = Vector3(4.106, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0326"]
+size = Vector3(4.006, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0329"]
+size = Vector3(4.006, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0352"]
+size = Vector3(6.456, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0355"]
+size = Vector3(3.2551, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0358"]
+size = Vector3(2.056, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0361"]
+size = Vector3(2.4747, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0364"]
+size = Vector3(6.456, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0368"]
+size = Vector3(4.8835, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0371"]
+size = Vector3(4.8835, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0374"]
+size = Vector3(4.506, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0378"]
+size = Vector3(3.7609, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0381"]
+size = Vector3(5.961, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0385"]
+size = Vector3(3.806, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0388"]
+size = Vector3(3.6127, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0391"]
+size = Vector3(6.1227, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0394"]
+size = Vector3(6.1227, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0397"]
+size = Vector3(6.1227, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0401"]
 size = Vector3(3.106, 0.46, 4.8)
 
+[sub_resource type="BoxShape3D" id="BoxShape3D_0405"]
+size = Vector3(7.856, 0.46, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0410"]
+size = Vector3(6.756, 0.46, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0413"]
+size = Vector3(8.106, 0.46, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0416"]
+size = Vector3(7.306, 0.46, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0423"]
+size = Vector3(5.356, 0.46, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0426"]
+size = Vector3(14.568, 0.46, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0469"]
+size = Vector3(7.006, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0472"]
+size = Vector3(13.901, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0475"]
+size = Vector3(3.506, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0479"]
+size = Vector3(3.006, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0482"]
+size = Vector3(17.387, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0485"]
+size = Vector3(15.226, 0.46, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0488"]
+size = Vector3(13.226, 0.46, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0491"]
+size = Vector3(0.79, 2.4, 4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0497"]
+size = Vector3(4.006, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0500"]
+size = Vector3(4.006, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0525"]
+size = Vector3(1.406, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0528"]
+size = Vector3(2.0776, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0531"]
+size = Vector3(1.406, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0534"]
+size = Vector3(2.2713, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0537"]
+size = Vector3(5.006, 0.84, 4.8)
+
 [sub_resource type="BoxShape3D" id="BoxShape3D_0540"]
-size = Vector3(2.806, 0.46, 4.8)
+size = Vector3(4.906, 0.46, 4.8)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_0543"]
-size = Vector3(2.006, 0.46, 4.8)
+size = Vector3(5.1398, 0.46, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0546"]
+size = Vector3(5.1397, 0.46, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0549"]
+size = Vector3(2.6375, 0.46, 4.8)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_0552"]
-size = Vector3(6.1452, 0.84, 4.8)
+size = Vector3(1.256, 0.46, 4.8)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_0555"]
-size = Vector3(7.2631, 0.84, 4.8)
+size = Vector3(2.5891, 0.46, 4.8)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_0558"]
-size = Vector3(7.2631, 0.84, 4.8)
+size = Vector3(5.1398, 0.46, 4.8)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_0561"]
-size = Vector3(7.2631, 0.84, 4.8)
+size = Vector3(5.1398, 0.46, 4.8)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_0564"]
-size = Vector3(7.2631, 0.84, 4.8)
+size = Vector3(5.806, 0.46, 4.8)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_0567"]
-size = Vector3(7.2631, 0.84, 4.8)
+size = Vector3(5.006, 0.46, 4.8)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_0570"]
-size = Vector3(7.2631, 0.84, 4.8)
+size = Vector3(5.5, 0.46, 4.8)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_0573"]
-size = Vector3(7.2631, 0.84, 4.8)
+size = Vector3(5.1256, 0.46, 4.8)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_0576"]
-size = Vector3(0.79, 8.95, 4)
+size = Vector3(3.2253, 0.46, 4.8)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_0579"]
-size = Vector3(7.3928, 0.84, 4.8)
+size = Vector3(4.606, 0.46, 4.8)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_0582"]
-size = Vector3(7.3928, 0.84, 4.8)
+size = Vector3(4.606, 0.46, 4.8)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_0585"]
-size = Vector3(7.3928, 0.84, 4.8)
+size = Vector3(2.7102, 0.46, 4.8)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_0588"]
-size = Vector3(7.3928, 0.84, 4.8)
+size = Vector3(1.256, 0.46, 4.8)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_0591"]
-size = Vector3(7.3928, 0.84, 4.8)
+size = Vector3(2.6631, 0.46, 4.8)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_0594"]
-size = Vector3(3.306, 0.84, 4.8)
+size = Vector3(4.606, 0.46, 4.8)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_0597"]
-size = Vector3(5.4613, 0.84, 4.8)
+size = Vector3(4.606, 0.46, 4.8)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_0600"]
-size = Vector3(5.4613, 0.84, 4.8)
+size = Vector3(2.706, 0.46, 4.8)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_0603"]
-size = Vector3(5.4613, 0.84, 4.8)
+size = Vector3(3.906, 0.46, 4.8)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_0607"]
-size = Vector3(0.79, 10.05, 4)
+[sub_resource type="BoxShape3D" id="BoxShape3D_0606"]
+size = Vector3(3.406, 0.46, 4.8)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_0610"]
-size = Vector3(0.79, 10.3, 4)
+[sub_resource type="BoxShape3D" id="BoxShape3D_0609"]
+size = Vector3(3.356, 0.46, 4.8)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_0613"]
-size = Vector3(0.906, 0.84, 4.8)
+[sub_resource type="BoxShape3D" id="BoxShape3D_0612"]
+size = Vector3(3.106, 0.46, 4.8)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_0617"]
-size = Vector3(6.9489, 0.84, 4.8)
+[sub_resource type="BoxShape3D" id="BoxShape3D_0615"]
+size = Vector3(1.706, 0.46, 4.8)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_0620"]
-size = Vector3(6.9489, 0.84, 4.8)
+[sub_resource type="BoxShape3D" id="BoxShape3D_0618"]
+size = Vector3(2.006, 0.46, 4.8)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_0623"]
-size = Vector3(6.9489, 0.84, 4.8)
+[sub_resource type="BoxShape3D" id="BoxShape3D_0627"]
+size = Vector3(6.1452, 0.84, 4.8)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_0626"]
-size = Vector3(6.9489, 0.84, 4.8)
+[sub_resource type="BoxShape3D" id="BoxShape3D_0630"]
+size = Vector3(6.7727, 0.84, 4.8)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_0629"]
-size = Vector3(6.9489, 0.84, 4.8)
+[sub_resource type="BoxShape3D" id="BoxShape3D_0633"]
+size = Vector3(6.7727, 0.84, 4.8)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_0632"]
-size = Vector3(6.9489, 0.84, 4.8)
+[sub_resource type="BoxShape3D" id="BoxShape3D_0636"]
+size = Vector3(2.6375, 0.84, 4.8)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_0635"]
-size = Vector3(6.9489, 0.84, 4.8)
+[sub_resource type="BoxShape3D" id="BoxShape3D_0639"]
+size = Vector3(1.256, 0.84, 4.8)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_0638"]
-size = Vector3(5.6911, 0.84, 4.8)
+[sub_resource type="BoxShape3D" id="BoxShape3D_0642"]
+size = Vector3(2.5891, 0.84, 4.8)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_0641"]
-size = Vector3(2.876, 0.84, 4.8)
+[sub_resource type="BoxShape3D" id="BoxShape3D_0645"]
+size = Vector3(5.2227, 0.84, 4.8)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_0644"]
-size = Vector3(5.256, 0.84, 4.8)
+[sub_resource type="BoxShape3D" id="BoxShape3D_0648"]
+size = Vector3(5.2227, 0.84, 4.8)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_0647"]
-size = Vector3(4.5519, 0.84, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0650"]
-size = Vector3(0.956, 0.84, 4.8)
+[sub_resource type="BoxShape3D" id="BoxShape3D_0651"]
+size = Vector3(2.0615, 0.84, 4.8)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_0654"]
-size = Vector3(0.79, 25.435, 4)
+size = Vector3(1.806, 0.84, 4.8)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_0657"]
-size = Vector3(0.79, 13.44, 4)
+size = Vector3(2.5408, 0.84, 4.8)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_0664"]
-size = Vector3(0.79, 2.5, 4)
+[sub_resource type="BoxShape3D" id="BoxShape3D_0660"]
+size = Vector3(6.7977, 0.84, 4.8)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_0671"]
-size = Vector3(4.006, 0.84, 4.8)
+[sub_resource type="BoxShape3D" id="BoxShape3D_0663"]
+size = Vector3(6.7977, 0.84, 4.8)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_0674"]
-size = Vector3(4.006, 0.84, 4.8)
+[sub_resource type="BoxShape3D" id="BoxShape3D_0666"]
+size = Vector3(0.79, 8.95, 4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0669"]
+size = Vector3(7.4145, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0672"]
+size = Vector3(7.4145, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0675"]
+size = Vector3(3.2551, 0.84, 4.8)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_0678"]
-size = Vector3(4.006, 0.84, 4.8)
+size = Vector3(2.056, 0.84, 4.8)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_0681"]
-size = Vector3(4.006, 0.84, 4.8)
+size = Vector3(2.4747, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0684"]
+size = Vector3(7.4145, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0687"]
+size = Vector3(7.4145, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0690"]
+size = Vector3(3.306, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0693"]
+size = Vector3(5.4613, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0696"]
+size = Vector3(5.4613, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0699"]
+size = Vector3(5.4613, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0703"]
+size = Vector3(0.79, 10.05, 4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0706"]
+size = Vector3(0.79, 10.3, 4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0709"]
+size = Vector3(0.906, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0713"]
+size = Vector3(6.556, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0716"]
+size = Vector3(6.556, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0719"]
+size = Vector3(2.0615, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0722"]
+size = Vector3(1.806, 0.84, 4.8)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_0725"]
-size = Vector3(7.006, 0.84, 4.8)
+size = Vector3(2.5408, 0.84, 4.8)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_0728"]
-size = Vector3(5.3185, 0.84, 4.8)
+size = Vector3(4.731, 0.84, 4.8)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_0731"]
-size = Vector3(5.3185, 0.84, 4.8)
+size = Vector3(4.731, 0.84, 4.8)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_0734"]
-size = Vector3(3.881, 0.84, 4.8)
+size = Vector3(3.1245, 0.84, 4.8)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_0737"]
-size = Vector3(3.881, 0.84, 4.8)
+size = Vector3(2.056, 0.84, 4.8)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_0740"]
-size = Vector3(5.3185, 0.84, 4.8)
+size = Vector3(2.3, 0.84, 4.8)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_0743"]
-size = Vector3(5.3185, 0.84, 4.8)
+size = Vector3(6.281, 0.84, 4.8)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_0746"]
-size = Vector3(6.656, 0.46, 4.8)
+size = Vector3(6.281, 0.84, 4.8)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_0753"]
-size = Vector3(6.286, 0.46, 4.8)
+[sub_resource type="BoxShape3D" id="BoxShape3D_0749"]
+size = Vector3(5.6911, 0.84, 4.8)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_0756"]
-size = Vector3(5.206, 0.46, 4.8)
+[sub_resource type="BoxShape3D" id="BoxShape3D_0752"]
+size = Vector3(2.876, 0.84, 4.8)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_0762"]
-size = Vector3(4.006, 0.84, 4.8)
+[sub_resource type="BoxShape3D" id="BoxShape3D_0755"]
+size = Vector3(5.256, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0758"]
+size = Vector3(4.5519, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0761"]
+size = Vector3(0.956, 0.84, 4.8)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_0765"]
+size = Vector3(0.79, 25.435, 4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0768"]
+size = Vector3(0.79, 13.44, 4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0775"]
+size = Vector3(0.79, 2.5, 4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0782"]
 size = Vector3(4.006, 0.84, 4.8)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_0788"]
-size = Vector3(7.006, 0.84, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0791"]
+[sub_resource type="BoxShape3D" id="BoxShape3D_0785"]
 size = Vector3(4.006, 0.84, 4.8)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_0794"]
-size = Vector3(17.168, 0.84, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0797"]
-size = Vector3(2.006, 0.84, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0800"]
-size = Vector3(7.706, 0.46, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0803"]
-size = Vector3(6.356, 0.46, 4.8)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0806"]
-size = Vector3(0.79, 2.1, 4)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0813"]
+[sub_resource type="BoxShape3D" id="BoxShape3D_0789"]
 size = Vector3(4.006, 0.84, 4.8)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_0816"]
+[sub_resource type="BoxShape3D" id="BoxShape3D_0792"]
 size = Vector3(4.006, 0.84, 4.8)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_0836"]
-size = Vector3(5.006, 0.84, 4.8)
+size = Vector3(1.406, 0.84, 4.8)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_0839"]
-size = Vector3(5.006, 0.84, 4.8)
+size = Vector3(2.2511, 0.84, 4.8)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_0878"]
-size = Vector3(6.006, 0.46, 4.8)
+[sub_resource type="BoxShape3D" id="BoxShape3D_0842"]
+size = Vector3(1.406, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0845"]
+size = Vector3(2.431, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0848"]
+size = Vector3(5.3185, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0851"]
+size = Vector3(5.3185, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0854"]
+size = Vector3(3.881, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0857"]
+size = Vector3(3.881, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0860"]
+size = Vector3(5.3185, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0863"]
+size = Vector3(5.3185, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0866"]
+size = Vector3(6.656, 0.46, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0873"]
+size = Vector3(6.286, 0.46, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0876"]
+size = Vector3(5.206, 0.46, 4.8)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_0882"]
+size = Vector3(4.006, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0885"]
+size = Vector3(4.006, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0908"]
+size = Vector3(5.606, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0911"]
+size = Vector3(2.606, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0914"]
+size = Vector3(2.6564, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0917"]
+size = Vector3(4.706, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0920"]
+size = Vector3(4.706, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0923"]
+size = Vector3(2.1253, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0926"]
+size = Vector3(1.806, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0929"]
+size = Vector3(2.5928, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0932"]
+size = Vector3(4.706, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0935"]
+size = Vector3(4.706, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0938"]
+size = Vector3(0.79, 15.55, 4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0941"]
+size = Vector3(6.806, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0944"]
+size = Vector3(6.806, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0947"]
+size = Vector3(6.806, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0950"]
+size = Vector3(6.806, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0953"]
+size = Vector3(6.806, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0956"]
+size = Vector3(6.806, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0959"]
+size = Vector3(0.79, 7.4, 4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0962"]
+size = Vector3(0.79, 6.6, 4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0965"]
+size = Vector3(5.99, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0968"]
+size = Vector3(5.99, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0972"]
+size = Vector3(5.092, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0975"]
+size = Vector3(5.092, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0979"]
+size = Vector3(6.2727, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0982"]
+size = Vector3(6.2727, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0985"]
+size = Vector3(6.2727, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0988"]
+size = Vector3(6.2727, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0991"]
+size = Vector3(6.2727, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0994"]
+size = Vector3(6.2727, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0998"]
+size = Vector3(19.879, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_1028"]
+size = Vector3(7.006, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_1031"]
+size = Vector3(4.006, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_1034"]
+size = Vector3(3.006, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_1037"]
+size = Vector3(2.006, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_1041"]
+size = Vector3(3.506, 0.46, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_1044"]
+size = Vector3(3.506, 0.46, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_1047"]
+size = Vector3(0.79, 2.1, 4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_1054"]
+size = Vector3(4.006, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_1057"]
+size = Vector3(4.006, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_1072"]
+size = Vector3(5.006, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_1075"]
+size = Vector3(5.006, 0.84, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_1114"]
+size = Vector3(6.006, 0.46, 4.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_1118"]
 size = Vector3(7.006, 0.46, 4.8)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_0886"]
+[sub_resource type="BoxShape3D" id="BoxShape3D_1122"]
 size = Vector3(7.006, 0.46, 4.8)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_0891"]
+[sub_resource type="BoxShape3D" id="BoxShape3D_1127"]
 size = Vector3(0.79, 11, 4)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_0894"]
+[sub_resource type="BoxShape3D" id="BoxShape3D_1130"]
 size = Vector3(0.79, 3.82, 4)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_0897"]
+[sub_resource type="BoxShape3D" id="BoxShape3D_1133"]
 size = Vector3(0.79, 3.82, 4)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_0900"]
+[sub_resource type="BoxShape3D" id="BoxShape3D_1136"]
 size = Vector3(0.79, 3.82, 4)
 
 [node name="OmegaChimeraSector" type="Node3D"]
@@ -676,7 +886,7 @@ shape = SubResource("Checkpoint")
 position = Vector3(0, 0, -0.72)
 
 [node name="ForgeHallCheckpoint" type="Area3D" parent="TERRAIN"]
-position = Vector3(566.9, 0.8, 0)
+position = Vector3(616.18, 0.8, 0)
 collision_layer = 0
 script = ExtResource("factory_checkpoint")
 
@@ -688,17 +898,17 @@ shape = SubResource("Checkpoint")
 position = Vector3(0, 0, -0.72)
 
 [node name="HallFullHeal" parent="TERRAIN" instance=ExtResource("health_large")]
-position = Vector3(564.6, 1.25, 0)
+position = Vector3(613.88, 1.25, 0)
 full_heal = true
 
 [node name="ArenaUnifiedFloor" type="StaticBody3D" parent="."]
-position = Vector3(589.05, 0.61, 0)
+position = Vector3(638.33, 0.61, 0)
 
 [node name="Collider" type="CollisionShape3D" parent="ArenaUnifiedFloor"]
 shape = SubResource("ArenaFloor")
 
 [node name="ForgeHallDoor" type="Node3D" parent="."]
-position = Vector3(561.15, 0.8, 0)
+position = Vector3(610.43, 0.8, 0)
 script = ExtResource("forge_safe_hall")
 
 [node name="Door" parent="ForgeHallDoor" instance=ExtResource("gate")]
@@ -717,7 +927,7 @@ position = Vector3(0, 3.2, 0)
 shape = SubResource("GateBlocker")
 
 [node name="Gate" type="Node3D" parent="."]
-position = Vector3(569, 0.8, 0)
+position = Vector3(618.28, 0.8, 0)
 
 [node name="Door" parent="Gate" instance=ExtResource("gate")]
 rotation = Vector3(0, -1.5708, 0)
@@ -742,7 +952,7 @@ collision_layer = 0
 shape = SubResource("HallShield")
 
 [node name="ExitBarrier" type="StaticBody3D" parent="."]
-position = Vector3(615, 0.8, 0)
+position = Vector3(664.28, 0.8, 0)
 
 [node name="Seal" parent="ExitBarrier" instance=ExtResource("gate")]
 rotation = Vector3(0, -1.5708, 0)
@@ -753,15 +963,15 @@ position = Vector3(0, 3.2, 0)
 shape = SubResource("GateBlocker")
 
 [node name="ArenaMachine0" parent="DECOR" instance=ExtResource("relay")]
-position = Vector3(576, 0.8, -3)
+position = Vector3(625.28, 0.8, -3)
 scale = Vector3(1.6, 2.15, 1.4)
 
 [node name="ArenaMachine1" parent="DECOR" instance=ExtResource("relay")]
-position = Vector3(591, 0.8, -3)
+position = Vector3(640.28, 0.8, -3)
 scale = Vector3(1.6, 2.31, 1.4)
 
 [node name="ArenaMachine2" parent="DECOR" instance=ExtResource("relay")]
-position = Vector3(606, 0.8, -3)
+position = Vector3(655.28, 0.8, -3)
 scale = Vector3(1.6, 2.47, 1.4)
 
 [node name="MARKERS" type="Node3D" parent="."]
@@ -770,11 +980,11 @@ scale = Vector3(1.6, 2.47, 1.4)
 position = Vector3(0, 0.905, 0)
 
 [node name="RoomExit" type="Marker3D" parent="MARKERS"]
-position = Vector3(616.04, 1.65, 0)
+position = Vector3(665.32, 1.65, 0)
 
 [node name="CameraBounds" type="Node3D" parent="MARKERS"]
 metadata/min_x = 0.0
-metadata/max_x = 616.04
+metadata/max_x = 665.3225
 
 [node name="DeploymentPad" parent="MARKERS/PlayerSpawn" instance=ExtResource("deployment_pad")]
 position = Vector3(0, -0.905, 0)
@@ -789,77 +999,77 @@ position = Vector3(0, 0.905, 0)
 pit_floor_y = -22.0
 
 [node name="OmegaChimera" parent="Actors" instance=ExtResource("boss")]
-position = Vector3(593.38, 2.35, 0)
+position = Vector3(642.66, 2.35, 0)
 
 [node name="CultureScout00" parent="Actors" groups=["level_enemies"] instance=ExtResource("scout")]
 position = Vector3(34.75, -0.7, 0)
-patrol_right_limit = 556.000
+patrol_right_limit = 605.282
 detachment_sector = 7
 patrol_model = -1
 
 [node name="MutationCrawler01" parent="Actors" groups=["level_enemies"] instance=ExtResource("heavy")]
-position = Vector3(46, -0.7, 0)
-patrol_right_limit = 556.000
+position = Vector3(61, 2.65, 0)
+patrol_right_limit = 605.282
 detachment_sector = 7
 patrol_model = -1
 
 [node name="QuarantineBrute02" parent="Actors" groups=["level_enemies"] instance=ExtResource("turret")]
 position = Vector3(83.365, 2.65, 0)
-patrol_right_limit = 556.000
+patrol_right_limit = 605.282
 detachment_sector = 7
 patrol_model = -1
 
 [node name="DoseSentry03" parent="Actors" groups=["level_enemies"] instance=ExtResource("flyer")]
 position = Vector3(158.91, -0.16, 0)
-patrol_right_limit = 556.000
+patrol_right_limit = 605.282
 detachment_sector = 7
 patrol_model = -1
 
 [node name="SpliceDrone04" parent="Actors" groups=["level_enemies"] instance=ExtResource("heavy")]
-position = Vector3(190, -0.7, 0)
-patrol_right_limit = 556.000
+position = Vector3(241, 5.45, 0)
+patrol_right_limit = 605.282
 detachment_sector = 7
 patrol_model = 1
 
 [node name="CultureScout05" parent="Actors" groups=["level_enemies"] instance=ExtResource("turret")]
-position = Vector3(269.15, 21.6, 0)
-patrol_right_limit = 556.000
+position = Vector3(308, 5.45, 0)
+patrol_right_limit = 605.282
 detachment_sector = 7
 patrol_model = 2
 
 [node name="MutationCrawler06" parent="Actors" groups=["level_enemies"] instance=ExtResource("flyer")]
 position = Vector3(321, 5.45, 0)
-patrol_right_limit = 556.000
+patrol_right_limit = 605.282
 detachment_sector = 7
 patrol_model = 3
 
 [node name="QuarantineBrute07" parent="Actors" groups=["level_enemies"] instance=ExtResource("scout")]
 position = Vector3(346.07, 5.83, 0)
-patrol_right_limit = 556.000
+patrol_right_limit = 605.282
 detachment_sector = 7
 patrol_model = 4
 
 [node name="DoseSentry08" parent="Actors" groups=["level_enemies"] instance=ExtResource("turret")]
-position = Vector3(393, 9.35, 0)
-patrol_right_limit = 556.000
+position = Vector3(426.87, 9.35, 0)
+patrol_right_limit = 605.282
 detachment_sector = 7
 patrol_model = 5
 
 [node name="SpliceDrone09" parent="Actors" groups=["level_enemies"] instance=ExtResource("flyer")]
 position = Vector3(446.4, -8, 0)
-patrol_right_limit = 556.000
+patrol_right_limit = 605.282
 detachment_sector = 7
 patrol_model = 0
 
 [node name="Escort3" parent="Actors" groups=["level_enemies"] instance=ExtResource("scout")]
-position = Vector3(473, 4.1, 0)
-patrol_right_limit = 556.000
+position = Vector3(516, 4.1, 0)
+patrol_right_limit = 605.282
 detachment_sector = 7
 patrol_model = 1
 
 [node name="Escort12" parent="Actors" groups=["level_enemies"] instance=ExtResource("heavy")]
-position = Vector3(516, 4.1, 0)
-patrol_right_limit = 556.000
+position = Vector3(532.5, 4.1, 0)
+patrol_right_limit = 605.282
 detachment_sector = 7
 patrol_model = -1
 
@@ -926,13 +1136,13 @@ position = Vector3(0, -0.42, 0)
 shape = SubResource("BoxShape3D_0013")
 
 [node name="ExteriorSpikes" type="Area3D" parent="TERRAIN/Room01_Fall"]
-position = Vector3(15.93, -4.3, 0)
+position = Vector3(16.35, -4.3, 0)
 script = ExtResource("RCPit")
-width = 4.199999999999999
+width = 5.039999999999999
 tint = Color(1.0, 0.3843, 0.7137, 1)
 
 [node name="EaveStep" type="StaticBody3D" parent="TERRAIN/Room01_Fall"]
-position = Vector3(21.03, -0.9, 0)
+position = Vector3(21.87, -0.9, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
@@ -944,12 +1154,12 @@ position = Vector3(0, -0.42, 0)
 shape = SubResource("BoxShape3D_0017")
 
 [node name="EaveLowerStep" type="StaticBody3D" parent="TERRAIN/Room01_Fall"]
-position = Vector3(29.215, -1.65, 0)
+position = Vector3(29.635, -1.65, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
 [node name="Art" parent="TERRAIN/Room01_Fall/EaveLowerStep" instance=ExtResource("RCDeck")]
-scale = Vector3(1.2617, 1, 1)
+scale = Vector3(1.1217, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room01_Fall/EaveLowerStep"]
 position = Vector3(0, -0.42, 0)
@@ -1025,17 +1235,53 @@ position = Vector3(0, 0, 0)
 metadata/entry_x = 41
 metadata/entry_y = -1.65
 
-[node name="Entry00" type="StaticBody3D" parent="TERRAIN/Room02_Junction"]
-position = Vector3(44.5, -1.65, 0)
+[node name="Entry" type="StaticBody3D" parent="TERRAIN/Room02_Junction"]
+position = Vector3(41.7, -1.65, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
-[node name="Art" parent="TERRAIN/Room02_Junction/Entry00" instance=ExtResource("RCDeck")]
-scale = Vector3(1.1667, 1, 1)
+[node name="Art" parent="TERRAIN/Room02_Junction/Entry" instance=ExtResource("RCDeck")]
+scale = Vector3(0.23333, 1, 1)
 
-[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room02_Junction/Entry00"]
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room02_Junction/Entry"]
 position = Vector3(0, -0.42, 0)
 shape = SubResource("BoxShape3D_0040")
+
+[node name="RoomSillIn" type="StaticBody3D" parent="TERRAIN/Room02_Junction"]
+position = Vector3(43.4, -1.92, 0)
+rotation = Vector3(0, 0, -0.26371)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/Room02_Junction/RoomSillIn" instance=ExtResource("RCDeck")]
+scale = Vector3(0.34527, 1, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room02_Junction/RoomSillIn"]
+position = Vector3(0, -0.42, 0)
+shape = SubResource("BoxShape3D_0043")
+
+[node name="RoomSill" type="StaticBody3D" parent="TERRAIN/Room02_Junction"]
+position = Vector3(45.1, -2.19, 0)
+rotation = Vector3(0, 0, 0)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/Room02_Junction/RoomSill" instance=ExtResource("RCDeck")]
+scale = Vector3(0.23333, 1, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room02_Junction/RoomSill"]
+position = Vector3(0, -0.42, 0)
+shape = SubResource("BoxShape3D_0046")
+
+[node name="RoomSillOut" type="StaticBody3D" parent="TERRAIN/Room02_Junction"]
+position = Vector3(46.9, -1.92, 0)
+rotation = Vector3(0, 0, 0.2407)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/Room02_Junction/RoomSillOut" instance=ExtResource("RCDeck")]
+scale = Vector3(0.37755, 1, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room02_Junction/RoomSillOut"]
+position = Vector3(0, -0.42, 0)
+shape = SubResource("BoxShape3D_0049")
 
 [node name="ForkApron00" type="StaticBody3D" parent="TERRAIN/Room02_Junction"]
 position = Vector3(50.5, -1.65, 0)
@@ -1047,19 +1293,19 @@ scale = Vector3(0.83333, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room02_Junction/ForkApron00"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0043")
+shape = SubResource("BoxShape3D_0052")
 
 [node name="MiddleStep" type="StaticBody3D" parent="TERRAIN/Room02_Junction" groups=["factory_drop_through"]]
-position = Vector3(52.85, 0.2, 0)
+position = Vector3(53.25, 0.65, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
 [node name="Art" parent="TERRAIN/Room02_Junction/MiddleStep" instance=ExtResource("RCDeck")]
-scale = Vector3(0.95, 0.54762, 1)
+scale = Vector3(0.81667, 0.54762, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room02_Junction/MiddleStep"]
 position = Vector3(0, -0.23, 0)
-shape = SubResource("BoxShape3D_0046")
+shape = SubResource("BoxShape3D_0055")
 
 [node name="MiddleWest00" type="StaticBody3D" parent="TERRAIN/Room02_Junction" groups=["factory_drop_through"]]
 position = Vector3(59.5, 1.7, 0)
@@ -1071,7 +1317,7 @@ scale = Vector3(0.76667, 0.54762, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room02_Junction/MiddleWest00"]
 position = Vector3(0, -0.23, 0)
-shape = SubResource("BoxShape3D_0049")
+shape = SubResource("BoxShape3D_0058")
 
 [node name="MiddleWest01" type="StaticBody3D" parent="TERRAIN/Room02_Junction" groups=["factory_drop_through"]]
 position = Vector3(64.1, 1.7, 0)
@@ -1083,7 +1329,7 @@ scale = Vector3(0.76667, 0.54762, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room02_Junction/MiddleWest01"]
 position = Vector3(0, -0.23, 0)
-shape = SubResource("BoxShape3D_0052")
+shape = SubResource("BoxShape3D_0061")
 
 [node name="MiddleAfterHoist00" type="StaticBody3D" parent="TERRAIN/Room02_Junction" groups=["factory_drop_through"]]
 position = Vector3(71.667, 1.7, 0)
@@ -1095,7 +1341,7 @@ scale = Vector3(0.28917, 0.54762, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room02_Junction/MiddleAfterHoist00"]
 position = Vector3(0, -0.23, 0)
-shape = SubResource("BoxShape3D_0055")
+shape = SubResource("BoxShape3D_0064")
 
 [node name="MiddleEast00" type="StaticBody3D" parent="TERRAIN/Room02_Junction" groups=["factory_drop_through"]]
 position = Vector3(84.765, 1.7, 0)
@@ -1107,7 +1353,7 @@ scale = Vector3(0.96667, 0.54762, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room02_Junction/MiddleEast00"]
 position = Vector3(0, -0.23, 0)
-shape = SubResource("BoxShape3D_0058")
+shape = SubResource("BoxShape3D_0067")
 
 [node name="CompactApproach" type="StaticBody3D" parent="TERRAIN/Room02_Junction"]
 position = Vector3(90.532, 1.7, 0)
@@ -1119,7 +1365,7 @@ scale = Vector3(0.95567, 0.54762, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room02_Junction/CompactApproach"]
 position = Vector3(0, -0.23, 0)
-shape = SubResource("BoxShape3D_0061")
+shape = SubResource("BoxShape3D_0070")
 
 [node name="CompactTransfer" type="StaticBody3D" parent="TERRAIN/Room02_Junction"]
 position = Vector3(96.051, 1.225, 0)
@@ -1131,7 +1377,7 @@ scale = Vector3(0.89806, 0.54762, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room02_Junction/CompactTransfer"]
 position = Vector3(0, -0.23, 0)
-shape = SubResource("BoxShape3D_0064")
+shape = SubResource("BoxShape3D_0073")
 
 [node name="CompactMerge" type="StaticBody3D" parent="TERRAIN/Room02_Junction"]
 position = Vector3(100.35, 1.225, 0)
@@ -1143,19 +1389,7 @@ scale = Vector3(0.57186, 0.54762, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room02_Junction/CompactMerge"]
 position = Vector3(0, -0.23, 0)
-shape = SubResource("BoxShape3D_0067")
-
-[node name="MiddleMerge" type="StaticBody3D" parent="TERRAIN/Room02_Junction" groups=["factory_drop_through"]]
-position = Vector3(103.62, 0.565, 0)
-rotation = Vector3(0, 0, -0.60969)
-collision_layer = 1
-
-[node name="Art" parent="TERRAIN/Room02_Junction/MiddleMerge" instance=ExtResource("RCDeck")]
-scale = Vector3(0.66071, 0.54762, 1)
-
-[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room02_Junction/MiddleMerge"]
-position = Vector3(0, -0.23, 0)
-shape = SubResource("BoxShape3D_0070")
+shape = SubResource("BoxShape3D_0076")
 
 [node name="BalconyHoist" type="AnimatableBody3D" parent="TERRAIN/Room02_Junction"]
 position = Vector3(68.6, 1.7, 0)
@@ -1167,7 +1401,7 @@ scale = Vector3(0.73333, 0.54762, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room02_Junction/BalconyHoist"]
 position = Vector3(0, -0.23, 0)
-shape = SubResource("BoxShape3D_0073")
+shape = SubResource("BoxShape3D_0079")
 
 [node name="BalconyHoistRelay" type="StaticBody3D" parent="TERRAIN/Room02_Junction" groups=["factory_shot_relay"]]
 position = Vector3(65.6, 2.7, 0)
@@ -1179,6 +1413,7 @@ travel = Vector3(0, 4.85, 0)
 operation = "SPECIMEN HOIST"
 lift = true
 repeat_hold = 6.5
+departure_delay = 1.15
 
 [node name="Casing" parent="TERRAIN/Room02_Junction/BalconyHoistRelay" instance=ExtResource("RCDoorRelay")]
 position = Vector3(0, -0.26, 0)
@@ -1191,64 +1426,88 @@ position = Vector3(0, 0, 0.26)
 mesh = SubResource("RCRelayLamp")
 
 [node name="UpperBalcony00" type="StaticBody3D" parent="TERRAIN/Room02_Junction" groups=["factory_drop_through"]]
-position = Vector3(75.375, 6.55, 0)
+position = Vector3(74.463, 6.55, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
 [node name="Art" parent="TERRAIN/Room02_Junction/UpperBalcony00" instance=ExtResource("RCDeck")]
-scale = Vector3(1.125, 0.54762, 1)
+scale = Vector3(0.82083, 0.54762, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room02_Junction/UpperBalcony00"]
 position = Vector3(0, -0.23, 0)
-shape = SubResource("BoxShape3D_0080")
+shape = SubResource("BoxShape3D_0086")
 
 [node name="UpperBalcony01" type="StaticBody3D" parent="TERRAIN/Room02_Junction" groups=["factory_drop_through"]]
-position = Vector3(82.125, 6.55, 0)
+position = Vector3(79.387, 6.55, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
 [node name="Art" parent="TERRAIN/Room02_Junction/UpperBalcony01" instance=ExtResource("RCDeck")]
-scale = Vector3(1.125, 0.54762, 1)
+scale = Vector3(0.82083, 0.54762, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room02_Junction/UpperBalcony01"]
 position = Vector3(0, -0.23, 0)
-shape = SubResource("BoxShape3D_0083")
-
-[node name="UpperBalcony02" type="StaticBody3D" parent="TERRAIN/Room02_Junction" groups=["factory_drop_through"]]
-position = Vector3(88.875, 6.55, 0)
-rotation = Vector3(0, 0, 0)
-collision_layer = 1
-
-[node name="Art" parent="TERRAIN/Room02_Junction/UpperBalcony02" instance=ExtResource("RCDeck")]
-scale = Vector3(1.125, 0.54762, 1)
-
-[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room02_Junction/UpperBalcony02"]
-position = Vector3(0, -0.23, 0)
-shape = SubResource("BoxShape3D_0086")
-
-[node name="UpperBalcony03" type="StaticBody3D" parent="TERRAIN/Room02_Junction" groups=["factory_drop_through"]]
-position = Vector3(95.625, 6.55, 0)
-rotation = Vector3(0, 0, 0)
-collision_layer = 1
-
-[node name="Art" parent="TERRAIN/Room02_Junction/UpperBalcony03" instance=ExtResource("RCDeck")]
-scale = Vector3(1.125, 0.54762, 1)
-
-[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room02_Junction/UpperBalcony03"]
-position = Vector3(0, -0.23, 0)
 shape = SubResource("BoxShape3D_0089")
 
-[node name="BalconyExit" type="StaticBody3D" parent="TERRAIN/Room02_Junction" groups=["factory_drop_through"]]
-position = Vector3(103.5, 3.25, 0)
+[node name="UpperBalconyGradeIn0" type="StaticBody3D" parent="TERRAIN/Room02_Junction" groups=["factory_drop_through"]]
+position = Vector3(83.375, 7.11, 0)
+rotation = Vector3(0, 0, 0.35193)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/Room02_Junction/UpperBalconyGradeIn0" instance=ExtResource("RCDeck")]
+scale = Vector3(0.54152, 0.54762, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room02_Junction/UpperBalconyGradeIn0"]
+position = Vector3(0, -0.23, 0)
+shape = SubResource("BoxShape3D_0092")
+
+[node name="UpperBalconyBench000" type="StaticBody3D" parent="TERRAIN/Room02_Junction" groups=["factory_drop_through"]]
+position = Vector3(85.925, 7.67, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
-[node name="Art" parent="TERRAIN/Room02_Junction/BalconyExit" instance=ExtResource("RCDeck")]
-scale = Vector3(0.83333, 0.54762, 1)
+[node name="Art" parent="TERRAIN/Room02_Junction/UpperBalconyBench000" instance=ExtResource("RCDeck")]
+scale = Vector3(0.34167, 0.54762, 1)
 
-[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room02_Junction/BalconyExit"]
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room02_Junction/UpperBalconyBench000"]
 position = Vector3(0, -0.23, 0)
-shape = SubResource("BoxShape3D_0092")
+shape = SubResource("BoxShape3D_0095")
+
+[node name="UpperBalconyGradeOut0" type="StaticBody3D" parent="TERRAIN/Room02_Junction" groups=["factory_drop_through"]]
+position = Vector3(88.05, 7.11, 0)
+rotation = Vector3(0, 0, -0.47089)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/Room02_Junction/UpperBalconyGradeOut0" instance=ExtResource("RCDeck")]
+scale = Vector3(0.41145, 0.54762, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room02_Junction/UpperBalconyGradeOut0"]
+position = Vector3(0, -0.23, 0)
+shape = SubResource("BoxShape3D_0098")
+
+[node name="UpperBalconyRejoin00" type="StaticBody3D" parent="TERRAIN/Room02_Junction" groups=["factory_drop_through"]]
+position = Vector3(91.613, 6.55, 0)
+rotation = Vector3(0, 0, 0)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/Room02_Junction/UpperBalconyRejoin00" instance=ExtResource("RCDeck")]
+scale = Vector3(0.82083, 0.54762, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room02_Junction/UpperBalconyRejoin00"]
+position = Vector3(0, -0.23, 0)
+shape = SubResource("BoxShape3D_0101")
+
+[node name="UpperBalconyRejoin01" type="StaticBody3D" parent="TERRAIN/Room02_Junction" groups=["factory_drop_through"]]
+position = Vector3(96.537, 6.55, 0)
+rotation = Vector3(0, 0, 0)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/Room02_Junction/UpperBalconyRejoin01" instance=ExtResource("RCDeck")]
+scale = Vector3(0.82083, 0.54762, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room02_Junction/UpperBalconyRejoin01"]
+position = Vector3(0, -0.23, 0)
+shape = SubResource("BoxShape3D_0104")
 
 [node name="InteriorCache01" type="Area3D" parent="TERRAIN" groups=["factory_salvage_chest"]]
 position = Vector3(97, 6.55, 0)
@@ -1277,7 +1536,7 @@ scale = Vector3(1.0349, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room02_Junction/LowerDown"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0098")
+shape = SubResource("BoxShape3D_0110")
 
 [node name="LowerWest00" type="StaticBody3D" parent="TERRAIN/Room02_Junction"]
 position = Vector3(61.593, -3.25, 0)
@@ -1289,7 +1548,7 @@ scale = Vector3(0.86444, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room02_Junction/LowerWest00"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0101")
+shape = SubResource("BoxShape3D_0113")
 
 [node name="LowerWest01" type="StaticBody3D" parent="TERRAIN/Room02_Junction"]
 position = Vector3(66.78, -3.25, 0)
@@ -1301,7 +1560,7 @@ scale = Vector3(0.86444, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room02_Junction/LowerWest01"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0104")
+shape = SubResource("BoxShape3D_0116")
 
 [node name="LowerWest02" type="StaticBody3D" parent="TERRAIN/Room02_Junction"]
 position = Vector3(71.967, -3.25, 0)
@@ -1313,43 +1572,67 @@ scale = Vector3(0.86444, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room02_Junction/LowerWest02"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0107")
+shape = SubResource("BoxShape3D_0119")
 
 [node name="LowerEast00" type="StaticBody3D" parent="TERRAIN/Room02_Junction"]
-position = Vector3(83.2, -3.25, 0)
+position = Vector3(83.18, -3.25, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
 [node name="Art" parent="TERRAIN/Room02_Junction/LowerEast00" instance=ExtResource("RCDeck")]
-scale = Vector3(1.12, 1, 1)
+scale = Vector3(1.1133, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room02_Junction/LowerEast00"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0110")
+shape = SubResource("BoxShape3D_0122")
 
-[node name="LowerEast01" type="StaticBody3D" parent="TERRAIN/Room02_Junction"]
-position = Vector3(89.92, -3.25, 0)
+[node name="LowerEastGradeIn0" type="StaticBody3D" parent="TERRAIN/Room02_Junction"]
+position = Vector3(87.92, -3.575, 0)
+rotation = Vector3(0, 0, -0.2281)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/Room02_Junction/LowerEastGradeIn0" instance=ExtResource("RCDeck")]
+scale = Vector3(0.47908, 1, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room02_Junction/LowerEastGradeIn0"]
+position = Vector3(0, -0.42, 0)
+shape = SubResource("BoxShape3D_0125")
+
+[node name="LowerEastBench000" type="StaticBody3D" parent="TERRAIN/Room02_Junction"]
+position = Vector3(89.945, -3.9, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
-[node name="Art" parent="TERRAIN/Room02_Junction/LowerEast01" instance=ExtResource("RCDeck")]
-scale = Vector3(1.12, 1, 1)
+[node name="Art" parent="TERRAIN/Room02_Junction/LowerEastBench000" instance=ExtResource("RCDeck")]
+scale = Vector3(0.20833, 1, 1)
 
-[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room02_Junction/LowerEast01"]
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room02_Junction/LowerEastBench000"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0113")
+shape = SubResource("BoxShape3D_0128")
 
-[node name="LowerEast02" type="StaticBody3D" parent="TERRAIN/Room02_Junction"]
-position = Vector3(96.64, -3.25, 0)
+[node name="LowerEastGradeOut0" type="StaticBody3D" parent="TERRAIN/Room02_Junction"]
+position = Vector3(91.945, -3.575, 0)
+rotation = Vector3(0, 0, 0.2321)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/Room02_Junction/LowerEastGradeOut0" instance=ExtResource("RCDeck")]
+scale = Vector3(0.47096, 1, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room02_Junction/LowerEastGradeOut0"]
+position = Vector3(0, -0.42, 0)
+shape = SubResource("BoxShape3D_0131")
+
+[node name="LowerEastRejoin00" type="StaticBody3D" parent="TERRAIN/Room02_Junction"]
+position = Vector3(96.66, -3.25, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
-[node name="Art" parent="TERRAIN/Room02_Junction/LowerEast02" instance=ExtResource("RCDeck")]
-scale = Vector3(1.12, 1, 1)
+[node name="Art" parent="TERRAIN/Room02_Junction/LowerEastRejoin00" instance=ExtResource("RCDeck")]
+scale = Vector3(1.1133, 1, 1)
 
-[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room02_Junction/LowerEast02"]
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room02_Junction/LowerEastRejoin00"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0116")
+shape = SubResource("BoxShape3D_0134")
 
 [node name="LowerRouteSpikes" type="Area3D" parent="TERRAIN/Room02_Junction"]
 position = Vector3(77.2, -6.15, 0)
@@ -1367,7 +1650,7 @@ scale = Vector3(1.0349, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room02_Junction/LowerUp"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0120")
+shape = SubResource("BoxShape3D_0138")
 
 [node name="LowerField" type="Area3D" parent="TERRAIN/Room02_Junction"]
 position = Vector3(69.06, -1.95, 0)
@@ -1377,6 +1660,7 @@ tint = Color(1.0, 0.3843, 0.7137, 1)
 offset = 2.15
 period = 4.96
 terrain_strength = 1.0
+crossing_window_scale = 1.0
 power = 23
 direction = -1
 burnable_spore_pod = false
@@ -1392,7 +1676,7 @@ scale = Vector3(0.66667, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room02_Junction/MergeApron00"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0124")
+shape = SubResource("BoxShape3D_0142")
 
 [node name="MergeApron01" type="StaticBody3D" parent="TERRAIN/Room02_Junction"]
 position = Vector3(112, -1.65, 0)
@@ -1404,7 +1688,7 @@ scale = Vector3(0.66667, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room02_Junction/MergeApron01"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0127")
+shape = SubResource("BoxShape3D_0145")
 
 [node name="MergeField" type="Area3D" parent="TERRAIN/Room02_Junction"]
 position = Vector3(113.2, -0.35, 0)
@@ -1414,6 +1698,7 @@ tint = Color(1.0, 0.3843, 0.7137, 1)
 offset = 2.15
 period = 4.96
 terrain_strength = 1.0
+crossing_window_scale = 1.0
 power = 23
 direction = -1
 burnable_spore_pod = false
@@ -1429,7 +1714,7 @@ scale = Vector3(0.66667, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room02_Junction/Exit00"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0131")
+shape = SubResource("BoxShape3D_0149")
 
 [node name="Exit01" type="StaticBody3D" parent="TERRAIN/Room02_Junction"]
 position = Vector3(120, -1.65, 0)
@@ -1441,7 +1726,7 @@ scale = Vector3(0.66667, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room02_Junction/Exit01"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0134")
+shape = SubResource("BoxShape3D_0152")
 
 [node name="InteriorCladding_8" type="Node3D" parent="TERRAIN/Room02_Junction"]
 
@@ -1594,7 +1879,7 @@ scale = Vector3(0.35833, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room03_Loop/EntryTakeoff"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0171")
+shape = SubResource("BoxShape3D_0189")
 
 [node name="EntrySpikes" type="Area3D" parent="TERRAIN/Room03_Loop"]
 position = Vector3(126.35, -4.5, 0)
@@ -1612,7 +1897,7 @@ scale = Vector3(0.075, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room03_Loop/EntryLanding"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0175")
+shape = SubResource("BoxShape3D_0193")
 
 [node name="DescentUnderBalcony" type="StaticBody3D" parent="TERRAIN/Room03_Loop"]
 position = Vector3(131.9, -2.9, 0)
@@ -1624,7 +1909,7 @@ scale = Vector3(1.0526, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room03_Loop/DescentUnderBalcony"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0178")
+shape = SubResource("BoxShape3D_0196")
 
 [node name="LowerGallery00" type="StaticBody3D" parent="TERRAIN/Room03_Loop"]
 position = Vector3(137.67, -4.15, 0)
@@ -1636,7 +1921,7 @@ scale = Vector3(0.95556, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room03_Loop/LowerGallery00"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0181")
+shape = SubResource("BoxShape3D_0199")
 
 [node name="LowerGallery01" type="StaticBody3D" parent="TERRAIN/Room03_Loop"]
 position = Vector3(143.4, -4.15, 0)
@@ -1648,7 +1933,7 @@ scale = Vector3(0.95556, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room03_Loop/LowerGallery01"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0184")
+shape = SubResource("BoxShape3D_0202")
 
 [node name="LowerGallery02" type="StaticBody3D" parent="TERRAIN/Room03_Loop"]
 position = Vector3(149.13, -4.15, 0)
@@ -1660,7 +1945,7 @@ scale = Vector3(0.95556, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room03_Loop/LowerGallery02"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0187")
+shape = SubResource("BoxShape3D_0205")
 
 [node name="GalleryCut" type="Area3D" parent="TERRAIN/Room03_Loop"]
 position = Vector3(154.45, -7.3, 0)
@@ -1678,7 +1963,7 @@ scale = Vector3(1.1325, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room03_Loop/LowerGalleryFar00"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0191")
+shape = SubResource("BoxShape3D_0209")
 
 [node name="LowerGalleryFar01" type="StaticBody3D" parent="TERRAIN/Room03_Loop"]
 position = Vector3(167.1, -3.01, 0)
@@ -1690,7 +1975,7 @@ scale = Vector3(1.1325, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room03_Loop/LowerGalleryFar01"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0194")
+shape = SubResource("BoxShape3D_0212")
 
 [node name="GalleryExitRamp" type="StaticBody3D" parent="TERRAIN/Room03_Loop"]
 position = Vector3(173.75, -2.33, 0)
@@ -1702,7 +1987,7 @@ scale = Vector3(1.1068, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room03_Loop/GalleryExitRamp"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0197")
+shape = SubResource("BoxShape3D_0215")
 
 [node name="EastBalcony" type="StaticBody3D" parent="TERRAIN/Room03_Loop" groups=["factory_drop_through"]]
 position = Vector3(173.57, 0.75, 0)
@@ -1714,67 +1999,91 @@ scale = Vector3(0.925, 0.54762, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room03_Loop/EastBalcony"]
 position = Vector3(0, -0.23, 0)
-shape = SubResource("BoxShape3D_0200")
+shape = SubResource("BoxShape3D_0218")
 
 [node name="WestboundBypass00" type="StaticBody3D" parent="TERRAIN/Room03_Loop" groups=["factory_drop_through"]]
-position = Vector3(135.68, 1.1, 0)
+position = Vector3(135.77, 1.1, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
 [node name="Art" parent="TERRAIN/Room03_Loop/WestboundBypass00" instance=ExtResource("RCDeck")]
-scale = Vector3(1.16, 0.54762, 1)
+scale = Vector3(1.1917, 0.54762, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room03_Loop/WestboundBypass00"]
 position = Vector3(0, -0.23, 0)
-shape = SubResource("BoxShape3D_0203")
+shape = SubResource("BoxShape3D_0221")
 
 [node name="WestboundBypass01" type="StaticBody3D" parent="TERRAIN/Room03_Loop" groups=["factory_drop_through"]]
-position = Vector3(142.64, 1.1, 0)
+position = Vector3(142.93, 1.1, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
 [node name="Art" parent="TERRAIN/Room03_Loop/WestboundBypass01" instance=ExtResource("RCDeck")]
-scale = Vector3(1.16, 0.54762, 1)
+scale = Vector3(1.1917, 0.54762, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room03_Loop/WestboundBypass01"]
 position = Vector3(0, -0.23, 0)
-shape = SubResource("BoxShape3D_0206")
+shape = SubResource("BoxShape3D_0224")
 
-[node name="WestboundBypass02" type="StaticBody3D" parent="TERRAIN/Room03_Loop" groups=["factory_drop_through"]]
-position = Vector3(149.6, 1.1, 0)
+[node name="WestboundBypassGradeIn0" type="StaticBody3D" parent="TERRAIN/Room03_Loop" groups=["factory_drop_through"]]
+position = Vector3(147.47, 1.515, 0)
+rotation = Vector3(0, 0, 0.40241)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/Room03_Loop/WestboundBypassGradeIn0" instance=ExtResource("RCDeck")]
+scale = Vector3(0.35322, 0.54762, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room03_Loop/WestboundBypassGradeIn0"]
+position = Vector3(0, -0.23, 0)
+shape = SubResource("BoxShape3D_0227")
+
+[node name="WestboundBypassBench000" type="StaticBody3D" parent="TERRAIN/Room03_Loop" groups=["factory_drop_through"]]
+position = Vector3(149.35, 1.93, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
-[node name="Art" parent="TERRAIN/Room03_Loop/WestboundBypass02" instance=ExtResource("RCDeck")]
-scale = Vector3(1.16, 0.54762, 1)
+[node name="Art" parent="TERRAIN/Room03_Loop/WestboundBypassBench000" instance=ExtResource("RCDeck")]
+scale = Vector3(0.3, 0.54762, 1)
 
-[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room03_Loop/WestboundBypass02"]
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room03_Loop/WestboundBypassBench000"]
 position = Vector3(0, -0.23, 0)
-shape = SubResource("BoxShape3D_0209")
+shape = SubResource("BoxShape3D_0230")
 
-[node name="WestboundBypass03" type="StaticBody3D" parent="TERRAIN/Room03_Loop" groups=["factory_drop_through"]]
-position = Vector3(156.56, 1.1, 0)
+[node name="WestboundBypassGradeOut0" type="StaticBody3D" parent="TERRAIN/Room03_Loop" groups=["factory_drop_through"]]
+position = Vector3(151.47, 1.515, 0)
+rotation = Vector3(0, 0, -0.32664)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/Room03_Loop/WestboundBypassGradeOut0" instance=ExtResource("RCDeck")]
+scale = Vector3(0.43113, 0.54762, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room03_Loop/WestboundBypassGradeOut0"]
+position = Vector3(0, -0.23, 0)
+shape = SubResource("BoxShape3D_0233")
+
+[node name="WestboundBypassRejoin00" type="StaticBody3D" parent="TERRAIN/Room03_Loop" groups=["factory_drop_through"]]
+position = Vector3(156.27, 1.1, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
-[node name="Art" parent="TERRAIN/Room03_Loop/WestboundBypass03" instance=ExtResource("RCDeck")]
-scale = Vector3(1.16, 0.54762, 1)
+[node name="Art" parent="TERRAIN/Room03_Loop/WestboundBypassRejoin00" instance=ExtResource("RCDeck")]
+scale = Vector3(1.1917, 0.54762, 1)
 
-[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room03_Loop/WestboundBypass03"]
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room03_Loop/WestboundBypassRejoin00"]
 position = Vector3(0, -0.23, 0)
-shape = SubResource("BoxShape3D_0212")
+shape = SubResource("BoxShape3D_0236")
 
-[node name="WestboundBypass04" type="StaticBody3D" parent="TERRAIN/Room03_Loop" groups=["factory_drop_through"]]
-position = Vector3(163.52, 1.1, 0)
+[node name="WestboundBypassRejoin01" type="StaticBody3D" parent="TERRAIN/Room03_Loop" groups=["factory_drop_through"]]
+position = Vector3(163.43, 1.1, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
-[node name="Art" parent="TERRAIN/Room03_Loop/WestboundBypass04" instance=ExtResource("RCDeck")]
-scale = Vector3(1.16, 0.54762, 1)
+[node name="Art" parent="TERRAIN/Room03_Loop/WestboundBypassRejoin01" instance=ExtResource("RCDeck")]
+scale = Vector3(1.1917, 0.54762, 1)
 
-[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room03_Loop/WestboundBypass04"]
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room03_Loop/WestboundBypassRejoin01"]
 position = Vector3(0, -0.23, 0)
-shape = SubResource("BoxShape3D_0215")
+shape = SubResource("BoxShape3D_0239")
 
 [node name="InteriorCache02" type="Area3D" parent="TERRAIN" groups=["factory_salvage_chest"]]
 position = Vector3(134.3, 1.1, 0)
@@ -1801,6 +2110,7 @@ tint = Color(1.0, 0.3843, 0.7137, 1)
 offset = 2.15
 period = 4.96
 terrain_strength = 1.0
+crossing_window_scale = 1.0
 power = 23
 direction = 1.0
 burnable_spore_pod = false
@@ -1816,7 +2126,7 @@ scale = Vector3(0.66667, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room03_Loop/Exit00"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0222")
+shape = SubResource("BoxShape3D_0246")
 
 [node name="Exit01" type="StaticBody3D" parent="TERRAIN/Room03_Loop"]
 position = Vector3(183, -1.65, 0)
@@ -1828,7 +2138,7 @@ scale = Vector3(0.66667, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room03_Loop/Exit01"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0225")
+shape = SubResource("BoxShape3D_0249")
 
 [node name="InteriorCladding_9" type="Node3D" parent="TERRAIN/Room03_Loop"]
 
@@ -1937,17 +2247,53 @@ position = Vector3(0, 0, 0)
 metadata/entry_x = 185
 metadata/entry_y = -1.65
 
-[node name="Entry00" type="StaticBody3D" parent="TERRAIN/Room04_Shaft"]
-position = Vector3(188.5, -1.65, 0)
+[node name="Entry" type="StaticBody3D" parent="TERRAIN/Room04_Shaft"]
+position = Vector3(185.7, -1.65, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
-[node name="Art" parent="TERRAIN/Room04_Shaft/Entry00" instance=ExtResource("RCDeck")]
-scale = Vector3(1.1667, 1, 1)
+[node name="Art" parent="TERRAIN/Room04_Shaft/Entry" instance=ExtResource("RCDeck")]
+scale = Vector3(0.23333, 1, 1)
 
-[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room04_Shaft/Entry00"]
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room04_Shaft/Entry"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0254")
+shape = SubResource("BoxShape3D_0278")
+
+[node name="RoomSillIn" type="StaticBody3D" parent="TERRAIN/Room04_Shaft"]
+position = Vector3(187.4, -1.3, 0)
+rotation = Vector3(0, 0, 0.33667)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/Room04_Shaft/RoomSillIn" instance=ExtResource("RCDeck")]
+scale = Vector3(0.35316, 1, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room04_Shaft/RoomSillIn"]
+position = Vector3(0, -0.42, 0)
+shape = SubResource("BoxShape3D_0281")
+
+[node name="RoomSill" type="StaticBody3D" parent="TERRAIN/Room04_Shaft"]
+position = Vector3(189.1, -0.95, 0)
+rotation = Vector3(0, 0, 0)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/Room04_Shaft/RoomSill" instance=ExtResource("RCDeck")]
+scale = Vector3(0.23333, 1, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room04_Shaft/RoomSill"]
+position = Vector3(0, -0.42, 0)
+shape = SubResource("BoxShape3D_0284")
+
+[node name="RoomSillOut" type="StaticBody3D" parent="TERRAIN/Room04_Shaft"]
+position = Vector3(190.9, -1.3, 0)
+rotation = Vector3(0, 0, -0.30805)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/Room04_Shaft/RoomSillOut" instance=ExtResource("RCDeck")]
+scale = Vector3(0.38478, 1, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room04_Shaft/RoomSillOut"]
+position = Vector3(0, -0.42, 0)
+shape = SubResource("BoxShape3D_0287")
 
 [node name="Approach00" type="StaticBody3D" parent="TERRAIN/Room04_Shaft"]
 position = Vector3(195.21, -1.65, 0)
@@ -1959,7 +2305,7 @@ scale = Vector3(1.07, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room04_Shaft/Approach00"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0257")
+shape = SubResource("BoxShape3D_0290")
 
 [node name="ShaftEntryRamp" type="StaticBody3D" parent="TERRAIN/Room04_Shaft" groups=["factory_drop_through"]]
 position = Vector3(199.5, -0.975, 0)
@@ -1971,7 +2317,7 @@ scale = Vector3(0.42453, 0.54762, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room04_Shaft/ShaftEntryRamp"]
 position = Vector3(0, -0.23, 0)
-shape = SubResource("BoxShape3D_0260")
+shape = SubResource("BoxShape3D_0293")
 
 [node name="ShaftFoot" type="StaticBody3D" parent="TERRAIN/Room04_Shaft" groups=["factory_drop_through"]]
 position = Vector3(201.09, -0.3, 0)
@@ -1983,7 +2329,7 @@ scale = Vector3(0.17083, 0.54762, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room04_Shaft/ShaftFoot"]
 position = Vector3(0, -0.23, 0)
-shape = SubResource("BoxShape3D_0263")
+shape = SubResource("BoxShape3D_0296")
 
 [node name="WestGrip" type="StaticBody3D" parent="TERRAIN/Room04_Shaft"]
 position = Vector3(198, 3.71, 0)
@@ -1995,7 +2341,7 @@ scale = Vector3(1, 1.5247, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room04_Shaft/WestGrip"]
 position = Vector3(0, 0, 0)
-shape = SubResource("BoxShape3D_0266")
+shape = SubResource("BoxShape3D_0299")
 
 [node name="EastGrip" type="StaticBody3D" parent="TERRAIN/Room04_Shaft"]
 position = Vector3(202, 1.425, 0)
@@ -2007,55 +2353,91 @@ scale = Vector3(1, 1.4471, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room04_Shaft/EastGrip"]
 position = Vector3(0, 0, 0)
-shape = SubResource("BoxShape3D_0269")
+shape = SubResource("BoxShape3D_0302")
 
 [node name="ExitLanding00" type="StaticBody3D" parent="TERRAIN/Room04_Shaft"]
-position = Vector3(205.23, 4.5, 0)
+position = Vector3(204.45, 4.5, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
 [node name="Art" parent="TERRAIN/Room04_Shaft/ExitLanding00" instance=ExtResource("RCDeck")]
-scale = Vector3(0.94167, 1, 1)
+scale = Vector3(0.68333, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room04_Shaft/ExitLanding00"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0272")
+shape = SubResource("BoxShape3D_0305")
 
 [node name="ExitLanding01" type="StaticBody3D" parent="TERRAIN/Room04_Shaft"]
-position = Vector3(210.88, 4.5, 0)
+position = Vector3(208.55, 4.5, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
 [node name="Art" parent="TERRAIN/Room04_Shaft/ExitLanding01" instance=ExtResource("RCDeck")]
-scale = Vector3(0.94167, 1, 1)
+scale = Vector3(0.68333, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room04_Shaft/ExitLanding01"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0275")
+shape = SubResource("BoxShape3D_0308")
 
-[node name="ExitLanding02" type="StaticBody3D" parent="TERRAIN/Room04_Shaft"]
-position = Vector3(216.52, 4.5, 0)
+[node name="ExitLandingGradeIn0" type="StaticBody3D" parent="TERRAIN/Room04_Shaft"]
+position = Vector3(211.57, 4.915, 0)
+rotation = Vector3(0, 0, 0.40241)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/Room04_Shaft/ExitLandingGradeIn0" instance=ExtResource("RCDeck")]
+scale = Vector3(0.35322, 1, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room04_Shaft/ExitLandingGradeIn0"]
+position = Vector3(0, -0.42, 0)
+shape = SubResource("BoxShape3D_0311")
+
+[node name="ExitLandingBench000" type="StaticBody3D" parent="TERRAIN/Room04_Shaft"]
+position = Vector3(213.45, 5.33, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
-[node name="Art" parent="TERRAIN/Room04_Shaft/ExitLanding02" instance=ExtResource("RCDeck")]
-scale = Vector3(0.94167, 1, 1)
+[node name="Art" parent="TERRAIN/Room04_Shaft/ExitLandingBench000" instance=ExtResource("RCDeck")]
+scale = Vector3(0.3, 1, 1)
 
-[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room04_Shaft/ExitLanding02"]
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room04_Shaft/ExitLandingBench000"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0278")
+shape = SubResource("BoxShape3D_0314")
 
-[node name="ExitLanding03" type="StaticBody3D" parent="TERRAIN/Room04_Shaft"]
-position = Vector3(222.18, 4.5, 0)
+[node name="ExitLandingGradeOut0" type="StaticBody3D" parent="TERRAIN/Room04_Shaft"]
+position = Vector3(215.57, 4.915, 0)
+rotation = Vector3(0, 0, -0.32664)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/Room04_Shaft/ExitLandingGradeOut0" instance=ExtResource("RCDeck")]
+scale = Vector3(0.43113, 1, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room04_Shaft/ExitLandingGradeOut0"]
+position = Vector3(0, -0.42, 0)
+shape = SubResource("BoxShape3D_0317")
+
+[node name="ExitLandingRejoin00" type="StaticBody3D" parent="TERRAIN/Room04_Shaft"]
+position = Vector3(218.85, 4.5, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
-[node name="Art" parent="TERRAIN/Room04_Shaft/ExitLanding03" instance=ExtResource("RCDeck")]
-scale = Vector3(0.94167, 1, 1)
+[node name="Art" parent="TERRAIN/Room04_Shaft/ExitLandingRejoin00" instance=ExtResource("RCDeck")]
+scale = Vector3(0.68333, 1, 1)
 
-[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room04_Shaft/ExitLanding03"]
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room04_Shaft/ExitLandingRejoin00"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0281")
+shape = SubResource("BoxShape3D_0320")
+
+[node name="ExitLandingRejoin01" type="StaticBody3D" parent="TERRAIN/Room04_Shaft"]
+position = Vector3(222.95, 4.5, 0)
+rotation = Vector3(0, 0, 0)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/Room04_Shaft/ExitLandingRejoin01" instance=ExtResource("RCDeck")]
+scale = Vector3(0.68333, 1, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room04_Shaft/ExitLandingRejoin01"]
+position = Vector3(0, -0.42, 0)
+shape = SubResource("BoxShape3D_0323")
 
 [node name="Exit00" type="StaticBody3D" parent="TERRAIN/Room04_Shaft"]
 position = Vector3(227, 4.5, 0)
@@ -2067,7 +2449,7 @@ scale = Vector3(0.66667, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room04_Shaft/Exit00"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0284")
+shape = SubResource("BoxShape3D_0326")
 
 [node name="Exit01" type="StaticBody3D" parent="TERRAIN/Room04_Shaft"]
 position = Vector3(231, 4.5, 0)
@@ -2079,7 +2461,7 @@ scale = Vector3(0.66667, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room04_Shaft/Exit01"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0287")
+shape = SubResource("BoxShape3D_0329")
 
 [node name="InteriorCladding_10" type="Node3D" parent="TERRAIN/Room04_Shaft"]
 
@@ -2166,40 +2548,64 @@ metadata/direction = -1
 metadata/title = "EXHAUST BYPASS"
 
 [node name="MainWest00" type="StaticBody3D" parent="TERRAIN/OverheadLoop"]
-position = Vector3(236.37, 4.5, 0)
+position = Vector3(236.22, 4.5, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
 [node name="Art" parent="TERRAIN/OverheadLoop/MainWest00" instance=ExtResource("RCDeck")]
-scale = Vector3(1.1222, 1, 1)
+scale = Vector3(1.075, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/OverheadLoop/MainWest00"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0310")
+shape = SubResource("BoxShape3D_0352")
 
-[node name="MainWest01" type="StaticBody3D" parent="TERRAIN/OverheadLoop"]
-position = Vector3(243.1, 4.5, 0)
+[node name="MainWestGradeIn0" type="StaticBody3D" parent="TERRAIN/OverheadLoop"]
+position = Vector3(240.97, 5.06, 0)
+rotation = Vector3(0, 0, 0.35193)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/OverheadLoop/MainWestGradeIn0" instance=ExtResource("RCDeck")]
+scale = Vector3(0.54152, 1, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/OverheadLoop/MainWestGradeIn0"]
+position = Vector3(0, -0.42, 0)
+shape = SubResource("BoxShape3D_0355")
+
+[node name="MainWestBench000" type="StaticBody3D" parent="TERRAIN/OverheadLoop"]
+position = Vector3(243.52, 5.62, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
-[node name="Art" parent="TERRAIN/OverheadLoop/MainWest01" instance=ExtResource("RCDeck")]
-scale = Vector3(1.1222, 1, 1)
+[node name="Art" parent="TERRAIN/OverheadLoop/MainWestBench000" instance=ExtResource("RCDeck")]
+scale = Vector3(0.34167, 1, 1)
 
-[node name="Collision" type="CollisionShape3D" parent="TERRAIN/OverheadLoop/MainWest01"]
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/OverheadLoop/MainWestBench000"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0313")
+shape = SubResource("BoxShape3D_0358")
 
-[node name="MainWest02" type="StaticBody3D" parent="TERRAIN/OverheadLoop"]
-position = Vector3(249.83, 4.5, 0)
+[node name="MainWestGradeOut0" type="StaticBody3D" parent="TERRAIN/OverheadLoop"]
+position = Vector3(245.65, 5.06, 0)
+rotation = Vector3(0, 0, -0.47089)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/OverheadLoop/MainWestGradeOut0" instance=ExtResource("RCDeck")]
+scale = Vector3(0.41145, 1, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/OverheadLoop/MainWestGradeOut0"]
+position = Vector3(0, -0.42, 0)
+shape = SubResource("BoxShape3D_0361")
+
+[node name="MainWestRejoin00" type="StaticBody3D" parent="TERRAIN/OverheadLoop"]
+position = Vector3(249.97, 4.5, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
-[node name="Art" parent="TERRAIN/OverheadLoop/MainWest02" instance=ExtResource("RCDeck")]
-scale = Vector3(1.1222, 1, 1)
+[node name="Art" parent="TERRAIN/OverheadLoop/MainWestRejoin00" instance=ExtResource("RCDeck")]
+scale = Vector3(1.075, 1, 1)
 
-[node name="Collision" type="CollisionShape3D" parent="TERRAIN/OverheadLoop/MainWest02"]
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/OverheadLoop/MainWestRejoin00"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0316")
+shape = SubResource("BoxShape3D_0364")
 
 [node name="LoftSpikesWest" type="Area3D" parent="TERRAIN/OverheadLoop"]
 position = Vector3(255.54, 1.15, 0)
@@ -2217,7 +2623,7 @@ scale = Vector3(0.81292, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/OverheadLoop/MainBetweenWest00"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0320")
+shape = SubResource("BoxShape3D_0368")
 
 [node name="MainBetweenWest01" type="StaticBody3D" parent="TERRAIN/OverheadLoop"]
 position = Vector3(265.21, 4.5, 0)
@@ -2229,7 +2635,7 @@ scale = Vector3(0.81292, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/OverheadLoop/MainBetweenWest01"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0323")
+shape = SubResource("BoxShape3D_0371")
 
 [node name="MainRaisedMachine" type="StaticBody3D" parent="TERRAIN/OverheadLoop"]
 position = Vector3(269.89, 5.86, 0)
@@ -2241,7 +2647,7 @@ scale = Vector3(0.75, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/OverheadLoop/MainRaisedMachine"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0326")
+shape = SubResource("BoxShape3D_0374")
 
 [node name="MachineRiser" parent="TERRAIN/OverheadLoop" instance=ExtResource("RCWall")]
 position = Vector3(269.89, 4.8944, -0.98)
@@ -2257,7 +2663,7 @@ scale = Vector3(0.62582, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/OverheadLoop/MachineDescent"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0330")
+shape = SubResource("BoxShape3D_0378")
 
 [node name="MainBetweenEast00" type="StaticBody3D" parent="TERRAIN/OverheadLoop"]
 position = Vector3(278.62, 4.5, 0)
@@ -2269,7 +2675,7 @@ scale = Vector3(0.9925, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/OverheadLoop/MainBetweenEast00"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0333")
+shape = SubResource("BoxShape3D_0381")
 
 [node name="LoftSpikesEast" type="Area3D" parent="TERRAIN/OverheadLoop"]
 position = Vector3(285.93, 0.7, 0)
@@ -2287,7 +2693,7 @@ scale = Vector3(0.63333, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/OverheadLoop/MainRaisedLanding"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0337")
+shape = SubResource("BoxShape3D_0385")
 
 [node name="MainLandingRamp" type="StaticBody3D" parent="TERRAIN/OverheadLoop"]
 position = Vector3(295.85, 4.61, 0)
@@ -2299,7 +2705,7 @@ scale = Vector3(0.60112, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/OverheadLoop/MainLandingRamp"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0340")
+shape = SubResource("BoxShape3D_0388")
 
 [node name="MainEast00" type="StaticBody3D" parent="TERRAIN/OverheadLoop"]
 position = Vector3(300.71, 4.5, 0)
@@ -2311,7 +2717,7 @@ scale = Vector3(1.0194, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/OverheadLoop/MainEast00"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0343")
+shape = SubResource("BoxShape3D_0391")
 
 [node name="MainEast01" type="StaticBody3D" parent="TERRAIN/OverheadLoop"]
 position = Vector3(306.82, 4.5, 0)
@@ -2323,7 +2729,7 @@ scale = Vector3(1.0194, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/OverheadLoop/MainEast01"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0346")
+shape = SubResource("BoxShape3D_0394")
 
 [node name="MainEast02" type="StaticBody3D" parent="TERRAIN/OverheadLoop"]
 position = Vector3(312.94, 4.5, 0)
@@ -2335,7 +2741,7 @@ scale = Vector3(1.0194, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/OverheadLoop/MainEast02"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0349")
+shape = SubResource("BoxShape3D_0397")
 
 [node name="LoftAccessHatch" parent="TERRAIN/OverheadLoop" instance=ExtResource("RCHatch")]
 position = Vector3(299.6, 8.5, 0)
@@ -2352,7 +2758,7 @@ scale = Vector3(0.51667, 0.54762, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/OverheadLoop/DockLip"]
 position = Vector3(0, -0.23, 0)
-shape = SubResource("BoxShape3D_0353")
+shape = SubResource("BoxShape3D_0401")
 
 [node name="OverheadLowerHatch" parent="TERRAIN/OverheadLoop" instance=ExtResource("RCHatch")]
 position = Vector3(295.5, 14.2, 0)
@@ -2369,7 +2775,7 @@ scale = Vector3(1.3083, 0.54762, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/OverheadLoop/TransferDeck"]
 position = Vector3(0, -0.23, 0)
-shape = SubResource("BoxShape3D_0357")
+shape = SubResource("BoxShape3D_0405")
 
 [node name="OverheadLedgeHatch" parent="TERRAIN/OverheadLoop" instance=ExtResource("RCHatch")]
 position = Vector3(287.55, 20.05, 0)
@@ -2384,6 +2790,7 @@ tint = Color(1.0, 0.3843, 0.7137, 1)
 offset = 2.15
 period = 4.96
 terrain_strength = 1.0
+crossing_window_scale = 1.0
 power = 23
 direction = 1.0
 burnable_spore_pod = false
@@ -2399,7 +2806,7 @@ scale = Vector3(1.125, 0.54762, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/OverheadLoop/HighLaunch"]
 position = Vector3(0, -0.23, 0)
-shape = SubResource("BoxShape3D_0362")
+shape = SubResource("BoxShape3D_0410")
 
 [node name="HighSpan" type="StaticBody3D" parent="TERRAIN/OverheadLoop" groups=["factory_drop_through"]]
 position = Vector3(269.15, 20.65, 0)
@@ -2411,7 +2818,7 @@ scale = Vector3(1.35, 0.54762, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/OverheadLoop/HighSpan"]
 position = Vector3(0, -0.23, 0)
-shape = SubResource("BoxShape3D_0365")
+shape = SubResource("BoxShape3D_0413")
 
 [node name="HighVault" type="StaticBody3D" parent="TERRAIN/OverheadLoop" groups=["factory_drop_through"]]
 position = Vector3(256.85, 21.2, 0)
@@ -2423,7 +2830,7 @@ scale = Vector3(1.2167, 0.54762, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/OverheadLoop/HighVault"]
 position = Vector3(0, -0.23, 0)
-shape = SubResource("BoxShape3D_0368")
+shape = SubResource("BoxShape3D_0416")
 
 [node name="InteriorCache03" type="Area3D" parent="TERRAIN" groups=["factory_salvage_chest"]]
 position = Vector3(256.85, 21.2, 0)
@@ -2450,6 +2857,7 @@ tint = Color(1.0, 0.3843, 0.7137, 1)
 offset = 2.15
 period = 4.96
 terrain_strength = 1.0
+crossing_window_scale = 1.0
 power = 23
 direction = -1
 burnable_spore_pod = false
@@ -2465,19 +2873,19 @@ scale = Vector3(0.89167, 0.54762, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/OverheadLoop/Turnaround"]
 position = Vector3(0, -0.23, 0)
-shape = SubResource("BoxShape3D_0375")
+shape = SubResource("BoxShape3D_0423")
 
 [node name="ReturnCross" type="StaticBody3D" parent="TERRAIN/OverheadLoop" groups=["factory_drop_through"]]
-position = Vector3(255.12, 14.775, 0)
-rotation = Vector3(0, 0, -0.092519)
+position = Vector3(255.12, 14.4, 0)
+rotation = Vector3(0, 0, -0.041214)
 collision_layer = 1
 
 [node name="Art" parent="TERRAIN/OverheadLoop/ReturnCross" instance=ExtResource("RCDeck")]
-scale = Vector3(2.4354, 0.54762, 1)
+scale = Vector3(2.4271, 0.54762, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/OverheadLoop/ReturnCross"]
 position = Vector3(0, -0.23, 0)
-shape = SubResource("BoxShape3D_0378")
+shape = SubResource("BoxShape3D_0426")
 
 [node name="OverheadBrace0" parent="TERRAIN/OverheadLoop" instance=ExtResource("RCWall")]
 position = Vector3(282, 24.85, -3.15)
@@ -2660,7 +3068,7 @@ scale = Vector3(1.1667, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room05_Gallery/Entry00"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0421")
+shape = SubResource("BoxShape3D_0469")
 
 [node name="EmbankmentIn" type="StaticBody3D" parent="TERRAIN/Room05_Gallery"]
 position = Vector3(329.86, 3.4, 0)
@@ -2672,7 +3080,7 @@ scale = Vector3(2.3159, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room05_Gallery/EmbankmentIn"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0424")
+shape = SubResource("BoxShape3D_0472")
 
 [node name="EmbankmentLip" type="StaticBody3D" parent="TERRAIN/Room05_Gallery"]
 position = Vector3(338.47, 2.3, 0)
@@ -2684,7 +3092,7 @@ scale = Vector3(0.58333, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room05_Gallery/EmbankmentLip"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0427")
+shape = SubResource("BoxShape3D_0475")
 
 [node name="SignatureCrossing" type="Area3D" parent="TERRAIN/Room05_Gallery"]
 position = Vector3(342.42, -1.05, 0)
@@ -2702,7 +3110,7 @@ scale = Vector3(0.5, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room05_Gallery/EmbankmentLanding"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0431")
+shape = SubResource("BoxShape3D_0479")
 
 [node name="EmbankmentOut" type="StaticBody3D" parent="TERRAIN/Room05_Gallery"]
 position = Vector3(356.31, 3.065, 0)
@@ -2714,7 +3122,7 @@ scale = Vector3(2.8968, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room05_Gallery/EmbankmentOut"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0434")
+shape = SubResource("BoxShape3D_0482")
 
 [node name="RecessFloor" type="StaticBody3D" parent="TERRAIN/Room05_Gallery" groups=["factory_drop_through"]]
 position = Vector3(331.01, 6.94, 0)
@@ -2726,10 +3134,10 @@ scale = Vector3(2.5367, 0.54762, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room05_Gallery/RecessFloor"]
 position = Vector3(0, -0.23, 0)
-shape = SubResource("BoxShape3D_0437")
+shape = SubResource("BoxShape3D_0485")
 
 [node name="RecessLintel" type="StaticBody3D" parent="TERRAIN/Room05_Gallery" groups=["factory_drop_through"]]
-position = Vector3(332.01, 9.06, 0)
+position = Vector3(332.01, 9.34, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
@@ -2738,19 +3146,19 @@ scale = Vector3(2.2033, 0.54762, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room05_Gallery/RecessLintel"]
 position = Vector3(0, -0.23, 0)
-shape = SubResource("BoxShape3D_0440")
+shape = SubResource("BoxShape3D_0488")
 
 [node name="RecessEnd" type="StaticBody3D" parent="TERRAIN/Room05_Gallery"]
-position = Vector3(338.42, 7.99, 0)
+position = Vector3(338.42, 8.14, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
 [node name="Art" parent="TERRAIN/Room05_Gallery/RecessEnd" instance=ExtResource("RCWall")]
-scale = Vector3(1, 0.49412, 1)
+scale = Vector3(1, 0.56471, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room05_Gallery/RecessEnd"]
 position = Vector3(0, 0, 0)
-shape = SubResource("BoxShape3D_0443")
+shape = SubResource("BoxShape3D_0491")
 
 [node name="InteriorCache04" type="Area3D" parent="TERRAIN" groups=["factory_salvage_chest"]]
 position = Vector3(336.67, 6.94, 0)
@@ -2779,7 +3187,7 @@ scale = Vector3(0.66667, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room05_Gallery/Exit00"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0449")
+shape = SubResource("BoxShape3D_0497")
 
 [node name="Exit01" type="StaticBody3D" parent="TERRAIN/Room05_Gallery"]
 position = Vector3(371, 3.15, 0)
@@ -2791,7 +3199,7 @@ scale = Vector3(0.66667, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room05_Gallery/Exit01"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0452")
+shape = SubResource("BoxShape3D_0500")
 
 [node name="InteriorCladding_11" type="Node3D" parent="TERRAIN/Room05_Gallery"]
 
@@ -2879,17 +3287,53 @@ position = Vector3(0, 0, 0)
 metadata/entry_x = 373
 metadata/entry_y = 3.15
 
-[node name="Entry00" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
-position = Vector3(376.5, 3.15, 0)
+[node name="Entry" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
+position = Vector3(373.7, 3.15, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
-[node name="Art" parent="TERRAIN/Room06_Switchback/Entry00" instance=ExtResource("RCDeck")]
-scale = Vector3(1.1667, 1, 1)
+[node name="Art" parent="TERRAIN/Room06_Switchback/Entry" instance=ExtResource("RCDeck")]
+scale = Vector3(0.23333, 1, 1)
 
-[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/Entry00"]
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/Entry"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0477")
+shape = SubResource("BoxShape3D_0525")
+
+[node name="RoomSillIn" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
+position = Vector3(375.4, 2.88, 0)
+rotation = Vector3(0, 0, -0.26371)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/Room06_Switchback/RoomSillIn" instance=ExtResource("RCDeck")]
+scale = Vector3(0.34527, 1, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/RoomSillIn"]
+position = Vector3(0, -0.42, 0)
+shape = SubResource("BoxShape3D_0528")
+
+[node name="RoomSill" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
+position = Vector3(377.1, 2.61, 0)
+rotation = Vector3(0, 0, 0)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/Room06_Switchback/RoomSill" instance=ExtResource("RCDeck")]
+scale = Vector3(0.23333, 1, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/RoomSill"]
+position = Vector3(0, -0.42, 0)
+shape = SubResource("BoxShape3D_0531")
+
+[node name="RoomSillOut" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
+position = Vector3(378.9, 2.88, 0)
+rotation = Vector3(0, 0, 0.2407)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/Room06_Switchback/RoomSillOut" instance=ExtResource("RCDeck")]
+scale = Vector3(0.37755, 1, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/RoomSillOut"]
+position = Vector3(0, -0.42, 0)
+shape = SubResource("BoxShape3D_0534")
 
 [node name="ForkApron00" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
 position = Vector3(382.5, 3.15, 0)
@@ -2901,67 +3345,103 @@ scale = Vector3(0.83333, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/ForkApron00"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0480")
+shape = SubResource("BoxShape3D_0537")
 
 [node name="MiddleStep" type="StaticBody3D" parent="TERRAIN/Room06_Switchback" groups=["factory_drop_through"]]
-position = Vector3(384.85, 5, 0)
+position = Vector3(385.25, 5.45, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
 [node name="Art" parent="TERRAIN/Room06_Switchback/MiddleStep" instance=ExtResource("RCDeck")]
-scale = Vector3(0.95, 0.54762, 1)
+scale = Vector3(0.81667, 0.54762, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/MiddleStep"]
 position = Vector3(0, -0.23, 0)
-shape = SubResource("BoxShape3D_0483")
+shape = SubResource("BoxShape3D_0540")
 
 [node name="MiddleWest00" type="StaticBody3D" parent="TERRAIN/Room06_Switchback" groups=["factory_drop_through"]]
-position = Vector3(392.55, 6.5, 0)
+position = Vector3(391.77, 6.5, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
 [node name="Art" parent="TERRAIN/Room06_Switchback/MiddleWest00" instance=ExtResource("RCDeck")]
-scale = Vector3(1.1181, 0.54762, 1)
+scale = Vector3(0.85563, 0.54762, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/MiddleWest00"]
 position = Vector3(0, -0.23, 0)
-shape = SubResource("BoxShape3D_0486")
+shape = SubResource("BoxShape3D_0543")
 
 [node name="MiddleWest01" type="StaticBody3D" parent="TERRAIN/Room06_Switchback" groups=["factory_drop_through"]]
-position = Vector3(399.26, 6.5, 0)
+position = Vector3(396.9, 6.5, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
 [node name="Art" parent="TERRAIN/Room06_Switchback/MiddleWest01" instance=ExtResource("RCDeck")]
-scale = Vector3(1.1181, 0.54762, 1)
+scale = Vector3(0.85562, 0.54762, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/MiddleWest01"]
 position = Vector3(0, -0.23, 0)
-shape = SubResource("BoxShape3D_0489")
+shape = SubResource("BoxShape3D_0546")
 
-[node name="MiddleWest02" type="StaticBody3D" parent="TERRAIN/Room06_Switchback" groups=["factory_drop_through"]]
-position = Vector3(405.97, 6.5, 0)
+[node name="MiddleWestGradeIn0" type="StaticBody3D" parent="TERRAIN/Room06_Switchback" groups=["factory_drop_through"]]
+position = Vector3(400.74, 6.175, 0)
+rotation = Vector3(0, 0, -0.24959)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/Room06_Switchback/MiddleWestGradeIn0" instance=ExtResource("RCDeck")]
+scale = Vector3(0.43859, 0.54762, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/MiddleWestGradeIn0"]
+position = Vector3(0, -0.23, 0)
+shape = SubResource("BoxShape3D_0549")
+
+[node name="MiddleWestBench000" type="StaticBody3D" parent="TERRAIN/Room06_Switchback" groups=["factory_drop_through"]]
+position = Vector3(402.64, 5.85, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
-[node name="Art" parent="TERRAIN/Room06_Switchback/MiddleWest02" instance=ExtResource("RCDeck")]
-scale = Vector3(1.1181, 0.54762, 1)
+[node name="Art" parent="TERRAIN/Room06_Switchback/MiddleWestBench000" instance=ExtResource("RCDeck")]
+scale = Vector3(0.20833, 0.54762, 1)
 
-[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/MiddleWest02"]
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/MiddleWestBench000"]
 position = Vector3(0, -0.23, 0)
-shape = SubResource("BoxShape3D_0492")
+shape = SubResource("BoxShape3D_0552")
 
-[node name="MiddleWest03" type="StaticBody3D" parent="TERRAIN/Room06_Switchback" groups=["factory_drop_through"]]
-position = Vector3(412.68, 6.5, 0)
+[node name="MiddleWestGradeOut0" type="StaticBody3D" parent="TERRAIN/Room06_Switchback" groups=["factory_drop_through"]]
+position = Vector3(404.52, 6.175, 0)
+rotation = Vector3(0, 0, 0.25437)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/Room06_Switchback/MiddleWestGradeOut0" instance=ExtResource("RCDeck")]
+scale = Vector3(0.43052, 0.54762, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/MiddleWestGradeOut0"]
+position = Vector3(0, -0.23, 0)
+shape = SubResource("BoxShape3D_0555")
+
+[node name="MiddleWestRejoin00" type="StaticBody3D" parent="TERRAIN/Room06_Switchback" groups=["factory_drop_through"]]
+position = Vector3(408.33, 6.5, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
-[node name="Art" parent="TERRAIN/Room06_Switchback/MiddleWest03" instance=ExtResource("RCDeck")]
-scale = Vector3(1.1181, 0.54762, 1)
+[node name="Art" parent="TERRAIN/Room06_Switchback/MiddleWestRejoin00" instance=ExtResource("RCDeck")]
+scale = Vector3(0.85563, 0.54762, 1)
 
-[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/MiddleWest03"]
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/MiddleWestRejoin00"]
 position = Vector3(0, -0.23, 0)
-shape = SubResource("BoxShape3D_0495")
+shape = SubResource("BoxShape3D_0558")
+
+[node name="MiddleWestRejoin01" type="StaticBody3D" parent="TERRAIN/Room06_Switchback" groups=["factory_drop_through"]]
+position = Vector3(413.47, 6.5, 0)
+rotation = Vector3(0, 0, 0)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/Room06_Switchback/MiddleWestRejoin01" instance=ExtResource("RCDeck")]
+scale = Vector3(0.85563, 0.54762, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/MiddleWestRejoin01"]
+position = Vector3(0, -0.23, 0)
+shape = SubResource("BoxShape3D_0561")
 
 [node name="MiddleEast00" type="StaticBody3D" parent="TERRAIN/Room06_Switchback" groups=["factory_drop_through"]]
 position = Vector3(428.26, 6.5, 0)
@@ -2973,7 +3453,7 @@ scale = Vector3(0.96667, 0.54762, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/MiddleEast00"]
 position = Vector3(0, -0.23, 0)
-shape = SubResource("BoxShape3D_0498")
+shape = SubResource("BoxShape3D_0564")
 
 [node name="VaultApproach00" type="StaticBody3D" parent="TERRAIN/Room06_Switchback" groups=["factory_drop_through"]]
 position = Vector3(433.67, 6.5, 0)
@@ -2985,7 +3465,7 @@ scale = Vector3(0.83333, 0.54762, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/VaultApproach00"]
 position = Vector3(0, -0.23, 0)
-shape = SubResource("BoxShape3D_0501")
+shape = SubResource("BoxShape3D_0567")
 
 [node name="CompactApproach" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
 position = Vector3(438.91, 6.5, 0)
@@ -2997,7 +3477,7 @@ scale = Vector3(0.91567, 0.54762, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/CompactApproach"]
 position = Vector3(0, -0.23, 0)
-shape = SubResource("BoxShape3D_0504")
+shape = SubResource("BoxShape3D_0570")
 
 [node name="CompactTransfer" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
 position = Vector3(444.2, 6.19, 0)
@@ -3009,7 +3489,7 @@ scale = Vector3(0.85327, 0.54762, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/CompactTransfer"]
 position = Vector3(0, -0.23, 0)
-shape = SubResource("BoxShape3D_0507")
+shape = SubResource("BoxShape3D_0573")
 
 [node name="CompactMerge" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
 position = Vector3(448.32, 6.19, 0)
@@ -3021,55 +3501,91 @@ scale = Vector3(0.53655, 0.54762, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/CompactMerge"]
 position = Vector3(0, -0.23, 0)
-shape = SubResource("BoxShape3D_0510")
+shape = SubResource("BoxShape3D_0576")
 
 [node name="UpperWestVault00" type="StaticBody3D" parent="TERRAIN/Room06_Switchback" groups=["factory_drop_through"]]
-position = Vector3(393.09, 11.35, 0)
+position = Vector3(392.3, 11.35, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
 [node name="Art" parent="TERRAIN/Room06_Switchback/UpperWestVault00" instance=ExtResource("RCDeck")]
-scale = Vector3(1.0292, 0.54762, 1)
+scale = Vector3(0.76667, 0.54762, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/UpperWestVault00"]
 position = Vector3(0, -0.23, 0)
-shape = SubResource("BoxShape3D_0513")
+shape = SubResource("BoxShape3D_0579")
 
 [node name="UpperWestVault01" type="StaticBody3D" parent="TERRAIN/Room06_Switchback" groups=["factory_drop_through"]]
-position = Vector3(399.26, 11.35, 0)
+position = Vector3(396.9, 11.35, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
 [node name="Art" parent="TERRAIN/Room06_Switchback/UpperWestVault01" instance=ExtResource("RCDeck")]
-scale = Vector3(1.0292, 0.54762, 1)
+scale = Vector3(0.76667, 0.54762, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/UpperWestVault01"]
 position = Vector3(0, -0.23, 0)
-shape = SubResource("BoxShape3D_0516")
+shape = SubResource("BoxShape3D_0582")
 
-[node name="UpperWestVault02" type="StaticBody3D" parent="TERRAIN/Room06_Switchback" groups=["factory_drop_through"]]
-position = Vector3(405.44, 11.35, 0)
+[node name="UpperWestVaultGradeIn0" type="StaticBody3D" parent="TERRAIN/Room06_Switchback" groups=["factory_drop_through"]]
+position = Vector3(400.48, 11.8, 0)
+rotation = Vector3(0, 0, 0.33929)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/Room06_Switchback/UpperWestVaultGradeIn0" instance=ExtResource("RCDeck")]
+scale = Vector3(0.45069, 0.54762, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/UpperWestVaultGradeIn0"]
+position = Vector3(0, -0.23, 0)
+shape = SubResource("BoxShape3D_0585")
+
+[node name="UpperWestVaultBench000" type="StaticBody3D" parent="TERRAIN/Room06_Switchback" groups=["factory_drop_through"]]
+position = Vector3(402.38, 12.25, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
-[node name="Art" parent="TERRAIN/Room06_Switchback/UpperWestVault02" instance=ExtResource("RCDeck")]
-scale = Vector3(1.0292, 0.54762, 1)
+[node name="Art" parent="TERRAIN/Room06_Switchback/UpperWestVaultBench000" instance=ExtResource("RCDeck")]
+scale = Vector3(0.20833, 0.54762, 1)
 
-[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/UpperWestVault02"]
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/UpperWestVaultBench000"]
 position = Vector3(0, -0.23, 0)
-shape = SubResource("BoxShape3D_0519")
+shape = SubResource("BoxShape3D_0588")
 
-[node name="UpperWestVault03" type="StaticBody3D" parent="TERRAIN/Room06_Switchback" groups=["factory_drop_through"]]
-position = Vector3(411.61, 11.35, 0)
+[node name="UpperWestVaultGradeOut0" type="StaticBody3D" parent="TERRAIN/Room06_Switchback" groups=["factory_drop_through"]]
+position = Vector3(404.25, 11.8, 0)
+rotation = Vector3(0, 0, -0.34556)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/Room06_Switchback/UpperWestVaultGradeOut0" instance=ExtResource("RCDeck")]
+scale = Vector3(0.44284, 0.54762, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/UpperWestVaultGradeOut0"]
+position = Vector3(0, -0.23, 0)
+shape = SubResource("BoxShape3D_0591")
+
+[node name="UpperWestVaultRejoin00" type="StaticBody3D" parent="TERRAIN/Room06_Switchback" groups=["factory_drop_through"]]
+position = Vector3(407.8, 11.35, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
-[node name="Art" parent="TERRAIN/Room06_Switchback/UpperWestVault03" instance=ExtResource("RCDeck")]
-scale = Vector3(1.0292, 0.54762, 1)
+[node name="Art" parent="TERRAIN/Room06_Switchback/UpperWestVaultRejoin00" instance=ExtResource("RCDeck")]
+scale = Vector3(0.76667, 0.54762, 1)
 
-[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/UpperWestVault03"]
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/UpperWestVaultRejoin00"]
 position = Vector3(0, -0.23, 0)
-shape = SubResource("BoxShape3D_0522")
+shape = SubResource("BoxShape3D_0594")
+
+[node name="UpperWestVaultRejoin01" type="StaticBody3D" parent="TERRAIN/Room06_Switchback" groups=["factory_drop_through"]]
+position = Vector3(412.4, 11.35, 0)
+rotation = Vector3(0, 0, 0)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/Room06_Switchback/UpperWestVaultRejoin01" instance=ExtResource("RCDeck")]
+scale = Vector3(0.76667, 0.54762, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/UpperWestVaultRejoin01"]
+position = Vector3(0, -0.23, 0)
+shape = SubResource("BoxShape3D_0597")
 
 [node name="UpperWestTurn" type="StaticBody3D" parent="TERRAIN/Room06_Switchback" groups=["factory_drop_through"]]
 position = Vector3(418.75, 11.2, 0)
@@ -3081,10 +3597,10 @@ scale = Vector3(0.45, 0.54762, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/UpperWestTurn"]
 position = Vector3(0, -0.23, 0)
-shape = SubResource("BoxShape3D_0525")
+shape = SubResource("BoxShape3D_0600")
 
 [node name="UpperEastTurn" type="StaticBody3D" parent="TERRAIN/Room06_Switchback" groups=["factory_drop_through"]]
-position = Vector3(436.25, 8.1, 0)
+position = Vector3(436.25, 8.86, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
@@ -3093,7 +3609,7 @@ scale = Vector3(0.65, 0.54762, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/UpperEastTurn"]
 position = Vector3(0, -0.23, 0)
-shape = SubResource("BoxShape3D_0528")
+shape = SubResource("BoxShape3D_0603")
 
 [node name="UpperReturnLow" type="StaticBody3D" parent="TERRAIN/Room06_Switchback" groups=["factory_drop_through"]]
 position = Vector3(431.5, 9.61, 0)
@@ -3105,7 +3621,7 @@ scale = Vector3(0.56667, 0.54762, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/UpperReturnLow"]
 position = Vector3(0, -0.23, 0)
-shape = SubResource("BoxShape3D_0531")
+shape = SubResource("BoxShape3D_0606")
 
 [node name="UpperReturnTurn" type="StaticBody3D" parent="TERRAIN/Room06_Switchback" groups=["factory_drop_through"]]
 position = Vector3(427.27, 10.7, 0)
@@ -3117,7 +3633,7 @@ scale = Vector3(0.55833, 0.54762, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/UpperReturnTurn"]
 position = Vector3(0, -0.23, 0)
-shape = SubResource("BoxShape3D_0534")
+shape = SubResource("BoxShape3D_0609")
 
 [node name="UpperReturnWest" type="StaticBody3D" parent="TERRAIN/Room06_Switchback" groups=["factory_drop_through"]]
 position = Vector3(422.75, 11.29, 0)
@@ -3129,22 +3645,22 @@ scale = Vector3(0.51667, 0.54762, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/UpperReturnWest"]
 position = Vector3(0, -0.23, 0)
-shape = SubResource("BoxShape3D_0537")
+shape = SubResource("BoxShape3D_0612")
 
 [node name="VaultExitStep" type="StaticBody3D" parent="TERRAIN/Room06_Switchback" groups=["factory_drop_through"]]
-position = Vector3(387.7, 7.95, 0)
+position = Vector3(386.75, 7.95, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
 [node name="Art" parent="TERRAIN/Room06_Switchback/VaultExitStep" instance=ExtResource("RCDeck")]
-scale = Vector3(0.46667, 0.54762, 1)
+scale = Vector3(0.28333, 0.54762, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/VaultExitStep"]
 position = Vector3(0, -0.23, 0)
-shape = SubResource("BoxShape3D_0540")
+shape = SubResource("BoxShape3D_0615")
 
 [node name="VaultSecondStep" type="StaticBody3D" parent="TERRAIN/Room06_Switchback" groups=["factory_drop_through"]]
-position = Vector3(388.9, 9.5, 0)
+position = Vector3(389.12, 9.5, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
@@ -3153,7 +3669,7 @@ scale = Vector3(0.33333, 0.54762, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/VaultSecondStep"]
 position = Vector3(0, -0.23, 0)
-shape = SubResource("BoxShape3D_0543")
+shape = SubResource("BoxShape3D_0618")
 
 [node name="InteriorCache05" type="Area3D" parent="TERRAIN" groups=["factory_salvage_chest"]]
 position = Vector3(413.1, 11.35, 0)
@@ -3199,91 +3715,151 @@ scale = Vector3(1.0232, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/MainDescent"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0552")
+shape = SubResource("BoxShape3D_0627")
 
 [node name="MainToDrop00" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
-position = Vector3(394.63, 1.85, 0)
+position = Vector3(394.38, 1.85, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
 [node name="Art" parent="TERRAIN/Room06_Switchback/MainToDrop00" instance=ExtResource("RCDeck")]
-scale = Vector3(1.2095, 1, 1)
+scale = Vector3(1.1278, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/MainToDrop00"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0555")
+shape = SubResource("BoxShape3D_0630")
 
 [node name="MainToDrop01" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
-position = Vector3(401.89, 1.85, 0)
+position = Vector3(401.15, 1.85, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
 [node name="Art" parent="TERRAIN/Room06_Switchback/MainToDrop01" instance=ExtResource("RCDeck")]
-scale = Vector3(1.2095, 1, 1)
+scale = Vector3(1.1278, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/MainToDrop01"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0558")
+shape = SubResource("BoxShape3D_0633")
 
-[node name="MainToDrop02" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
-position = Vector3(409.14, 1.85, 0)
+[node name="MainToDropGradeIn0" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
+position = Vector3(405.81, 1.525, 0)
+rotation = Vector3(0, 0, -0.24959)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/Room06_Switchback/MainToDropGradeIn0" instance=ExtResource("RCDeck")]
+scale = Vector3(0.43859, 1, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/MainToDropGradeIn0"]
+position = Vector3(0, -0.42, 0)
+shape = SubResource("BoxShape3D_0636")
+
+[node name="MainToDropBench000" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
+position = Vector3(407.71, 1.2, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
-[node name="Art" parent="TERRAIN/Room06_Switchback/MainToDrop02" instance=ExtResource("RCDeck")]
-scale = Vector3(1.2095, 1, 1)
+[node name="Art" parent="TERRAIN/Room06_Switchback/MainToDropBench000" instance=ExtResource("RCDeck")]
+scale = Vector3(0.20833, 1, 1)
 
-[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/MainToDrop02"]
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/MainToDropBench000"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0561")
+shape = SubResource("BoxShape3D_0639")
 
-[node name="MainToDrop03" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
-position = Vector3(416.4, 1.85, 0)
+[node name="MainToDropGradeOut0" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
+position = Vector3(409.58, 1.525, 0)
+rotation = Vector3(0, 0, 0.25437)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/Room06_Switchback/MainToDropGradeOut0" instance=ExtResource("RCDeck")]
+scale = Vector3(0.43052, 1, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/MainToDropGradeOut0"]
+position = Vector3(0, -0.42, 0)
+shape = SubResource("BoxShape3D_0642")
+
+[node name="MainToDropLevel100" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
+position = Vector3(413.44, 1.85, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
-[node name="Art" parent="TERRAIN/Room06_Switchback/MainToDrop03" instance=ExtResource("RCDeck")]
-scale = Vector3(1.2095, 1, 1)
+[node name="Art" parent="TERRAIN/Room06_Switchback/MainToDropLevel100" instance=ExtResource("RCDeck")]
+scale = Vector3(0.86944, 1, 1)
 
-[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/MainToDrop03"]
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/MainToDropLevel100"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0564")
+shape = SubResource("BoxShape3D_0645")
 
-[node name="MainToDrop04" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
-position = Vector3(423.66, 1.85, 0)
+[node name="MainToDropLevel101" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
+position = Vector3(418.66, 1.85, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
-[node name="Art" parent="TERRAIN/Room06_Switchback/MainToDrop04" instance=ExtResource("RCDeck")]
-scale = Vector3(1.2095, 1, 1)
+[node name="Art" parent="TERRAIN/Room06_Switchback/MainToDropLevel101" instance=ExtResource("RCDeck")]
+scale = Vector3(0.86944, 1, 1)
 
-[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/MainToDrop04"]
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/MainToDropLevel101"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0567")
+shape = SubResource("BoxShape3D_0648")
 
-[node name="MainToDrop05" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
-position = Vector3(430.91, 1.85, 0)
+[node name="MainToDropGradeIn1" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
+position = Vector3(422.24, 1.525, 0)
+rotation = Vector3(0, 0, -0.32175)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/Room06_Switchback/MainToDropGradeIn1" instance=ExtResource("RCDeck")]
+scale = Vector3(0.34258, 1, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/MainToDropGradeIn1"]
+position = Vector3(0, -0.42, 0)
+shape = SubResource("BoxShape3D_0651")
+
+[node name="MainToDropBench100" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
+position = Vector3(424.12, 1.2, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
-[node name="Art" parent="TERRAIN/Room06_Switchback/MainToDrop05" instance=ExtResource("RCDeck")]
-scale = Vector3(1.2095, 1, 1)
+[node name="Art" parent="TERRAIN/Room06_Switchback/MainToDropBench100" instance=ExtResource("RCDeck")]
+scale = Vector3(0.3, 1, 1)
 
-[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/MainToDrop05"]
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/MainToDropBench100"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0570")
+shape = SubResource("BoxShape3D_0654")
 
-[node name="MainToDrop06" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
-position = Vector3(438.17, 1.85, 0)
+[node name="MainToDropGradeOut1" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
+position = Vector3(426.24, 1.525, 0)
+rotation = Vector3(0, 0, 0.25933)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/Room06_Switchback/MainToDropGradeOut1" instance=ExtResource("RCDeck")]
+scale = Vector3(0.42246, 1, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/MainToDropGradeOut1"]
+position = Vector3(0, -0.42, 0)
+shape = SubResource("BoxShape3D_0657")
+
+[node name="MainToDropRejoin00" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
+position = Vector3(430.86, 1.85, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
-[node name="Art" parent="TERRAIN/Room06_Switchback/MainToDrop06" instance=ExtResource("RCDeck")]
-scale = Vector3(1.2095, 1, 1)
+[node name="Art" parent="TERRAIN/Room06_Switchback/MainToDropRejoin00" instance=ExtResource("RCDeck")]
+scale = Vector3(1.1319, 1, 1)
 
-[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/MainToDrop06"]
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/MainToDropRejoin00"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0573")
+shape = SubResource("BoxShape3D_0660")
+
+[node name="MainToDropRejoin01" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
+position = Vector3(437.65, 1.85, 0)
+rotation = Vector3(0, 0, 0)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/Room06_Switchback/MainToDropRejoin01" instance=ExtResource("RCDeck")]
+scale = Vector3(1.1319, 1, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/MainToDropRejoin01"]
+position = Vector3(0, -0.42, 0)
+shape = SubResource("BoxShape3D_0663")
 
 [node name="DropBulkhead" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
 position = Vector3(450.65, 9.875, 0)
@@ -3295,67 +3871,91 @@ scale = Vector3(1, 2.1059, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/DropBulkhead"]
 position = Vector3(0, 0, 0)
-shape = SubResource("BoxShape3D_0576")
+shape = SubResource("BoxShape3D_0666")
 
 [node name="SumpWest00" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
-position = Vector3(389.09, -8.95, 0)
+position = Vector3(389.1, -8.95, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
 [node name="Art" parent="TERRAIN/Room06_Switchback/SumpWest00" instance=ExtResource("RCDeck")]
-scale = Vector3(1.2311, 1, 1)
+scale = Vector3(1.2348, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/SumpWest00"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0579")
+shape = SubResource("BoxShape3D_0669")
 
 [node name="SumpWest01" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
-position = Vector3(396.48, -8.95, 0)
+position = Vector3(396.51, -8.95, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
 [node name="Art" parent="TERRAIN/Room06_Switchback/SumpWest01" instance=ExtResource("RCDeck")]
-scale = Vector3(1.2311, 1, 1)
+scale = Vector3(1.2348, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/SumpWest01"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0582")
+shape = SubResource("BoxShape3D_0672")
 
-[node name="SumpWest02" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
-position = Vector3(403.87, -8.95, 0)
+[node name="SumpWestGradeIn0" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
+position = Vector3(401.74, -8.39, 0)
+rotation = Vector3(0, 0, 0.35193)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/Room06_Switchback/SumpWestGradeIn0" instance=ExtResource("RCDeck")]
+scale = Vector3(0.54152, 1, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/SumpWestGradeIn0"]
+position = Vector3(0, -0.42, 0)
+shape = SubResource("BoxShape3D_0675")
+
+[node name="SumpWestBench000" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
+position = Vector3(404.29, -7.83, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
-[node name="Art" parent="TERRAIN/Room06_Switchback/SumpWest02" instance=ExtResource("RCDeck")]
-scale = Vector3(1.2311, 1, 1)
+[node name="Art" parent="TERRAIN/Room06_Switchback/SumpWestBench000" instance=ExtResource("RCDeck")]
+scale = Vector3(0.34167, 1, 1)
 
-[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/SumpWest02"]
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/SumpWestBench000"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0585")
+shape = SubResource("BoxShape3D_0678")
 
-[node name="SumpWest03" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
-position = Vector3(411.25, -8.95, 0)
+[node name="SumpWestGradeOut0" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
+position = Vector3(406.42, -8.39, 0)
+rotation = Vector3(0, 0, -0.47089)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/Room06_Switchback/SumpWestGradeOut0" instance=ExtResource("RCDeck")]
+scale = Vector3(0.41145, 1, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/SumpWestGradeOut0"]
+position = Vector3(0, -0.42, 0)
+shape = SubResource("BoxShape3D_0681")
+
+[node name="SumpWestRejoin00" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
+position = Vector3(411.22, -8.95, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
-[node name="Art" parent="TERRAIN/Room06_Switchback/SumpWest03" instance=ExtResource("RCDeck")]
-scale = Vector3(1.2311, 1, 1)
+[node name="Art" parent="TERRAIN/Room06_Switchback/SumpWestRejoin00" instance=ExtResource("RCDeck")]
+scale = Vector3(1.2348, 1, 1)
 
-[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/SumpWest03"]
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/SumpWestRejoin00"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0588")
+shape = SubResource("BoxShape3D_0684")
 
-[node name="SumpWest04" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
-position = Vector3(418.64, -8.95, 0)
+[node name="SumpWestRejoin01" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
+position = Vector3(418.63, -8.95, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
-[node name="Art" parent="TERRAIN/Room06_Switchback/SumpWest04" instance=ExtResource("RCDeck")]
-scale = Vector3(1.2311, 1, 1)
+[node name="Art" parent="TERRAIN/Room06_Switchback/SumpWestRejoin01" instance=ExtResource("RCDeck")]
+scale = Vector3(1.2348, 1, 1)
 
-[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/SumpWest04"]
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/SumpWestRejoin01"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0591")
+shape = SubResource("BoxShape3D_0687")
 
 [node name="SumpIsland" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
 position = Vector3(429.18, -8.49, 0)
@@ -3367,7 +3967,7 @@ scale = Vector3(0.55, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/SumpIsland"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0594")
+shape = SubResource("BoxShape3D_0690")
 
 [node name="SumpEast00" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
 position = Vector3(436.76, -8.95, 0)
@@ -3379,7 +3979,7 @@ scale = Vector3(0.90922, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/SumpEast00"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0597")
+shape = SubResource("BoxShape3D_0693")
 
 [node name="SumpEast01" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
 position = Vector3(442.22, -8.95, 0)
@@ -3391,7 +3991,7 @@ scale = Vector3(0.90922, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/SumpEast01"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0600")
+shape = SubResource("BoxShape3D_0696")
 
 [node name="SumpEast02" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
 position = Vector3(447.67, -8.95, 0)
@@ -3403,7 +4003,7 @@ scale = Vector3(0.90922, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/SumpEast02"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0603")
+shape = SubResource("BoxShape3D_0699")
 
 [node name="SumpSpikes" type="Area3D" parent="TERRAIN/Room06_Switchback"]
 position = Vector3(424.93, -11.6, 0)
@@ -3421,7 +4021,7 @@ scale = Vector3(1, 2.3647, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/SumpWestWall"]
 position = Vector3(0, 0, 0)
-shape = SubResource("BoxShape3D_0607")
+shape = SubResource("BoxShape3D_0703")
 
 [node name="SumpEastWall" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
 position = Vector3(450.4, -4.25, 0)
@@ -3433,7 +4033,7 @@ scale = Vector3(1, 2.4235, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/SumpEastWall"]
 position = Vector3(0, 0, 0)
-shape = SubResource("BoxShape3D_0610")
+shape = SubResource("BoxShape3D_0706")
 
 [node name="LadderWestLanding" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
 position = Vector3(385.85, -2.7, 0)
@@ -3445,7 +4045,7 @@ scale = Vector3(0.15, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/LadderWestLanding"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0613")
+shape = SubResource("BoxShape3D_0709")
 
 [node name="ReturnHatch" parent="TERRAIN/Room06_Switchback" instance=ExtResource("RCHatch")]
 position = Vector3(388.4, -2.7, 0)
@@ -3453,88 +4053,148 @@ deck_width = 4.2
 climb_height = 6.25
 
 [node name="ReturnUnderMain00" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
-position = Vector3(393.97, -2.7, 0)
+position = Vector3(393.77, -2.7, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
 [node name="Art" parent="TERRAIN/Room06_Switchback/ReturnUnderMain00" instance=ExtResource("RCDeck")]
-scale = Vector3(1.1571, 1, 1)
+scale = Vector3(1.0917, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/ReturnUnderMain00"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0617")
+shape = SubResource("BoxShape3D_0713")
 
 [node name="ReturnUnderMain01" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
-position = Vector3(400.91, -2.7, 0)
+position = Vector3(400.32, -2.7, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
 [node name="Art" parent="TERRAIN/Room06_Switchback/ReturnUnderMain01" instance=ExtResource("RCDeck")]
-scale = Vector3(1.1571, 1, 1)
+scale = Vector3(1.0917, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/ReturnUnderMain01"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0620")
+shape = SubResource("BoxShape3D_0716")
 
-[node name="ReturnUnderMain02" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
-position = Vector3(407.86, -2.7, 0)
+[node name="ReturnUnderMainGradeIn0" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
+position = Vector3(404.57, -3.025, 0)
+rotation = Vector3(0, 0, -0.32175)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/Room06_Switchback/ReturnUnderMainGradeIn0" instance=ExtResource("RCDeck")]
+scale = Vector3(0.34258, 1, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/ReturnUnderMainGradeIn0"]
+position = Vector3(0, -0.42, 0)
+shape = SubResource("BoxShape3D_0719")
+
+[node name="ReturnUnderMainBench000" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
+position = Vector3(406.45, -3.35, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
-[node name="Art" parent="TERRAIN/Room06_Switchback/ReturnUnderMain02" instance=ExtResource("RCDeck")]
-scale = Vector3(1.1571, 1, 1)
+[node name="Art" parent="TERRAIN/Room06_Switchback/ReturnUnderMainBench000" instance=ExtResource("RCDeck")]
+scale = Vector3(0.3, 1, 1)
 
-[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/ReturnUnderMain02"]
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/ReturnUnderMainBench000"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0623")
+shape = SubResource("BoxShape3D_0722")
 
-[node name="ReturnUnderMain03" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
-position = Vector3(414.8, -2.7, 0)
+[node name="ReturnUnderMainGradeOut0" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
+position = Vector3(408.57, -3.025, 0)
+rotation = Vector3(0, 0, 0.25933)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/Room06_Switchback/ReturnUnderMainGradeOut0" instance=ExtResource("RCDeck")]
+scale = Vector3(0.42246, 1, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/ReturnUnderMainGradeOut0"]
+position = Vector3(0, -0.42, 0)
+shape = SubResource("BoxShape3D_0725")
+
+[node name="ReturnUnderMainLevel100" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
+position = Vector3(412.16, -2.7, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
-[node name="Art" parent="TERRAIN/Room06_Switchback/ReturnUnderMain03" instance=ExtResource("RCDeck")]
-scale = Vector3(1.1571, 1, 1)
+[node name="Art" parent="TERRAIN/Room06_Switchback/ReturnUnderMainLevel100" instance=ExtResource("RCDeck")]
+scale = Vector3(0.7875, 1, 1)
 
-[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/ReturnUnderMain03"]
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/ReturnUnderMainLevel100"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0626")
+shape = SubResource("BoxShape3D_0728")
 
-[node name="ReturnUnderMain04" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
-position = Vector3(421.74, -2.7, 0)
+[node name="ReturnUnderMainLevel101" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
+position = Vector3(416.89, -2.7, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
-[node name="Art" parent="TERRAIN/Room06_Switchback/ReturnUnderMain04" instance=ExtResource("RCDeck")]
-scale = Vector3(1.1571, 1, 1)
+[node name="Art" parent="TERRAIN/Room06_Switchback/ReturnUnderMainLevel101" instance=ExtResource("RCDeck")]
+scale = Vector3(0.7875, 1, 1)
 
-[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/ReturnUnderMain04"]
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/ReturnUnderMainLevel101"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0629")
+shape = SubResource("BoxShape3D_0731")
 
-[node name="ReturnUnderMain05" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
-position = Vector3(428.69, -2.7, 0)
+[node name="ReturnUnderMainGradeIn1" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
+position = Vector3(420.78, -3.025, 0)
+rotation = Vector3(0, 0, -0.20997)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/Room06_Switchback/ReturnUnderMainGradeIn1" instance=ExtResource("RCDeck")]
+scale = Vector3(0.51975, 1, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/ReturnUnderMainGradeIn1"]
+position = Vector3(0, -0.42, 0)
+shape = SubResource("BoxShape3D_0734")
+
+[node name="ReturnUnderMainBench100" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
+position = Vector3(423.33, -3.35, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
-[node name="Art" parent="TERRAIN/Room06_Switchback/ReturnUnderMain05" instance=ExtResource("RCDeck")]
-scale = Vector3(1.1571, 1, 1)
+[node name="Art" parent="TERRAIN/Room06_Switchback/ReturnUnderMainBench100" instance=ExtResource("RCDeck")]
+scale = Vector3(0.34167, 1, 1)
 
-[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/ReturnUnderMain05"]
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/ReturnUnderMainBench100"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0632")
+shape = SubResource("BoxShape3D_0737")
 
-[node name="ReturnUnderMain06" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
-position = Vector3(435.63, -2.7, 0)
+[node name="ReturnUnderMainGradeOut1" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
+position = Vector3(425.45, -3.025, 0)
+rotation = Vector3(0, 0, 0.28728)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/Room06_Switchback/ReturnUnderMainGradeOut1" instance=ExtResource("RCDeck")]
+scale = Vector3(0.38234, 1, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/ReturnUnderMainGradeOut1"]
+position = Vector3(0, -0.42, 0)
+shape = SubResource("BoxShape3D_0740")
+
+[node name="ReturnUnderMainRejoin00" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
+position = Vector3(429.69, -2.7, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
-[node name="Art" parent="TERRAIN/Room06_Switchback/ReturnUnderMain06" instance=ExtResource("RCDeck")]
-scale = Vector3(1.1571, 1, 1)
+[node name="Art" parent="TERRAIN/Room06_Switchback/ReturnUnderMainRejoin00" instance=ExtResource("RCDeck")]
+scale = Vector3(1.0458, 1, 1)
 
-[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/ReturnUnderMain06"]
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/ReturnUnderMainRejoin00"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0635")
+shape = SubResource("BoxShape3D_0743")
+
+[node name="ReturnUnderMainRejoin01" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
+position = Vector3(435.96, -2.7, 0)
+rotation = Vector3(0, 0, 0)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/Room06_Switchback/ReturnUnderMainRejoin01" instance=ExtResource("RCDeck")]
+scale = Vector3(1.0458, 1, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/ReturnUnderMainRejoin01"]
+position = Vector3(0, -0.42, 0)
+shape = SubResource("BoxShape3D_0746")
 
 [node name="ReturnRamp" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
 position = Vector3(441.3, -0.9, 0)
@@ -3546,7 +4206,7 @@ scale = Vector3(0.94751, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/ReturnRamp"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0638")
+shape = SubResource("BoxShape3D_0749")
 
 [node name="ReturnTakeoff" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
 position = Vector3(444.94, 0.9, 0)
@@ -3558,7 +4218,7 @@ scale = Vector3(0.47833, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/ReturnTakeoff"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0641")
+shape = SubResource("BoxShape3D_0752")
 
 [node name="ReturnEast00" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
 position = Vector3(453.48, 0.9, 0)
@@ -3570,7 +4230,7 @@ scale = Vector3(0.875, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/ReturnEast00"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0644")
+shape = SubResource("BoxShape3D_0755")
 
 [node name="GateRamp" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
 position = Vector3(458.08, 2.025, 0)
@@ -3582,7 +4242,7 @@ scale = Vector3(0.75765, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/GateRamp"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0647")
+shape = SubResource("BoxShape3D_0758")
 
 [node name="GateThreshold" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
 position = Vector3(460.52, 3.15, 0)
@@ -3594,7 +4254,7 @@ scale = Vector3(0.15833, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/GateThreshold"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0650")
+shape = SubResource("BoxShape3D_0761")
 
 [node name="SumpShutter" parent="TERRAIN/Room06_Switchback" instance=ExtResource("RCShutter")]
 position = Vector3(461, 9.25, 0)
@@ -3609,7 +4269,7 @@ scale = Vector3(1, 5.9847, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/ShutterSill"]
 position = Vector3(0, 0, 0)
-shape = SubResource("BoxShape3D_0654")
+shape = SubResource("BoxShape3D_0765")
 
 [node name="ShutterHeader" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
 position = Vector3(461, 18.63, 0)
@@ -3621,7 +4281,7 @@ scale = Vector3(1, 3.1624, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/ShutterHeader"]
 position = Vector3(0, 0, 0)
-shape = SubResource("BoxShape3D_0657")
+shape = SubResource("BoxShape3D_0768")
 
 [node name="SumpShutterRelay" type="StaticBody3D" parent="TERRAIN/Room06_Switchback" groups=["factory_shot_relay"]]
 position = Vector3(391.9, -7.95, 0)
@@ -3633,6 +4293,7 @@ travel = Vector3(0, 11, 0)
 operation = "RETURN SHUTTER"
 lift = false
 repeat_hold = 6.5
+departure_delay = 0.0
 
 [node name="Casing" parent="TERRAIN/Room06_Switchback/SumpShutterRelay" instance=ExtResource("RCDoorRelay")]
 position = Vector3(0, -0.26, 0)
@@ -3654,7 +4315,7 @@ scale = Vector3(1, 0.58824, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/RelaySightBaffle"]
 position = Vector3(0, 0, 0)
-shape = SubResource("BoxShape3D_0664")
+shape = SubResource("BoxShape3D_0775")
 
 [node name="SumpField" type="Area3D" parent="TERRAIN/Room06_Switchback"]
 position = Vector3(438.03, -7.65, 0)
@@ -3664,6 +4325,7 @@ tint = Color(1.0, 0.3843, 0.7137, 1)
 offset = 2.15
 period = 4.96
 terrain_strength = 1.0
+crossing_window_scale = 1.0
 power = 23
 direction = -1
 burnable_spore_pod = false
@@ -3696,7 +4358,7 @@ scale = Vector3(0.66667, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/MergeApron00"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0671")
+shape = SubResource("BoxShape3D_0782")
 
 [node name="MergeApron01" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
 position = Vector3(467, 3.15, 0)
@@ -3708,7 +4370,7 @@ scale = Vector3(0.66667, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/MergeApron01"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0674")
+shape = SubResource("BoxShape3D_0785")
 
 [node name="MergeField" type="Area3D" parent="TERRAIN/Room06_Switchback"]
 position = Vector3(468.2, 4.45, 0)
@@ -3718,6 +4380,7 @@ tint = Color(1.0, 0.3843, 0.7137, 1)
 offset = 2.15
 period = 4.96
 terrain_strength = 1.0
+crossing_window_scale = 1.0
 power = 23
 direction = -1
 burnable_spore_pod = false
@@ -3733,7 +4396,7 @@ scale = Vector3(0.66667, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/Exit00"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0678")
+shape = SubResource("BoxShape3D_0789")
 
 [node name="Exit01" type="StaticBody3D" parent="TERRAIN/Room06_Switchback"]
 position = Vector3(475, 3.15, 0)
@@ -3745,7 +4408,7 @@ scale = Vector3(0.66667, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Switchback/Exit01"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0681")
+shape = SubResource("BoxShape3D_0792")
 
 [node name="InteriorCladding_12" type="Node3D" parent="TERRAIN/Room06_Switchback"]
 
@@ -3917,17 +4580,53 @@ position = Vector3(0, 0, 0)
 metadata/entry_x = 477
 metadata/entry_y = 3.15
 
-[node name="Entry00" type="StaticBody3D" parent="TERRAIN/Room07_Lift"]
-position = Vector3(480.5, 3.15, 0)
+[node name="Entry" type="StaticBody3D" parent="TERRAIN/Room07_Lift"]
+position = Vector3(477.7, 3.15, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
-[node name="Art" parent="TERRAIN/Room07_Lift/Entry00" instance=ExtResource("RCDeck")]
-scale = Vector3(1.1667, 1, 1)
+[node name="Art" parent="TERRAIN/Room07_Lift/Entry" instance=ExtResource("RCDeck")]
+scale = Vector3(0.23333, 1, 1)
 
-[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room07_Lift/Entry00"]
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room07_Lift/Entry"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0725")
+shape = SubResource("BoxShape3D_0836")
+
+[node name="RoomSillIn" type="StaticBody3D" parent="TERRAIN/Room07_Lift"]
+position = Vector3(479.4, 3.66, 0)
+rotation = Vector3(0, 0, 0.47162)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/Room07_Lift/RoomSillIn" instance=ExtResource("RCDeck")]
+scale = Vector3(0.37418, 1, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room07_Lift/RoomSillIn"]
+position = Vector3(0, -0.42, 0)
+shape = SubResource("BoxShape3D_0839")
+
+[node name="RoomSill" type="StaticBody3D" parent="TERRAIN/Room07_Lift"]
+position = Vector3(481.1, 4.17, 0)
+rotation = Vector3(0, 0, 0)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/Room07_Lift/RoomSill" instance=ExtResource("RCDeck")]
+scale = Vector3(0.23333, 1, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room07_Lift/RoomSill"]
+position = Vector3(0, -0.42, 0)
+shape = SubResource("BoxShape3D_0842")
+
+[node name="RoomSillOut" type="StaticBody3D" parent="TERRAIN/Room07_Lift"]
+position = Vector3(482.9, 3.66, 0)
+rotation = Vector3(0, 0, -0.43414)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/Room07_Lift/RoomSillOut" instance=ExtResource("RCDeck")]
+scale = Vector3(0.40416, 1, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room07_Lift/RoomSillOut"]
+position = Vector3(0, -0.42, 0)
+shape = SubResource("BoxShape3D_0845")
 
 [node name="LeftApron00" type="StaticBody3D" parent="TERRAIN/Room07_Lift"]
 position = Vector3(486.66, 3.15, 0)
@@ -3939,7 +4638,7 @@ scale = Vector3(0.88542, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room07_Lift/LeftApron00"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0728")
+shape = SubResource("BoxShape3D_0848")
 
 [node name="LeftApron01" type="StaticBody3D" parent="TERRAIN/Room07_Lift"]
 position = Vector3(491.97, 3.15, 0)
@@ -3951,7 +4650,7 @@ scale = Vector3(0.88542, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room07_Lift/LeftApron01"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0731")
+shape = SubResource("BoxShape3D_0851")
 
 [node name="CatchFloor00" type="StaticBody3D" parent="TERRAIN/Room07_Lift"]
 position = Vector3(496.56, 1.45, 0)
@@ -3963,7 +4662,7 @@ scale = Vector3(0.64583, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room07_Lift/CatchFloor00"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0734")
+shape = SubResource("BoxShape3D_0854")
 
 [node name="CatchFloor01" type="StaticBody3D" parent="TERRAIN/Room07_Lift"]
 position = Vector3(500.44, 1.45, 0)
@@ -3975,7 +4674,7 @@ scale = Vector3(0.64583, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room07_Lift/CatchFloor01"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0737")
+shape = SubResource("BoxShape3D_0857")
 
 [node name="RightApron00" type="StaticBody3D" parent="TERRAIN/Room07_Lift"]
 position = Vector3(505.03, 3.15, 0)
@@ -3987,7 +4686,7 @@ scale = Vector3(0.88542, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room07_Lift/RightApron00"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0740")
+shape = SubResource("BoxShape3D_0860")
 
 [node name="RightApron01" type="StaticBody3D" parent="TERRAIN/Room07_Lift"]
 position = Vector3(510.34, 3.15, 0)
@@ -3999,10 +4698,10 @@ scale = Vector3(0.88542, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room07_Lift/RightApron01"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0743")
+shape = SubResource("BoxShape3D_0863")
 
 [node name="ServiceLift" type="AnimatableBody3D" parent="TERRAIN/Room07_Lift"]
-position = Vector3(498.5, 1.93, 0)
+position = Vector3(498.5, 3.83, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
@@ -4011,7 +4710,7 @@ scale = Vector3(1.1083, 0.54762, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room07_Lift/ServiceLift"]
 position = Vector3(0, -0.23, 0)
-shape = SubResource("BoxShape3D_0746")
+shape = SubResource("BoxShape3D_0866")
 
 [node name="ServiceLiftRelay" type="StaticBody3D" parent="TERRAIN/Room07_Lift" groups=["factory_shot_relay"]]
 position = Vector3(492.43, 4.15, 0)
@@ -4019,10 +4718,11 @@ script = ExtResource("RCRelayScript")
 collision_layer = 16
 collision_mask = 0
 platform_path = NodePath("../ServiceLift")
-travel = Vector3(0, 5.52, 0)
+travel = Vector3(0, 3.62, 0)
 operation = "SPECIMEN HOIST"
 lift = true
 repeat_hold = 6.5
+departure_delay = 1.15
 
 [node name="Casing" parent="TERRAIN/Room07_Lift/ServiceLiftRelay" instance=ExtResource("RCDoorRelay")]
 position = Vector3(0, -0.26, 0)
@@ -4044,7 +4744,7 @@ scale = Vector3(1.0467, 0.54762, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room07_Lift/HighLanding"]
 position = Vector3(0, -0.23, 0)
-shape = SubResource("BoxShape3D_0753")
+shape = SubResource("BoxShape3D_0873")
 
 [node name="HighReturn" type="StaticBody3D" parent="TERRAIN/Room07_Lift" groups=["factory_drop_through"]]
 position = Vector3(511.77, 5.45, 0)
@@ -4056,7 +4756,7 @@ scale = Vector3(0.86667, 0.54762, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room07_Lift/HighReturn"]
 position = Vector3(0, -0.23, 0)
-shape = SubResource("BoxShape3D_0756")
+shape = SubResource("BoxShape3D_0876")
 
 [node name="InteriorCache08" type="Area3D" parent="TERRAIN" groups=["factory_salvage_chest"]]
 position = Vector3(505.38, 7.45, 0)
@@ -4085,7 +4785,7 @@ scale = Vector3(0.66667, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room07_Lift/Exit00"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0762")
+shape = SubResource("BoxShape3D_0882")
 
 [node name="Exit01" type="StaticBody3D" parent="TERRAIN/Room07_Lift"]
 position = Vector3(519, 3.15, 0)
@@ -4097,7 +4797,7 @@ scale = Vector3(0.66667, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room07_Lift/Exit01"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0765")
+shape = SubResource("BoxShape3D_0885")
 
 [node name="InteriorCladding_13" type="Node3D" parent="TERRAIN/Room07_Lift"]
 
@@ -4176,13 +4876,515 @@ scale = Vector3(1.8333, 1.6, 1.9)
 position = Vector3(515.5, -5.85, -2.2)
 scale = Vector3(1.8333, 1, 1)
 
+[node name="BasementTurnback" type="Node3D" parent="TERRAIN"]
+
+[node name="Ingress00" type="StaticBody3D" parent="TERRAIN/BasementTurnback"]
+position = Vector3(523.8, 3.15, 0)
+rotation = Vector3(0, 0, 0)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/BasementTurnback/Ingress00" instance=ExtResource("RCDeck")]
+scale = Vector3(0.93333, 1, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/BasementTurnback/Ingress00"]
+position = Vector3(0, -0.42, 0)
+shape = SubResource("BoxShape3D_0908")
+
+[node name="IngressStep00" type="StaticBody3D" parent="TERRAIN/BasementTurnback"]
+position = Vector3(527.9, 4.03, 0)
+rotation = Vector3(0, 0, 0)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/BasementTurnback/IngressStep00" instance=ExtResource("RCDeck")]
+scale = Vector3(0.43333, 1, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/BasementTurnback/IngressStep00"]
+position = Vector3(0, -0.42, 0)
+shape = SubResource("BoxShape3D_0911")
+
+[node name="IngressStepRamp" type="StaticBody3D" parent="TERRAIN/BasementTurnback"]
+position = Vector3(530.45, 3.59, 0)
+rotation = Vector3(0, 0, -0.33846)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/BasementTurnback/IngressStepRamp" instance=ExtResource("RCDeck")]
+scale = Vector3(0.44173, 1, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/BasementTurnback/IngressStepRamp"]
+position = Vector3(0, -0.42, 0)
+shape = SubResource("BoxShape3D_0914")
+
+[node name="IngressLane00" type="StaticBody3D" parent="TERRAIN/BasementTurnback"]
+position = Vector3(534.05, 3.15, 0)
+rotation = Vector3(0, 0, 0)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/BasementTurnback/IngressLane00" instance=ExtResource("RCDeck")]
+scale = Vector3(0.78333, 1, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/BasementTurnback/IngressLane00"]
+position = Vector3(0, -0.42, 0)
+shape = SubResource("BoxShape3D_0917")
+
+[node name="IngressLane01" type="StaticBody3D" parent="TERRAIN/BasementTurnback"]
+position = Vector3(538.75, 3.15, 0)
+rotation = Vector3(0, 0, 0)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/BasementTurnback/IngressLane01" instance=ExtResource("RCDeck")]
+scale = Vector3(0.78333, 1, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/BasementTurnback/IngressLane01"]
+position = Vector3(0, -0.42, 0)
+shape = SubResource("BoxShape3D_0920")
+
+[node name="IngressLaneGradeIn0" type="StaticBody3D" parent="TERRAIN/BasementTurnback"]
+position = Vector3(542.08, 3.565, 0)
+rotation = Vector3(0, 0, 0.40241)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/BasementTurnback/IngressLaneGradeIn0" instance=ExtResource("RCDeck")]
+scale = Vector3(0.35322, 1, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/BasementTurnback/IngressLaneGradeIn0"]
+position = Vector3(0, -0.42, 0)
+shape = SubResource("BoxShape3D_0923")
+
+[node name="IngressLaneBench000" type="StaticBody3D" parent="TERRAIN/BasementTurnback"]
+position = Vector3(543.95, 3.98, 0)
+rotation = Vector3(0, 0, 0)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/BasementTurnback/IngressLaneBench000" instance=ExtResource("RCDeck")]
+scale = Vector3(0.3, 1, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/BasementTurnback/IngressLaneBench000"]
+position = Vector3(0, -0.42, 0)
+shape = SubResource("BoxShape3D_0926")
+
+[node name="IngressLaneGradeOut0" type="StaticBody3D" parent="TERRAIN/BasementTurnback"]
+position = Vector3(546.08, 3.565, 0)
+rotation = Vector3(0, 0, -0.32664)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/BasementTurnback/IngressLaneGradeOut0" instance=ExtResource("RCDeck")]
+scale = Vector3(0.43113, 1, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/BasementTurnback/IngressLaneGradeOut0"]
+position = Vector3(0, -0.42, 0)
+shape = SubResource("BoxShape3D_0929")
+
+[node name="IngressLaneRejoin00" type="StaticBody3D" parent="TERRAIN/BasementTurnback"]
+position = Vector3(549.65, 3.15, 0)
+rotation = Vector3(0, 0, 0)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/BasementTurnback/IngressLaneRejoin00" instance=ExtResource("RCDeck")]
+scale = Vector3(0.78333, 1, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/BasementTurnback/IngressLaneRejoin00"]
+position = Vector3(0, -0.42, 0)
+shape = SubResource("BoxShape3D_0932")
+
+[node name="IngressLaneRejoin01" type="StaticBody3D" parent="TERRAIN/BasementTurnback"]
+position = Vector3(554.35, 3.15, 0)
+rotation = Vector3(0, 0, 0)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/BasementTurnback/IngressLaneRejoin01" instance=ExtResource("RCDeck")]
+scale = Vector3(0.78333, 1, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/BasementTurnback/IngressLaneRejoin01"]
+position = Vector3(0, -0.42, 0)
+shape = SubResource("BoxShape3D_0935")
+
+[node name="LowerExitHeader" type="StaticBody3D" parent="TERRAIN/BasementTurnback"]
+position = Vector3(561.38, 2.675, 0)
+rotation = Vector3(0, 0, 0)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/BasementTurnback/LowerExitHeader" instance=ExtResource("RCWall")]
+scale = Vector3(1, 3.6588, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/BasementTurnback/LowerExitHeader"]
+position = Vector3(0, 0, 0)
+shape = SubResource("BoxShape3D_0938")
+
+[node name="Ceiling00" type="StaticBody3D" parent="TERRAIN/BasementTurnback"]
+position = Vector3(524.4, 10.35, 0)
+rotation = Vector3(0, 0, 0)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/BasementTurnback/Ceiling00" instance=ExtResource("RCDeck")]
+scale = Vector3(1.1333, 1, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/BasementTurnback/Ceiling00"]
+position = Vector3(0, -0.42, 0)
+shape = SubResource("BoxShape3D_0941")
+
+[node name="Ceiling01" type="StaticBody3D" parent="TERRAIN/BasementTurnback"]
+position = Vector3(531.2, 10.35, 0)
+rotation = Vector3(0, 0, 0)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/BasementTurnback/Ceiling01" instance=ExtResource("RCDeck")]
+scale = Vector3(1.1333, 1, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/BasementTurnback/Ceiling01"]
+position = Vector3(0, -0.42, 0)
+shape = SubResource("BoxShape3D_0944")
+
+[node name="Ceiling02" type="StaticBody3D" parent="TERRAIN/BasementTurnback"]
+position = Vector3(538, 10.35, 0)
+rotation = Vector3(0, 0, 0)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/BasementTurnback/Ceiling02" instance=ExtResource("RCDeck")]
+scale = Vector3(1.1333, 1, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/BasementTurnback/Ceiling02"]
+position = Vector3(0, -0.42, 0)
+shape = SubResource("BoxShape3D_0947")
+
+[node name="Ceiling03" type="StaticBody3D" parent="TERRAIN/BasementTurnback"]
+position = Vector3(544.8, 10.35, 0)
+rotation = Vector3(0, 0, 0)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/BasementTurnback/Ceiling03" instance=ExtResource("RCDeck")]
+scale = Vector3(1.1333, 1, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/BasementTurnback/Ceiling03"]
+position = Vector3(0, -0.42, 0)
+shape = SubResource("BoxShape3D_0950")
+
+[node name="Ceiling04" type="StaticBody3D" parent="TERRAIN/BasementTurnback"]
+position = Vector3(551.6, 10.35, 0)
+rotation = Vector3(0, 0, 0)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/BasementTurnback/Ceiling04" instance=ExtResource("RCDeck")]
+scale = Vector3(1.1333, 1, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/BasementTurnback/Ceiling04"]
+position = Vector3(0, -0.42, 0)
+shape = SubResource("BoxShape3D_0953")
+
+[node name="Ceiling05" type="StaticBody3D" parent="TERRAIN/BasementTurnback"]
+position = Vector3(558.4, 10.35, 0)
+rotation = Vector3(0, 0, 0)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/BasementTurnback/Ceiling05" instance=ExtResource("RCDeck")]
+scale = Vector3(1.1333, 1, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/BasementTurnback/Ceiling05"]
+position = Vector3(0, -0.42, 0)
+shape = SubResource("BoxShape3D_0956")
+
+[node name="CeilingButtress" type="StaticBody3D" parent="TERRAIN/BasementTurnback"]
+position = Vector3(561.38, 14.05, 0)
+rotation = Vector3(0, 0, 0)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/BasementTurnback/CeilingButtress" instance=ExtResource("RCWall")]
+scale = Vector3(1, 1.7412, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/BasementTurnback/CeilingButtress"]
+position = Vector3(0, 0, 0)
+shape = SubResource("BoxShape3D_0959")
+
+[node name="WestShaftWall" type="StaticBody3D" parent="TERRAIN/BasementTurnback"]
+position = Vector3(528.81, -5.75, 0)
+rotation = Vector3(0, 0, 0)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/BasementTurnback/WestShaftWall" instance=ExtResource("RCWall")]
+scale = Vector3(1, 1.5529, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/BasementTurnback/WestShaftWall"]
+position = Vector3(0, 0, 0)
+shape = SubResource("BoxShape3D_0962")
+
+[node name="WestGallery00" type="StaticBody3D" parent="TERRAIN/BasementTurnback"]
+position = Vector3(536.79, -3.05, 0)
+rotation = Vector3(0, 0, 0)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/BasementTurnback/WestGallery00" instance=ExtResource("RCDeck")]
+scale = Vector3(0.99733, 1, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/BasementTurnback/WestGallery00"]
+position = Vector3(0, -0.42, 0)
+shape = SubResource("BoxShape3D_0965")
+
+[node name="WestGallery01" type="StaticBody3D" parent="TERRAIN/BasementTurnback"]
+position = Vector3(542.78, -3.05, 0)
+rotation = Vector3(0, 0, 0)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/BasementTurnback/WestGallery01" instance=ExtResource("RCDeck")]
+scale = Vector3(0.99733, 1, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/BasementTurnback/WestGallery01"]
+position = Vector3(0, -0.42, 0)
+shape = SubResource("BoxShape3D_0968")
+
+[node name="GalleryPit" type="Area3D" parent="TERRAIN/BasementTurnback"]
+position = Vector3(548.32, -5.9, 0)
+script = ExtResource("RCPit")
+width = 5.100000000000023
+tint = Color(1.0, 0.3843, 0.7137, 1)
+
+[node name="EastGallery00" type="StaticBody3D" parent="TERRAIN/BasementTurnback"]
+position = Vector3(553.41, -3.05, 0)
+rotation = Vector3(0, 0, 0)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/BasementTurnback/EastGallery00" instance=ExtResource("RCDeck")]
+scale = Vector3(0.84767, 1, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/BasementTurnback/EastGallery00"]
+position = Vector3(0, -0.42, 0)
+shape = SubResource("BoxShape3D_0972")
+
+[node name="EastGallery01" type="StaticBody3D" parent="TERRAIN/BasementTurnback"]
+position = Vector3(558.5, -3.05, 0)
+rotation = Vector3(0, 0, 0)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/BasementTurnback/EastGallery01" instance=ExtResource("RCDeck")]
+scale = Vector3(0.84767, 1, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/BasementTurnback/EastGallery01"]
+position = Vector3(0, -0.42, 0)
+shape = SubResource("BoxShape3D_0975")
+
+[node name="Hazard" type="Area3D" parent="TERRAIN/BasementTurnback"]
+position = Vector3(554.6, -7.35, 0)
+script = ExtResource("RCBiome")
+dimensions = Vector3(2.6, 2.6, 2.65)
+tint = Color(1.0, 0.3843, 0.7137, 1)
+offset = 2.15
+period = 4.96
+terrain_strength = 1.0
+crossing_window_scale = 0.8
+power = 23
+direction = 1.0
+burnable_spore_pod = false
+kind = 4
+
+[node name="Basement00" type="StaticBody3D" parent="TERRAIN/BasementTurnback"]
+position = Vector3(532.33, -8.65, 0)
+rotation = Vector3(0, 0, 0)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/BasementTurnback/Basement00" instance=ExtResource("RCDeck")]
+scale = Vector3(1.0444, 1, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/BasementTurnback/Basement00"]
+position = Vector3(0, -0.42, 0)
+shape = SubResource("BoxShape3D_0979")
+
+[node name="Basement01" type="StaticBody3D" parent="TERRAIN/BasementTurnback"]
+position = Vector3(538.6, -8.65, 0)
+rotation = Vector3(0, 0, 0)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/BasementTurnback/Basement01" instance=ExtResource("RCDeck")]
+scale = Vector3(1.0444, 1, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/BasementTurnback/Basement01"]
+position = Vector3(0, -0.42, 0)
+shape = SubResource("BoxShape3D_0982")
+
+[node name="Basement02" type="StaticBody3D" parent="TERRAIN/BasementTurnback"]
+position = Vector3(544.87, -8.65, 0)
+rotation = Vector3(0, 0, 0)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/BasementTurnback/Basement02" instance=ExtResource("RCDeck")]
+scale = Vector3(1.0444, 1, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/BasementTurnback/Basement02"]
+position = Vector3(0, -0.42, 0)
+shape = SubResource("BoxShape3D_0985")
+
+[node name="Basement03" type="StaticBody3D" parent="TERRAIN/BasementTurnback"]
+position = Vector3(551.13, -8.65, 0)
+rotation = Vector3(0, 0, 0)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/BasementTurnback/Basement03" instance=ExtResource("RCDeck")]
+scale = Vector3(1.0444, 1, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/BasementTurnback/Basement03"]
+position = Vector3(0, -0.42, 0)
+shape = SubResource("BoxShape3D_0988")
+
+[node name="Basement04" type="StaticBody3D" parent="TERRAIN/BasementTurnback"]
+position = Vector3(557.4, -8.65, 0)
+rotation = Vector3(0, 0, 0)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/BasementTurnback/Basement04" instance=ExtResource("RCDeck")]
+scale = Vector3(1.0444, 1, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/BasementTurnback/Basement04"]
+position = Vector3(0, -0.42, 0)
+shape = SubResource("BoxShape3D_0991")
+
+[node name="Basement05" type="StaticBody3D" parent="TERRAIN/BasementTurnback"]
+position = Vector3(563.67, -8.65, 0)
+rotation = Vector3(0, 0, 0)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/BasementTurnback/Basement05" instance=ExtResource("RCDeck")]
+scale = Vector3(1.0444, 1, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/BasementTurnback/Basement05"]
+position = Vector3(0, -0.42, 0)
+shape = SubResource("BoxShape3D_0994")
+
+[node name="BasementHazard" type="Area3D" parent="TERRAIN/BasementTurnback"]
+position = Vector3(546.5, -7.35, 0)
+script = ExtResource("RCBiome")
+dimensions = Vector3(3.1, 2.6, 2.65)
+tint = Color(1.0, 0.3843, 0.7137, 1)
+offset = 2.15
+period = 4.96
+terrain_strength = 1.0
+crossing_window_scale = 0.8
+power = 23
+direction = 1.0
+burnable_spore_pod = false
+kind = 7
+
+[node name="DrainRise" type="StaticBody3D" parent="TERRAIN/BasementTurnback"]
+position = Vector3(575.54, -3.925, 0)
+rotation = Vector3(0, 0, 0.49555)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/BasementTurnback/DrainRise" instance=ExtResource("RCDeck")]
+scale = Vector3(3.3122, 1, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/BasementTurnback/DrainRise"]
+position = Vector3(0, -0.42, 0)
+shape = SubResource("BoxShape3D_0998")
+
+[node name="InteriorCladding_53" type="Node3D" parent="TERRAIN/BasementTurnback"]
+
+[node name="Bulkhead0" parent="TERRAIN/BasementTurnback/InteriorCladding_53" instance=ExtResource("RCRoom")]
+position = Vector3(524.16, -10.75, -3.4)
+scale = Vector3(1.0547, 4.1375, 1)
+
+[node name="Bulkhead1" parent="TERRAIN/BasementTurnback/InteriorCladding_53" instance=ExtResource("RCRoom")]
+position = Vector3(530.49, -10.75, -3.4)
+scale = Vector3(1.0547, 4.1375, 1)
+
+[node name="BayLight1" type="OmniLight3D" parent="TERRAIN/BasementTurnback/InteriorCladding_53"]
+position = Vector3(530.49, 20.45, -1.85)
+light_color = Color(1.0, 0.3843, 0.7137, 1)
+light_energy = 0.8
+omni_range = 8.5
+
+[node name="Bulkhead2" parent="TERRAIN/BasementTurnback/InteriorCladding_53" instance=ExtResource("RCRoom")]
+position = Vector3(536.82, -10.75, -4)
+scale = Vector3(1.0547, 4.1375, 1)
+
+[node name="Bulkhead3" parent="TERRAIN/BasementTurnback/InteriorCladding_53" instance=ExtResource("RCRoom")]
+position = Vector3(543.15, -10.75, -3.4)
+scale = Vector3(1.0547, 4.1375, 1)
+
+[node name="Bulkhead4" parent="TERRAIN/BasementTurnback/InteriorCladding_53" instance=ExtResource("RCRoom")]
+position = Vector3(549.48, -10.75, -3.4)
+scale = Vector3(1.0547, 4.1375, 1)
+
+[node name="SectorFixture4" parent="TERRAIN/BasementTurnback/InteriorCladding_53" instance=ExtResource("RCFixture")]
+position = Vector3(549.48, -8.9, -2.67)
+
+[node name="BayLight4" type="OmniLight3D" parent="TERRAIN/BasementTurnback/InteriorCladding_53"]
+position = Vector3(549.48, 20.45, -1.85)
+light_color = Color(1.0, 0.3843, 0.7137, 1)
+light_energy = 0.8
+omni_range = 8.5
+
+[node name="Bulkhead5" parent="TERRAIN/BasementTurnback/InteriorCladding_53" instance=ExtResource("RCRoom")]
+position = Vector3(555.81, -10.75, -4)
+scale = Vector3(1.0547, 4.1375, 1)
+
+[node name="Bulkhead6" parent="TERRAIN/BasementTurnback/InteriorCladding_53" instance=ExtResource("RCRoom")]
+position = Vector3(562.13, -10.75, -3.4)
+scale = Vector3(1.0547, 4.1375, 1)
+
+[node name="Bulkhead7" parent="TERRAIN/BasementTurnback/InteriorCladding_53" instance=ExtResource("RCRoom")]
+position = Vector3(568.46, -10.75, -3.4)
+scale = Vector3(1.0547, 4.1375, 1)
+
+[node name="BayLight7" type="OmniLight3D" parent="TERRAIN/BasementTurnback/InteriorCladding_53"]
+position = Vector3(568.46, 20.45, -1.85)
+light_color = Color(1.0, 0.3843, 0.7137, 1)
+light_energy = 0.8
+omni_range = 8.5
+
+[node name="Bulkhead8" parent="TERRAIN/BasementTurnback/InteriorCladding_53" instance=ExtResource("RCRoom")]
+position = Vector3(574.79, -10.75, -4)
+scale = Vector3(1.0547, 4.1375, 1)
+
+[node name="Bulkhead9" parent="TERRAIN/BasementTurnback/InteriorCladding_53" instance=ExtResource("RCRoom")]
+position = Vector3(581.12, -10.75, -3.4)
+scale = Vector3(1.0547, 4.1375, 1)
+
+[node name="SectorFixture9" parent="TERRAIN/BasementTurnback/InteriorCladding_53" instance=ExtResource("RCFixture")]
+position = Vector3(581.12, -8.9, -2.67)
+
+[node name="Ceiling0" parent="TERRAIN/BasementTurnback/InteriorCladding_53" instance=ExtResource("RCDeck")]
+position = Vector3(527.33, 22.35, -1.25)
+scale = Vector3(2.1094, 1.6, 1.9)
+
+[node name="Foundation0" parent="TERRAIN/BasementTurnback/InteriorCladding_53" instance=ExtResource("RCRoom")]
+position = Vector3(527.33, -18.65, -2.2)
+scale = Vector3(2.1094, 1, 1)
+
+[node name="Ceiling1" parent="TERRAIN/BasementTurnback/InteriorCladding_53" instance=ExtResource("RCDeck")]
+position = Vector3(539.98, 22.35, -1.25)
+scale = Vector3(2.1094, 1.6, 1.9)
+
+[node name="Foundation1" parent="TERRAIN/BasementTurnback/InteriorCladding_53" instance=ExtResource("RCRoom")]
+position = Vector3(539.98, -18.65, -2.2)
+scale = Vector3(2.1094, 1, 1)
+
+[node name="Ceiling2" parent="TERRAIN/BasementTurnback/InteriorCladding_53" instance=ExtResource("RCDeck")]
+position = Vector3(552.64, 22.35, -1.25)
+scale = Vector3(2.1094, 1.6, 1.9)
+
+[node name="Foundation2" parent="TERRAIN/BasementTurnback/InteriorCladding_53" instance=ExtResource("RCRoom")]
+position = Vector3(552.64, -18.65, -2.2)
+scale = Vector3(2.1094, 1, 1)
+
+[node name="Ceiling3" parent="TERRAIN/BasementTurnback/InteriorCladding_53" instance=ExtResource("RCDeck")]
+position = Vector3(565.3, 22.35, -1.25)
+scale = Vector3(2.1094, 1.6, 1.9)
+
+[node name="Foundation3" parent="TERRAIN/BasementTurnback/InteriorCladding_53" instance=ExtResource("RCRoom")]
+position = Vector3(565.3, -18.65, -2.2)
+scale = Vector3(2.1094, 1, 1)
+
+[node name="Ceiling4" parent="TERRAIN/BasementTurnback/InteriorCladding_53" instance=ExtResource("RCDeck")]
+position = Vector3(577.95, 22.35, -1.25)
+scale = Vector3(2.1094, 1.6, 1.9)
+
+[node name="Foundation4" parent="TERRAIN/BasementTurnback/InteriorCladding_53" instance=ExtResource("RCRoom")]
+position = Vector3(577.95, -18.65, -2.2)
+scale = Vector3(2.1094, 1, 1)
+
 [node name="Room08_Hall" type="Node3D" parent="TERRAIN"]
 position = Vector3(0, 0, 0)
-metadata/entry_x = 521
-metadata/entry_y = 3.15
+metadata/entry_x = 584.2824999999999
+metadata/entry_y = 0.8
 
 [node name="Entry00" type="StaticBody3D" parent="TERRAIN/Room08_Hall"]
-position = Vector3(524.5, 3.15, 0)
+position = Vector3(587.78, 0.8, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
@@ -4191,10 +5393,10 @@ scale = Vector3(1.1667, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room08_Hall/Entry00"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0788")
+shape = SubResource("BoxShape3D_1028")
 
 [node name="Approach00" type="StaticBody3D" parent="TERRAIN/Room08_Hall"]
-position = Vector3(530, 3.15, 0)
+position = Vector3(593.28, 0.8, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
@@ -4203,22 +5405,22 @@ scale = Vector3(0.66667, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room08_Hall/Approach00"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0791")
+shape = SubResource("BoxShape3D_1031")
 
 [node name="Incline" type="StaticBody3D" parent="TERRAIN/Room08_Hall"]
-position = Vector3(540.5, 1.975, 0)
-rotation = Vector3(0, 0, -0.13736)
+position = Vector3(596.78, 0.8, 0)
+rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
 [node name="Art" parent="TERRAIN/Room08_Hall/Incline" instance=ExtResource("RCDeck")]
-scale = Vector3(2.8603, 1, 1)
+scale = Vector3(0.5, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room08_Hall/Incline"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0794")
+shape = SubResource("BoxShape3D_1034")
 
 [node name="Transition" type="StaticBody3D" parent="TERRAIN/Room08_Hall"]
-position = Vector3(550, 0.8, 0)
+position = Vector3(599.28, 0.8, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
@@ -4227,34 +5429,39 @@ scale = Vector3(0.33333, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room08_Hall/Transition"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0797")
+shape = SubResource("BoxShape3D_1037")
+
+[node name="AlcoveHatch" parent="TERRAIN/Room08_Hall" instance=ExtResource("RCHatch")]
+position = Vector3(602.58, 3.95, 0)
+deck_width = 4.2
+climb_height = 3.1500000000000004
 
 [node name="MaintenanceAlcove" type="StaticBody3D" parent="TERRAIN/Room08_Hall" groups=["factory_drop_through"]]
-position = Vector3(555.05, 3.25, 0)
+position = Vector3(606.43, 3.95, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
 [node name="Art" parent="TERRAIN/Room08_Hall/MaintenanceAlcove" instance=ExtResource("RCDeck")]
-scale = Vector3(1.2833, 0.54762, 1)
+scale = Vector3(0.58333, 0.54762, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room08_Hall/MaintenanceAlcove"]
 position = Vector3(0, -0.23, 0)
-shape = SubResource("BoxShape3D_0800")
+shape = SubResource("BoxShape3D_1041")
 
 [node name="AlcoveCeiling" type="StaticBody3D" parent="TERRAIN/Room08_Hall" groups=["factory_drop_through"]]
-position = Vector3(555.72, 5.6, 0)
+position = Vector3(606.43, 6.3, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
 [node name="Art" parent="TERRAIN/Room08_Hall/AlcoveCeiling" instance=ExtResource("RCDeck")]
-scale = Vector3(1.0583, 0.54762, 1)
+scale = Vector3(0.58333, 0.54762, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room08_Hall/AlcoveCeiling"]
 position = Vector3(0, -0.23, 0)
-shape = SubResource("BoxShape3D_0803")
+shape = SubResource("BoxShape3D_1044")
 
 [node name="AlcoveEnd" type="StaticBody3D" parent="TERRAIN/Room08_Hall"]
-position = Vector3(558.75, 4.3, 0)
+position = Vector3(608.03, 5, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
@@ -4263,15 +5470,15 @@ scale = Vector3(1, 0.49412, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room08_Hall/AlcoveEnd"]
 position = Vector3(0, 0, 0)
-shape = SubResource("BoxShape3D_0806")
+shape = SubResource("BoxShape3D_1047")
 
 [node name="FracturedBarricade" type="StaticBody3D" parent="TERRAIN/Room08_Hall"]
-position = Vector3(553.15, 3.25, 0)
+position = Vector3(605.18, 3.95, 0)
 script = ExtResource("RCBarricade")
 accent = Color(1.0, 0.3843, 0.7137, 1)
 
 [node name="InteriorCache09" type="Area3D" parent="TERRAIN" groups=["factory_salvage_chest"]]
-position = Vector3(556.7, 3.25, 0)
+position = Vector3(606.93, 3.95, 0)
 script = ExtResource("RCCacheScript")
 sector = 7
 blueprint = ""
@@ -4288,7 +5495,7 @@ position = Vector3(0, 0.56, 0)
 shape = SubResource("RCCacheShape")
 
 [node name="Exit00" type="StaticBody3D" parent="TERRAIN/Room08_Hall"]
-position = Vector3(553, 0.8, 0)
+position = Vector3(602.28, 0.8, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
@@ -4297,10 +5504,10 @@ scale = Vector3(0.66667, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room08_Hall/Exit00"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0813")
+shape = SubResource("BoxShape3D_1054")
 
 [node name="Exit01" type="StaticBody3D" parent="TERRAIN/Room08_Hall"]
-position = Vector3(557, 0.8, 0)
+position = Vector3(606.28, 0.8, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
@@ -4309,77 +5516,55 @@ scale = Vector3(0.66667, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room08_Hall/Exit01"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0816")
+shape = SubResource("BoxShape3D_1057")
 
 [node name="InteriorCladding_14" type="Node3D" parent="TERRAIN/Room08_Hall"]
 
 [node name="Bulkhead0" parent="TERRAIN/Room08_Hall/InteriorCladding_14" instance=ExtResource("RCRoom")]
-position = Vector3(524.17, -0.3, -3.4)
-scale = Vector3(1.0556, 3.0188, 1)
+position = Vector3(587.28, -0.3, -3.4)
+scale = Vector3(1, 2.725, 1)
 
 [node name="Bulkhead1" parent="TERRAIN/Room08_Hall/InteriorCladding_14" instance=ExtResource("RCRoom")]
-position = Vector3(530.5, -0.3, -3.4)
-scale = Vector3(1.0556, 3.0188, 1)
+position = Vector3(593.28, -0.3, -3.4)
+scale = Vector3(1, 2.725, 1)
 
 [node name="BayLight1" type="OmniLight3D" parent="TERRAIN/Room08_Hall/InteriorCladding_14"]
-position = Vector3(530.5, 21.95, -1.85)
+position = Vector3(593.28, 19.6, -1.85)
 light_color = Color(1.0, 0.3843, 0.7137, 1)
 light_energy = 0.8
 omni_range = 8.5
 
 [node name="Bulkhead2" parent="TERRAIN/Room08_Hall/InteriorCladding_14" instance=ExtResource("RCRoom")]
-position = Vector3(536.83, -0.3, -4)
-scale = Vector3(1.0556, 3.0188, 1)
+position = Vector3(599.28, -0.3, -4)
+scale = Vector3(1, 2.725, 1)
 
 [node name="Bulkhead3" parent="TERRAIN/Room08_Hall/InteriorCladding_14" instance=ExtResource("RCRoom")]
-position = Vector3(543.17, -0.3, -3.4)
-scale = Vector3(1.0556, 3.0188, 1)
+position = Vector3(605.28, -0.3, -3.4)
+scale = Vector3(1, 2.725, 1)
 
 [node name="SectorFixture3" parent="TERRAIN/Room08_Hall/InteriorCladding_14" instance=ExtResource("RCFixture")]
-position = Vector3(543.17, 1.55, -2.67)
-
-[node name="Bulkhead4" parent="TERRAIN/Room08_Hall/InteriorCladding_14" instance=ExtResource("RCRoom")]
-position = Vector3(549.5, -0.3, -3.4)
-scale = Vector3(1.0556, 3.0188, 1)
-
-[node name="BayLight4" type="OmniLight3D" parent="TERRAIN/Room08_Hall/InteriorCladding_14"]
-position = Vector3(549.5, 21.95, -1.85)
-light_color = Color(1.0, 0.3843, 0.7137, 1)
-light_energy = 0.8
-omni_range = 8.5
-
-[node name="Bulkhead5" parent="TERRAIN/Room08_Hall/InteriorCladding_14" instance=ExtResource("RCRoom")]
-position = Vector3(555.83, -0.3, -4)
-scale = Vector3(1.0556, 3.0188, 1)
+position = Vector3(605.28, 1.55, -2.67)
 
 [node name="Ceiling0" parent="TERRAIN/Room08_Hall/InteriorCladding_14" instance=ExtResource("RCDeck")]
-position = Vector3(527.33, 23.85, -1.25)
-scale = Vector3(2.1111, 1.6, 1.9)
+position = Vector3(590.28, 21.5, -1.25)
+scale = Vector3(2, 1.6, 1.9)
 
 [node name="Foundation0" parent="TERRAIN/Room08_Hall/InteriorCladding_14" instance=ExtResource("RCRoom")]
-position = Vector3(527.33, -8.2, -2.2)
-scale = Vector3(2.1111, 1, 1)
+position = Vector3(590.28, -8.2, -2.2)
+scale = Vector3(2, 1, 1)
 
 [node name="Ceiling1" parent="TERRAIN/Room08_Hall/InteriorCladding_14" instance=ExtResource("RCDeck")]
-position = Vector3(540, 23.85, -1.25)
-scale = Vector3(2.1111, 1.6, 1.9)
+position = Vector3(602.28, 21.5, -1.25)
+scale = Vector3(2, 1.6, 1.9)
 
 [node name="Foundation1" parent="TERRAIN/Room08_Hall/InteriorCladding_14" instance=ExtResource("RCRoom")]
-position = Vector3(540, -8.2, -2.2)
-scale = Vector3(2.1111, 1, 1)
-
-[node name="Ceiling2" parent="TERRAIN/Room08_Hall/InteriorCladding_14" instance=ExtResource("RCDeck")]
-position = Vector3(552.67, 23.85, -1.25)
-scale = Vector3(2.1111, 1.6, 1.9)
-
-[node name="Foundation2" parent="TERRAIN/Room08_Hall/InteriorCladding_14" instance=ExtResource("RCRoom")]
-position = Vector3(552.67, -8.2, -2.2)
-scale = Vector3(2.1111, 1, 1)
+position = Vector3(602.28, -8.2, -2.2)
+scale = Vector3(2, 1, 1)
 
 [node name="BossWing" type="Node3D" parent="TERRAIN"]
 
 [node name="Antechamber00" type="StaticBody3D" parent="TERRAIN/BossWing"]
-position = Vector3(561.5, 0.8, 0)
+position = Vector3(610.78, 0.8, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
@@ -4388,10 +5573,10 @@ scale = Vector3(0.83333, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/BossWing/Antechamber00"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0836")
+shape = SubResource("BoxShape3D_1072")
 
 [node name="Antechamber01" type="StaticBody3D" parent="TERRAIN/BossWing"]
-position = Vector3(566.5, 0.8, 0)
+position = Vector3(615.78, 0.8, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
@@ -4400,149 +5585,149 @@ scale = Vector3(0.83333, 1, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/BossWing/Antechamber01"]
 position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0839")
+shape = SubResource("BoxShape3D_1075")
 
 [node name="ArenaDeck0" parent="TERRAIN/BossWing" instance=ExtResource("RCDeck")]
-position = Vector3(572, 0.8, 0)
+position = Vector3(621.28, 0.8, 0)
 
 [node name="ArenaDeck1" parent="TERRAIN/BossWing" instance=ExtResource("RCDeck")]
-position = Vector3(578, 0.8, 0)
+position = Vector3(627.28, 0.8, 0)
 
 [node name="ArenaDeck2" parent="TERRAIN/BossWing" instance=ExtResource("RCDeck")]
-position = Vector3(584, 0.8, 0)
+position = Vector3(633.28, 0.8, 0)
 
 [node name="ArenaDeck3" parent="TERRAIN/BossWing" instance=ExtResource("RCDeck")]
-position = Vector3(590, 0.8, 0)
+position = Vector3(639.28, 0.8, 0)
 
 [node name="ArenaDeck4" parent="TERRAIN/BossWing" instance=ExtResource("RCDeck")]
-position = Vector3(596, 0.8, 0)
+position = Vector3(645.28, 0.8, 0)
 
 [node name="ArenaDeck5" parent="TERRAIN/BossWing" instance=ExtResource("RCDeck")]
-position = Vector3(602, 0.8, 0)
+position = Vector3(651.28, 0.8, 0)
 
 [node name="ArenaDeck6" parent="TERRAIN/BossWing" instance=ExtResource("RCDeck")]
-position = Vector3(608, 0.8, 0)
+position = Vector3(657.28, 0.8, 0)
 
 [node name="ArenaDeck7" parent="TERRAIN/BossWing" instance=ExtResource("RCDeck")]
-position = Vector3(614, 0.8, 0)
+position = Vector3(663.28, 0.8, 0)
 
 [node name="ArenaDeck8" parent="TERRAIN/BossWing" instance=ExtResource("RCDeck")]
-position = Vector3(620, 0.8, 0)
+position = Vector3(669.28, 0.8, 0)
 
 [node name="InteriorCladding_3" type="Node3D" parent="TERRAIN/BossWing"]
 
 [node name="Bulkhead0" parent="TERRAIN/BossWing/InteriorCladding_3" instance=ExtResource("RCRoom")]
-position = Vector3(562.15, -0.3, -3.4)
+position = Vector3(611.43, -0.3, -3.4)
 scale = Vector3(1.0507, 2.8875, 1)
 
 [node name="BayLight0" type="OmniLight3D" parent="TERRAIN/BossWing/InteriorCladding_3"]
-position = Vector3(562.15, 20.9, -1.85)
+position = Vector3(611.43, 20.9, -1.85)
 light_color = Color(1.0, 0.3843, 0.7137, 1)
 light_energy = 0.8
 omni_range = 8.5
 
 [node name="Bulkhead1" parent="TERRAIN/BossWing/InteriorCladding_3" instance=ExtResource("RCRoom")]
-position = Vector3(568.46, -0.3, -4)
+position = Vector3(617.74, -0.3, -4)
 scale = Vector3(1.0507, 2.8875, 1)
 
 [node name="Bulkhead2" parent="TERRAIN/BossWing/InteriorCladding_3" instance=ExtResource("RCRoom")]
-position = Vector3(574.76, -0.3, -3.4)
+position = Vector3(624.04, -0.3, -3.4)
 scale = Vector3(1.0507, 2.8875, 1)
 
 [node name="Bulkhead3" parent="TERRAIN/BossWing/InteriorCladding_3" instance=ExtResource("RCRoom")]
-position = Vector3(581.06, -0.3, -3.4)
+position = Vector3(630.35, -0.3, -3.4)
 scale = Vector3(1.0507, 2.8875, 1)
 
 [node name="BayLight3" type="OmniLight3D" parent="TERRAIN/BossWing/InteriorCladding_3"]
-position = Vector3(581.06, 20.9, -1.85)
+position = Vector3(630.35, 20.9, -1.85)
 light_color = Color(1.0, 0.3843, 0.7137, 1)
 light_energy = 0.8
 omni_range = 8.5
 
 [node name="Bulkhead4" parent="TERRAIN/BossWing/InteriorCladding_3" instance=ExtResource("RCRoom")]
-position = Vector3(587.37, -0.3, -4)
+position = Vector3(636.65, -0.3, -4)
 scale = Vector3(1.0507, 2.8875, 1)
 
 [node name="SectorFixture4" parent="TERRAIN/BossWing/InteriorCladding_3" instance=ExtResource("RCFixture")]
-position = Vector3(587.37, 1.55, -3.27)
+position = Vector3(636.65, 1.55, -3.27)
 
 [node name="Bulkhead5" parent="TERRAIN/BossWing/InteriorCladding_3" instance=ExtResource("RCRoom")]
-position = Vector3(593.67, -0.3, -3.4)
+position = Vector3(642.95, -0.3, -3.4)
 scale = Vector3(1.0507, 2.8875, 1)
 
 [node name="Bulkhead6" parent="TERRAIN/BossWing/InteriorCladding_3" instance=ExtResource("RCRoom")]
-position = Vector3(599.98, -0.3, -3.4)
+position = Vector3(649.26, -0.3, -3.4)
 scale = Vector3(1.0507, 2.8875, 1)
 
 [node name="BayLight6" type="OmniLight3D" parent="TERRAIN/BossWing/InteriorCladding_3"]
-position = Vector3(599.98, 20.9, -1.85)
+position = Vector3(649.26, 20.9, -1.85)
 light_color = Color(1.0, 0.3843, 0.7137, 1)
 light_energy = 0.8
 omni_range = 8.5
 
 [node name="Bulkhead7" parent="TERRAIN/BossWing/InteriorCladding_3" instance=ExtResource("RCRoom")]
-position = Vector3(606.28, -0.3, -4)
+position = Vector3(655.56, -0.3, -4)
 scale = Vector3(1.0507, 2.8875, 1)
 
 [node name="Bulkhead8" parent="TERRAIN/BossWing/InteriorCladding_3" instance=ExtResource("RCRoom")]
-position = Vector3(612.58, -0.3, -3.4)
+position = Vector3(661.87, -0.3, -3.4)
 scale = Vector3(1.0507, 2.8875, 1)
 
 [node name="Bulkhead9" parent="TERRAIN/BossWing/InteriorCladding_3" instance=ExtResource("RCRoom")]
-position = Vector3(618.89, -0.3, -3.4)
+position = Vector3(668.17, -0.3, -3.4)
 scale = Vector3(1.0507, 2.8875, 1)
 
 [node name="SectorFixture9" parent="TERRAIN/BossWing/InteriorCladding_3" instance=ExtResource("RCFixture")]
-position = Vector3(618.89, 1.55, -2.67)
+position = Vector3(668.17, 1.55, -2.67)
 
 [node name="BayLight9" type="OmniLight3D" parent="TERRAIN/BossWing/InteriorCladding_3"]
-position = Vector3(618.89, 20.9, -1.85)
+position = Vector3(668.17, 20.9, -1.85)
 light_color = Color(1.0, 0.3843, 0.7137, 1)
 light_energy = 0.8
 omni_range = 8.5
 
 [node name="Ceiling0" parent="TERRAIN/BossWing/InteriorCladding_3" instance=ExtResource("RCDeck")]
-position = Vector3(565.3, 22.8, -1.25)
+position = Vector3(614.59, 22.8, -1.25)
 scale = Vector3(2.1013, 1.6, 1.9)
 
 [node name="Foundation0" parent="TERRAIN/BossWing/InteriorCladding_3" instance=ExtResource("RCRoom")]
-position = Vector3(565.3, -8.2, -2.2)
+position = Vector3(614.59, -8.2, -2.2)
 scale = Vector3(2.1013, 1, 1)
 
 [node name="Ceiling1" parent="TERRAIN/BossWing/InteriorCladding_3" instance=ExtResource("RCDeck")]
-position = Vector3(577.91, 22.8, -1.25)
+position = Vector3(627.19, 22.8, -1.25)
 scale = Vector3(2.1013, 1.6, 1.9)
 
 [node name="Foundation1" parent="TERRAIN/BossWing/InteriorCladding_3" instance=ExtResource("RCRoom")]
-position = Vector3(577.91, -8.2, -2.2)
+position = Vector3(627.19, -8.2, -2.2)
 scale = Vector3(2.1013, 1, 1)
 
 [node name="Ceiling2" parent="TERRAIN/BossWing/InteriorCladding_3" instance=ExtResource("RCDeck")]
-position = Vector3(590.52, 22.8, -1.25)
+position = Vector3(639.8, 22.8, -1.25)
 scale = Vector3(2.1013, 1.6, 1.9)
 
 [node name="Foundation2" parent="TERRAIN/BossWing/InteriorCladding_3" instance=ExtResource("RCRoom")]
-position = Vector3(590.52, -8.2, -2.2)
+position = Vector3(639.8, -8.2, -2.2)
 scale = Vector3(2.1013, 1, 1)
 
 [node name="Ceiling3" parent="TERRAIN/BossWing/InteriorCladding_3" instance=ExtResource("RCDeck")]
-position = Vector3(603.13, 22.8, -1.25)
+position = Vector3(652.41, 22.8, -1.25)
 scale = Vector3(2.1013, 1.6, 1.9)
 
 [node name="Foundation3" parent="TERRAIN/BossWing/InteriorCladding_3" instance=ExtResource("RCRoom")]
-position = Vector3(603.13, -8.2, -2.2)
+position = Vector3(652.41, -8.2, -2.2)
 scale = Vector3(2.1013, 1, 1)
 
 [node name="Ceiling4" parent="TERRAIN/BossWing/InteriorCladding_3" instance=ExtResource("RCDeck")]
-position = Vector3(615.74, 22.8, -1.25)
+position = Vector3(665.02, 22.8, -1.25)
 scale = Vector3(2.1013, 1.6, 1.9)
 
 [node name="Foundation4" parent="TERRAIN/BossWing/InteriorCladding_3" instance=ExtResource("RCRoom")]
-position = Vector3(615.74, -8.2, -2.2)
+position = Vector3(665.02, -8.2, -2.2)
 scale = Vector3(2.1013, 1, 1)
 
 [node name="TacticalDeck0" type="StaticBody3D" parent="TERRAIN/BossWing" groups=["factory_drop_through"]]
-position = Vector3(578.41, 5.6, 0)
+position = Vector3(627.69, 5.6, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
@@ -4551,16 +5736,16 @@ scale = Vector3(1, 0.54762, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/BossWing/TacticalDeck0"]
 position = Vector3(0, -0.23, 0)
-shape = SubResource("BoxShape3D_0878")
+shape = SubResource("BoxShape3D_1114")
 
 [node name="TacticalLight0" type="OmniLight3D" parent="TERRAIN/BossWing"]
-position = Vector3(578.41, 6.7, -1.6)
+position = Vector3(627.69, 6.7, -1.6)
 light_color = Color(1.0, 0.3843, 0.7137, 1)
 light_energy = 1.55
 omni_range = 5.6
 
 [node name="TacticalDeck1" type="StaticBody3D" parent="TERRAIN/BossWing" groups=["factory_drop_through"]]
-position = Vector3(595.81, 7, 0)
+position = Vector3(645.1, 7, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
@@ -4569,16 +5754,16 @@ scale = Vector3(1.1667, 0.54762, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/BossWing/TacticalDeck1"]
 position = Vector3(0, -0.23, 0)
-shape = SubResource("BoxShape3D_0882")
+shape = SubResource("BoxShape3D_1118")
 
 [node name="TacticalLight1" type="OmniLight3D" parent="TERRAIN/BossWing"]
-position = Vector3(595.81, 8.1, -1.6)
+position = Vector3(645.1, 8.1, -1.6)
 light_color = Color(1.0, 0.3843, 0.7137, 1)
 light_energy = 1.55
 omni_range = 5.6
 
 [node name="TacticalDeck2" type="StaticBody3D" parent="TERRAIN/BossWing" groups=["factory_drop_through"]]
-position = Vector3(606.16, 4.7, 0)
+position = Vector3(655.44, 4.7, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
@@ -4587,22 +5772,23 @@ scale = Vector3(1.1667, 0.54762, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/BossWing/TacticalDeck2"]
 position = Vector3(0, -0.23, 0)
-shape = SubResource("BoxShape3D_0886")
+shape = SubResource("BoxShape3D_1122")
 
 [node name="TacticalLight2" type="OmniLight3D" parent="TERRAIN/BossWing"]
-position = Vector3(606.16, 5.8, -1.6)
+position = Vector3(655.44, 5.8, -1.6)
 light_color = Color(1.0, 0.3843, 0.7137, 1)
 light_energy = 1.55
 omni_range = 5.6
 
 [node name="ArenaMovementField" type="Area3D" parent="TERRAIN/BossWing"]
-position = Vector3(584.05, 2.1, 0)
+position = Vector3(633.34, 2.1, 0)
 script = ExtResource("RCBiome")
 dimensions = Vector3(5.8, 2.6, 2.65)
 tint = Color(1.0, 0.3843, 0.7137, 1)
 offset = 2.15
 period = 4.96
 terrain_strength = 1.0
+crossing_window_scale = 1.0
 power = 23
 direction = -1
 burnable_spore_pod = false
@@ -4618,10 +5804,10 @@ scale = Vector3(1, 2.5882, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/BossWing/SealedAirlock"]
 position = Vector3(0, 0, 0)
-shape = SubResource("BoxShape3D_0891")
+shape = SubResource("BoxShape3D_1127")
 
 [node name="ForgeHallDoorHeader" type="StaticBody3D" parent="TERRAIN/BossWing"]
-position = Vector3(561.15, 9.19, 0)
+position = Vector3(610.43, 9.19, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
@@ -4630,10 +5816,10 @@ scale = Vector3(1, 0.89882, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/BossWing/ForgeHallDoorHeader"]
 position = Vector3(0, 0, 0)
-shape = SubResource("BoxShape3D_0894")
+shape = SubResource("BoxShape3D_1130")
 
 [node name="GateHeader" type="StaticBody3D" parent="TERRAIN/BossWing"]
-position = Vector3(569, 9.19, 0)
+position = Vector3(618.28, 9.19, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
@@ -4642,10 +5828,10 @@ scale = Vector3(1, 0.89882, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/BossWing/GateHeader"]
 position = Vector3(0, 0, 0)
-shape = SubResource("BoxShape3D_0897")
+shape = SubResource("BoxShape3D_1133")
 
 [node name="ExitBarrierHeader" type="StaticBody3D" parent="TERRAIN/BossWing"]
-position = Vector3(615, 9.19, 0)
+position = Vector3(664.28, 9.19, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
@@ -4654,4 +5840,4 @@ scale = Vector3(1, 0.89882, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/BossWing/ExitBarrierHeader"]
 position = Vector3(0, 0, 0)
-shape = SubResource("BoxShape3D_0900")
+shape = SubResource("BoxShape3D_1136")

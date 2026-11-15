@@ -59,10 +59,9 @@ func _collect(body: Node3D) -> void:
 	collect_fx.call_deferred()
 	match kind:
 		Kind.HEALTH:
-			player.health = player.max_health if full_heal else minf(player.max_health, player.health + (50.0 if large else 25.0) * player.healing_pickup_multiplier)
-			player.health_changed.emit(player.health, player.max_health)
+			player.restore_health(player.max_health if full_heal else (50.0 if large else 25.0) * player.healing_pickup_multiplier, true)
 		Kind.ENERGY:
-			player.restore_energy(60.0 if large else 30.0)
+			player.restore_energy(60.0 if large else 30.0, true)
 		Kind.CREDITS:
 			player.credits += roundi((30.0 if large else 10.0) * player.salvage_multiplier)
 			player.credits_changed.emit(player.credits)

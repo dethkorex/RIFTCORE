@@ -23,7 +23,7 @@ static func catalog() -> Array[Dictionary]:
 					detail = "+%d HP  ·  %.1f%% resistance" % [stats.hp, fraction * 100]
 				"core":
 					stats = {"energy": 3 + index, "charge": 1.0 - fraction}
-					detail = "+%d energy  ·  %.1f%% lower charge cost" % [stats.energy, fraction * 100]
+					detail = "+%d energy  ·  %.1f%% lower boss-weapon charge cost" % [stats.energy, fraction * 100]
 				"utility":
 					stats = {"speed": 1.0 + fraction, "dash": 1.0 + fraction * 1.5}
 					detail = "+%.1f%% run speed  ·  +%.1f%% dash speed" % [fraction * 100, fraction * 150]

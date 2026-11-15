@@ -1,6 +1,8 @@
 shader_type spatial;
 render_mode unshaded, cull_disabled, shadows_disabled, fog_disabled;
 uniform sampler2D skyline : source_color, filter_linear_mipmap, repeat_disable;
+uniform vec3 shadow_tint = vec3(0.016, 0.036, 0.093);
+uniform vec3 panorama_filter = vec3(0.66, 0.74, 0.84);
 varying vec3 world_at;
 void vertex() {
 	world_at = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
@@ -19,5 +21,5 @@ void fragment() {
 		color = mix(texture(skyline, vec2(0.94 + u * 0.94, y)).rgb, color, blend);
 	}
 	float fade = smoothstep(-0.06, 0.14, vertical) * (1.0 - smoothstep(0.87, 1.08, vertical));
-	ALBEDO = mix(vec3(0.016, 0.036, 0.093), color * vec3(0.66, 0.74, 0.84), fade);
+	ALBEDO = mix(shadow_tint, color * panorama_filter, fade);
 }

@@ -15,6 +15,7 @@ const Equipment := preload("res://scripts/equipment_stats.gd")
 const Materials := preload("res://scripts/fabrication_catalog.gd")
 const BossCache := preload("res://scripts/boss_loot_cache.gd")
 const BossIntro := preload("res://scripts/boss_intro.gd")
+const CampaignDoor := preload("res://scripts/campaign_door.gd")
 const INPUTS := [&"jump", &"dash", &"crouch", &"crouch_stick", &"shoot", &"melee", &"climb_down", &"swap_weapon", &"previous_suit", &"quick_0", &"quick_1", &"quick_2", &"quick_3"]
 const INPUT_SUSPENDED := 1 << 30
 const PauseMenu := preload("res://scripts/coop_pause_menu.gd")
@@ -41,6 +42,8 @@ var relay_owner: Node
 var stage: Node3D
 var boss: Combatant
 var gate: Node3D
+var arena_door: CampaignDoor
+var repair_hall: Node3D
 var exit_marker: Marker3D
 var boss_started := false
 var boss_intro_active := false
@@ -53,9 +56,9 @@ var boss_position := Vector3.ZERO
 var stage_props: Array[NodePath] = []
 var factory_trap_clock := 0.0
 var factory_relays: Array[Node3D] = []
+var foundry_boulders: Array[AnimatableBody3D] = []
 var moving_platforms: Array[AnimatableBody3D] = []
 var props_consumed: Array[int] = []
-var last_gate_open := false
 var active_weapon_ids: Array = []
 var stage_title: Label
 var personal_hud: Control
@@ -87,6 +90,9 @@ var extracted_results: Dictionary = {}
 var boss_cache: BossCache
 var cache_opened := false
 var cache_pickups: Array[Area3D] = []
+var quick_revision := 0
+var salvage_spills := {}
+const SalvageOrbs := preload("res://scripts/material_pickup.gd")
 var loot_rng := RandomNumberGenerator.new()
 var rewards_delivered := false
 var blueprint_count := 0
@@ -117,7 +123,7 @@ func _ready() -> void:
 		for id in roster.slice(1):
 			var loadout = Profile.new()
 			loadout.manual_only = true
-			remote_players[id] = {"profile": loadout, "loaded": false, "timeout": 0.0, "suspended": false, "input": -1, "edge": -1}
+			remote_players[id] = {"profile": loadout, "loaded": false, "timeout": 0.0, "suspended": false, "input": -1, "edge": -1, "quick_revision": 0}
 	loot_rng.randomize()
 	for number in range(1, sector):
 		active_weapon_ids.append(Catalog.info(number).reward)
@@ -127,11 +133,16 @@ func _ready() -> void:
 	peer.expose_func(receive_challenge_results)
 	peer.expose_func(receive_cache_open)
 	peer.expose_func(receive_cache_pickup)
+	peer.expose_func(receive_salvage_spill)
+	peer.expose_func(receive_salvage_pickup)
+	peer.expose_func(receive_supply)
+	peer.expose_func(receive_restore_feedback)
 	peer.expose_func(receive_boss_intro)
 	peer.expose_func(receive_shot)
 	peer.expose_func(receive_outcome)
 	peer.expose_func(receive_act)
 	peer.expose_func(receive_loadout)
+	peer.expose_func(receive_quick_config)
 	load_stage()
 	build_hud()
 	if not host:
@@ -146,11 +157,7 @@ func receive_loadout(gear: Dictionary, upgrades: Dictionary, quick: Array) -> vo
 		return
 	remote.loaded = true
 	var loadout = remote.profile
-	for index in mini(quick.size(), 4):
-		if quick[index] is Dictionary:
-			var id := String(quick[index].get("id", ""))
-			if Profile.stock.has(id) and not Profile.stock[id].has("material"):
-				loadout.quick_slots[index] = {"id": id, "count": clampi(int(quick[index].get("count", 0)), 0, Profile.QUICK_MAX)}
+	apply_quick_config(loadout, quick)
 	var slots := {}
 	for id in gear:
 		if id is String and Profile.GEAR.has(id) and gear[id] == "equipped":
@@ -161,6 +168,32 @@ func receive_loadout(gear: Dictionary, upgrades: Dictionary, quick: Array) -> vo
 	for enhancement in local_profile.all_upgrades():
 		loadout.owned[enhancement.id] = clampi(int(upgrades.get(enhancement.id, 0)), 0, 2)
 	Equipment.apply(operators[roster.find(sender)], loadout)
+
+func apply_quick_config(loadout, quick: Array) -> void:
+	for index in 4:
+		var item = quick[index] if index < quick.size() else {}
+		var id := String(item.get("id", "")) if item is Dictionary else ""
+		var next := {}
+		if Profile.stock.has(id) and not Profile.stock[id].has("material"):
+			var count := clampi(int(item.get("count", 0)), 0, Profile.QUICK_MAX)
+			if count > 0:
+				next = {"id": id, "count": count}
+		loadout.quick_slots[index] = next
+
+func send_quick_config() -> void:
+	if not host and outcome.is_empty():
+		quick_revision += 1
+		peer.call_func_on(peer.get_host(), receive_quick_config, quick_revision, local_profile.quick_slots)
+
+func receive_quick_config(revision: int, quick: Array) -> void:
+	var sender: int = peer.get_sender_id()
+	if not host or not remote_players.has(sender) or not outcome.is_empty() or quick.size() != 4:
+		return
+	var remote: Dictionary = remote_players[sender]
+	if not remote.loaded or revision <= remote.quick_revision:
+		return
+	remote.quick_revision = revision
+	apply_quick_config(remote.profile, quick)
 
 func load_stage() -> void:
 	var previous := []
@@ -180,6 +213,7 @@ func load_stage() -> void:
 	nameplates.clear()
 	stage_props.clear()
 	factory_relays.clear()
+	foundry_boulders.clear()
 	factory_trap_clock = 0.0
 	moving_platforms.clear()
 	props_consumed.clear()
@@ -190,9 +224,9 @@ func load_stage() -> void:
 	boss_defeated = false
 	cache_opened = false
 	cache_pickups.clear()
+	salvage_spills.clear()
 	checkpoint = Vector3.ZERO
 	last_boss_health = -1.0
-	last_gate_open = false
 	remote_checkpoint = Vector3.ZERO
 	var info := Catalog.info(sector)
 	var path: String = info.level if act == 1 else "res://scenes/levels/%s_act_2.tscn" % info.id
@@ -240,6 +274,15 @@ func load_stage() -> void:
 				operator.collision_mask = 0
 		else:
 			operator.coop_xp_pickup = award_pickup_xp
+			operator.recovered_resources.connect(func(hp: float, eng: float):
+				peer.call_func(receive_restore_feedback, act, index, hp, eng)
+			)
+			operator.supply_found.connect(func(id: String):
+				if index == local_index:
+					announce_supply(id)
+				else:
+					peer.call_func_on(roster[index], receive_supply, id)
+			)
 			operator.fell_into_pit.connect(respawn_operator.bind(operator))
 			operator.died.connect(respawn_operator.bind(operator))
 		operators.append(operator)
@@ -267,15 +310,16 @@ func load_stage() -> void:
 			disable_replica(enemy)
 		enemies.append(enemy)
 	gate = stage.get_node("Gate")
+	arena_door = CampaignDoor.new(gate)
+	arena_door.reset()
 	exit_marker = stage.get_node("MARKERS/RoomExit")
 	boss = actors.get_node(info.boss_node) as Combatant
 	boss_position = boss.position
 	if act == 1:
 		actors.remove_child(boss)
 		boss.queue_free()
-		var guard := Miniboss.new()
+		var guard := Miniboss.for_sector(sector, Color(info.color), info.weak, gate.global_position, stage.get_node("ExitBarrier").global_position.x)
 		guard.name = "SectorMiniboss"
-		guard.configure(sector, Color(info.color), info.weak, gate.global_position, stage.get_node("ExitBarrier").global_position.x)
 		guard.position = Vector3(boss_position.x, gate.position.y + guard.chassis_height, 0.0)
 		actors.add_child(guard)
 		boss = guard
@@ -302,8 +346,17 @@ func load_stage() -> void:
 	for node in stage.find_children("*", "Area3D", true, false):
 		if node.is_in_group(&"factory_interior_trap") or node.get_script() == preload("res://scripts/biome_zone.gd"):
 			node.phase_time = func(): return factory_trap_clock
+		if node.get_script() == preload("res://scripts/foundry_vent.gd"):
+			node.authority = host
 		if node.scene_file_path.begins_with("res://assets/pickups/") or node.is_in_group(&"factory_salvage_chest"):
 			stage_props.append(stage.get_path_to(node))
+		if host and node.is_in_group(&"factory_salvage_chest"):
+			node.spilled.connect(send_salvage_spill)
+	for supply in get_tree().get_nodes_in_group(&"factory_supply_carrier"):
+		if stage.is_ancestor_of(supply):
+			supply.authority = host
+			supply.phase_time = func(): return factory_trap_clock
+			stage_props.append(stage.get_path_to(supply))
 	for barricade in get_tree().get_nodes_in_group(&"factory_breakable"):
 		if stage.is_ancestor_of(barricade):
 			stage_props.append(stage.get_path_to(barricade))
@@ -311,12 +364,18 @@ func load_stage() -> void:
 		if stage.is_ancestor_of(platform) and platform.get_script() == preload("res://scripts/phase_platform.gd"):
 			platform.phase_time = func(): return factory_trap_clock
 	for platform in stage.find_children("*", "AnimatableBody3D", true, false):
+		if platform.is_in_group(&"foundry_boulder"):
+			foundry_boulders.append(platform)
+			platform.authority = host
+			continue
 		moving_platforms.append(platform)
 		if not host:
 			# Guests need the replicated platform collider for local movement prediction.
 			platform.disable_mode = CollisionObject3D.DISABLE_MODE_KEEP_ACTIVE
 			platform.process_mode = Node.PROCESS_MODE_DISABLED
-	stage.get_node("ForgeHallDoor").target = first
+	repair_hall = stage.get_node("ForgeHallDoor")
+	repair_hall.operators = operators
+	repair_hall.authority = host
 	Details.new().install(stage, first, sector, act)
 	correction = Vector3.ZERO
 	if stage_title:
@@ -360,6 +419,9 @@ func respawn_point() -> Vector3:
 func restore_operator(operator: RiftPlayer, at: Vector3) -> void:
 	if operator.lives <= 0 or not operator.has_meta("coop_down"):
 		return
+	if foundry_boulders.size() > 0 and not operators.any(func(body): return body.health > 0.0 and body.global_position.x > foundry_boulders[0].global_position.x - foundry_boulders[0].runway_length - 3.5):
+		for boulder in foundry_boulders:
+			boulder.reset_runway()
 	operator.global_position = at
 	operator.health = operator.max_health
 	operator.velocity = Vector3.ZERO
@@ -385,9 +447,8 @@ func reset_coop_arena() -> void:
 	boss.queue_free()
 	var info := Catalog.info(sector)
 	if act == 1:
-		var guard := Miniboss.new()
+		var guard := Miniboss.for_sector(sector, Color(info.color), info.weak, gate.global_position, stage.get_node("ExitBarrier").global_position.x)
 		guard.name = "SectorMiniboss"
-		guard.configure(sector, Color(info.color), info.weak, gate.global_position, stage.get_node("ExitBarrier").global_position.x)
 		guard.position = Vector3(boss_position.x, gate.position.y + guard.chassis_height, 0.0)
 		boss = guard
 	else:
@@ -401,6 +462,9 @@ func reset_coop_arena() -> void:
 	boss.died.connect(on_boss_defeated)
 	boss_started = false
 	entrance_open = false
+	arena_door.reset()
+	repair_hall.hold = 0.0
+	repair_hall.motor.reset()
 	resetting_arena = false
 	update_doors()
 	for operator in operators:
@@ -422,6 +486,39 @@ func on_boss_defeated() -> void:
 		for operator in operators:
 			operator.unlock_sector_weapon(reward)
 	update_doors()
+
+func receive_restore_feedback(remote_act: int, index: int, hp: float, eng: float) -> void:
+	if not host and remote_act == act and peer.get_sender_id() == peer.get_host() and index >= 0 and index < operators.size():
+		operators[index].play_restore_feedback.call_deferred(hp, eng)
+
+func announce_supply(id: String) -> void:
+	if is_instance_valid(personal_hud) and Profile.stock.has(id):
+		personal_hud.announce(Profile.stock[id].name + "  +1", Color("75ffd2"), 22)
+
+func receive_supply(id: String) -> void:
+	if not host and peer.get_sender_id() == peer.get_host() and local_profile.collect_supply(id):
+		announce_supply(id)
+
+func send_salvage_spill(key: String, at: Vector3, rewards: Dictionary, drops: Array[Area3D]) -> void:
+	peer.call_func(receive_salvage_spill, act, key, at, rewards)
+	for index in drops.size():
+		drops[index].collected.connect(func(): peer.call_func(receive_salvage_pickup, act, key, index))
+
+func receive_salvage_spill(remote_act: int, key: String, at: Vector3, rewards: Dictionary) -> void:
+	if host or remote_act != act or peer.get_sender_id() != peer.get_host() or salvage_spills.has(key):
+		return
+	var terrain := stage.get_node("TERRAIN") as Node3D
+	var chest := terrain.get_node_or_null(NodePath(key))
+	if chest:
+		chest.finish_open()
+	salvage_spills[key] = SalvageOrbs.spill(terrain, at, rewards, false)
+
+func receive_salvage_pickup(remote_act: int, key: String, index: int) -> void:
+	if host or remote_act != act or peer.get_sender_id() != peer.get_host():
+		return
+	var drops: Array = salvage_spills.get(key, [])
+	if index >= 0 and index < drops.size() and is_instance_valid(drops[index]):
+		drops[index].queue_free()
 
 func create_boss_cache() -> void:
 	var actors := stage.get_node("Actors") as Node3D
@@ -449,7 +546,7 @@ func receive_cache_open(at: Vector3, rewards: Dictionary) -> void:
 	elif is_instance_valid(boss_cache):
 		boss_cache.queue_free()
 	var actors := stage.get_node("Actors") as Node3D
-	cache_pickups = BossCache.spill(actors, at, rewards)
+	cache_pickups = BossCache.spill(actors, at, rewards, false)
 
 func receive_cache_pickup(index: int) -> void:
 	if not host and act == 2 and peer.get_sender_id() == peer.get_host() and index >= 0 and index < cache_pickups.size():
@@ -457,12 +554,6 @@ func receive_cache_pickup(index: int) -> void:
 			cache_pickups[index].queue_free()
 
 func update_doors() -> void:
-	var opened := boss_defeated or entrance_open and not boss_started
-	if opened != last_gate_open:
-		last_gate_open = opened
-		var door := gate.get_node("Door") as Node3D
-		door.position.y = 4.2 if opened else 0.0
-		gate.get_node("Blocker/CollisionShape3D").set_deferred("disabled", opened)
 	if boss_defeated:
 		var barrier := stage.get_node("ExitBarrier")
 		if barrier.visible:
@@ -470,13 +561,11 @@ func update_doors() -> void:
 			barrier.get_node("CollisionShape3D").set_deferred("disabled", true)
 
 func check_campaign_progress() -> void:
-	var hall := stage.get_node("ForgeHallDoor") as Node3D
-	hall.target = nearest_operator(hall.global_position)
-	var entry := gate.global_position
+	var far_edge := exit_marker.global_position.x
 	if not boss_started:
-		if not entrance_open and operators.all(func(operator): return operator.health > 0.0 and absf(operator.global_position.x - entry.x) <= 4.0 and absf(operator.global_position.y - entry.y) <= 3.4):
+		if not entrance_open and operators.all(func(operator): return arena_door.near(operator)):
 			entrance_open = true
-		if entrance_open and operators.all(func(operator): return operator.health > 0.0 and operator.global_position.x >= entry.x + 1.35):
+		if entrance_open and arena_door.passable and operators.all(func(operator): return arena_door.inside(operator, far_edge)):
 			boss_started = true
 			var track := RiftAudio.choose_boss_track()
 			peer.call_func(receive_boss_intro, act, track)
@@ -585,6 +674,7 @@ func build_hud() -> void:
 	pause_menu = PauseMenu.new()
 	pause_menu.in_mission = true
 	pause_menu.profile = local_profile
+	pause_menu.quick_edited = send_quick_config
 	pause_menu.operator = func(): return operators[local_index]
 	pause_menu.dismissed.connect(func(): resume_controls_pending = true)
 	pause_menu.leave_requested.connect(func(): exit_requested.emit())
@@ -636,6 +726,10 @@ func get_player_axis() -> Vector2:
 	return Vector2(Input.get_axis("move_left", "move_right"), Input.get_axis("climb_down", "climb_up"))
 
 func _physics_process(delta: float) -> void:
+	if host and is_instance_valid(gate):
+		arena_door.step(delta, boss_defeated or entrance_open and not boss_started, operators)
+	elif boss_intro_active:
+		arena_door.step(delta, false, [])
 	if resume_controls_pending:
 		resume_controls_pending = false
 		# Let this physics tick finish before gameplay can read the dismiss action.
@@ -798,7 +892,7 @@ func broadcast_state(reliable_operators := false) -> void:
 	security.resize(enemies.size() * 6)
 	props_consumed.clear()
 	for operator in operators:
-		players.append([operator.global_position, operator.model_root.rotation, operator.health, operator.energy, operator.current_animation, operator.facing, operator.equipped_suit(), operator.lives, operator.max_health, operator.max_energy, operator.velocity, operator.fire_lock, operator.charge_held, operator.melee_lock, operator.quick_profile.quick_slots if operator.quick_profile else [], operator.supplies, operator.charge_elapsed if operator.charge_held else 0.0])
+		players.append([operator.global_position, operator.model_root.rotation, operator.health, operator.energy, operator.current_animation, operator.facing, operator.equipped_suit(), operator.lives, operator.max_health, operator.max_energy, operator.velocity, operator.fire_lock, operator.charge_held, operator.melee_lock, operator.quick_profile.quick_slots if operator.quick_profile else [], operator.supplies, operator.charge_elapsed if operator.charge_held else 0.0, operator.saber_hold, remote_players.get(roster[players.size()], {}).get("quick_revision", 0)])
 	for index in enemies.size():
 		var enemy := enemies[index]
 		if is_instance_valid(enemy) and enemy.health > 0:
@@ -819,17 +913,24 @@ func broadcast_state(reliable_operators := false) -> void:
 	var platform_positions: Array[Vector3] = []
 	for platform in moving_platforms:
 		platform_positions.append(platform.position)
-	var boss_state := [Vector3.ZERO, Vector3.ZERO, 0.0, boss_started, boss_defeated, gate.get_node("Door").position.y, platform_positions, entrance_open, checkpoint, factory_trap_clock, fractures]
+	var doors := [arena_door.passable, repair_hall.motor.lift(), repair_hall.motor.passable]
+	var relay_lamps := PackedByteArray()
+	for relay in factory_relays:
+		relay_lamps.append(maxi(0, relay.shown_power))
+	var foundry_state := foundry_boulders.map(func(rock): return rock.snapshot())
+	var boss_state := [Vector3.ZERO, Vector3.ZERO, 0.0, boss_started, boss_defeated, arena_door.lift(), platform_positions, entrance_open, checkpoint, factory_trap_clock, fractures, doors, relay_lamps, [], foundry_state]
 	if is_instance_valid(boss):
 		boss_state[0] = boss.global_position
 		boss_state[1] = boss.rotation
 		boss_state[2] = boss.health
+		if boss.has_method("foundry_snapshot"):
+			boss_state[13] = boss.foundry_snapshot()
 	state_sequence += 1
 	for index in range(1, roster.size()):
 		var snapshot := players.duplicate()
 		for other in players.size():
 			if other != index:
-				snapshot[other] = players[other].slice(0, 11) + [players[other][16]]
+				snapshot[other] = players[other].slice(0, 11) + [players[other][16], players[other][17]]
 		if reliable_operators:
 			peer.call_func_on(roster[index], receive_operators, act, snapshot, state_sequence)
 		else:
@@ -847,6 +948,8 @@ func receive_state(remote_act: int, security: PackedFloat32Array, arena: Array, 
 		boss.global_position = arena[0]
 		boss.rotation = arena[1]
 		boss.health = arena[2]
+		if arena.size() > 13 and not arena[13].is_empty() and boss.has_method("apply_foundry_snapshot"):
+			boss.apply_foundry_snapshot(arena[13])
 		if last_boss_health != boss.health:
 			last_boss_health = boss.health
 			boss.health_changed.emit(boss.health, boss.max_health)
@@ -866,8 +969,8 @@ func receive_state(remote_act: int, security: PackedFloat32Array, arena: Array, 
 		room_status.text = "%s  •  %d / %d HP" % [Miniboss.TITLES[sector - 1] if act == 1 else Catalog.info(sector).boss, arena[2], boss.max_health]
 	else:
 		room_status.text = "Enter the boss room together." if entrance_open else "Everyone must reach the boss door."
-	gate.get_node("Door").position.y = arena[5]
-	gate.get_node("Blocker/CollisionShape3D").set_deferred("disabled", boss_defeated or entrance_open and not boss_started)
+	arena_door.apply(arena[5], arena[11][0])
+	repair_hall.motor.apply(arena[11][1], arena[11][2])
 	if arena[8] != remote_checkpoint:
 		remote_checkpoint = arena[8]
 		for path_name in ["TERRAIN/MidpointCheckpoint", "TERRAIN/ForgeHallCheckpoint"]:
@@ -878,8 +981,12 @@ func receive_state(remote_act: int, security: PackedFloat32Array, arena: Array, 
 		moving_platforms[index].position = arena[6][index]
 	if arena.size() > 9:
 		factory_trap_clock = float(arena[9])
-	for receiver in factory_relays:
-		receiver.reflect_motion()
+	if arena.size() > 14:
+		for index in mini(foundry_boulders.size(), arena[14].size()):
+			foundry_boulders[index].apply_snapshot(arena[14][index])
+	for index in factory_relays.size():
+		if arena.size() > 12 and index < arena[12].size():
+			factory_relays[index].show_state(arena[12][index] != 0)
 	if boss_defeated:
 		stage.get_node("ExitBarrier").hide()
 		stage.get_node("ExitBarrier/CollisionShape3D").set_deferred("disabled", true)
@@ -892,6 +999,10 @@ func receive_state(remote_act: int, security: PackedFloat32Array, arena: Array, 
 	for index in consumed:
 		if index >= 0 and index < stage_props.size():
 			var prop := stage.get_node_or_null(stage_props[index])
+			if prop and prop.is_in_group(&"factory_supply_carrier"):
+				if not prop.is_queued_for_deletion():
+					prop.drop_crate()
+				continue
 			if prop and prop.is_in_group(&"factory_breakable"):
 				prop.set_fractures(5)
 			elif prop:
@@ -941,19 +1052,19 @@ func _process(delta: float) -> void:
 				else:
 					operator.global_position = projected
 				operator.model_root.rotation = data[1]
-				operator.reflect_saber_pose(data[4])
+				operator.reflect_saber_pose(data[4], float(data[12]) if data.size() > 12 else -1.0)
 				operator.play_character_animation(data[4])
 				operator.facing = data[5]
-				operator.present_charge(float(data[11]) if data.size() > 11 else 0.0, data[3] >= operator.charged_shot_cost())
+				operator.present_charge(float(data[11]), data[3] >= operator.charged_shot_cost())
 			else:
 				operator.fire_lock = data[11]
 				operator.charge_held = data[12] and not operator.controls_suspended
 				operator.present_charge(float(data[16]) if data.size() > 16 and operator.charge_held else 0.0, data[3] >= operator.charged_shot_cost())
 				operator.melee_lock = data[13]
-				operator.reflect_saber_pose(data[4])
+				operator.reflect_saber_pose(data[4], float(data[17]) if data.size() > 17 else -1.0)
 				if operator.melee_lock > 0.0:
 					operator.play_character_animation(data[4])
-				if data[14].size() == 4:
+				if data[14].size() == 4 and (int(data[18]) if data.size() > 18 else 0) == quick_revision:
 					for slot in 4:
 						var actual: Dictionary = data[14][slot]
 						var local: Dictionary = local_profile.quick_slots[slot]
@@ -1027,15 +1138,16 @@ func receive_challenge_results(results: Dictionary) -> void:
 		extracted_results = results
 
 func send_shot(shot: RiftProjectile) -> void:
-	peer.call_func(receive_shot, shot.global_position, shot.direction, shot.speed, shot.palette, shot.is_charged, shot.is_magma, shot.owner_faction, shot.launch_profile, shot.range_remaining if is_finite(shot.range_remaining) else -1.0)
+	peer.call_func(receive_shot, shot.global_position, shot.direction, shot.speed, shot.palette, shot.is_charged, shot.is_magma, shot.owner_faction, shot.launch_profile, shot.range_remaining if is_finite(shot.range_remaining) else -1.0, shot.lifetime)
 
-func receive_shot(at: Vector3, direction: Vector3, speed: float, tint: Color, charged: bool, magma: bool, faction: String, profile_id := 0, flight_range := -1.0) -> void:
+func receive_shot(at: Vector3, direction: Vector3, speed: float, tint: Color, charged: bool, magma: bool, faction: String, profile_id := 0, flight_range := -1.0, flight_time := 2.0) -> void:
 	if host or peer.get_sender_id() != peer.get_host():
 		return
 	var shot := RiftProjectile.new()
 	shot.collision_layer = 0
 	shot.collision_mask = 0
 	shot.speed = speed
+	shot.lifetime = flight_time
 	add_child(shot)
 	shot.global_position = at
 	var sector_style := (profile_id >> 3) if profile_id >= 0 else 0

@@ -58,10 +58,8 @@ static func roll_loot(sector: int, mode: int) -> Dictionary:
 	for item in ["scrap", Materials.sector_key(sector)]:
 		bonus[item] = int(bonus.get(item, 0)) + 2
 	var source := "nightmare_cache" if mode == Difficulty.NIGHTMARE else "boss_cache"
-	return {"materials": bonus, "blueprint": Blueprints.roll(sector, source, rng, loot_scale)}
+	return {"materials": bonus, "blueprint": Blueprints.roll(sector, source, rng, loot_scale),
+		"bolts": 45 + sector * 8, "supply": Orbs.supply_roll(rng, minf(.8, .48 * loot_scale), true)}
 
-static func spill(parent: Node3D, at: Vector3, rewards: Dictionary) -> Array[Area3D]:
-	var pickups: Array[Area3D] = [Orbs.spawn(parent, at + Vector3(-0.36, 0.14, 0), rewards.materials)]
-	if not String(rewards.blueprint).is_empty():
-		pickups.append(Orbs.spawn(parent, at + Vector3(0.53, 0.14, 0), {}, rewards.blueprint))
-	return pickups
+static func spill(parent: Node3D, at: Vector3, rewards: Dictionary, authority := true) -> Array[Area3D]:
+	return Orbs.spill(parent, at, rewards, authority)

@@ -5,7 +5,7 @@ const SECTORS := [
  {
   "number": 1,
   "id": "neon_factory",
-  "title": "Neon Factory",
+  "title": "Ember Foundry",
   "boss_slug": "forge_titan",
   "boss": "Forge Titan",
   "boss_node": "ForgeTitan",

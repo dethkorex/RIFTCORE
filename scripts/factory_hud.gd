@@ -1,6 +1,7 @@
 extends Control
 
 const UI := preload("res://scripts/rift_ui.gd")
+const EquipmentIcons := preload("res://scripts/equipment_icons.gd")
 const CURRENCY := preload("res://assets/ui/bolt.svg")
 const SHARD := preload("res://assets/ui/core-shard.svg")
 const PAUSE_PLATE := preload("res://assets/ui/riftcore_kit/panel_base_small.png")
@@ -47,9 +48,8 @@ func show_quick_slots(profile) -> void:
 	row.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
 	row.offset_left = -110
 	row.offset_right = 110
-	row.offset_top = -73
-	row.offset_bottom = -15
-	var icons := preload("res://scripts/equipment_icons.gd")
+	row.offset_top = -86
+	row.offset_bottom = -18
 	for index in 4:
 		var panel := PanelContainer.new()
 		panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -57,13 +57,10 @@ func show_quick_slots(profile) -> void:
 		panel.add_theme_stylebox_override("panel", UI.frame(Color("0b1b32"), UI.CYAN, 1))
 		row.add_child(panel)
 		var stack := UI.column(panel, 0)
-		var slot: Dictionary = profile.quick_slots[index]
-		var id := String(slot.get("id", ""))
 		var key: String = ["↑", "←", "→", "↓"][index] if not Input.get_connected_joypads().is_empty() else str(index + 1)
 		var count := UI.label(stack, key, 14, UI.CYAN)
 		count.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		var icon := TextureRect.new()
-		var item_icon: Texture2D = icons.icon(profile.stock[id].icon, profile.stock[id].icon) if profile.stock.has(id) else null
 		icon.custom_minimum_size = Vector2(23, 23)
 		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
@@ -73,9 +70,11 @@ func show_quick_slots(profile) -> void:
 		quantity.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		var refresh := func():
 			if is_instance_valid(icon):
-				var remaining := int(profile.quick_slots[index].get("count", 0))
-				icon.texture = item_icon if remaining > 0 else null
-				quantity.text = str(remaining)
+				var current: Dictionary = profile.quick_slots[index]
+				var remaining := int(current.get("count", 0))
+				var item: Dictionary = profile.stock.get(current.get("id", ""), {})
+				icon.texture = EquipmentIcons.supply_icon(item) if remaining > 0 and not item.is_empty() else null
+				quantity.text = "×%d" % remaining if remaining > 0 else "—"
 		refresh.call()
 		profile.quick_changed.connect(refresh)
 

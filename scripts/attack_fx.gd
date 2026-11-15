@@ -104,15 +104,24 @@ static func charge(parent: Node3D, at: Vector3, tint: Color, duration: float) ->
 	build.chain().tween_callback(warning.queue_free)
 
 static func telegraph(parent: Node3D, width: float, tint: Color, duration: float) -> void:
-	var bar := piece(parent, cube, Vector3.ZERO, Vector3(width, 0.025, 1.12), tint.darkened(0.43))
-	piece(parent, cube, Vector3(0, 0.018, 0.57), Vector3(width, 0.036, 0.07), tint)
-	piece(parent, cube, Vector3(0, 0.018, -0.57), Vector3(width, 0.036, 0.07), tint)
-	var count := clampi(ceili(width / 1.4), 2, 18)
-	for i in range(count):
-		var x := width * ((i + 0.5) / count - 0.5)
-		var stripe := piece(parent, cube, Vector3(x, 0.022, 0), Vector3(0.076, 0.026, 0.85), tint)
-		stripe.rotation.y = 0.46
-	bar.create_tween().tween_property(bar, "scale:z", 0.48, duration)
+	var count := clampi(ceili(width / 1.8), 1, 18)
+	var ring := TorusMesh.new()
+	ring.inner_radius = 0.39
+	ring.outer_radius = 0.49
+	ring.rings = 12
+	ring.ring_segments = 5
+	var pulse := parent.create_tween().set_parallel()
+	for index in count:
+		var x := width * ((index + 0.5) / count - 0.5)
+		var footprint := clampf(width / count * 0.86, 0.44, 1.68)
+		var beacon := piece(parent, ring, Vector3(x, 0.042, 0), Vector3(footprint, 0.23, 0.94), tint)
+		beacon.transparency = 0.48
+		pulse.tween_property(beacon, "transparency", 0.0, maxf(duration, 0.12)).set_trans(Tween.TRANS_CUBIC)
+		for side in [-1, 1]:
+			var spark := piece(parent, crystal, Vector3(x, 0.125, side * 0.52),
+				Vector3(0.105, 0.18, 0.085), tint.lerp(Color.WHITE, 0.4))
+			spark.rotation.z = side * 0.26
+			pulse.tween_property(spark, "position:y", 0.37, maxf(duration, 0.12))
 
 static func field(parent: Node3D, sector: int, radius: float, height: float, duration: float, move: String) -> void:
 	var tint := tint_for(sector)
@@ -139,8 +148,7 @@ static func field(parent: Node3D, sector: int, radius: float, height: float, dur
 		tween.tween_property(beam, "scale:z", 0.04, duration)
 		return
 	var count := clampi(ceili(span / 0.85), 3, 24)
-	var bar := piece(parent, cube, Vector3(0, -height * 0.46, 0.07), Vector3(span, 0.07, 0.7), tint)
-	tween.tween_property(bar, "scale:z", 0.13, duration)
+
 	for i in range(count):
 		var x := span * ((i + 0.5) / count - 0.5)
 		var size := minf(height, 2.65) * (0.45 + 0.11 * (i % 5))

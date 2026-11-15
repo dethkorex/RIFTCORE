@@ -1,7 +1,7 @@
 @tool
 extends Node3D
 
-enum Mark { PLUS, LIGHTNING, XP, NONE, MATERIAL, BLUEPRINT }
+enum Mark { PLUS, LIGHTNING, XP, NONE, MATERIAL, BLUEPRINT, SUPPLY }
 
 @export var tint := Color("52ff80")
 @export var mark := Mark.PLUS
@@ -35,6 +35,8 @@ func _ready() -> void:
 			add_text("XP", Color.BLACK, 0.00205)
 		Mark.MATERIAL:
 			add_text("MAT", Color("fff3e4"), 0.0016)
+		Mark.SUPPLY:
+			add_text("KIT", Color("eafff9"), 0.00155)
 		Mark.BLUEPRINT:
 			add_text("BP", Color("e9faff"), 0.0020)
 

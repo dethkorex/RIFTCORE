@@ -20,7 +20,7 @@ const CHALLENGE_SETS := [
 
 const UPGRADES := [
 	{"id": "armor", "name": "Ceramic Armor", "prices": [15, 28], "effects": ["+12 starting HP", "+28 starting HP and 10% damage resistance"]},
-	{"id": "capacitor", "name": "Flux Capacitor", "prices": [19, 34], "effects": ["+15 starting energy", "+32 starting energy and 20% cheaper charged shots"]},
+	{"id": "capacitor", "name": "Flux Capacitor", "prices": [19, 34], "effects": ["+15 starting energy", "+32 starting energy and 20% cheaper boss-weapon charge shots"]},
 	{"id": "buster", "name": "Buster Overdrive", "prices": [25, 41], "effects": ["+15% Buster and saber damage", "+32% Buster and saber damage"]},
 	{"id": "dash", "name": "Vector Drive", "prices": [31, 47], "effects": ["+10% dash speed and 15% shorter cooldown", "+20% dash speed and 32% shorter cooldown"]},
 	{"id": "storage", "name": "Storage Expansion", "prices": [20, 36], "effects": ["+7 storage positions", "+14 storage positions"]},
@@ -49,7 +49,7 @@ const LEGACY_GEAR := {
 	"impact_liner": {"name": "Impact Liner", "slot": "frame", "price": 320, "rarity": 0, "perk": "12% damage resistance", "stats": {"resist": 0.12}},
 	"vital_weave": {"name": "Vital Weave", "slot": "frame", "price": 360, "rarity": 0, "perk": "+18 maximum HP", "stats": {"hp": 18}},
 	"pulse_lens": {"name": "Pulse Lens", "slot": "core", "price": 420, "rarity": 0, "perk": "+14% Buster and saber damage", "stats": {"attack": 1.14}},
-	"charge_relay": {"name": "Charge Relay", "slot": "core", "price": 440, "rarity": 0, "perk": "+20 energy and 10% lower charge cost", "stats": {"energy": 20, "charge": 0.9}},
+	"charge_relay": {"name": "Charge Relay", "slot": "core", "price": 440, "rarity": 0, "perk": "+20 energy and 10% lower boss-weapon charge cost", "stats": {"energy": 20, "charge": 0.9}},
 	"air_jets": {"name": "Air Jets", "slot": "utility", "price": 380, "rarity": 0, "perk": "8% faster dash, 12% shorter dash cooldown", "stats": {"dash": 1.08, "cooldown": 0.88}},
 	"salvage_chip": {"name": "Salvage Chip", "slot": "utility", "price": 290, "rarity": 0, "perk": "50% more bolts from currency pickups", "stats": {"bolts": 1.5}},
 	"shock_brace": {"name": "Shock Brace", "slot": "frame", "price": 620, "rarity": 1, "perk": "+12 HP and 9% damage resistance", "stats": {"hp": 12, "resist": 0.09}},
@@ -60,12 +60,12 @@ const LEGACY_GEAR := {
 	"aegis_shell": {"name": "Aegis Shell", "slot": "frame", "price": 3080, "rarity": 3, "perk": "+32 HP and 19% damage resistance", "stats": {"hp": 32, "resist": 0.19}},
 	"berserker_mesh": {"name": "Berserker Mesh", "slot": "frame", "price": 3280, "rarity": 3, "perk": "+19% attack, +12 HP, and 7% damage resistance", "stats": {"hp": 12, "resist": 0.07, "attack": 1.19}},
 	"coil_stack": {"name": "Coil Stack", "slot": "core", "price": 640, "rarity": 1, "perk": "+34 maximum energy", "stats": {"energy": 34}},
-	"flux_prism": {"name": "Flux Prism", "slot": "core", "price": 920, "rarity": 1, "perk": "+18% attack and 6% lower charge cost", "stats": {"attack": 1.18, "charge": 0.94}},
-	"arc_regulator": {"name": "Arc Regulator", "slot": "core", "price": 1150, "rarity": 1, "perk": "+15 energy and 18% lower charge cost", "stats": {"energy": 15, "charge": 0.82}},
+	"flux_prism": {"name": "Flux Prism", "slot": "core", "price": 920, "rarity": 1, "perk": "+18% attack and 6% lower boss-weapon charge cost", "stats": {"attack": 1.18, "charge": 0.94}},
+	"arc_regulator": {"name": "Arc Regulator", "slot": "core", "price": 1150, "rarity": 1, "perk": "+15 energy and 18% lower boss-weapon charge cost", "stats": {"energy": 15, "charge": 0.82}},
 	"twin_reactor": {"name": "Twin Reactor", "slot": "core", "price": 1640, "rarity": 2, "perk": "+20% attack and +32 energy", "stats": {"attack": 1.2, "energy": 32}},
-	"phase_condenser": {"name": "Phase Condenser", "slot": "core", "price": 1850, "rarity": 2, "perk": "+43 energy and 21% lower charge cost", "stats": {"energy": 43, "charge": 0.79}},
+	"phase_condenser": {"name": "Phase Condenser", "slot": "core", "price": 1850, "rarity": 2, "perk": "+43 energy and 21% lower boss-weapon charge cost", "stats": {"energy": 43, "charge": 0.79}},
 	"nova_core": {"name": "Nova Core", "slot": "core", "price": 3180, "rarity": 3, "perk": "+34% attack and +16 energy", "stats": {"attack": 1.34, "energy": 16}},
-	"zero_cell": {"name": "Zero Cell", "slot": "core", "price": 3450, "rarity": 3, "perk": "+62 energy and 29% lower charge cost", "stats": {"energy": 62, "charge": 0.71}},
+	"zero_cell": {"name": "Zero Cell", "slot": "core", "price": 3450, "rarity": 3, "perk": "+62 energy and 29% lower boss-weapon charge cost", "stats": {"energy": 62, "charge": 0.71}},
 	"vector_vanes": {"name": "Vector Vanes", "slot": "utility", "price": 740, "rarity": 1, "perk": "6% faster run, 14% faster dash, 15% shorter dash cooldown", "stats": {"speed": 1.06, "dash": 1.14, "cooldown": 0.85}},
 	"scavenger_array": {"name": "Scavenger Array", "slot": "utility", "price": 860, "rarity": 1, "perk": "70% more bolts from pickups", "stats": {"bolts": 1.7}},
 	"strike_thrusters": {"name": "Strike Thrusters", "slot": "utility", "price": 1060, "rarity": 1, "perk": "+9% attack and 12% faster dash", "stats": {"attack": 1.09, "dash": 1.12}},
@@ -382,8 +382,11 @@ func nightmare_unlocked() -> bool:
 func challenge_cycle(sector: int) -> Dictionary:
 	var cycle: Dictionary = challenge_cycles.get(sector, {})
 	var now := int(Time.get_unix_time_from_system())
-	if cycle.is_empty() or (int(cycle.get("reset_at", 0)) > 0 and now >= int(cycle.reset_at)):
-		var next := 0 if cycle.is_empty() else posmod(int(cycle.set) + randi_range(1, CHALLENGE_SETS.size() - 1), CHALLENGE_SETS.size())
+	var deadline := int(cycle.get("reset_at", 0))
+	if cycle.is_empty() or (deadline > 0 and now >= deadline):
+		var picker := RandomNumberGenerator.new()
+		picker.seed = hash([deadline, sector, operator_name])
+		var next := 0 if cycle.is_empty() else posmod(int(cycle.set) + picker.randi_range(1, CHALLENGE_SETS.size() - 1), CHALLENGE_SETS.size())
 		var done: Array = []
 		if cycle.is_empty():
 			for tier in CHALLENGES.size():
@@ -391,7 +394,18 @@ func challenge_cycle(sector: int) -> Dictionary:
 					done.append(tier)
 		cycle = {"set": next, "done": done, "reset_at": 0}
 		challenge_cycles[sector] = cycle
+	if cycle.done.size() == 5 and int(cycle.reset_at) <= 0:
+		cycle.reset_at = now + CHALLENGE_COOLDOWN
 	return cycle
+
+static func challenge_seconds_left(cycle: Dictionary) -> int:
+	return maxi(0, int(cycle.get("reset_at", 0)) - int(Time.get_unix_time_from_system()))
+
+static func challenge_shards(sector: int, tier: int) -> int:
+	return 4 + sector * 2 + tier * 2
+
+static func challenge_set_shards(sector: int) -> int:
+	return 12 + sector * 3
 
 static func rotated_challenge_credits(sector: int, index: int) -> int:
 	return 120 + index * 35 + (sector - 1) * 18
@@ -400,6 +414,7 @@ func record_challenges(sector: int, results: Dictionary) -> Dictionary:
 	var cycle := challenge_cycle(sector)
 	var before := cycle.duplicate(true)
 	var payment := 0
+	var shards := 0
 	var earned := 0
 	for index in 5:
 		if cycle.done.has(index):
@@ -411,14 +426,15 @@ func record_challenges(sector: int, results: Dictionary) -> Dictionary:
 		if (value <= task[3] if task[2] == "time" else value >= task[3]):
 			cycle.done.append(index)
 			payment += rotated_challenge_credits(sector, index)
+			shards += challenge_shards(sector, index)
 			earned += 1
 	if earned == 0:
 		return {}
 	if cycle.done.size() == 5:
 		cycle.reset_at = int(Time.get_unix_time_from_system()) + CHALLENGE_COOLDOWN
+		shards += challenge_set_shards(sector)
 	credits += payment
 	reserve_lives += earned
-	var shards := earned * (3 + sector)
 	core_shards += shards
 	if save() != OK:
 		challenge_cycles[sector] = before
@@ -522,8 +538,10 @@ func collect_blueprint(id: String) -> bool:
 	return true
 
 func learn_blueprint(id: String) -> String:
-	if not blueprint_items.has(id):
+	if not GEAR.has(id) or not blueprint_items.has(id):
 		return "Blueprint unavailable."
+	if blueprints.has(id):
+		return "Recipe already unlocked."
 	blueprint_items.erase(id)
 	blueprints[id] = true
 	if save() != OK:
@@ -561,6 +579,18 @@ func buy_supply(id: String, bundles := 1) -> String:
 		return "Could not save the purchase."
 	return "Purchased %s ×%d." % [item.name, quantity]
 
+func collect_supply(id: String) -> bool:
+	if not stock.has(id) or stock[id].has("material"):
+		return false
+	var previous := int(inventory.get(id, 0))
+	if previous >= STACK_MAX:
+		return false
+	inventory[id] = previous + 1
+	if save() != OK:
+		inventory[id] = previous
+		return false
+	return true
+
 func assign_quick(index: int, id: String) -> String:
 	if index < 0 or index >= quick_slots.size() or not stock.has(id) or stock[id].has("material"):
 		return "Invalid quick slot."
@@ -582,6 +612,7 @@ func assign_quick(index: int, id: String) -> String:
 		inventory = snapshot
 		quick_slots[index] = previous
 		return "Could not save the quick slot."
+	quick_changed.emit()
 	return "%s assigned." % stock[id].name
 
 func clear_quick(index: int) -> String:
@@ -599,6 +630,7 @@ func clear_quick(index: int) -> String:
 		quick_slots[index] = slot
 		inventory[id] = previous
 		return "Could not save the quick slot."
+	quick_changed.emit()
 	return "Stack returned to inventory."
 
 func consume_quick(index: int, operator: RiftPlayer) -> bool:

@@ -15,6 +15,7 @@ const SectorDetails := preload("res://scripts/sector_details.gd")
 const COMBAT_VFX := preload("res://scripts/combat_vfx.gd")
 const ManualSave := preload("res://scripts/manual_save_session.gd")
 const SuitReveal := preload("res://scripts/suit_reveal.gd")
+const CampaignDoor := preload("res://scripts/campaign_door.gd")
 const HOME_HUB := preload("res://scenes/home_hub.tscn")
 var sector_complete := false
 var deploying := false
@@ -23,7 +24,8 @@ var factory_hud: Control
 var boss: Combatant
 var gate: Node3D
 var gate_open := false
-var gate_motion: Tween
+var arena_door: CampaignDoor
+var repair_hall: Node3D
 var arena_sealed := false
 var arena_intro := false
 var suit_reveal_active := false
@@ -451,6 +453,8 @@ func clear_coop_test_boss(mission: Node) -> bool:
 	mission.operators[1].global_position = gate_position + Vector3(-1.0, 1.0, 0.0)
 	mission.check_campaign_progress()
 	if not mission.entrance_open or mission.boss_started:
+		return false
+	if not await wait_for_relay(func(): return mission.arena_door.passable, 2.0):
 		return false
 	mission.operators[0].global_position = gate_position + Vector3(3.0, 1.0, 0.0)
 	mission.check_campaign_progress()
@@ -1129,6 +1133,8 @@ func build_level() -> void:
 	camera_rig.max_x = bounds.get_meta("max_x")
 	boss = game_root.get_node("Actors/" + Catalog.info(sector).boss_node) as Combatant
 	gate = game_root.get_node("Gate") as Node3D
+	arena_door = CampaignDoor.new(gate)
+	arena_door.reset()
 	boss_spawn = boss.position
 	if act == 1:
 		var actors := boss.get_parent()
@@ -1144,17 +1150,18 @@ func build_level() -> void:
 		var checkpoint := game_root.get_node_or_null(CHECKPOINT_STATIONS[station])
 		if checkpoint:
 			checkpoint.activated.connect(_on_checkpoint_activated.bind(station))
-	game_root.get_node("ForgeHallDoor").target = player
+	repair_hall = game_root.get_node("ForgeHallDoor")
+	repair_hall.operators = [player]
+	repair_hall.motor.reset()
 	bind_boss_signals()
 	install_sector_pads()
 	SectorDetails.new().install(game_root, player, sector, act)
 
 func create_miniboss() -> Combatant:
-	var guard := Miniboss.new()
 	var info := Catalog.info(sector)
-	guard.name = "SectorMiniboss"
 	var exit := game_root.get_node("ExitBarrier") as Node3D
-	guard.configure(sector, Color(info.color), info.weak, gate.global_position, exit.global_position.x)
+	var guard := Miniboss.for_sector(sector, Color(info.color), info.weak, gate.global_position, exit.global_position.x)
+	guard.name = "SectorMiniboss"
 	guard.position = Vector3(boss_spawn.x, gate.position.y + guard.chassis_height, 0.0)
 	return guard
 
@@ -1291,6 +1298,9 @@ func build_hud() -> void:
 		if not profile.blueprints.has(id) and profile.GEAR.has(id):
 			factory_hud.announce("BLUEPRINT RECOVERED  /  " + profile.GEAR[id].name, Color("ffda83"), 27)
 	)
+	player.supply_found.connect(func(id: String):
+		factory_hud.announce(profile.stock[id].name + "  +1", Color("75ffd2"), 22)
+	)
 	player.salvage_collected.connect(func(drop: Dictionary):
 		var recovered: Array[String] = []
 		for id in drop:
@@ -1405,6 +1415,9 @@ func _on_pit_fall() -> void:
 	if arena_sealed and not boss_defeated:
 		reset_boss_room()
 	burst.queue_free()
+	for boulder in get_tree().get_nodes_in_group(&"foundry_boulder"):
+		if game_root.is_ancestor_of(boulder):
+			boulder.reset_runway()
 	player.global_position = checkpoint_spawn if checkpoint_reached else deployed_spawn
 	player.velocity = Vector3.ZERO
 	player.dash_left = 0.0
@@ -1461,8 +1474,6 @@ func expire_run_on_death() -> void:
 
 func reset_boss_room() -> void:
 	RiftAudio.play_music(true, sector)
-	if gate_motion and gate_motion.is_valid():
-		gate_motion.kill()
 	if is_instance_valid(boss):
 		boss.hide()
 		boss.collision_layer = 0
@@ -1487,8 +1498,9 @@ func reset_boss_room() -> void:
 	bind_boss_signals()
 	gate_open = false
 	arena_sealed = false
-	gate.get_node("Door").position.y = 0.0
-	gate.get_node("Blocker/CollisionShape3D").set_deferred("disabled", false)
+	arena_door.reset()
+	repair_hall.hold = 0.0
+	repair_hall.motor.reset()
 	factory_hud.boss_visible = false
 	factory_hud.boss_health = boss.health
 	factory_hud.boss_max_health = boss.max_health
@@ -1525,14 +1537,23 @@ func show_exit_confirmation() -> void:
 		, true)
 	UI.button(stack, "Return to title", return_to_title)
 
+func _physics_process(delta: float) -> void:
+	if not is_instance_valid(player) or not is_instance_valid(gate):
+		return
+	arena_door.step(delta, gate_open and (not arena_sealed or boss_defeated), [player])
+	if deploying or advancing_act or arena_intro or suit_reveal_active or sector_complete or respawning:
+		return
+	if not gate_open and arena_door.near(player):
+		open_factory_gate()
+	if gate_open and arena_door.passable and not arena_sealed and not boss_defeated and is_instance_valid(boss):
+		var exit := game_root.get_node("MARKERS/RoomExit") as Marker3D
+		if arena_door.inside(player, exit.global_position.x):
+			seal_arena()
+
 func _process(delta: float) -> void:
 	if deploying or advancing_act or arena_intro or suit_reveal_active or sector_complete or not is_instance_valid(player) or player.health <= 0.0:
 		return
 	mission_stats.seconds += delta
-	if not gate_open and absf(player.global_position.x - gate.global_position.x) < 4.0:
-		open_factory_gate()
-	if gate_open and not arena_sealed and not boss_defeated and is_instance_valid(boss) and player.global_position.x >= gate.global_position.x + 1.35:
-		seal_arena()
 	var exit := game_root.get_node("MARKERS/RoomExit") as Marker3D
 	var at_exit := player.global_position.distance_to(exit.global_position) <= 1.45
 	if not at_exit:
@@ -1694,24 +1715,10 @@ func cancel_act_transition(loading: CanvasLayer, message: String) -> void:
 
 func open_factory_gate() -> void:
 	gate_open = true
-	var door := gate.get_node("Door") as Node3D
-	var blocker := gate.get_node("Blocker/CollisionShape3D") as CollisionShape3D
-	if gate_motion and gate_motion.is_valid():
-		gate_motion.kill()
-	gate_motion = gate.create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
-	gate_motion.tween_property(door, "position:y", 4.2, 0.8)
-	gate_motion.tween_callback(blocker.set_deferred.bind("disabled", true))
 
 func seal_arena() -> void:
 	arena_sealed = true
 	arena_intro = true
-	var door := gate.get_node("Door") as Node3D
-	var blocker := gate.get_node("Blocker/CollisionShape3D") as CollisionShape3D
-	blocker.set_deferred("disabled", false)
-	if gate_motion and gate_motion.is_valid():
-		gate_motion.kill()
-	gate_motion = gate.create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
-	gate_motion.tween_property(door, "position:y", 0.0, 0.48)
 	play_arena_intro()
 
 func play_arena_intro() -> void:

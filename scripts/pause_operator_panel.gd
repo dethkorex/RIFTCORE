@@ -14,7 +14,18 @@ var stat_values: Array[Label] = []
 var buster: Label
 var quick_labels: Array[Label] = []
 var quick_icons: Array[TextureRect] = []
-var inventory: Label
+var quick_edited: Callable
+var inventory_grid: GridContainer
+var inventory_tiles: Dictionary = {}
+var inventory_snapshot: Dictionary = {}
+var inventory_empty: Label
+var selected_supply := ""
+var selected_slot := 0
+var item_detail: Label
+var item_feedback: Label
+var equip_buttons: Array[Button] = []
+var return_stack: Button
+const QUICK_KEYS := ["↑", "←", "→", "↓"]
 var sections: TabContainer
 var refresh_in := 0.0
 
@@ -36,10 +47,15 @@ func _ready() -> void:
 	buster = weapon_slot(weapons, "BUSTER", "arm")
 	weapon_slot(weapons, "SABER", "utility").text = "RX-07 Saber"
 	var sidebar := UI.column(layout, 6)
-	sidebar.custom_minimum_size.x = 246
+	sidebar.custom_minimum_size.x = 322
 	UI.label(sidebar, "LB / RB   Switch tab", 14, UI.MUTED)
 	sections = TabContainer.new()
 	sections.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	sections.add_theme_stylebox_override("panel", UI.frame(Color("101e32"), Color("365d79"), 1))
+	sections.add_theme_stylebox_override("tab_focus", StyleBoxEmpty.new())
+	sections.add_theme_stylebox_override("tab_selected", UI.frame(Color("34244f"), UI.VIOLET))
+	sections.add_theme_stylebox_override("tab_hovered", UI.frame(Color("34244f"), UI.VIOLET))
+	sections.add_theme_stylebox_override("tab_unselected", UI.frame(Color("12253d"), Color("3b6384")))
 	sidebar.add_child(sections)
 	var content := VBoxContainer.new()
 	content.name = "Stats"
@@ -67,27 +83,136 @@ func _ready() -> void:
 		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		quick_row.add_child(card)
 		var slot := UI.column(card, 2)
-		var key := UI.label(slot, str(index + 1), 14, UI.CYAN)
+		var key := UI.label(slot, QUICK_KEYS[index], 14, UI.CYAN)
 		key.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		quick_icons.append(item_icon(slot, 20))
 		var count := UI.label(slot, "", 14)
 		count.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		quick_labels.append(count)
-	var scroll := ScrollContainer.new()
-	scroll.name = "Inventory"
-	scroll.custom_minimum_size.y = 70
-	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	UI.make_readable_scroll(scroll)
-	sections.add_child(scroll)
-	inventory = UI.label(scroll, "", 16)
-	inventory.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	build_inventory()
 	sections.tab_changed.connect(func(_tab: int):
+		selected_supply = ""
 		var focused := get_viewport().gui_get_focus_owner()
 		if focused == null or not focused.is_visible_in_tree():
 			sections.get_tab_bar().grab_focus()
 	)
 	refresh()
+
+func build_inventory() -> void:
+	var panel := VBoxContainer.new()
+	panel.name = "Inventory"
+	panel.add_theme_constant_override("separation", 5)
+	sections.add_child(panel)
+	var scroll := ScrollContainer.new()
+	scroll.custom_minimum_size.y = 120
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.follow_focus = true
+	panel.add_child(scroll)
+	var contents := UI.column(scroll, 4)
+	contents.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	inventory_empty = UI.label(contents, "No items in inventory.", 16, UI.MUTED)
+	inventory_grid = GridContainer.new()
+	inventory_grid.columns = 4
+	inventory_grid.add_theme_constant_override("h_separation", UI.ITEM_GAP)
+	inventory_grid.add_theme_constant_override("v_separation", UI.ITEM_GAP)
+	contents.add_child(inventory_grid)
+	item_detail = UI.label(panel, "Select a supply, then pick its D-pad slot.", 16, UI.MUTED)
+	item_detail.custom_minimum_size.y = 36
+	item_feedback = UI.label(panel, "", 14, UI.CYAN)
+	UI.label(panel, "D-PAD QUICK SLOTS", 17, UI.CYAN)
+	var slots := HBoxContainer.new()
+	panel.add_child(slots)
+	for index in 4:
+		var button := UI.button(slots, QUICK_KEYS[index], edit_slot.bind(index), false, 30)
+		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		button.expand_icon = true
+		button.add_theme_constant_override("icon_max_width", 15)
+		button.focus_entered.connect(func():
+			selected_slot = index
+			refresh_slot_details()
+		)
+		equip_buttons.append(button)
+	return_stack = UI.button(panel, "Unequip Selected Slot", clear_slot, false, 30)
+	return_stack.focus_neighbor_top = return_stack.get_path_to(equip_buttons[0])
+
+func select_inventory_item(key: String, equip := false) -> void:
+	var item: Dictionary = inventory_snapshot[key]
+	item_detail.text = "%s ×%d
+%s" % [item.name, item.count, item.detail]
+	if equip:
+		selected_supply = String(item.get("supply", ""))
+	if equip and not selected_supply.is_empty():
+		item_feedback.text = "Choose a D-pad slot for %s." % item.name
+		equip_buttons[selected_slot].grab_focus()
+
+func edit_slot(index: int) -> void:
+	selected_slot = index
+	if selected_supply.is_empty():
+		refresh_slot_details()
+		item_feedback.text = "Select a supply above to equip it."
+		return
+	var previous: Dictionary = profile.quick_slots[index].duplicate()
+	item_feedback.text = profile.assign_quick(index, selected_supply)
+	if previous != profile.quick_slots[index]:
+		selected_supply = ""
+		if quick_edited.is_valid():
+			quick_edited.call()
+	refresh()
+
+func clear_slot() -> void:
+	var previous: Dictionary = profile.quick_slots[selected_slot].duplicate()
+	item_feedback.text = profile.clear_quick(selected_slot)
+	if previous != profile.quick_slots[selected_slot] and quick_edited.is_valid():
+		quick_edited.call()
+	refresh()
+	equip_buttons[selected_slot].grab_focus()
+
+func refresh_slot_details() -> void:
+	var stack: Dictionary = profile.quick_slots[selected_slot]
+	return_stack.disabled = int(stack.get("count", 0)) <= 0
+	for button in equip_buttons:
+		button.focus_neighbor_bottom = NodePath() if return_stack.disabled else button.get_path_to(return_stack)
+	return_stack.focus_neighbor_top = return_stack.get_path_to(equip_buttons[selected_slot])
+	if selected_supply.is_empty() and not return_stack.disabled and equip_buttons[selected_slot].has_focus():
+		var item: Dictionary = Profile.stock.get(stack.get("id", ""), {})
+		item_detail.text = "%s ×%d
+%s" % [item.get("name", "Supply"), stack.count, item.get("detail", "")]
+
+func reload_inventory(contents: Dictionary) -> void:
+	if contents == inventory_snapshot:
+		return
+	var focused := get_viewport().gui_get_focus_owner()
+	var previous_key: String = focused.get_meta("inventory_key", "") if focused else ""
+	inventory_snapshot = contents
+	for tile in inventory_tiles.values():
+		inventory_grid.remove_child(tile)
+		tile.queue_free()
+	inventory_tiles.clear()
+	inventory_empty.visible = contents.is_empty()
+	for key: String in contents:
+		var item: Dictionary = contents[key]
+		var icon := EquipmentIcons.supply_icon(Profile.stock[item.supply]) if item.has("supply") else EquipmentIcons.icon(item.icon, item.get("slot", item.icon))
+		var tile := UI.item_tile(inventory_grid, icon,
+			Profile.RARITY_COLORS[item.rarity], item.rarity, "×%d" % item.count, select_inventory_item.bind(key, true))
+		tile.set_meta("inventory_key", key)
+		tile.tooltip_text = item.name
+		tile.focus_entered.connect(select_inventory_item.bind(key))
+		inventory_tiles[key] = tile
+	var buttons := inventory_tiles.values()
+	for index in buttons.size():
+		var tile: Button = buttons[index]
+		var columns := inventory_grid.columns
+		if index + columns >= buttons.size():
+			tile.focus_neighbor_bottom = tile.get_path_to(equip_buttons[index % columns])
+	for index in equip_buttons.size():
+		var button := equip_buttons[index]
+		var top: Control = buttons[mini(index, buttons.size() - 1)] if not buttons.is_empty() else sections.get_tab_bar()
+		button.focus_neighbor_top = button.get_path_to(top)
+	if not previous_key.is_empty() and sections.get_current_tab_control().name == "Inventory":
+		var target: Button = inventory_tiles.get(previous_key, equip_buttons[selected_slot])
+		target.grab_focus()
 
 func weapon_slot(parent: HBoxContainer, title: String, icon_kind: String) -> Label:
 	var card := UI.equipment_card(UI.CYAN)
@@ -144,22 +269,32 @@ func refresh() -> void:
 		var id := String(stack.get("id", ""))
 		var count := int(stack.get("count", 0))
 		var item: Dictionary = Profile.stock.get(id, {}) if count > 0 else {}
-		quick_icons[index].texture = EquipmentIcons.icon(item.icon, item.icon) if not item.is_empty() else null
+		quick_icons[index].texture = EquipmentIcons.supply_icon(item) if not item.is_empty() else null
 		quick_labels[index].text = "×%d" % count if not item.is_empty() else "—"
 		quick_labels[index].tooltip_text = String(item.get("name", "Empty"))
-	var contents := PackedStringArray()
+	for index in profile.quick_slots.size():
+		equip_buttons[index].text = "%s  %s" % [QUICK_KEYS[index], quick_labels[index].text]
+		equip_buttons[index].tooltip_text = quick_labels[index].tooltip_text
+		equip_buttons[index].icon = quick_icons[index].texture
+	refresh_slot_details()
+	var contents := {}
 	for id in profile.inventory:
 		if Profile.stock.has(id) and int(profile.inventory[id]) > 0:
-			contents.append("%s  ×%d" % [Profile.stock[id].name, profile.inventory[id]])
+			var supply: Dictionary = Profile.stock[id]
+			contents[id] = {"name": supply.name, "count": profile.inventory[id], "detail": supply.detail,
+				"icon": supply.icon, "rarity": supply.rarity, "supply": id}
 	var materials: Dictionary = profile.materials.duplicate()
 	for id in player.salvage:
 		materials[id] = int(materials.get(id, 0)) + int(player.salvage[id])
 	for id in materials:
 		if int(materials[id]) > 0:
-			contents.append("%s  ×%d" % [Materials.label(id), materials[id]])
+			contents["material:" + id] = {"name": Materials.label(id), "count": materials[id],
+				"detail": "Crafting material", "icon": "core", "rarity": 0}
 	var blueprints: Dictionary = profile.blueprint_items.duplicate()
 	blueprints.merge(player.recovered_blueprints)
 	for id in blueprints:
 		if Profile.GEAR.has(id):
-			contents.append("%s Blueprint" % Profile.GEAR[id].name)
-	inventory.text = "Empty" if contents.is_empty() else "\n".join(contents)
+			var gear: Dictionary = Profile.GEAR[id]
+			contents["blueprint:" + id] = {"name": gear.name + " Blueprint", "count": 1,
+				"detail": "Learn this recipe at the station.", "icon": id, "slot": gear.slot, "rarity": gear.rarity}
+	reload_inventory(contents)

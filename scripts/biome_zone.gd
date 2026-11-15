@@ -14,6 +14,7 @@ enum Kind { ICE, WATER, WIND, LOW_GRAVITY, VENT, ELECTRIC, UPDRAFT, MUTATION, SO
 @export var direction := 1.0
 @export var period := 4.2
 @export var offset := 0.0
+@export_range(0.8, 1.0) var crossing_window_scale := 1.0
 @export var power := 20.0
 @export var terrain_strength := 1.0
 @export var burnable_spore_pod := false
@@ -261,8 +262,10 @@ func _physics_process(delta: float) -> void:
 	if Engine.is_editor_hint():
 		return
 	var length := maxf(period, 2.4)
-	clock = fposmod(float(phase_time.call()) + offset if phase_time.is_valid() else clock + delta, length)
-	var phase := clock / length
+	var lead := length * 0.42
+	var reduction := length * 0.75 * (1.0 - crossing_window_scale)
+	clock = fposmod(float(phase_time.call()) + offset if phase_time.is_valid() else clock + delta, length - reduction)
+	var phase := (clock + reduction) / length if clock >= lead - reduction else 0.42 * clock / (lead - reduction)
 	var live := kind >= Kind.VENT and phase >= 0.65 and phase <= 0.90
 	update_visuals(phase, live)
 	if not live:

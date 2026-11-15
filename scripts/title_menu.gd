@@ -43,6 +43,9 @@ var shop_status := ""
 var shop_category := "All Items"
 const SHOP_FILTERS := {"All Items": "visor", "Supplies": "frame", "Materials": "core", "Buffs": "utility", "Cores": "core"}
 var challenge_sector := 1
+var focus_operator_actions := false
+var roster_actions: Control
+var roster_selection: Button
 var selected_sector := 1
 var selected_difficulty := 0
 var archive_sector := 1
@@ -194,7 +197,7 @@ func show_page(next: String) -> void:
 			var confirmation := card(columns)
 			UI.label(confirmation, "Start a new run?", 34, UI.CYAN)
 			UI.label(confirmation, "Your current deployment, run XP and level unlocks will be reset.", 20, UI.MUTED)
-			UI.button(confirmation, "Start in Neon Factory", deploy, true).grab_focus()
+			UI.button(confirmation, "Start in Ember Foundry", deploy, true).grab_focus()
 			UI.button(confirmation, "Keep current run", show_page.bind("Sector select"))
 		"Upgrades":
 			build_workshop(columns)
@@ -202,21 +205,8 @@ func show_page(next: String) -> void:
 			build_fabrication(columns)
 		"Storage":
 			build_storage(columns)
-		"Learn Blueprint":
-			var confirm := card(columns)
-			UI.label(confirm, "Learn Blueprint?", 32, UI.CYAN)
-			if Profile.GEAR.has(pending_blueprint):
-				UI.label(confirm, Profile.GEAR[pending_blueprint].name, 22)
-			UI.label(confirm, "This consumes the item and unlocks its recipe in Crafting.", 17, UI.MUTED)
-			UI.button(confirm, "No", show_page.bind("Storage")).grab_focus()
-			UI.button(confirm, "Yes, Learn Blueprint", func():
-				inventory_status = profile.learn_blueprint(pending_blueprint)
-				show_page("Storage")
-			, true)
-			UI.button(confirm, "Move to Blueprint Pouch", func():
-				inventory_status = profile.move_blueprint_to_pouch(pending_blueprint)
-				open_equipment_view("Blueprint Pouch")
-			)
+		"Blueprint Details", "Learn Blueprint":
+			build_blueprint_details(columns)
 		"Shop":
 			build_shop(columns)
 		"Craft Item":
@@ -245,6 +235,10 @@ func show_page(next: String) -> void:
 			back_title = "Back to Deployment" if page in ["Level select", "New run"] else "Back to Station"
 			if page == "Craft Item":
 				back_title = "Back to Fabrication"
+			elif page == "Blueprint Details":
+				back_title = "Back to Equipment"
+			elif page == "Learn Blueprint":
+				back_title = "Back to Blueprint"
 		var back := UI.button(layout, back_title, leave_page)
 		back.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 		if get_viewport().gui_get_focus_owner() == null:
@@ -391,6 +385,9 @@ func leave_page() -> void:
 			show_page("Fabrication")
 			return
 		if page == "Learn Blueprint":
+			show_page("Blueprint Details")
+			return
+		if page == "Blueprint Details":
 			show_page("Storage")
 			return
 		if page in ["Level select", "New run"]:
@@ -401,6 +398,7 @@ func leave_page() -> void:
 		station_closed.emit()
 		return
 	if page == "Delete Operator":
+		focus_operator_actions = true
 		show_page(delete_return_page)
 		return
 	show_page("New Game" if page == "Replace Slot" else "Title")
@@ -790,6 +788,7 @@ func refresh_online_room() -> void:
 			relay_host.grab_focus()
 
 func open_slot_picker(mode: String) -> void:
+	focus_operator_actions = false
 	slot_error = ""
 	displayed_operator = maxi(active_slot, 1)
 	if active_slot == 0:
@@ -831,12 +830,15 @@ func build_save_slots(columns: HBoxContainer) -> void:
 		var selection := UI.button(operator_card, "Select", select_operator.bind(number), false, 34)
 		cards.append(selection)
 	var detail := card(columns, 1.25)
+	roster_actions = detail
 	var saved := saves[displayed_operator - 1]
 	UI.label(detail, "OPERATOR %02d DETAILS" % displayed_operator, 23, UI.CYAN)
 	UI.label(detail, operator_name(saved) if saved else "Empty operator slot", 27)
 	if saved:
 		for line in operator_facts(saved):
 			UI.label(detail, line, 16, UI.MUTED)
+	var action: Button
+	var other_action: Control
 	if not saved:
 		UI.label(detail, "Player Name", 16, UI.CYAN)
 		var field := LineEdit.new()
@@ -845,17 +847,37 @@ func build_save_slots(columns: HBoxContainer) -> void:
 		field.text = new_operator_name
 		field.text_changed.connect(func(value: String): new_operator_name = value)
 		detail.add_child(field)
-		UI.button(detail, "Create Operator", choose_slot.bind(displayed_operator, true), true, 34)
+		action = UI.button(detail, "Create Operator", choose_slot.bind(displayed_operator, true), true, 34)
+		other_action = field
 	if saved:
-		UI.button(detail, "Load Operator", choose_slot.bind(displayed_operator, false), true, 34)
-		UI.button(detail, "Delete Operator", func():
+		action = UI.button(detail, "Load Operator", choose_slot.bind(displayed_operator, false), true, 34)
+		other_action = UI.button(detail, "Delete Operator", func():
 			delete_return_page = page
 			show_page("Delete Operator")
 		, false, 34)
 	if not slot_error.is_empty():
 		UI.label(detail, slot_error, 16, UI.VIOLET)
-	cards[displayed_operator - 1].add_theme_color_override("font_color", UI.CYAN)
-	cards[displayed_operator - 1].grab_focus()
+	var selected := cards[displayed_operator - 1]
+	roster_selection = selected
+	selected.add_theme_color_override("font_color", UI.CYAN)
+	for index in cards.size():
+		if index > 0:
+			cards[index].focus_neighbor_left = cards[index].get_path_to(cards[index - 1])
+		var next: Control = cards[index + 1] if index + 1 < cards.size() else action
+		cards[index].focus_neighbor_right = cards[index].get_path_to(next)
+	action.focus_neighbor_left = action.get_path_to(selected)
+	other_action.focus_neighbor_left = other_action.get_path_to(selected)
+	if saved:
+		action.focus_neighbor_bottom = action.get_path_to(other_action)
+		other_action.focus_neighbor_top = other_action.get_path_to(action)
+	else:
+		action.focus_neighbor_top = action.get_path_to(other_action)
+		other_action.focus_neighbor_bottom = other_action.get_path_to(action)
+	if focus_operator_actions:
+		focus_operator_actions = false
+		action.grab_focus()
+	else:
+		selected.grab_focus()
 
 func delete_selected_operator() -> void:
 	var result := ManualSave.delete_slot(displayed_operator)
@@ -867,6 +889,7 @@ func delete_selected_operator() -> void:
 	show_page(delete_return_page)
 
 func select_operator(number: int) -> void:
+	focus_operator_actions = true
 	displayed_operator = number
 	show_page(page)
 
@@ -1163,11 +1186,23 @@ func select_challenge_sector(number: int, details: VBoxContainer) -> void:
 		child.queue_free()
 	UI.label(details, Catalog.info(number).title, 30, UI.CYAN)
 	var cycle: Dictionary = profile.challenge_cycle(number)
-	var reset_in := maxi(0, int(cycle.reset_at) - int(Time.get_unix_time_from_system()))
+	var reset_in: int = Profile.challenge_seconds_left(cycle)
 	if reset_in > 0:
-		UI.label(details, "New set in %02dh %02dm" % [reset_in / 3600, (reset_in / 60) % 60], 17, UI.VIOLET)
+		var countdown := UI.label(details, "", 17, UI.VIOLET)
+		var heartbeat := Timer.new()
+		countdown.add_child(heartbeat)
+		var refresh := func():
+			var left: int = Profile.challenge_seconds_left(cycle)
+			if left <= 0:
+				heartbeat.stop()
+				select_challenge_sector(number, details)
+				return
+			countdown.text = "New set in %02dh %02dm %02ds" % [left / 3600, (left / 60) % 60, left % 60]
+		heartbeat.timeout.connect(refresh)
+		heartbeat.start(1.0)
+		refresh.call()
 	else:
-		UI.label(details, "%d / 5 cleared" % cycle.done.size(), 17, UI.MUTED)
+		UI.label(details, "%d / 5 cleared  ·  +%d Core Shards for finishing the set" % [cycle.done.size(), Profile.challenge_set_shards(number)], 17, UI.MUTED)
 	for tier in 5:
 		var data: Array = Profile.CHALLENGE_SETS[cycle.set][tier]
 		var done: bool = cycle.done.has(tier)
@@ -1181,7 +1216,8 @@ func select_challenge_sector(number: int, details: VBoxContainer) -> void:
 		status.autowrap_mode = TextServer.AUTOWRAP_OFF
 		UI.label(details, data[1], 16, UI.MUTED)
 		var amount := Profile.rotated_challenge_credits(number, tier)
-		UI.label(details, "%s  %d bolts  ·  1 reserve life" % ["Earned" if done else "Reward", amount], 17, Color("ffe28e"))
+		var shards: int = Profile.challenge_shards(number, tier)
+		UI.label(details, "%s  %d bolts  ·  %d Core Shards  ·  1 reserve life" % ["Reward claimed" if done else "Reward", amount, shards], 17, Color("ffe28e"))
 	var reserve: int = profile.reserve_lives if profile else 0
 	details.add_child(HSeparator.new())
 	UI.label(details, "Reserve lives: %d. Used automatically when you lose your last life." % reserve, 16, UI.MUTED)
@@ -1304,7 +1340,7 @@ func sector_card(entries: GridContainer, number: int, state: String) -> Button:
 	var art := TextureRect.new()
 	var art_path := "res://assets/campaign/%s/panorama.png" % sector.id
 	if number == 1:
-		art_path = "res://assets/neon_factory/factory_panorama.png"
+		art_path = "res://assets/neon_factory/foundry/foundry_panorama.jpg"
 	elif number == 2:
 		art_path = "res://assets/machine_jungle/jungle_panorama.png"
 	art.texture = load(art_path) as Texture2D
@@ -1669,7 +1705,7 @@ func build_storage_grid(parent: VBoxContainer) -> Button:
 			reveal.call(id)
 			if item.kind == "Blueprints":
 				pending_blueprint = id.trim_prefix("blueprint/")
-				show_page("Learn Blueprint")
+				show_page("Blueprint Details")
 			elif action.visible:
 				action.grab_focus()
 		)
@@ -1757,6 +1793,57 @@ func add_stat_group(parent: VBoxContainer, category: String, values: String) -> 
 func open_equipment_view(section: String) -> void:
 	equipment_view = section
 	show_page("Storage")
+
+func build_blueprint_details(columns: HBoxContainer) -> void:
+	var center := CenterContainer.new()
+	center.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	columns.add_child(center)
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size.x = 494
+	center.add_child(panel)
+	var frame := panel.get_theme_stylebox("panel").duplicate() as StyleBox
+	frame.content_margin_bottom = 23
+	panel.add_theme_stylebox_override("panel", frame)
+	var content := UI.column(panel, 10)
+	var id := pending_blueprint
+	if not Profile.GEAR.has(id) or not profile.blueprint_items.has(id):
+		UI.label(content, "Blueprint unavailable", 27, UI.CYAN)
+		return
+	var known: bool = profile.blueprints.has(id)
+	UI.label(content, "Unlock this recipe?" if page == "Learn Blueprint" else "Blueprint Details", 29, UI.CYAN)
+	item_card(content, id)
+	if page == "Learn Blueprint":
+		UI.label(content, "Uses this blueprint to permanently unlock the recipe at the Workshop.", 17, UI.MUTED)
+		var actions := HBoxContainer.new()
+		actions.add_theme_constant_override("separation", 9)
+		content.add_child(actions)
+		UI.button(actions, "Keep Blueprint", show_page.bind("Blueprint Details"), false, 34).grab_focus()
+		UI.button(actions, "Unlock Recipe", func():
+			inventory_status = profile.learn_blueprint(id)
+			show_page("Storage" if profile.blueprints.has(id) else "Blueprint Details")
+		, true, 34)
+		return
+
+	var learn := UI.button(content, "Recipe Already Unlocked" if known else "Unlock Recipe", Callable() if known else show_page.bind("Learn Blueprint"), true, 34)
+	UI.label(content, "Unlock this item’s recipe at the Workshop.", 15, UI.MUTED)
+	content.add_child(HSeparator.new())
+	var count: int = profile.blueprint_pouch.size()
+	var can_carry := count < Profile.BLUEPRINT_POUCH_SIZE
+	var carry := UI.button(content, "Carry for Co-op  ·  %d / %d" % [count, Profile.BLUEPRINT_POUCH_SIZE], func():
+		inventory_status = profile.move_blueprint_to_pouch(id)
+		if profile.blueprint_pouch.has(id):
+			open_equipment_view("Blueprint Pouch")
+		else:
+			show_page("Blueprint Details")
+	, false, 34)
+	carry.disabled = not can_carry
+	UI.label(content, "Move it to the Blueprint Pouch to share with your party." if can_carry else "Blueprint Pouch is full. Return a blueprint to Storage to make room.", 15, UI.MUTED)
+	if not inventory_status.is_empty() and inventory_status.begins_with("Could not"):
+		UI.label(content, inventory_status, 16, UI.VIOLET)
+	if not learn.disabled:
+		learn.grab_focus()
+	elif not carry.disabled:
+		carry.grab_focus()
 
 func build_blueprint_pouch(parent: VBoxContainer) -> void:
 	UI.label(parent, "Blueprint Pouch   %d / %d" % [profile.blueprint_pouch.size(), Profile.BLUEPRINT_POUCH_SIZE], 22, UI.CYAN)
@@ -1871,5 +1958,9 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 	if event.is_action_pressed("ui_cancel") and page != "Title":
 		RiftAudio.play_effect(&"menu_confirm")
-		leave_page()
+		var focused := get_viewport().gui_get_focus_owner()
+		if page in ["Load Game", "New Game"] and is_instance_valid(roster_selection) and focused and roster_actions.is_ancestor_of(focused):
+			roster_selection.grab_focus()
+		else:
+			leave_page()
 		get_viewport().set_input_as_handled()

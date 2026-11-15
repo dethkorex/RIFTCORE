@@ -1,0 +1,29 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/climb_platform.gd" id="climb"]
+[ext_resource type="Texture2D" path="res://assets/neon_factory/foundry/deck_Heat-treated steel • albedo.png" id="deck"]
+[ext_resource type="Texture2D" path="res://assets/neon_factory/foundry/deck_Burnished nickel • albedo.png" id="frame"]
+
+[sub_resource type="StandardMaterial3D" id="Deck"]
+albedo_texture = ExtResource("deck")
+metallic = 0.45
+roughness = 0.57
+uv1_scale = Vector3(2, 1, 1)
+
+[sub_resource type="StandardMaterial3D" id="Frame"]
+albedo_texture = ExtResource("frame")
+metallic = 0.55
+roughness = 0.48
+
+[sub_resource type="StandardMaterial3D" id="HatchLights"]
+albedo_color = Color(1.0, 0.31, 0.07, 1)
+emission_enabled = true
+emission = Color(1.0, 0.31, 0.07, 1)
+emission_energy_multiplier = 2.3
+
+[node name="FoundryClimbPlatformCenter" type="Node3D"]
+script = ExtResource("climb")
+hatch = 1
+deck_material = SubResource("Deck")
+frame_material = SubResource("Frame")
+accent_material = SubResource("HatchLights")

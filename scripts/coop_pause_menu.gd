@@ -9,6 +9,7 @@ const OperatorPanel := preload("res://scripts/pause_operator_panel.gd")
 
 var in_mission := false
 var operator: Callable
+var quick_edited: Callable
 var profile
 var menu: Control
 var actions: VBoxContainer
@@ -46,6 +47,7 @@ func _ready() -> void:
 		var operator_panel := OperatorPanel.new()
 		operator_panel.operator = operator
 		operator_panel.profile = profile
+		operator_panel.quick_edited = quick_edited
 		layout.add_child(operator_panel)
 		menu.sections = operator_panel.sections
 	var content := UI.column(panel)

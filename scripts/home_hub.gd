@@ -41,13 +41,13 @@ const ARRIVAL := [
 	["RX-07", "I can hear you. Why can't I remember getting here?"],
 	["NOVA", "The Architect built you. After the Blackout, Dr. Mara Voss installed the Rogue Protocol so you could choose your own orders."],
 	["RX-07", "Then tell me where you need me."],
-	["NOVA", "The Architect seized ten facilities. Start in Neon Factory. Stop the Forge Titan and bring back its memory. We need those records to reach the Architect."],
-	["RX-07", "Understood. Put Neon Factory on the deployment map."],
+	["NOVA", "The Architect seized ten facilities. Start in Ember Foundry. Stop the Forge Titan and bring back its memory. We need those records to reach the Architect."],
+	["RX-07", "Understood. Put Ember Foundry on the deployment map."],
 ]
 const RECONSTRUCTION := [
 	["NOVA", "You're back, RX-07. When a frame is lost, I can recode you from the operator pattern."],
 	["RX-07", "Then put me back where I fell."],
-	["NOVA", "I can restore you here. The deployment is gone, so you'll start again in Neon Factory. Your banked bolts and permanent enhancements are still here."],
+	["NOVA", "I can restore you here. The deployment is gone, so you'll start again in Ember Foundry. Your banked bolts and permanent enhancements are still here."],
 	["RX-07", "All right. Let's make this run count."],
 ]
 var pads: Array[Dictionary] = []

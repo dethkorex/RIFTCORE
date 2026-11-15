@@ -9,6 +9,8 @@ signal experience_changed(total: int)
 signal experience_earned(amount: int)
 signal blueprint_found(id: String)
 signal salvage_collected(drop: Dictionary)
+signal supply_found(id: String)
+signal recovered_resources(hp: float, eng: float)
 
 const START_HEALTH := 80.0
 const START_ENERGY := 75.0
@@ -65,7 +67,6 @@ const WALK_SPEED_FRACTION := 0.42
 @export_group("Combat")
 @export var fire_interval := 0.115
 @export var charge_time := 0.7
-@export var charge_energy_cost := 30.0
 @export var base_buster_damage := 18.0
 @export var melee_multiplier := 2.5
 @export var damage_gain_per_level := 0.06
@@ -106,6 +107,7 @@ const SWING_DURATIONS := [0.20, 0.19, 0.26]
 const SABER_CHARGE_TIME := 0.52
 var saber_hold := -1.0
 var saber_primed := false
+var displayed_saber_charge := -1.0
 var combo_wave := false
 var combo_trail := false
 var sword_pivot: Node3D
@@ -140,6 +142,11 @@ const ChargingOrb := preload("res://scripts/buster_charge_orb.gd")
 const CHARGE_SHELL := preload("res://assets/vfx/buster_charge_shell.gdshader")
 var charge_orb: ChargingOrb
 var charge_shell: ShaderMaterial
+var restore_shell: ShaderMaterial
+var restore_glow: Tween
+var restore_aura: Node3D
+const HEAL_TINT := Color("6fff94")
+const ENERGY_TINT := Color("69c7ff")
 var full_charge_visual := false
 var muzzle_skeleton: Skeleton3D
 var muzzle_bone := -1
@@ -232,6 +239,7 @@ func bind_cannon_muzzle() -> void:
 func bind_sword_to_hand() -> void:
 	var skeleton := find_child("Skeleton3D", true, false) as Skeleton3D
 	var sword := get_node_or_null("SwordPivot") as Node3D
+	sword_pivot = sword
 	if skeleton == null or sword == null or skeleton.find_bone("mixamorig_LeftHand") < 0:
 		return
 	var hand := BoneAttachment3D.new()
@@ -300,13 +308,20 @@ var local_prediction := false
 var supplies := {}
 var quick_profile
 
+func collect_supply(id: String) -> bool:
+	if not quick_profile or not quick_profile.collect_supply(id):
+		return false
+	supply_found.emit(id)
+	return true
+
 func apply_supply(item: Dictionary) -> void:
-	var healing := int(item.get("hp", 0))
-	if healing > 0:
-		health = minf(max_health, health + healing)
-		health_changed.emit(health, max_health)
+	var hp_before := health
+	var eng_before := energy
+	if item.get("hp", 0) > 0:
+		restore_health(item.hp)
 	if item.get("energy", 0) > 0:
 		restore_energy(item.energy)
+	report_recovery(health - hp_before, energy - eng_before)
 	if item.has("stat"):
 		supplies[item.stat] = Vector2(item.gain, item.duration)
 	RiftAudio.play_effect(&"pickup")
@@ -330,8 +345,7 @@ func set_controls_suspended(suspended: bool) -> void:
 		shot_buffer_left = 0.0
 		jump_buffer = 0.0
 		combo_queued = 0
-		saber_hold = -1.0
-		saber_primed = false
+		cancel_saber_charge()
 		remote_pressed.clear()
 		remote_released.clear()
 
@@ -377,6 +391,7 @@ func simulate_movement(delta: float) -> void:
 	resume_input_guard = maxf(0.0, resume_input_guard - delta)
 	if health <= 0.0:
 		cancel_charge()
+		cancel_saber_charge()
 		return
 	var terrain := environment_control()
 	landing_left = maxf(0.0, landing_left - delta)
@@ -390,6 +405,7 @@ func simulate_movement(delta: float) -> void:
 	var drop_command := grounded() and wants_crouch and action_pressed("dash") and not is_instance_valid(ladder)
 	var dropping := drop_command and start_platform_drop()
 	if not dropping and update_ladder(delta, axis):
+		cancel_saber_charge()
 		return
 	if climb_pose:
 		climb_pose.influence = move_toward(climb_pose.influence, 0.0, 0.28)
@@ -879,9 +895,69 @@ func add_life() -> void:
 	lives_changed.emit(lives)
 	life_picked_up.emit()
 
-func restore_energy(amount: float) -> void:
+func restore_health(amount: float, feedback := false) -> void:
+	var previous := health
+	health = minf(max_health, health + amount)
+	health_changed.emit(health, max_health)
+	if feedback:
+		report_recovery(health - previous, 0.0)
+
+func restore_energy(amount: float, feedback := false) -> void:
+	var previous := energy
 	energy = clampf(energy + amount, 0.0, max_energy)
 	energy_changed.emit(energy, max_energy)
+	if feedback:
+		report_recovery(0.0, energy - previous)
+
+func report_recovery(hp: float, eng: float) -> void:
+	if hp <= 0.0 and eng <= 0.0:
+		return
+	play_restore_feedback.call_deferred(hp, eng)
+	recovered_resources.emit(hp, eng)
+
+func play_restore_feedback(hp: float, eng: float) -> void:
+	var scene := get_tree().current_scene if is_inside_tree() else null
+	if not scene or health <= 0.0:
+		return
+	if hp > 0.0:
+		show_restore_number(scene, hp, true, -.18 if eng > 0.0 else 0.0, HEAL_TINT)
+	if eng > 0.0:
+		show_restore_number(scene, eng, false, .23 if hp > 0.0 else 0.0, ENERGY_TINT)
+	var tint := HEAL_TINT if hp > 0.0 else ENERGY_TINT
+	if hp > 0.0 and eng > 0.0:
+		tint = HEAL_TINT.lerp(ENERGY_TINT, .5)
+	if restore_glow and restore_glow.is_valid():
+		restore_glow.kill()
+	if not restore_shell:
+		restore_shell = ShaderMaterial.new()
+		restore_shell.shader = CHARGE_SHELL
+	restore_shell.set_shader_parameter("charge_color", tint)
+	restore_shell.set_shader_parameter("intensity", 1.6)
+	refresh_suit_overlay()
+	if is_instance_valid(restore_aura):
+		restore_aura.queue_free()
+	restore_aura = preload("res://scripts/combat_vfx.gd").recovery(self, tint)
+	restore_glow = create_tween()
+	restore_glow.tween_interval(.36)
+	restore_glow.tween_property(restore_shell, "shader_parameter/intensity", 0.0, .87)
+	restore_glow.tween_callback(func():
+		restore_shell = null
+		refresh_suit_overlay()
+	)
+
+func show_restore_number(scene: Node, amount: float, hp: bool, offset: float, tint: Color) -> void:
+	var counter := DAMAGE_NUMBER.new()
+	scene.add_child(counter)
+	counter.global_position = global_position + Vector3(offset, 1.22 + (0.22 if not hp and offset != 0.0 else 0.0), .32)
+	counter.animate_restoration(amount, hp, tint)
+
+func refresh_suit_overlay() -> void:
+	var material := restore_shell if restore_shell else (charge_shell if full_charge_visual else null)
+	for mesh in base_suit_meshes:
+		mesh.material_overlay = material
+	for mesh in [fire_suit_mesh, nature_suit_mesh]:
+		if is_instance_valid(mesh):
+			mesh.material_overlay = material
 
 func set_crouch(enabled: bool) -> void:
 	crouching = enabled
@@ -947,13 +1023,7 @@ func present_charge(held_time: float, has_energy: bool) -> void:
 		if primed and charge_shell == null:
 			charge_shell = ShaderMaterial.new()
 			charge_shell.shader = CHARGE_SHELL
-		var meshes: Array[MeshInstance3D] = base_suit_meshes.duplicate()
-		if is_instance_valid(fire_suit_mesh):
-			meshes.append(fire_suit_mesh)
-		if is_instance_valid(nature_suit_mesh):
-			meshes.append(nature_suit_mesh)
-		for shell in meshes:
-			shell.material_overlay = charge_shell if primed else null
+		refresh_suit_overlay()
 	if held_time < .18:
 		if is_instance_valid(charge_orb):
 			charge_orb.queue_free()
@@ -988,7 +1058,7 @@ func buster_power() -> float:
 	return base_buster_damage * level_damage_scale() * buster_damage_multiplier * (1.0 + supply_bonus("attack"))
 
 func charged_shot_cost() -> float:
-	var base := 36.0 if magma_active else (30.0 if thorn_active or not special_weapon.is_empty() else charge_energy_cost)
+	var base := 36.0 if magma_active else (30.0 if thorn_active or not special_weapon.is_empty() else 0.0)
 	return base * charge_cost_multiplier
 
 func shoot(charged := false, pose_held := false) -> void:
@@ -1035,16 +1105,16 @@ func buster_range(muzzle: Vector3, direction: Vector3) -> float:
 	# remote shooter instead of using the host's distance from that operator.
 	var camera := get_viewport().get_camera_3d()
 	if remote_input or camera == null or absf(camera.global_position.x - muzzle.x) > 9.0:
-		return 15.0
+		return 30.0
 	var rect := get_viewport().get_visible_rect()
 	var pixel := Vector2(rect.end.x if direction.x >= 0.0 else rect.position.x, rect.get_center().y)
 	var origin := camera.project_ray_origin(pixel)
 	var ray := camera.project_ray_normal(pixel)
 	if absf(ray.z) < .001:
-		return 15.0
+		return 30.0
 	var boundary := origin.x + ray.x * ((muzzle.z - origin.z) / ray.z)
-	var margin := 3.2
-	return clampf((boundary - muzzle.x) * signf(direction.x) + margin, 5.0, 20.0)
+	var visible_range := clampf((boundary - muzzle.x) * signf(direction.x) + 3.2, 5.0, 20.0)
+	return maxf(25.0, visible_range * 2.0)
 
 func launch_buster(muzzle: Vector3, direction: Vector3, charged: bool, magma: bool, power: float, tint := Color.TRANSPARENT, weapon_id := "") -> void:
 	var projectile := RiftProjectile.new()
@@ -1058,7 +1128,6 @@ func launch_buster(muzzle: Vector3, direction: Vector3, charged: bool, magma: bo
 		projectile.speed = 29.0
 	if magma:
 		projectile.speed = 24.0 if charged else 25.0
-		projectile.lifetime = 2.35
 		projectile.burn_power = (8.0 if charged else 4.5) * level_damage_scale()
 	match weapon_id:
 		"frost_lance":
@@ -1075,6 +1144,7 @@ func launch_buster(muzzle: Vector3, direction: Vector3, charged: bool, magma: bo
 			projectile.speed = 20.0
 		"core_override":
 			projectile.pierces = 2 if charged else 1
+	projectile.lifetime = projectile.range_remaining / projectile.speed + 0.15
 	var shot_color := (Color("ffae35") if charged else Color("ff681c")) if magma else (Color("73f4ff") if charged else Color.CYAN)
 	if tint.a > 0.0:
 		shot_color = tint
@@ -1235,26 +1305,34 @@ func sample_combat_pose(source: Animation, stops: Array, poses: Array, accent: f
 					clip.scale_track_insert_key(track, key_time, source.scale_track_interpolate(track, at))
 	return clip
 
+func cancel_saber_charge() -> void:
+	saber_hold = -1.0
+	saber_primed = false
+	present_saber_charge(-1.0, melee_lock > 0.0)
+
 func update_melee(delta: float) -> void:
-	var pressed := action_pressed("melee") and contact_recoil <= 0.0 and dash_left <= 0.0
-	if pressed:
+	var released_tap := false
+	var can_use_saber := contact_recoil <= 0.0 and dash_left <= 0.0 and not wall_sliding
+	if not can_use_saber:
+		cancel_saber_charge()
+	elif action_pressed("melee"):
 		saber_hold = 0.0
-	if saber_hold >= 0.0 and action_held("melee"):
-		saber_hold += delta
-		if saber_hold >= SABER_CHARGE_TIME and not saber_primed:
-			saber_primed = true
-			var ready := preload("res://scripts/attack_fx.gd")
-			ready.charge(get_tree().current_scene, global_position + Vector3(0, .3, .2),
-				Color("ff6525") if magma_active else Color("35beff"), .20)
-	elif saber_hold >= 0.0:
-		saber_hold = -1.0
-		if saber_primed:
-			saber_primed = false
-			if contact_recoil <= 0.0 and dash_left <= 0.0:
+	if saber_hold >= 0.0:
+		if action_held("melee") and not action_released("melee"):
+			saber_hold += delta
+			if saber_hold >= SABER_CHARGE_TIME and not saber_primed:
+				saber_primed = true
+				var ready := preload("res://scripts/attack_fx.gd")
+				ready.charge(get_parent(), global_position + Vector3(0, .7, .2),
+					Color("ff6525") if magma_active else Color("35beff"), .20)
+		else:
+			released_tap = not saber_primed
+			if saber_primed:
 				combo_queued = 0
 				perform_melee(3, true)
+			cancel_saber_charge()
 	if melee_lock > 0.0:
-		if pressed and combo_step + combo_queued < 3:
+		if released_tap and combo_step + combo_queued < 3:
 			combo_queued += 1
 		combo_time += delta
 		if not combo_trail and combo_time >= combo_hit_at - 0.045:
@@ -1275,10 +1353,11 @@ func update_melee(delta: float) -> void:
 				if sword_pivot:
 					sword_pivot.hide()
 				combo_grace = 0.19 if combo_step < 3 else 0.0
-	elif pressed:
+	elif released_tap:
 		perform_melee(combo_step + 1 if combo_grace > 0.0 and combo_step < 3 else 1)
 	else:
 		combo_grace = maxf(0.0, combo_grace - delta)
+	present_saber_charge(saber_hold, melee_lock > 0.0)
 
 func perform_melee(step := 1, charged := false) -> void:
 	combo_step = step
@@ -1310,12 +1389,22 @@ func emit_saber_trail(duration: float, finisher: bool) -> void:
 	if not combo_wave:
 		RiftAudio.play_effect(&"saber_swing")
 
-func reflect_saber_pose(clip: String) -> void:
+func present_saber_charge(held_time: float, swinging: bool) -> void:
+	displayed_saber_charge = held_time
+	if slide_pose:
+		var amount := smoothstep(0.07, SABER_CHARGE_TIME * .86, held_time) if not swinging else 0.0
+		slide_pose.set("windup_target", amount)
+		if amount > 0.0:
+			slide_pose.influence = 1.0
+	if sword_pivot:
+		sword_pivot.visible = swinging or held_time >= 0.10
+
+func reflect_saber_pose(clip: String, held_time: float) -> void:
 	var step := SWING_CLIPS.find(StringName(clip))
 	if not is_instance_valid(sword_pivot):
 		sword_pivot = find_child("SwordPivot", true, false) as Node3D
 	if sword_pivot:
-		sword_pivot.visible = step >= 0
+		present_saber_charge(held_time, step >= 0)
 		if step >= 0 and clip != current_animation:
 			combo_hot = magma_active
 			PACK_VFX.blade_trail(sword_pivot, SWING_DURATIONS[step] * .60, saber_tint(), step == 2)
@@ -1323,9 +1412,9 @@ func reflect_saber_pose(clip: String) -> void:
 func launch_saber_wave() -> void:
 	var wave := RiftProjectile.new()
 	wave.collision_mask = 3 | 16
-	wave.lifetime = .79
 	wave.range_remaining = buster_range(global_position, Vector3.RIGHT * combo_facing)
 	wave.speed = 22.0
+	wave.lifetime = wave.range_remaining / wave.speed + 0.15
 	wave.damage = buster_power() * melee_multiplier * 1.8
 	wave.pierces = 2
 	wave.burn_power = 3.8 * level_damage_scale() if combo_hot else 0.0
@@ -1381,15 +1470,17 @@ func play_ground_locomotion(axis: float, speed: float, top_speed: float) -> void
 func update_character_visuals(axis: float) -> void:
 	if model_root:
 		var visual_facing := signf(velocity.x) if absf(velocity.x) > 0.65 and fire_lock <= 0.0 and melee_lock <= 0.0 else facing
+		if wall_sliding and dash_left <= 0.0 and fire_lock <= 0.0:
+			visual_facing = -wall_side
 		if is_instance_valid(charge_orb):
 			visual_facing = facing
 		model_root.rotation.y = PI * 0.5 * (combo_facing if melee_lock > 0.0 else visual_facing)
-		model_root.rotation.x = lerpf(model_root.rotation.x, 0.31 if dash_left > 0.0 and not ground_dash else (0.13 if wall_sliding else 0.0), 0.48)
+		model_root.rotation.x = lerpf(model_root.rotation.x, 0.0, 0.48)
 	var swinging := melee_lock > 0.0
 	if buster_pose:
 		buster_pose.ladder_direction = 0.0
 		buster_pose.crouched = low_profile
-		var aiming := not swinging and not (ground_dash and dash_left > 0.0) and (charge_held or is_instance_valid(charge_orb) or fire_lock > 0.0)
+		var aiming := not swinging and displayed_saber_charge < 0.10 and not (ground_dash and dash_left > 0.0) and (charge_held or is_instance_valid(charge_orb) or fire_lock > 0.0)
 		buster_pose.influence = move_toward(buster_pose.influence, 1.0 if aiming else 0.0, 0.30)
 	if is_instance_valid(charge_orb):
 		charge_orb.global_position = cannon_muzzle(facing)
@@ -1398,12 +1489,8 @@ func update_character_visuals(axis: float) -> void:
 	if dash_left > 0.0:
 		play_character_animation("slide" if ground_dash else "dash")
 	elif wall_sliding:
-		play_character_animation("fall")
-		if animation_player:
-			animation_player.speed_scale = 0.36
+		play_character_animation("wall_slide")
 	elif not is_on_floor():
-		if current_animation == "fall" and animation_player:
-			animation_player.speed_scale = 1.0
 		play_character_animation("fall" if velocity.y < -0.6 else "jump")
 	elif low_profile:
 		play_character_animation("crouch")
@@ -1413,25 +1500,28 @@ func update_character_visuals(axis: float) -> void:
 		play_ground_locomotion(axis, velocity.x, move_speed)
 
 func play_character_animation(animation_name: String, force := false) -> void:
-	if not animation_player or not animation_player.has_animation(animation_name):
+	var clip := "fall" if animation_name == "wall_slide" else animation_name
+	if not animation_player or not animation_player.has_animation(clip):
 		return
 	if not force and current_animation == animation_name:
 		return
 	if slide_pose:
-		slide_pose.influence = 1.0 if animation_name == "slide" else 0.0
+		slide_pose.set("mode", animation_name)
+		slide_pose.influence = 1.0
 	current_animation = animation_name
 	animation_player.speed_scale = 1.0
 	var speed_scale := 1.0
-	var duration := animation_player.get_animation(animation_name).length
+	var duration := animation_player.get_animation(clip).length
 	match animation_name:
 		"jump": speed_scale = duration / (jump_velocity / gravity)
 		"land": speed_scale = duration / 0.21
 		"dash": speed_scale = duration / dash_duration
+		"wall_slide": speed_scale = 0.36
 		"shoot": speed_scale = duration / 0.15
 		"crouch_shoot": speed_scale = duration / 0.15
 		"saber_cut", "saber_return", "slash_finisher":
 			speed_scale = duration / SWING_DURATIONS[SWING_CLIPS.find(StringName(animation_name))]
-	animation_player.play(animation_name, 0.035 if force or animation_name in ["dash", "slide"] else 0.10, speed_scale)
+	animation_player.play(clip, 0.035 if force or animation_name in ["dash", "slide", "wall_slide"] else 0.10, speed_scale)
 
 static func defense_for_experience(total: int) -> float:
 	return minf(0.25, (level_for_experience(total) - 1) * 0.02)

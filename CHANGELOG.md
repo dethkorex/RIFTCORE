@@ -1,15 +1,10 @@
-# RIFTCORE Alpha 6.1.8
+# RIFTCORE Alpha 6.1.9
 
-- Hold the D-pad or left stick to move through long lists. Use the right stick to scroll without changing the selected item.
-- Equipment tiles use bright cyan and white focus markers so Epic items are easy to distinguish. Fixed missing icons for some blueprints.
-- Neon Factory’s miniboss room has clearer floor space. Its lift relay responds to shots without blocking movement.
-
-- All 20 acts received new routes, fewer crowded platforms, and more gaps, step-ups, and climbs. Ladders link each floor where a normal jump falls short.
-- Discover sealed salvage rooms. Buster shots reveal spreading cracks and break the barricade on the fifth hit.
-- Ground dash is a reclined slide and can carry you under low platforms at 1.5× speed. Down + B drops through raised catwalks.
-- Saber combos have new timing, trails, and sounds. Hold the saber button and release for a ranged slash.
-- Full buster charge pulses the armor gold, with electrical arcs at the muzzle. Traps, impacts, saber trails, and enemy fire are easier to read.
-- Four textured enemy chassis per sector, six shared patrols, and new guards, evasions, and firing patterns. Player shots expire just beyond the camera.
-- Video settings add display modes, V-Sync, and a frame limit. Remap controls through clickable Xbox and PlayStation layouts.
+- Neon Factory becomes Ember Foundry. Both acts have new fire-and-machinery art, reworked enemies, larger flame vents, clearer entrances, and fewer redundant platforms.
+- Shoot floating power couplers to operate machinery. Shoot down supply drones for health or energy. Break the lethal rolling slag boulder with 10 regular shots or 4 charged shots.
+- Fight the new Kiln Warden miniboss and a rebuilt Forge Titan. Boss warning markers are easier to read, and all 10 sectors have themed doorways.
+- Cannon shots and charged saber waves travel farther. Controller bindings and the pause inventory are easier to navigate, with equipment icons and recovery feedback.
+- Challenges display their 24-hour countdown and award more Core Shards, including a bonus for clearing the full set.
+- Selecting an operator moves focus to its actions. Press B or Escape to go back to the roster.
 
 Co-op players should update together. Windows and Linux players can update through the launcher or Settings → Update Game.

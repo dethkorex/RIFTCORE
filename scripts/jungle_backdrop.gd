@@ -3,6 +3,8 @@ extends Node3D
 
 var skyline: MeshInstance3D
 @export var panorama_texture: Texture2D
+@export var shadow_tint := Vector3(0.016, 0.036, 0.093)
+@export var panorama_filter := Vector3(0.66, 0.74, 0.84)
 
 func _ready() -> void:
 	var texture := panorama_texture if panorama_texture else load("res://assets/machine_jungle/jungle_panorama.png") as Texture2D
@@ -14,6 +16,8 @@ func _ready() -> void:
 	var effect := ShaderMaterial.new()
 	effect.shader = preload("res://assets/neon_factory/factory_panorama.gdshader")
 	effect.set_shader_parameter("skyline", texture)
+	effect.set_shader_parameter("shadow_tint", shadow_tint)
+	effect.set_shader_parameter("panorama_filter", panorama_filter)
 	skyline.mesh = quad
 	skyline.material_override = effect
 	skyline.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF

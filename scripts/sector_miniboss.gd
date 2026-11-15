@@ -2,11 +2,11 @@ extends Combatant
 
 # Each guard shares basic movement and gets a dedicated sector attack.
 const TITLES := [
-	"Drill Sergeant", "Briar Sentinel", "Rime Keeper", "Surge Diver", "Glyph Jackal",
+	"Kiln Warden", "Briar Sentinel", "Rime Keeper", "Surge Diver", "Glyph Jackal",
 	"Jet Talon", "Culture Breaker", "Prism Relay", "Magnet Mauler", "Null Marshal",
 ]
 const SIGNATURES := [
-	"DRILL RUN", "BRIAR ERUPTION", "ICICLE DROP", "CROSSFIRE",
+	"KILN PURGE", "BRIAR ERUPTION", "ICICLE DROP", "CROSSFIRE",
 	"GLYPH TRAP", "DIVE BOMB", "SPORE RAIN", "PRISM SWEEP", "MAGNET SLAM", "NULL LANES",
 ]
 const MODELS := [
@@ -49,6 +49,13 @@ var skin: Node3D
 var chassis_height := 1.05
 var core: MeshInstance3D
 var zones: Array[Vector3] = []
+
+static func for_sector(number: int, tint: Color, weakness: String, gate_position: Vector3, exit_x: float) -> Combatant:
+	if number == 1:
+		return preload("res://scenes/levels/kiln_warden.tscn").instantiate() as Combatant
+	var guard: Combatant = load("res://scripts/sector_miniboss.gd").new()
+	guard.configure(number, tint, weakness, gate_position, exit_x)
+	return guard
 
 func configure(number: int, tint: Color, weakness: String, gate_position: Vector3, exit_x: float) -> void:
 	sector = number
@@ -189,12 +196,10 @@ func telegraph() -> void:
 func mark(x: float, radius: float, height: float) -> void:
 	x = clampf(x, left - 0.45, right + 0.45)
 	zones.append(Vector3(x, radius, height))
-	RiftProjectile.part(warning, BoxMesh.new(), RiftProjectile.light_paint(accent, 1.5),
-		Vector3(x, 0, 0), Vector3(radius * 2.0, 0.045, 1.38))
-	for edge in [-1.0, 1.0]:
-		var column := RiftProjectile.part(warning, BoxMesh.new(), RiftProjectile.light_paint(accent, 1.2),
-			Vector3(x + edge * radius * 0.98, height * 0.25, 0), Vector3(0.045, height * 0.5, 0.09))
-		column.transparency = 0.42
+	var footprint := Node3D.new()
+	warning.add_child(footprint)
+	footprint.position.x = x
+	ATTACK_FX.telegraph(footprint, radius * 2.0, accent, cooldown)
 
 func strike() -> void:
 	if is_instance_valid(warning):
