@@ -116,7 +116,7 @@ static func style_button(item: Button) -> void:
 				var value := pixel.v
 				pixels.set_pixel(x, y, Color(value, value, value, pixel.a))
 		button_texture = ImageTexture.create_from_image(pixels)
-	var active := texture_frame("button_primary", 31, Vector2(16, 6))
+	var active := texture_frame("button_primary", 31, Vector2(26, 8))
 	active.texture = button_texture
 	active.set_texture_margin(SIDE_TOP, 19)
 	active.set_texture_margin(SIDE_BOTTOM, 19)
@@ -142,6 +142,8 @@ static func button(parent: Node, value: String, action: Callable, primary := fal
 	item.custom_minimum_size.y = height
 	if parent is VBoxContainer and not value.is_empty():
 		item.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+		if apply_default_style and height >= 40.0:
+			item.custom_minimum_size.x = 148.0
 	if primary:
 		item.add_theme_color_override("font_color", WHITE)
 	if action.is_valid():

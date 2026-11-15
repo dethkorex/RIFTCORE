@@ -5,6 +5,7 @@ const ACTIONS := {
 	"move_left": "Move left", "move_right": "Move right", "jump": "Jump",
 	"crouch": "Crouch", "climb_up": "Climb up", "climb_down": "Climb down",
 	"dash": "Dash", "shoot": "Buster", "melee": "Sword", "swap_weapon": "Next suit", "previous_suit": "Previous suit", "pause": "Pause",
+	"field_interact": "Field interact",
 }
 const QUICK_DEFAULTS := [JOY_BUTTON_DPAD_UP, JOY_BUTTON_DPAD_LEFT, JOY_BUTTON_DPAD_RIGHT, JOY_BUTTON_DPAD_DOWN]
 const AXES := ["move_left", "move_right", "climb_up", "climb_down", "crouch"]

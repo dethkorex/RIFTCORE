@@ -9,11 +9,13 @@ const FactoryHUD := preload("res://scripts/factory_hud.gd")
 const UI := preload("res://scripts/rift_ui.gd")
 const Catalog := preload("res://scripts/sector_catalog.gd")
 const Difficulty := preload("res://scripts/mission_difficulty.gd")
+const FoundryModule := preload("res://scripts/foundry_run_module.gd")
 const Miniboss := preload("res://scripts/sector_miniboss.gd")
 const Details := preload("res://scripts/sector_details.gd")
 const Loading := preload("res://scripts/act_loading_screen.gd")
 const Equipment := preload("res://scripts/equipment_stats.gd")
 const BossCache := preload("res://scripts/boss_loot_cache.gd")
+const SuitReveal := preload("res://scripts/suit_reveal.gd")
 const BossIntro := preload("res://scripts/boss_intro.gd")
 const Story := preload("res://scripts/rift_story.gd")
 const StoryDialogue := preload("res://scripts/story_dialogue.gd")
@@ -50,6 +52,7 @@ var boss_started := false
 var boss_intro_active := false
 var entrance_open := false
 var boss_defeated := false
+var suit_reveal_playing := false
 var changing_act := false
 var checkpoint := Vector3.ZERO
 var resetting_arena := false
@@ -68,6 +71,7 @@ var active_weapon_ids: Array = []
 var stage_title: Label
 var objective: Label
 var field_briefing: CanvasLayer
+var module_chooser: CanvasLayer
 var personal_hud: Control
 var return_timer: Timer
 var last_boss_health := -1.0
@@ -79,6 +83,13 @@ var room_status: Label
 var partner_status: Label
 var camera: SideCameraRig
 var nameplates: Array[Label3D] = []
+var reboot_markers: Array[Label3D] = []
+var reboot_used := false
+var reboot_from := -1
+var reboot_target := -1
+var reboot_left := 0.0
+var reboot_health := 0.0
+var reboot_origin := Vector3.ZERO
 var return_button: Button
 var pause_menu: PauseMenu
 var resume_controls_pending := false
@@ -140,11 +151,16 @@ func _ready() -> void:
 	peer.expose_func(receive_personal_pickup_taken)
 	peer.expose_func(receive_restore_feedback)
 	peer.expose_func(receive_boss_intro)
+	peer.expose_func(receive_suit_reveal)
+	peer.expose_func(receive_suit_impact)
 	peer.expose_func(receive_shot)
 	peer.expose_func(receive_outcome)
 	peer.expose_func(receive_act)
 	peer.expose_func(receive_loadout)
 	peer.expose_func(receive_quick_config)
+	peer.expose_func(receive_reboot_request)
+	peer.expose_func(receive_module_choice)
+	peer.expose_func(receive_deflection)
 	load_stage()
 	build_hud()
 	show_field_briefing.call_deferred()
@@ -169,7 +185,7 @@ func receive_loadout(gear: Dictionary, upgrades: Dictionary, quick: Array) -> vo
 				slots[slot] = true
 				loadout.gear[id] = "equipped"
 	for enhancement in local_profile.all_upgrades():
-		loadout.owned[enhancement.id] = clampi(int(upgrades.get(enhancement.id, 0)), 0, 2)
+		loadout.owned[enhancement.id] = clampi(int(upgrades.get(enhancement.id, 0)), 0, enhancement.prices.size())
 	Equipment.apply(operators[roster.find(sender)], loadout)
 
 func apply_quick_config(loadout, quick: Array, operator: RiftPlayer = null) -> void:
@@ -210,6 +226,9 @@ func receive_quick_config(revision: int, quick: Array) -> void:
 	apply_quick_config(remote.profile, quick, operators[roster.find(sender)])
 
 func load_stage() -> void:
+	cancel_reboot()
+	reboot_used = false
+	reboot_markers.clear()
 	var previous := []
 	for operator in operators:
 		previous.append([operator.health, operator.energy, operator.lives, operator.equipped_suit(), operator.recovered_supplies, operator.salvage, operator.recovered_blueprints])
@@ -272,7 +291,9 @@ func load_stage() -> void:
 		operator.damage_taken_scale = difficulty
 		Equipment.apply(operator, loadout)
 		for id in active_weapon_ids:
-			operator.unlock_sector_weapon(id)
+			operator.unlock_sector_weapon(id, false)
+		if previous.is_empty() and not active_weapon_ids.is_empty():
+			operator.equip_sector_weapon(active_weapon_ids.back())
 		operator.gain_experience(roundi(team_xp * operator.xp_gain_multiplier), false)
 		if not previous.is_empty():
 			operator.health = clampf(previous[index][0], 1.0, operator.max_health)
@@ -306,6 +327,8 @@ func load_stage() -> void:
 				operator.blueprint_found.connect(func(id: String): peer.call_func_on(roster[index], receive_recovered, {}, id, ""))
 			operator.fell_into_pit.connect(respawn_operator.bind(operator))
 			operator.died.connect(respawn_operator.bind(operator))
+			operator.projectile_deflected.connect(func(id: int): peer.call_func(receive_deflection, act, id))
+			operator.shot_fired.connect(send_shot)
 		operators.append(operator)
 		var plate := Label3D.new()
 		plate.position.y = 1.48
@@ -317,6 +340,16 @@ func load_stage() -> void:
 		plate.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 		operator.add_child(plate)
 		nameplates.append(plate)
+		var marker := Label3D.new()
+		marker.font = UI.DISPLAY
+		marker.font_size = 36
+		marker.pixel_size = 0.0055
+		marker.outline_size = 10
+		marker.modulate = Color("75ffd2")
+		marker.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		marker.hide()
+		stage.add_child(marker)
+		reboot_markers.append(marker)
 		targets.append([])
 	for node in get_tree().get_nodes_in_group(&"level_enemies"):
 		if not stage.is_ancestor_of(node) or not node is WalkerBot:
@@ -406,7 +439,9 @@ func load_stage() -> void:
 		update_personal_hud(operators[local_index])
 
 func scale_opponent(enemy: Combatant) -> void:
-	enemy.max_health *= difficulty
+	if enemy.has_method("configure_difficulty"):
+		enemy.configure_difficulty(mode)
+	enemy.max_health *= (1.0 + DIFFICULTY_PER_GUEST * (roster.size() - 1)) * Difficulty.boss_health_scale(sector, mode, act)
 	enemy.health = enemy.max_health
 	enemy.health_changed.emit(enemy.health, enemy.max_health)
 
@@ -428,6 +463,8 @@ func respawn_operator(operator: RiftPlayer) -> void:
 	operator.set_physics_process(false)
 	operator.set_deferred("collision_layer", 0)
 	if boss_started and not boss_defeated:
+		if operator.global_position.y < gate.global_position.y:
+			operator.global_position.y = gate.global_position.y + operator.standing_capsule.height * 0.5 + 0.1
 		if nearest_operator(gate.global_position) == null and not resetting_arena:
 			resetting_arena = true
 			reset_coop_arena.call_deferred()
@@ -439,20 +476,78 @@ func respawn_operator(operator: RiftPlayer) -> void:
 func respawn_point() -> Vector3:
 	return stage.get_node("MARKERS/PlayerSpawn").global_position if checkpoint == Vector3.ZERO else checkpoint
 
-func restore_operator(operator: RiftPlayer, at: Vector3) -> void:
+func restore_operator(operator: RiftPlayer, at: Vector3, health_ratio := 1.0) -> void:
 	if operator.lives <= 0 or not operator.has_meta("coop_down"):
 		return
 	if foundry_boulders.size() > 0 and not operators.any(func(body): return body.health > 0.0 and body.global_position.x > foundry_boulders[0].global_position.x - foundry_boulders[0].runway_length - 3.5):
 		for boulder in foundry_boulders:
 			boulder.reset_runway()
 	operator.global_position = at
-	operator.health = operator.max_health
+	operator.health = operator.max_health * health_ratio
 	operator.velocity = Vector3.ZERO
 	operator.invulnerable_time = 1.4
 	operator.collision_layer = 1
 	operator.remove_meta("coop_down")
 	operator.show()
 	operator.set_physics_process(true)
+
+func reboot_available() -> bool:
+	return outcome.is_empty() and boss_started and not boss_intro_active and not boss_defeated and not resetting_arena and not reboot_used and not changing_act
+
+func reboot_candidate(from: RiftPlayer) -> int:
+	if not reboot_available() or from.health <= 0.0 or from.controls_suspended:
+		return -1
+	var nearest := -1
+	var distance := 2.25 * 2.25
+	for index in operators.size():
+		var body := operators[index]
+		if body.health <= 0.0:
+			var span := from.global_position.distance_squared_to(body.global_position)
+			if span < distance:
+				distance = span
+				nearest = index
+	return nearest
+
+func receive_reboot_request(remote_act: int) -> void:
+	var sender: int = peer.get_sender_id()
+	if host and remote_act == act and remote_players.has(sender):
+		start_reboot(roster.find(sender))
+
+func start_reboot(index: int) -> void:
+	if not host or index < 0 or index >= operators.size() or reboot_left > 0.0:
+		return
+	var reviver := operators[index]
+	var rank: int = reviver.quick_profile.rank(Profile.FIELD_REBOOT)
+	var downed := reboot_candidate(reviver)
+	if rank == 0 or downed < 0 or not operators[downed].has_meta("coop_down"):
+		return
+	reboot_from = index
+	reboot_target = downed
+	reboot_health = reviver.health
+	reboot_origin = reviver.global_position
+	reboot_left = 0.9 if rank == 3 else 1.4
+
+func cancel_reboot() -> void:
+	reboot_from = -1
+	reboot_target = -1
+	reboot_left = 0.0
+
+func tick_reboot(delta: float) -> void:
+	if reboot_left <= 0.0:
+		return
+	var reviver := operators[reboot_from]
+	var downed := operators[reboot_target]
+	if not reboot_available() or reviver.health < reboot_health or reviver.controls_suspended or downed.health > 0.0 or reviver.global_position.distance_to(reboot_origin) > 0.65 or reviver.global_position.distance_to(downed.global_position) > 2.25:
+		cancel_reboot()
+		return
+	reboot_left -= delta
+	if reboot_left <= 0.0:
+		var rank: int = reviver.quick_profile.rank(Profile.FIELD_REBOOT)
+		reboot_used = true
+		downed.lives = maxi(1, downed.lives)
+		restore_operator(downed, reviver.global_position, [0.35, 0.50, 0.70][rank - 1])
+		cancel_reboot()
+		broadcast_state(true)
 
 func reset_coop_arena() -> void:
 	RiftAudio.play_music(true, sector)
@@ -484,6 +579,8 @@ func reset_coop_arena() -> void:
 	boss.hide()
 	boss.died.connect(on_boss_defeated)
 	boss_started = false
+	reboot_used = false
+	cancel_reboot()
 	entrance_open = false
 	arena_door.reset()
 	repair_hall.hold = 0.0
@@ -495,6 +592,7 @@ func reset_coop_arena() -> void:
 
 func on_boss_defeated() -> void:
 	boss_defeated = true
+	cancel_reboot()
 	RiftAudio.play_music(true, sector)
 	for operator in operators:
 		if operator.has_meta("coop_down"):
@@ -504,11 +602,43 @@ func on_boss_defeated() -> void:
 	if act == 2:
 		create_boss_cache()
 		var reward: String = Catalog.info(sector).reward
-		if not active_weapon_ids.has(reward):
+		var first_unlock := not active_weapon_ids.has(reward)
+		if first_unlock:
 			active_weapon_ids.append(reward)
 		for operator in operators:
 			operator.unlock_sector_weapon(reward)
+		if first_unlock:
+			suit_reveal_playing = true
+			peer.call_func(receive_suit_reveal, act, reward)
+			play_suit_reveal.call_deferred(reward)
 	update_doors()
+
+func receive_suit_reveal(remote_act: int, reward: String) -> void:
+	if not host and remote_act == act and act == 2 and reward == Catalog.info(sector).reward and peer.get_sender_id() == peer.get_host() and not suit_reveal_playing:
+		suit_reveal_playing = true
+		play_suit_reveal.call_deferred(reward)
+
+func play_suit_reveal(reward: String) -> void:
+	for operator in operators:
+		if host or operator == operators[local_index]:
+			operator.set_controls_suspended(true)
+	var actor := operators[local_index]
+	var until := get_tree().create_timer(5.0, false)
+	if is_instance_valid(actor) and actor.health > 0.0:
+		actor.unlock_sector_weapon(reward)
+		var flash := SuitReveal.new()
+		stage.add_child(flash)
+		var floor_at := actor.global_position - Vector3.UP * (actor.standing_capsule.height * 0.5)
+		camera.set_process(false)
+		await flash.play(actor, camera, personal_hud.get_parent(), Catalog.info(sector), floor_at, true)
+		flash.queue_free()
+		camera.set_process(true)
+	if until.time_left > 0.0:
+		await until.timeout
+	suit_reveal_playing = false
+	for operator in operators:
+		if host or operator == actor:
+			operator.set_controls_suspended(operator == actor and is_pause_open())
 
 func collect_personal_totals(settle_loot := false) -> void:
 	for index in operators.size():
@@ -689,7 +819,7 @@ func check_campaign_progress() -> void:
 		room_status.text = "%s  •  %d / %d HP" % [Miniboss.TITLES[sector - 1] if act == 1 else Catalog.info(sector).boss, boss.health, boss.max_health]
 	if boss_defeated and not changing_act:
 		room_status.text = "Enter the Act II gate." if act == 1 else "Reach the extraction pad."
-	if not boss_defeated or changing_act:
+	if not boss_defeated or changing_act or suit_reveal_playing:
 		return
 	for operator in operators:
 		if operator.health > 0.0 and operator.global_position.distance_to(exit_marker.global_position) <= 1.65:
@@ -754,7 +884,36 @@ func change_act(next: int) -> void:
 	await get_tree().create_timer(0.5).timeout
 	loading.fade_out()
 	changing_act = false
+	if sector == 1 and act == 2:
+		await choose_module()
 	show_field_briefing()
+
+func choose_module() -> void:
+	if DisplayServer.get_name() == "headless":
+		set_module(local_index, "prism")
+		if not host:
+			peer.call_func_on(peer.get_host(), receive_module_choice, "prism")
+		return
+	module_chooser = FoundryModule.new()
+	add_child(module_chooser)
+	module_chooser.choose()
+	set_local_controls_suspended(true)
+	var id: String = await module_chooser.selected
+	module_chooser.queue_free()
+	module_chooser = null
+	set_module(local_index, id)
+	if not host:
+		peer.call_func_on(peer.get_host(), receive_module_choice, id)
+	resume_controls_pending = true
+
+func receive_module_choice(id: String) -> void:
+	var sender: int = peer.get_sender_id()
+	if host and remote_players.has(sender):
+		set_module(roster.find(sender), id)
+
+func set_module(index: int, id: String) -> void:
+	if sector == 1 and act == 2 and index >= 0 and index < operators.size() and operators[index].run_module.is_empty() and FoundryModule.MODULES.has(id):
+		operators[index].run_module = id
 
 func show_field_briefing() -> void:
 	if DisplayServer.get_name() == "headless" or not local_profile.claim_briefing(sector, act):
@@ -811,10 +970,10 @@ func build_hud() -> void:
 	update_personal_hud(operators[local_index])
 
 func is_pause_open() -> bool:
-	return is_instance_valid(pause_menu) and pause_menu.is_open()
+	return is_instance_valid(module_chooser) or (is_instance_valid(pause_menu) and pause_menu.is_open())
 
 func open_pause() -> void:
-	if is_pause_open() or not outcome.is_empty() or changing_act or boss_intro_active:
+	if is_pause_open() or not outcome.is_empty() or changing_act or boss_intro_active or suit_reveal_playing:
 		return
 	pause_menu.open()
 	resume_controls_pending = false
@@ -881,6 +1040,7 @@ func _physics_process(delta: float) -> void:
 					released[action] = true
 	else:
 		sector_seconds += delta
+		tick_reboot(delta)
 		for index in range(1, operators.size()):
 			var remote: Dictionary = remote_players[roster[index]]
 			remote.timeout -= delta
@@ -894,7 +1054,7 @@ func _physics_process(delta: float) -> void:
 		if is_instance_valid(boss) and boss_started:
 			boss.target = nearest_operator(boss.global_position)
 		for shot in get_tree().get_nodes_in_group(&"rift_projectile"):
-			if not shot.has_meta(&"coop_sent"):
+			if not shot.is_queued_for_deletion() and not shot.has_meta(&"coop_sent"):
 				shot.set_meta(&"coop_sent", true)
 				send_shot(shot)
 		check_campaign_progress()
@@ -951,7 +1111,7 @@ func send_input(force_reliable := false) -> void:
 
 func receive_input(axis: Vector2, current: int, down: int, up: int, sequence: int) -> void:
 	var sender: int = peer.get_sender_id()
-	if not host or not outcome.is_empty() or not axis.is_finite() or not remote_players.has(sender):
+	if not host or suit_reveal_playing or not outcome.is_empty() or not axis.is_finite() or not remote_players.has(sender):
 		return
 	var operator := operators[roster.find(sender)]
 	var remote: Dictionary = remote_players[sender]
@@ -1034,6 +1194,7 @@ func broadcast_state(reliable_operators := false) -> void:
 		relay_lamps.append(maxi(0, relay.shown_power))
 	var foundry_state := foundry_boulders.map(func(rock): return rock.snapshot())
 	var boss_state := [Vector3.ZERO, Vector3.ZERO, 0.0, boss_started, boss_defeated, arena_door.lift(), platform_positions, entrance_open, checkpoint, factory_trap_clock, fractures, doors, relay_lamps, [], foundry_state, guards]
+	boss_state.append([reboot_used, reboot_from, reboot_target, reboot_left])
 	if is_instance_valid(boss):
 		boss_state[0] = boss.global_position
 		boss_state[1] = boss.rotation
@@ -1061,6 +1222,11 @@ func receive_state(remote_act: int, security: PackedFloat32Array, arena: Array, 
 	if host or changing_act or remote_act != act or not outcome.is_empty() or peer.get_sender_id() != peer.get_host() or sequence <= latest_state or security.size() != enemies.size() * 6:
 		return
 	latest_state = sequence
+	if arena.size() > 16:
+		reboot_used = arena[16][0]
+		reboot_from = arena[16][1]
+		reboot_target = arena[16][2]
+		reboot_left = arena[16][3]
 	if is_instance_valid(boss) and not boss_intro_active:
 		boss.global_position = arena[0]
 		boss.rotation = arena[1]
@@ -1196,7 +1362,7 @@ func _process(delta: float) -> void:
 			operator.max_health = data[8]
 			operator.max_energy = data[9]
 			operator.lives = data[7]
-			if operator.equipped_suit() != data[6]:
+			if not (index == local_index and suit_reveal_playing) and operator.equipped_suit() != data[6]:
 				if String(data[6]).is_empty():
 					operator.equip_sector_weapon("")
 				else:
@@ -1220,6 +1386,11 @@ func _process(delta: float) -> void:
 		var display_name := Profile.clean_operator_name(str(peer.player_get_data(roster[index], "operator_name", "RX-07")))
 		if plate.text != display_name:
 			plate.text = display_name
+		var marker := reboot_markers[index]
+		marker.visible = index != local_index and operators[index].health <= 0.0 and reboot_available() and local_profile.rank(Profile.FIELD_REBOOT) > 0
+		if marker.visible:
+			marker.global_position = operators[index].global_position + Vector3.UP * 1.2
+			marker.text = "REBOOTING" if reboot_target == index else "✚  " + display_name
 		if index == local_index:
 			continue
 		var teammate := operators[index]
@@ -1233,6 +1404,12 @@ func _process(delta: float) -> void:
 	if local.health <= 0.0:
 		var down := "Down / waiting for the team" if boss_started and not boss_defeated else ("Out of lives" if local.lives <= 0 else "Respawning at checkpoint")
 		teammates.insert(0, down)
+	elif reboot_from == local_index:
+		teammates.insert(0, "Rebooting ally · stay close")
+	elif local_profile.rank(Profile.FIELD_REBOOT) > 0 and reboot_left <= 0.0 and reboot_candidate(local) >= 0:
+		var key := RiftSettings.binding_label("field_interact", "key")
+		var pad := RiftSettings.binding_label("field_interact", "pad")
+		teammates.insert(0, "%s / %s  ·  Reboot ally" % [key, pad])
 	partner_status.text = "\n".join(teammates)
 
 	var blueprints: int = local.recovered_blueprints.size() if outcome.is_empty() else blueprint_count
@@ -1257,14 +1434,26 @@ func challenge_results(index := 0) -> Dictionary:
 		"recovered": ledger.materials.duplicate(), "supplies": ledger.supplies.duplicate()}
 
 func send_shot(shot: RiftProjectile) -> void:
-	peer.call_func(receive_shot, shot.global_position, shot.direction, shot.speed, shot.palette, shot.is_charged, shot.is_magma, shot.owner_faction, shot.launch_profile, shot.range_remaining if is_finite(shot.range_remaining) else -1.0, shot.lifetime)
+	peer.call_func(receive_shot, shot.global_position, shot.direction, shot.speed, shot.palette, shot.is_charged, shot.is_magma, shot.owner_faction, shot.launch_profile, shot.range_remaining if is_finite(shot.range_remaining) else -1.0, shot.lifetime, shot.get_instance_id(), shot.weapon_id)
+	if not shot.weapon_id.is_empty():
+		var suit := shot.weapon_id
+		var tint := shot.palette
+		var id := shot.get_instance_id()
+		shot.reward_hit.connect(func(at: Vector3, links: PackedVector3Array):
+			peer.call_func(receive_suit_impact, act, id, suit, tint, at, links)
+		)
+		shot.reward_spent.connect(func(at: Vector3):
+			peer.call_func(receive_suit_impact, act, id, suit, tint, at, PackedVector3Array())
+		)
 
-func receive_shot(at: Vector3, direction: Vector3, speed: float, tint: Color, charged: bool, magma: bool, faction: String, profile_id := 0, flight_range := -1.0, flight_time := 2.0) -> void:
+func receive_shot(at: Vector3, direction: Vector3, speed: float, tint: Color, charged: bool, magma: bool, faction: String, profile_id := 0, flight_range := -1.0, flight_time := 2.0, shot_id := 0, suit := "") -> void:
 	if host or peer.get_sender_id() != peer.get_host():
 		return
 	var shot := RiftProjectile.new()
+	shot.set_meta(&"coop_shot_id", shot_id)
 	shot.collision_layer = 0
 	shot.collision_mask = 0
+	shot.weapon_id = suit
 	shot.speed = speed
 	shot.lifetime = flight_time
 	add_child(shot)
@@ -1272,6 +1461,26 @@ func receive_shot(at: Vector3, direction: Vector3, speed: float, tint: Color, ch
 	var sector_style := (profile_id >> 3) if profile_id >= 0 else 0
 	shot.range_remaining = flight_range if flight_range >= 0.0 else INF
 	shot.setup(direction, faction, tint, profile_id == -1, charged, magma, sector_style, profile_id & 7, profile_id == -2)
+
+func receive_suit_impact(remote_act: int, shot_id: int, suit: String, tint: Color, at: Vector3, links: PackedVector3Array) -> void:
+	if host or remote_act != act or peer.get_sender_id() != peer.get_host():
+		return
+	if not links.is_empty():
+		RiftProjectile.draw_reward_hit(self, at, tint, suit, links)
+		return
+	for projectile in get_tree().get_nodes_in_group(&"rift_projectile"):
+		if projectile.get_meta(&"coop_shot_id", 0) == shot_id:
+			projectile.global_position = at
+			projectile.impact()
+			return
+
+func receive_deflection(remote_act: int, shot_id: int) -> void:
+	if host or remote_act != act or peer.get_sender_id() != peer.get_host():
+		return
+	for shot in get_tree().get_nodes_in_group(&"rift_projectile"):
+		if shot.get_meta(&"coop_shot_id", 0) == shot_id:
+			shot.queue_free()
+			return
 
 func receive_outcome(success: bool, xp: int, bolts: int, blueprints: Array, duration: float, results := {}) -> void:
 	if not host and peer.get_sender_id() == peer.get_host():
@@ -1305,12 +1514,23 @@ func finish_mission(success: bool, xp: int, bolts: int, blueprints: Array, exhau
 			rewards_delivered = true
 			rewards_earned.emit(xp, bolts, unlocked, sector)
 	outcome = message
+	if is_instance_valid(module_chooser):
+		module_chooser.queue_free()
+		module_chooser = null
 	if is_pause_open():
 		pause_menu.close()
 	room_status.text = message
 	if success:
 		var extraction_dialogue: Array = Story.hard_unlock(sector) if new_hard_unlock else []
 		rewards_status.text = "Recovered items sent to Storage. Save at the System pad to keep your rewards."
+		if extracted_results.get("talent_shards", 0) > 0:
+			rewards_status.text += "\nShard Reclaimer · +%d Core Shards." % extracted_results.talent_shards
+		if extracted_results.get("talent_packs", 0) > 0:
+			rewards_status.text += "\nResupply Contract · +%d Resupply Packs." % extracted_results.talent_packs
+		if not extracted_results.get("talent_blueprints", []).is_empty():
+			rewards_status.text += "\nArchive Mastery · " + ", ".join(extracted_results.talent_blueprints)
+		if extracted_results.has("hunt_award"):
+			rewards_status.text += "\nHunt complete · %s sent to Storage." % extracted_results.hunt_award
 		if sector == Catalog.SECTORS.size():
 			var restored := Story.has_all_memories(local_profile.memories)
 			rewards_status.text = Story.ending(restored)
@@ -1347,3 +1567,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("pause") and not event is InputEventMouseButton and not is_pause_open():
 		get_viewport().set_input_as_handled()
 		open_pause()
+	elif event.is_action_pressed("field_interact") and not is_pause_open() and local_profile.rank(Profile.FIELD_REBOOT) > 0 and reboot_candidate(operators[local_index]) >= 0:
+		get_viewport().set_input_as_handled()
+		if host:
+			start_reboot(local_index)
+		else:
+			peer.call_func_on(peer.get_host(), receive_reboot_request, act)

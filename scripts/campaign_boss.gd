@@ -1,5 +1,6 @@
 extends Combatant
 
+const Difficulty := preload("res://scripts/mission_difficulty.gd")
 const ATTACK_FX := preload("res://scripts/attack_fx.gd")
 
 @export_range(3, 10) var sector_number := 3
@@ -24,6 +25,7 @@ var facing := -1.0
 var attack := ""
 var attack_index := 0
 var cooldown := 0.94
+var difficulty_mode := 0
 var clock := 0.0
 var strike_x := 0.0
 var strike_dir := -1.0
@@ -40,6 +42,9 @@ var hazards: Array[Dictionary] = []
 var joints: Dictionary = {}
 var lamp: OmniLight3D
 @onready var armor: Node3D = $Armor
+
+func configure_difficulty(mode: int) -> void:
+	difficulty_mode = mode
 
 func _ready() -> void:
 	max_health *= 1.24
@@ -92,7 +97,7 @@ func _physics_process(delta: float) -> void:
 	if attack.is_empty() and sprint_left <= 0.0:
 		if absf(dx) > 0.25:
 			facing = signf(dx)
-	var speed := (2.6 + stage * 0.75) * (0.7 if sector_number == 4 else 1.0)
+	var speed := (2.6 + stage * 0.75) * (0.7 if sector_number == 4 else 1.0) * Difficulty.boss_pursuit_scale(difficulty_mode)
 	var walk := facing * speed if attack.is_empty() and absf(dx) > 4.3 else 0.0
 	velocity.x = strike_dir * (18.0 + stage * 3.4) if sprint_left > 0.0 else move_toward(velocity.x, walk, delta * 22.0)
 	velocity.y -= 29.0 * delta
@@ -125,18 +130,19 @@ func _physics_process(delta: float) -> void:
 			warning.queue_free()
 		execute(attack)
 		attack = ""
-		cooldown = (0.82 if stage == 0 else (0.61 if stage == 1 else 0.44)) + recovery
+		cooldown = (0.82 if stage == 0 else (0.61 if stage == 1 else 0.44)) * Difficulty.boss_recovery_scale(difficulty_mode) + recovery
 
 func windup() -> void:
 	var pattern: Array = PATTERNS[sector_number]
 	attack = pattern[attack_index % pattern.size()]
-	if phase() > 0 and attack_index % (4 if phase() == 1 else 3) == 2:
+	var pressure := phase() + difficulty_mode
+	if pressure > 0 and posmod(attack_index, 4 if pressure == 1 else 3) == 2:
 		attack = "crossfire"
 	attack_index += 1
 	strike_x = clampf(target.global_position.x, left - 0.8, right + 0.8)
 	strike_dir = signf(strike_x - global_position.x) if absf(strike_x - global_position.x) > 0.25 else facing
 	facing = strike_dir
-	cooldown = maxf(0.49, 0.84 - phase() * 0.11)
+	cooldown = Difficulty.windup_time(0.84 - phase() * 0.11, difficulty_mode, 0.49)
 	warning = Node3D.new()
 	add_child(warning)
 	warning.top_level = true

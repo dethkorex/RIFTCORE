@@ -3,10 +3,15 @@ extends Combatant
 const CARRIER := preload("res://scripts/cargo_carrier.gd")
 const FLAME := preload("res://scripts/foundry_flame.gd")
 const VFX := preload("res://scripts/factory_trap_vfx.gd")
+const Difficulty := preload("res://scripts/mission_difficulty.gd")
+const ReliefValve := preload("res://scripts/foundry_relief_valve.gd")
 const ORANGE := Color("ff6e31")
 const HEAT_MARKER := Color("ff6932")
 const MINI_CYCLE := ["low_volley", "firewall", "sweep", "firewall"]
 const TITAN_CYCLE := ["drill_volley", "hammer", "rush", "pressure_dump", "rush"]
+const HARD_WARDEN_CYCLE := ["crossfire", "sweep", "low_volley", "firewall"]
+const HARD_TITAN_CYCLE := ["crossfire", "rush", "hammer", "pressure_dump", "rush"]
+const EXPERT_TITAN_CYCLE := ["rupture", "crossfire", "pressure_dump", "rupture", "hammer"]
 
 @export var warden := false
 var chassis_height := 1.45
@@ -32,6 +37,9 @@ var contact_timers := {}
 var cargo_index := 0
 var move_phase := 0.0
 var world_impact := false
+var difficulty_mode := 0
+var valve: StaticBody3D
+var pressure_released := false
 
 @onready var armor: Node3D = $Armor
 @onready var drill := find_child("DrillModule", true, false) as Node3D
@@ -71,6 +79,22 @@ func _ready() -> void:
 func phase_index() -> int:
 	return 2 if health <= max_health * 0.30 else (1 if health <= max_health * 0.64 else 0)
 
+func configure_difficulty(mode: int) -> void:
+	difficulty_mode = mode
+	if not warden and mode == Difficulty.NIGHTMARE and not is_instance_valid(valve):
+		valve = ReliefValve.new()
+		add_child(valve)
+		valve.top_level = true
+		valve.global_position = Vector3((arena_left + arena_right) * 0.5, floor_height + 1.13, 0.0)
+		valve.released.connect(release_pressure)
+
+func attack_cycle() -> Array:
+	if warden:
+		return HARD_WARDEN_CYCLE if difficulty_mode > Difficulty.NORMAL else MINI_CYCLE
+	if difficulty_mode == Difficulty.NIGHTMARE:
+		return EXPERT_TITAN_CYCLE
+	return HARD_TITAN_CYCLE if difficulty_mode == Difficulty.HARD else TITAN_CYCLE
+
 func _physics_process(delta: float) -> void:
 	if not active or not is_instance_valid(target) or target.health <= 0.0 or health <= 0.0:
 		return
@@ -82,13 +106,13 @@ func _physics_process(delta: float) -> void:
 		if absf(gap) > 0.19:
 			facing = signf(gap)
 		var stop := 5.0 if warden else 6.0
-		var pace := (2.5 + phase_index() * 0.46) * facing
+		var pace := (2.5 + phase_index() * 0.46) * facing * Difficulty.boss_pursuit_scale(difficulty_mode, warden)
 		if absf(gap) < stop:
 			pace = -pace * 0.53 if absf(gap) < stop * 0.64 else 0.0
 		move_in_arena(pace, delta)
 		cooldown -= delta
 		if cooldown <= 0.0:
-			var cycle := MINI_CYCLE if warden else TITAN_CYCLE
+			var cycle := attack_cycle()
 			begin_attack(cycle[step % cycle.size()])
 			step += 1
 	else:
@@ -108,7 +132,7 @@ func move_in_arena(speed: float, delta: float) -> void:
 	stride += absf(move_phase) * delta * (4.85 if warden else 3.6)
 	for index in get_slide_collision_count():
 		var operator := get_slide_collision(index).get_collider() as RiftPlayer
-		if operator and motion != "rush":
+		if operator and motion not in ["rush", "rupture"]:
 			hit_operator(operator, 12.0 if warden else 17.0)
 
 func hit_operator(operator: RiftPlayer, power: float) -> void:
@@ -122,6 +146,7 @@ func begin_attack(kind: String) -> void:
 	motion = kind
 	elapsed = 0.0
 	world_impact = false
+	pressure_released = false
 	hit_players.clear()
 	match motion:
 		"firewall":
@@ -140,7 +165,12 @@ func begin_attack(kind: String) -> void:
 			var goal := target.global_position.x
 			for offset in [-5.7, -2.85, 0.0, 2.85, 5.7]:
 				add_flame(goal + offset, 3.65, 1.52, 0.95 + absf(offset) * 0.13)
-		"rush":
+		"crossfire":
+			var goal := target.global_position.x
+			add_flame(goal, 2.65, 1.5, 0.93)
+			if difficulty_mode == Difficulty.NIGHTMARE:
+				add_flame(goal + facing * 4.0, 3.10, 1.28, 1.38)
+		"rush", "rupture":
 			rush_origin = global_position.x
 			rush_end = clampf(rush_origin + facing * (12.8 + 2.05 * phase_index()), arena_left, arena_right)
 			show_rush_markers()
@@ -150,8 +180,8 @@ func advance_attack(delta: float) -> void:
 	var prior := elapsed
 	elapsed += delta
 	var pressure := phase_index()
-	exposed = motion == "pressure_dump" and elapsed > 1.62
-	if motion == "rush":
+	exposed = pressure_released or (motion == "pressure_dump" and elapsed > 1.62)
+	if motion in ["rush", "rupture"]:
 		update_rush(prior, delta)
 	else:
 		move_in_arena(0.0, delta)
@@ -165,14 +195,18 @@ func advance_attack(delta: float) -> void:
 			fire_at(prior, 0.89, 1.75, true)
 			if pressure > 0:
 				fire_at(prior, 1.26, 0.74, true)
+		elif motion == "crossfire":
+			fire_at(prior, .52, .66, not warden)
+			fire_at(prior, .88, 1.86, not warden)
+			fire_at(prior, 1.33, .70, not warden)
 		elif motion == "hammer" and prior < 0.95 and elapsed >= 0.95:
 			VFX.throw_sparks(fist, HEAT_MARKER, 2.65)
 			RiftAudio.foundry_sound(&"boulder_roll", global_position)
 	advance_flames(true)
-	var end_at := 3.40 if motion == "pressure_dump" else (2.52 if motion == "sweep" else (2.26 if motion in ["firewall", "hammer", "rush"] else 1.8))
+	var end_at := 3.40 if motion in ["pressure_dump", "rupture"] else (2.52 if motion in ["sweep", "crossfire"] else (2.26 if motion in ["firewall", "hammer", "rush"] else 1.8))
 	if elapsed > end_at:
 		clear_attack()
-		cooldown = 0.82 - pressure * 0.12
+		cooldown = (0.82 - pressure * 0.12) * Difficulty.boss_recovery_scale(difficulty_mode, warden)
 
 func update_rush(prior: float, delta: float) -> void:
 	var charging := elapsed >= 0.92 and elapsed <= 1.68 and not world_impact
@@ -199,7 +233,25 @@ func update_rush(prior: float, delta: float) -> void:
 			RiftAudio.foundry_sound(&"boulder_roll", global_position)
 	else:
 		move_in_arena(0.0, delta)
+	if motion == "rupture" and not world_impact and elapsed >= 1.68:
+		world_impact = true
+	if motion == "rupture" and world_impact and not pressure_released and zones.is_empty():
+		for i in [0, 1, 2]:
+			var lane := lerpf(rush_origin, rush_end, (float(i) + .5) / 3.0)
+			add_flame(lane, 3.1, 2.0, elapsed + .57 + float(i) * .11)
+		if is_instance_valid(valve):
+			valve.present_vent(true, true)
 	update_rush_markers()
+
+func release_pressure() -> void:
+	if motion != "rupture" or pressure_released:
+		return
+	pressure_released = true
+	exposed = true
+	for flame in zones:
+		flame.queue_free()
+	zones.clear()
+	RiftAudio.play_effect(&"checkpoint")
 
 func fire_at(prior: float, at: float, height: float, is_drill: bool) -> void:
 	if prior >= at or elapsed < at:
@@ -271,7 +323,7 @@ func draw_pose(delta: float) -> void:
 	var lean := 0.0
 	var rise := 0.0
 	match motion:
-		"rush":
+		"rush", "rupture":
 			windup = clampf(elapsed / 0.68, 0.0, 1.0)
 			lean = -0.21 * windup if elapsed < 0.92 else 0.26
 			rise = -0.13 * windup
@@ -323,6 +375,9 @@ func clear_attack() -> void:
 		tracks = null
 	motion = ""
 	exposed = false
+	pressure_released = false
+	if is_instance_valid(valve):
+		valve.present_vent(false, false)
 
 func take_damage(amount: float, source_position := Vector3.ZERO) -> void:
 	if active:
@@ -354,7 +409,7 @@ func drop_supply(index: int) -> void:
 
 func die() -> void:
 	active = false
-	if motion == "rush" and elapsed < 0.92:
+	if motion in ["rush", "rupture"] and elapsed < 0.92:
 		RiftAudio.stop_effect(&"titan_windup")
 	clear_attack()
 	set_deferred("collision_layer", 0)
@@ -372,10 +427,10 @@ func foundry_snapshot() -> Array:
 	var emitters := []
 	for flame in zones:
 		emitters.append(Vector4(flame.global_position.x, flame.height, flame.width, flame.warning_time))
-	return [motion, step, elapsed, facing, stride, move_phase, exposed, rush_origin, rush_end, emitters, world_impact]
+	return [motion, step, elapsed, facing, stride, move_phase, exposed, rush_origin, rush_end, emitters, world_impact, pressure_released]
 
 func apply_foundry_snapshot(state: Array) -> void:
-	if motion != state[0] or step != state[1]:
+	if motion != state[0] or step != state[1] or zones.size() != state[9].size():
 		clear_attack()
 		motion = state[0]
 		step = state[1]
@@ -384,7 +439,7 @@ func apply_foundry_snapshot(state: Array) -> void:
 		rush_end = state[8]
 		for emitter: Vector4 in state[9]:
 			add_flame(emitter.x, emitter.y, emitter.z, emitter.w)
-		if motion == "rush":
+		if motion in ["rush", "rupture"]:
 			show_rush_markers()
 	var delta := clampf(float(state[2]) - elapsed, 0.04, 0.11)
 	elapsed = state[2]
@@ -393,6 +448,9 @@ func apply_foundry_snapshot(state: Array) -> void:
 	move_phase = state[5]
 	exposed = state[6]
 	world_impact = state[10]
+	pressure_released = state[11] if state.size() > 11 else false
+	if is_instance_valid(valve):
+		valve.present_vent(motion == "rupture" and world_impact and not pressure_released, false)
 	draw_pose(delta)
 	advance_flames(false)
 	update_rush_markers()

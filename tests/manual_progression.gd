@@ -106,4 +106,35 @@ func run() -> void:
 	shopper.encode_into(shop_save)
 	shopper.decode_from(shop_save)
 	check(shopper.shop_announced_through == 20, "Seen shop milestones carry over with the operator")
+	var talents = manual_save.new(3).profile
+	talents.award_player_xp(player_script.experience_threshold(50))
+	talents.core_shards = 3000
+	check(talents.buy("field_reboot").begins_with("Requires Tier") and talents.rank("field_reboot") == 0 and talents.core_shards == 3000,
+		"Level and currency cannot bypass a locked talent tier")
+	check(talents.buy("armor").contains("installed") and talents.buy("field_reboot").contains("installed"), "A Survivability root unlocks Field Reboot")
+	check(talents.buy("overpressure").begins_with("Requires Tier"), "Survivability progress does not unlock later Damage tiers")
+	check(talents.buy("field_reboot").contains("II installed") and talents.buy("field_reboot").contains("III installed") and talents.rank("field_reboot") == 3,
+		"Field Reboot has three paid ranks")
+	talents.owned["socket_arm_04"] = 1
+	check(talents.buy("overpressure").begins_with("Requires Tier 1") and talents.rank("socket_arm_04") == 1,
+		"An imported upper-tier talent stays installed without bypassing missing prerequisites")
+	check(talents.buy("socket_arm_07") == "Unknown upgrade.", "Imported bonuses are preserved without selling the retired perks")
+	check(talents.buy("recovery_circuit").begins_with("Requires Tier 3"), "A player cannot skip Tier 3 to reach a capstone")
+	check(talents.buy("shock_dampers").contains("installed") and talents.buy("recovery_circuit").contains("I installed"),
+		"Installing a Tier 3 talent opens the Tier 4 capstone in its branch")
+	talents.record_sector_clear(1, difficulty.NORMAL)
+	var target := "bp_01_02"
+	talents.pin_blueprint(target)
+	check(talents.pinned_blueprint == target and talents.blueprint_min_mode(target) == difficulty.NORMAL, "A cleared sector exposes its blueprint hunt")
+	check(talents.advance_blueprint_hunt(2, difficulty.HARD, 10).is_empty() and talents.advance_blueprint_hunt(1, difficulty.NORMAL, 1).is_empty() and talents.blueprint_hunts.is_empty(),
+		"A different sector or underlevel extraction does not count")
+	for attempt in 2:
+		check(talents.advance_blueprint_hunt(1, difficulty.NORMAL, 3).is_empty(), "Eligible extraction adds hunt progress")
+	check(talents.advance_blueprint_hunt(1, difficulty.NORMAL, 3) == target and talents.blueprint_items.has(target) and talents.pinned_blueprint.is_empty(),
+		"Third eligible extraction banks the blueprint once")
+	var talent_save := ConfigFile.new()
+	talents.encode_into(talent_save)
+	var reloaded = manual_save.new(3).profile
+	reloaded.decode_from(talent_save)
+	check(reloaded.rank("field_reboot") == 3 and reloaded.blueprint_items.has(target), "Revive ranks and the hunted blueprint survive a save reload")
 	quit(failures)

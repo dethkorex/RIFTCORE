@@ -3,6 +3,12 @@ extends RefCounted
 const Profile := preload("res://scripts/rogue_profile.gd")
 
 const PATHS := {
+	"talent_flame": '<path d="M16 2c3 8 10 10 10 18a10 10 0 1 1-20 0c0-5 3-8 5-10 0 4 2 5 2 5 3-4 4-7 3-13zM17 18c-2 3-5 5-5 8m5-8c2 3 4 4 4 8"/>',
+	"talent_pierce": '<path d="M3 16h26m-6-5 6 5-6 5M8 10l4 6-4 6m8-12 4 6-4 6"/>',
+	"talent_shard": '<path d="M16 2l10 10v10L16 30 6 22V12zM16 2v28M6 12l20 10m0-10L6 22"/>',
+	"talent_case": '<path d="M3 10h26v17H3zM11 10V6h10v4M3 17h26m-16-3h6v6h-6z"/>',
+	"talent_echo": '<path d="M2 11l14-6 6 6-6 6zM4 22l14-6 6 6-6 6zm19-15 6 6-6 5M2 15l9 3"/>',
+	"talent_decoder": '<path d="M5 5h22v22H5zM9 11l5 5-5 5m9-10h5m-5 5h5m-5 5h5"/>',
 	"quick_heal": '<path d="M12 5h8v7h7v8h-7v7h-8v-7H5v-8h7z"/>',
 	"quick_energy": '<path d="M18 3L8 18h7l-2 11 11-15h-7z"/>',
 	"quick_hybrid": '<path d="M7 5h18v23H7zM12 2h8m-8 11h8m-4-4v8m-4 5h8"/>',

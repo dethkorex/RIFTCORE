@@ -8,6 +8,7 @@ static var rng := RandomNumberGenerator.new()
 
 @export var sector := 1
 @export var materials := 4
+@export var weapon_cache := false
 var opened := false
 var difficulty := 0
 
@@ -34,9 +35,16 @@ func burst(operator: RiftPlayer) -> void:
 	finish_open()
 
 func roll_loot(level: int) -> Dictionary:
+	var blueprint := Blueprints.roll_cache(sector, difficulty, level, false, rng)
+	if weapon_cache:
+		var pool := Blueprints.drop_pool(sector, difficulty, level, false)
+		for part in [10, 8, 2]:
+			if part in pool:
+				blueprint = Blueprints.blueprint_id(sector, part)
+				break
 	return {
 		"materials": {"scrap": materials, Materials.sector_key(sector): materials},
-		"blueprint": Blueprints.roll_cache(sector, difficulty, level, false, rng),
+		"blueprint": blueprint,
 		"supply": Orbs.supply_roll(rng, .022 * Difficulty.LOOT[difficulty], difficulty > 0),
 	}
 

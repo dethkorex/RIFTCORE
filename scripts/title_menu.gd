@@ -39,9 +39,7 @@ var run_unlocks: Array = []
 var profile
 var shop_status := ""
 var shop_category := "All Items"
-var enhancement_category := "Armor"
 var enhancement_focus := ""
-const ENHANCEMENT_CATEGORIES := ["Armor", "Energy", "Weapons", "Mobility", "Salvage", "Station"]
 const SHOP_FILTERS := {"All Items": "visor", "Supplies": "frame", "Materials": "core", "Buffs": "utility", "Cores": "core"}
 var challenge_sector := 1
 var focus_operator_actions := false
@@ -50,6 +48,7 @@ var roster_selection: Button
 var selected_sector := 1
 var selected_difficulty := 0
 var archive_sector := 1
+var archive_loot_mode := 0
 var tutorial_topic := 0
 var pending_blueprint := ""
 var whisper_contact: Variant = 0
@@ -77,6 +76,7 @@ const Difficulty := preload("res://scripts/mission_difficulty.gd")
 const Blueprints := preload("res://scripts/blueprint_catalog.gd")
 const Materials := preload("res://scripts/fabrication_catalog.gd")
 const Profile := preload("res://scripts/rogue_profile.gd")
+const TalentTree := preload("res://scripts/talent_tree.gd")
 const ManualSave := preload("res://scripts/manual_save_session.gd")
 const EquipmentBody := preload("res://scripts/equipment_body.gd")
 const EquipmentIcons := preload("res://scripts/equipment_icons.gd")
@@ -97,7 +97,8 @@ var tip_station := ""
 const HUB_TIPS := {
 	"Sector select": ["Deploy", "Resume a run or start a mission. Use Start a Group to bring a friend."],
 	"Shop": ["Shop", "Spend Bolts here. Recovery items restore health or energy, buffs briefly boost your stats, and materials are used to craft gear."],
-	"Fabrication": ["Crafting", "Use materials to craft gear from learned blueprints. Core Shards are a separate currency for permanent upgrades under Core Enhancements."],
+	"Fabrication": ["Crafting", "Use materials to craft gear from learned blueprints. Spend Core Shards on permanent talents in Core Ascension."],
+	"Upgrades": ["Core Ascension", "These upgrades survive reconstruction, RX-07. Spend Core Shards to install and rank up talents. Install one talent in each tier to reach the next, all the way to your branch's capstone."],
 	"Save Game": ["System / Save", "Save your progress manually here. Settings is on the next tab."],
 	"Storage": ["Equipment", "Equip or stow gear here. Learn a blueprint to unlock its recipe, or assign recovery items and buffs to the D-pad for use during a run."],
 	"Social": ["Social", "Find teammates, send a private message, and check game invites or sector records."],
@@ -204,6 +205,7 @@ func show_page(next: String) -> void:
 			UI.label(form, "Save Game", 34, UI.CYAN)
 			UI.label(form, "Save your operator’s inventory, banked bolts, and current deployment.", 19, UI.MUTED)
 			var save_button := UI.button(form, "Save Operator %02d" % active_slot, func(): save_requested.emit(), true)
+			save_button.custom_minimum_size.x = 192
 			save_button.disabled = active_slot == 0
 			if not save_button.disabled:
 				save_button.grab_focus()
@@ -269,12 +271,14 @@ func show_page(next: String) -> void:
 		back.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 		if get_viewport().gui_get_focus_owner() == null:
 			back.grab_focus()
+	if station_panel and page == "Upgrades" and RiftSettings.show_hub_tips and not RiftSettings.seen_hub_tips.has(page):
+		show_station_tip(page)
 
 func station_tabs() -> Dictionary:
 	if not station_panel:
 		return {}
 	if page in ["Fabrication", "Upgrades"]:
-		return {"Fabrication": "Crafting", "Upgrades": "Core Enhancements"}
+		return {"Fabrication": "Crafting", "Upgrades": "Core Ascension"}
 	if page in ["Save Game", "Settings"]:
 		return {"Save Game": "Save Game", "Settings": "Settings"}
 	if page in ["Collection", "Tutorials"]:
@@ -304,6 +308,10 @@ func build_station_header(header: HBoxContainer) -> void:
 		station_name = "SOCIAL"
 	var heading := UI.label(header, station_name, 25, UI.CYAN)
 	heading.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	if page == "Upgrades":
+		TalentTree.add_chip(header, "%04d BOLTS" % profile.credits, TalentTree.BOLT, UI.CYAN.darkened(0.22), 16, 27)
+		TalentTree.add_chip(header, "%04d CORE SHARDS" % profile.core_shards, TalentTree.SHARD, UI.VIOLET, 16, 27)
+		return
 	var wallet := UI.column(header, 2)
 	UI.currency_row(wallet, "%04d BOLTS" % profile.credits)
 	wallet.add_child(HSeparator.new())
@@ -323,7 +331,7 @@ func open_station(next: String) -> void:
 	party_from_deploy = false
 	show()
 	show_page(next)
-	if RiftSettings.show_hub_tips and HUB_TIPS.has(next) and not RiftSettings.seen_hub_tips.has(next):
+	if not is_instance_valid(hub_tip) and RiftSettings.show_hub_tips and HUB_TIPS.has(next) and not RiftSettings.seen_hub_tips.has(next):
 		show_station_tip(next)
 
 func show_station_tip(station: String) -> void:
@@ -496,7 +504,7 @@ func build_start_screen() -> void:
 	stack.add_child(HSeparator.new())
 	var buttons: Array[Button] = []
 	if active_slot > 0 or developer_session:
-		var label := "Continue  /  Operator %02d" % active_slot if active_slot > 0 else "Enter Station"
+		var label := "Continue" if active_slot > 0 else "Enter Station"
 		buttons.append(UI.button(stack, label, func(): hub_requested.emit(), true))
 	buttons.append(UI.button(stack, "Operators", open_slot_picker.bind("Load Game"), buttons.is_empty()))
 	buttons.append(UI.button(stack, "Settings", show_page.bind("Settings")))
@@ -504,8 +512,8 @@ func build_start_screen() -> void:
 	buttons.append(UI.button(stack, "Quit Game", get_tree().quit))
 	for i in range(buttons.size()):
 		var button := buttons[i]
-		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		button.custom_minimum_size.y = 43
+		button.alignment = HORIZONTAL_ALIGNMENT_CENTER
+		button.custom_minimum_size = Vector2(242, 43)
 		button.add_theme_font_size_override("font_size", 21)
 		button.focus_neighbor_top = button.get_path_to(buttons[posmod(i - 1, buttons.size())])
 		button.focus_neighbor_bottom = button.get_path_to(buttons[(i + 1) % buttons.size()])
@@ -581,10 +589,12 @@ func show_sector_loot(entries: VBoxContainer) -> void:
 	var mode := OptionButton.new()
 	for title in Difficulty.NAMES:
 		mode.add_item(title)
+	mode.select(archive_loot_mode)
 	entries.add_child(mode)
 	UI.style_button(mode)
 	var loot_list := UI.column(entries, 6)
 	var refresh := func(index: int):
+		archive_loot_mode = index
 		for child in loot_list.get_children():
 			loot_list.remove_child(child)
 			child.queue_free()
@@ -596,11 +606,27 @@ func show_sector_loot(entries: VBoxContainer) -> void:
 		for boss in [false, true]:
 			UI.label(loot_list, "Boss Cache" if boss else "Salvage Chests", 21, UI.CYAN)
 			for part in Blueprints.drop_pool(archive_sector, index, 100000, boss):
-				var item: Dictionary = Profile.GEAR[Blueprints.blueprint_id(archive_sector, part)]
+				var id := Blueprints.blueprint_id(archive_sector, part)
+				var item: Dictionary = Profile.GEAR[id]
 				UI.label(loot_list, "%s  ·  %s  ·  Lv. %d" % [item.name, Profile.RARITY_NAMES[item.rarity], item.level],
 					16, Profile.RARITY_COLORS[item.rarity])
+				if boss and profile.can_collect_blueprint(id):
+					var pin := "Pin blueprint"
+					if id == profile.pinned_blueprint:
+						pin = "Unpin  ·  %d/%d eligible clears" % [profile.blueprint_hunts.get(id, 0), Profile.HUNT_CLEARS]
+					UI.button(loot_list, pin, func():
+						profile.pin_blueprint(id)
+						refresh_archive_pin(entries, id)
+					, false, 29).set_meta(&"blueprint_pin", id)
 	mode.item_selected.connect(refresh)
-	refresh.call(0)
+	refresh.call(archive_loot_mode)
+
+func refresh_archive_pin(entries: VBoxContainer, id: String) -> void:
+	show_sector_loot(entries)
+	for button in entries.find_children("*", "Button", true, false):
+		if button.get_meta(&"blueprint_pin", "") == id:
+			button.grab_focus()
+			return
 
 func update_social_tabs() -> void:
 	if is_instance_valid(inbox_tab):
@@ -833,55 +859,18 @@ func show_save_result(result: String) -> void:
 	save_status.text = result
 
 func build_workshop(columns: HBoxContainer) -> void:
-	var categories := card(columns, 0.64)
-	UI.label(categories, "Core Enhancements", 28, UI.CYAN)
-	UI.label(categories, "Purchased enhancements stay active through reconstruction and leave every gear slot free.", 17, UI.MUTED)
-	categories.add_child(HSeparator.new())
-	var selection: Button
-	for category in ENHANCEMENT_CATEGORIES:
-		var filter := UI.button(categories, category, func():
-			enhancement_category = category
-			shop_status = ""
-			show_page("Upgrades")
-		, false, 37)
-		filter.size_flags_horizontal = Control.SIZE_FILL
-		filter.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		if category == enhancement_category:
-			filter.add_theme_color_override("font_color", UI.CYAN)
-			selection = filter
-	var store := card(columns, 1.55)
-	UI.label(store, enhancement_category, 29, UI.CYAN)
-	UI.label(store, "%d Core Shards  ·  Player Lv. %d" % [profile.core_shards, profile.player_level()], 17, Color("ffd079"))
-	if not shop_status.is_empty():
-		UI.label(store, shop_status, 15, UI.VIOLET)
-	var rows := scroll_entries(store)
-	for upgrade in profile.all_upgrades():
-		if upgrade.category != enhancement_category:
-			continue
-		var installed: int = profile.rank(upgrade.id)
-		var maxed: bool = installed >= upgrade.prices.size()
-		var tier: int = upgrade.get("rarity", 0)
-		var box := UI.equipment_card(Profile.RARITY_COLORS[tier])
-		rows.add_child(box)
-		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 14)
-		box.add_child(row)
-		var description := UI.column(row, 3)
-		description.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		UI.label(description, "%s  ·  %s" % [upgrade.name, Profile.RARITY_NAMES[tier]], 18, Profile.RARITY_COLORS[tier])
-		if installed > 0:
-			UI.label(description, "Active  ·  %s" % upgrade.effects[installed - 1], 15, UI.CYAN)
-		if not maxed:
-			UI.label(description, String(upgrade.effects[installed]), 15, UI.MUTED)
-		var cost: int = 0 if maxed else upgrade.prices[installed]
-		var required: int = profile.enhancement_level(upgrade.id, installed)
-		var button := UI.button(row, "Installed" if maxed else ("Install  /  %d shards  ·  Lv. %d" % [cost, required]), purchase_upgrade.bind(upgrade.id), false, 33)
-		button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		button.disabled = maxed or profile.core_shards < cost or profile.player_level() < required
-		if not button.disabled and upgrade.id == enhancement_focus:
-			selection = button
+	var tree := card(columns)
+	var header := HBoxContainer.new()
+	tree.add_child(header)
+	var heading := UI.label(header, "Core Ascension", 30, UI.CYAN)
+	heading.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var level := UI.label(header, "PLAYER LV. %d" % profile.player_level(), 17, Color("ffd079"))
+	level.autowrap_mode = TextServer.AUTOWRAP_OFF
+	UI.label(tree, "Install a talent in each earlier tier to unlock the next tier of that branch.", 16, UI.MUTED)
+	var talent_tree := TalentTree.new()
+	tree.add_child(talent_tree)
+	talent_tree.build(profile, enhancement_focus, shop_status if not enhancement_focus.is_empty() else "", purchase_upgrade)
 	enhancement_focus = ""
-	selection.grab_focus()
 
 func shop_type(item: Dictionary) -> String:
 	if item.has("material"):
@@ -996,11 +985,10 @@ func build_shop(columns: HBoxContainer) -> void:
 	message.custom_minimum_size.y = 18
 
 	var adjust := func(step: int):
-		var item: Dictionary = Profile.stock[focused_item]
 		var limit: int = profile.supply_purchase_limit(focused_item)
 		var count := clampi(int(quantity.text) + step, 1, maxi(1, limit))
 		quantity.text = str(count)
-		var cost: int = item.price * count
+		var cost: int = profile.supply_price(focused_item) * count
 		total.text = "%d bolts" % cost
 		buy.text = "BUY  /  %d BOLTS" % cost
 		buy.disabled = limit == 0 or profile.credits < cost
@@ -1020,7 +1008,7 @@ func build_shop(columns: HBoxContainer) -> void:
 		icon.modulate = Profile.RARITY_COLORS[item.rarity]
 		description.text = item.detail
 		type_value.text = shop_type(item)
-		price_value.text = "%d bolts" % item.price
+		price_value.text = "%d bolts" % profile.supply_price(id)
 		owned.text = str(profile.supply_owned(id))
 		quantity.text = "1"
 		adjust.call(0)
@@ -1033,7 +1021,7 @@ func build_shop(columns: HBoxContainer) -> void:
 				buy.grab_focus()
 		, false, 39)
 		record.tooltip_text = item.name
-		var cells := shop_columns(record, item.name, shop_type(item), "%d" % item.price, Color("ffd079"))
+		var cells := shop_columns(record, item.name, shop_type(item), "%d" % profile.supply_price(id), Color("ffd079"))
 		cells.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 		cells.offset_left = 10
 		cells.offset_right = -10
@@ -1111,6 +1099,7 @@ func build_challenges(columns: HBoxContainer) -> void:
 	for number in range(1, available + 1):
 		var label := "%02d   %s" % [number, Catalog.info(number).title]
 		var option := UI.button(list, label, select_challenge_sector.bind(number, details))
+		option.custom_minimum_size.x = 205
 		option.toggle_mode = true
 		option.button_group = group
 		option.set_pressed_no_signal(number == challenge_sector)
@@ -1234,6 +1223,15 @@ func show_mission_intel(panel: VBoxContainer, connected: bool, can_deploy: bool)
 	UI.label(panel, Story.briefing(selected_sector), 16, UI.MUTED)
 	if not deploy_error.is_empty():
 		UI.label(panel, deploy_error, 17, Color("ff9e95"))
+	var hunt: String = profile.pinned_blueprint
+	if profile.can_collect_blueprint(hunt):
+		var recipe: Dictionary = Profile.GEAR[hunt]
+		var source: String = Catalog.info(recipe.sector).title
+		var minimum: int = profile.blueprint_min_mode(hunt)
+		if minimum >= 0:
+			UI.label(panel, "Pinned  ·  %s\n%s, %s+  ·  Operator Lv. %d  ·  %d/%d clears" % [
+				recipe.name, source, Difficulty.NAMES[minimum], recipe.level, profile.blueprint_hunts.get(hunt, 0), Profile.HUNT_CLEARS,
+			], 15, UI.CYAN)
 	if connected and not can_deploy:
 		UI.label(panel, "The party leader chooses when to deploy.", 17, UI.MUTED)
 		return
@@ -1445,7 +1443,7 @@ func item_status(id: String, blueprints: bool) -> String:
 		"stored": return "Stowed"
 		"carried": return "Carried"
 	if blueprints:
-		var required := Profile.recipe_level(id)
+		var required: int = profile.crafting_level(id)
 		return "Lv. %d" % required if profile.player_level() < required else "Blueprint"
 	return ""
 
@@ -1500,7 +1498,7 @@ func build_purchase(columns: HBoxContainer) -> void:
 	var form := card(columns, 1.12)
 	UI.label(form, "Review Blueprint", 32, UI.CYAN)
 	item_card(form, shop_item)
-	UI.label(form, "PLAYER LEVEL  %d / %d" % [profile.player_level(), Profile.recipe_level(shop_item)], 17, UI.CYAN)
+	UI.label(form, "PLAYER LEVEL  %d / %d" % [profile.player_level(), profile.crafting_level(shop_item)], 17, UI.CYAN)
 	var bill: Dictionary = profile.recipe_materials(shop_item)
 	for material in bill:
 		var available := int(profile.materials.get(material, 0))

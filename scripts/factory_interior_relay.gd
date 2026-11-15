@@ -7,6 +7,7 @@ extends StaticBody3D
 @export var repeat_hold := 4.5
 @export var departure_delay := 0.0
 @export var floating := false
+@export var heat_key := false
 @onready var platform := get_node_or_null(platform_path) as AnimatableBody3D
 @onready var lamp: MeshInstance3D = $Lamp
 var triggered := false
@@ -33,6 +34,8 @@ func _ready() -> void:
 func hit_by_projectile(shot: RiftProjectile) -> bool:
 	if not is_instance_valid(platform) or shot.owner_faction != "player":
 		return false
+	if heat_key and not shot.is_magma and shot.launch_profile != -2:
+		return true
 	if running or triggered and not lift:
 		return true
 	triggered = true

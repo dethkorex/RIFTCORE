@@ -22,6 +22,7 @@ const MODELS := [
 	preload("res://assets/campaign/riftcore_nexus/enemies/quad.glb"),
 ]
 const BURST := preload("res://scripts/pit_burst.gd")
+const Difficulty := preload("res://scripts/mission_difficulty.gd")
 const ATTACK_FX := preload("res://scripts/attack_fx.gd")
 
 var sector := 1
@@ -36,6 +37,7 @@ var facing := -1.0
 var aim := Vector3.ZERO
 var locked_direction := -1.0
 var cooldown := 0.9
+var difficulty_mode := 0
 var contact_lock := 0.0
 var elapsed := 0.0
 var charge_time := 0.0
@@ -65,6 +67,9 @@ func configure(number: int, tint: Color, weakness: String, gate_position: Vector
 	floor_y = gate_position.y
 	left = gate_position.x + 2.65
 	right = exit_x - 2.65
+
+func configure_difficulty(mode: int) -> void:
+	difficulty_mode = mode
 
 func _ready() -> void:
 	super._ready()
@@ -121,9 +126,9 @@ func _physics_process(delta: float) -> void:
 	var distance := target.global_position.x - global_position.x
 	if attack.is_empty() and charge_time <= 0.0 and absf(distance) > 0.3:
 		facing = signf(distance)
-	var walk := facing * (2.9 + sector * 0.19) if absf(distance) > 3.8 and attack.is_empty() else 0.0
+	var walk := facing * (2.9 + sector * 0.19) * Difficulty.boss_pursuit_scale(difficulty_mode, true) if absf(distance) > 3.25 and attack.is_empty() else 0.0
 	if charge_time > 0.0:
-		walk = locked_direction * 18.0
+		walk = locked_direction * (18.0 + 1.65 * difficulty_mode)
 		if sector == 6 and charge_time > 0.0 and not is_zero_approx(dive_x):
 			walk = clampf((dive_x - global_position.x) / maxf(charge_time, 0.08), -32.0, 32.0)
 	elif not is_zero_approx(dive_x):
@@ -144,15 +149,19 @@ func _physics_process(delta: float) -> void:
 	else:
 		strike()
 		attack = ""
-		cooldown = 0.72 if health > max_health * 0.45 else 0.40
+		cooldown = (0.72 if health > max_health * 0.55 else 0.42) * Difficulty.boss_recovery_scale(difficulty_mode, true)
 
 func telegraph() -> void:
 	var pattern := ["signature", "volley", "signature", "charge"]
+	if difficulty_mode == Difficulty.HARD:
+		pattern = ["signature", "charge", "volley", "signature", "charge"]
+	elif difficulty_mode == Difficulty.NIGHTMARE:
+		pattern = ["signature", "charge", "signature", "volley", "charge", "volley"]
 	attack = pattern[turn % pattern.size()]
 	turn += 1
 	aim = target.global_position
 	locked_direction = facing
-	cooldown = 0.82 if attack == "signature" else 0.63
+	cooldown = Difficulty.windup_time(0.82 if attack == "signature" else 0.63, difficulty_mode)
 	warning = Node3D.new()
 	add_child(warning)
 	warning.top_level = true
@@ -211,7 +220,8 @@ func strike() -> void:
 		"volley":
 			var muzzle := global_position + Vector3(locked_direction * 0.87, 0.18, 0)
 			var direction := (aim - muzzle).normalized()
-			for angle in [-0.14, 0.0, 0.14]:
+			var spread := [-0.25, -0.12, 0.0, 0.12, 0.25] if difficulty_mode == Difficulty.NIGHTMARE else [-0.14, 0.0, 0.14]
+			for angle in spread:
 				fire(muzzle, direction.rotated(Vector3.BACK, angle), power * 0.7, 16.0 + sector * 0.6)
 		"signature":
 			signature(power)

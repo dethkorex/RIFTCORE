@@ -8,6 +8,7 @@ const UI := preload("res://scripts/rift_ui.gd")
 const FactoryHUD := preload("res://scripts/factory_hud.gd")
 const Catalog := preload("res://scripts/sector_catalog.gd")
 const Difficulty := preload("res://scripts/mission_difficulty.gd")
+const FoundryModule := preload("res://scripts/foundry_run_module.gd")
 const BossCache := preload("res://scripts/boss_loot_cache.gd")
 const Miniboss := preload("res://scripts/sector_miniboss.gd")
 const ActLoadingScreen := preload("res://scripts/act_loading_screen.gd")
@@ -55,6 +56,7 @@ var act_exit_retry := false
 var sector_deaths := 0
 var mission_stats := {"seconds": 0.0, "kills": 0, "operator_xp": 0, "player_xp": 0, "shards": 0}
 var run_weapons: Dictionary = {}
+var run_module := ""
 
 const NEON_FACTORY_LEVEL := preload("res://scenes/levels/neon_factory_test.tscn")
 
@@ -492,6 +494,7 @@ func configure_input() -> void:
 	add_key_action("melee", KEY_K)
 	add_key_action("restart", KEY_R)
 	add_key_action("pause", KEY_ESCAPE)
+	add_key_action("field_interact", KEY_F)
 	add_joy_action("move_left", JOY_AXIS_LEFT_X, -1.0)
 	add_joy_action("move_right", JOY_AXIS_LEFT_X, 1.0)
 	InputMap.action_set_deadzone("move_left", 0.18)
@@ -505,6 +508,7 @@ func configure_input() -> void:
 	add_joy_action("crouch_stick", JOY_AXIS_LEFT_Y, 1.0)
 	InputMap.action_set_deadzone("crouch_stick", 0.65)
 	add_joy_button("pause", JOY_BUTTON_START)
+	add_joy_button("field_interact", JOY_BUTTON_RIGHT_STICK)
 	add_joy_button("ui_accept", JOY_BUTTON_A)
 	add_joy_button("ui_cancel", JOY_BUTTON_B)
 	add_joy_button("ui_up", JOY_BUTTON_DPAD_UP)
@@ -613,10 +617,18 @@ func bank_coop_rewards(xp: int, bolts: int, blueprints: Array, number: int) -> v
 	profile.record_sector_clear(number, RiftRelay.mission_mode)
 	var results: Dictionary = coop_mission.challenge_results()
 	profile.record_challenges(number, results)
-	profile.deposit_materials(results.get("recovered", {}))
-	profile.deposit_supplies(results.get("supplies", {}))
+	var recovered: Dictionary = results.get("recovered", {}).duplicate()
+	profile.apply_recovery_crew(number, recovered)
+	profile.deposit_materials(recovered)
+	var supplies: Dictionary = results.get("supplies", {}).duplicate()
+	var packs := int(profile.apply_resupply_contract(supplies))
+	profile.deposit_supplies(supplies)
 	profile.award_player_xp(xp)
 	profile.credits += bolts
+	var shards := int(profile.talent_bonus("shard_reclaimer"))
+	profile.core_shards += shards
+	coop_mission.extracted_results["talent_shards"] = shards
+	coop_mission.extracted_results["talent_packs"] = packs
 	profile.unlock_sector(mini(number + 1, Catalog.SECTORS.size()))
 	if number <= Story.MEMORIES.size() and not profile.memories.has(number):
 		profile.memories.append(number)
@@ -626,6 +638,11 @@ func bank_coop_rewards(xp: int, bolts: int, blueprints: Array, number: int) -> v
 			profile.endings.append(ending)
 	for id in blueprints:
 		profile.collect_blueprint(id)
+	var operator_level := RiftPlayer.level_for_experience(coop_mission.operators[coop_mission.local_index].experience)
+	var hunt: String = profile.advance_blueprint_hunt(number, RiftRelay.mission_mode, operator_level)
+	if not hunt.is_empty():
+		coop_mission.extracted_results["hunt_award"] = profile.GEAR[hunt].name
+	coop_mission.extracted_results["talent_blueprints"] = profile.award_archive_mastery(number, RiftRelay.mission_mode, operator_level)
 
 func close_coop_mission(message: String) -> void:
 	if not is_instance_valid(coop_mission):
@@ -850,6 +867,7 @@ func start_game(play_intro := true, first_sector := 1) -> void:
 		act = 1
 		sector_deaths = 0
 		run_weapons.clear()
+		run_module = ""
 		clear_checkpoint()
 	RiftAudio.play_music(true, sector)
 	remove_home_hub()
@@ -944,6 +962,8 @@ func load_game(show_deployment := true) -> void:
 		return
 	profile.unlock_sector(sector)
 	run_weapons.clear()
+	var module_id := String(save.get_value("checkpoint", "module", ""))
+	run_module = module_id if FoundryModule.MODULES.has(module_id) else ""
 	var legacy_weapons: Array = []
 	for prior in range(1, sector):
 		legacy_weapons.append(Catalog.info(prior).reward)
@@ -964,6 +984,7 @@ func load_game(show_deployment := true) -> void:
 	player.salvage = save.get_value("checkpoint", "salvage", {})
 	player.recovered_blueprints = save.get_value("checkpoint", "blueprints", {})
 	player.recovered_supplies = save.get_value("checkpoint", "recovered_supplies", {}).duplicate()
+	player.phoenix_spent = bool(save.get_value("checkpoint", "phoenix_spent", false))
 	var restored_relays: Array = save.get_value("checkpoint", "interior_relays", [])
 	for relay in get_tree().get_nodes_in_group(&"factory_shot_relay"):
 		if not game_root.is_ancestor_of(relay):
@@ -1146,7 +1167,7 @@ func build_level() -> void:
 		boss.queue_free()
 		boss = create_miniboss()
 		actors.add_child(boss)
-	boss.max_health *= combat_scale
+	boss.max_health *= Difficulty.boss_health_scale(sector, mission_difficulty, act)
 	boss.health = boss.max_health
 	boss.hide()
 	build_hud()
@@ -1184,12 +1205,15 @@ func install_sector_pads() -> void:
 	exit.get_node("ExtractionPad").position.y = -player.standing_capsule.height * 0.5
 
 func apply_permanent_upgrades() -> void:
+	player.run_module = run_module
 	player.magma_unlocked = run_weapons.has("magma_breaker")
 	player.thorn_unlocked = run_weapons.has("thorn_swarm")
 	player.run_weapon_ids = run_weapons.keys()
 	preload("res://scripts/equipment_stats.gd").apply(player, profile)
 
 func bind_boss_signals() -> void:
+	if boss.has_method("configure_difficulty"):
+		boss.configure_difficulty(mission_difficulty)
 	boss.health_changed.connect(func(current: float, maximum: float):
 		factory_hud.boss_health = current
 		factory_hud.boss_max_health = maximum
@@ -1354,6 +1378,7 @@ func save_checkpoint(manual_combat_snapshot := false) -> void:
 	save.set_value("checkpoint", "run_cleared_through", run_cleared_through)
 	save.set_value("checkpoint", "act", act)
 	save.set_value("checkpoint", "weapons", run_weapons.keys())
+	save.set_value("checkpoint", "module", run_module)
 	save.set_value("checkpoint", "at_start", not checkpoint_reached)
 	save.set_value("checkpoint", "spawn", checkpoint_spawn)
 	save.set_value("checkpoint", "station", checkpoint_station)
@@ -1366,6 +1391,7 @@ func save_checkpoint(manual_combat_snapshot := false) -> void:
 	save.set_value("checkpoint", "lives", player.lives)
 	save.set_value("checkpoint", "sector_deaths", sector_deaths)
 	save.set_value("checkpoint", "life_taken", life_taken)
+	save.set_value("checkpoint", "phoenix_spent", player.phoenix_spent)
 	save.set_value("checkpoint", "factory_caches", player.get_meta("factory_caches", []))
 	var active_relays: Array[String] = []
 	for relay in get_tree().get_nodes_in_group(&"factory_shot_relay"):
@@ -1482,6 +1508,7 @@ func reset_defeated_run() -> void:
 		profile.lose_equipped_gear()
 	run_cleared_through = 0
 	run_weapons.clear()
+	run_module = ""
 
 func reset_boss_room() -> void:
 	RiftAudio.play_music(true, sector)
@@ -1503,7 +1530,7 @@ func reset_boss_room() -> void:
 		boss = (load(Catalog.info(sector).boss_scene) as PackedScene).instantiate() as Combatant
 		boss.position = boss_spawn
 	game_root.get_node("Actors").add_child(boss)
-	boss.max_health *= Difficulty.combat_scale(sector, mission_difficulty)
+	boss.max_health *= Difficulty.boss_health_scale(sector, mission_difficulty, act)
 	boss.health = boss.max_health
 	boss.hide()
 	bind_boss_signals()
@@ -1588,17 +1615,24 @@ func _process(delta: float) -> void:
 	var bonus := 160 + 25 * (sector - 1)
 	var hard_unlocked: bool = profile.record_sector_clear(sector, mission_difficulty)
 	var recovered := player.salvage.duplicate()
+	profile.apply_recovery_crew(sector, recovered)
 	var recovered_blueprints: Array[String] = []
 	for id in player.recovered_blueprints:
 		if profile.collect_blueprint(id):
 			recovered_blueprints.append(profile.GEAR[id].name)
+	var hunt: String = profile.advance_blueprint_hunt(sector, mission_difficulty, RiftPlayer.level_for_experience(player.experience))
+	if not hunt.is_empty():
+		recovered_blueprints.append(profile.GEAR[hunt].name)
+	recovered_blueprints.append_array(profile.award_archive_mastery(sector, mission_difficulty, RiftPlayer.level_for_experience(player.experience)))
 	profile.deposit_materials(recovered)
 	var recovered_supplies: Dictionary = profile.finish_field_supplies(player.recovered_supplies, true)
+	profile.apply_resupply_contract(recovered_supplies)
 	profile.deposit_supplies(recovered_supplies)
 	player.salvage.clear()
 	player.recovered_blueprints.clear()
-	profile.core_shards += 4 + sector
-	mission_stats.shards += 4 + sector
+	var shards := 4 + sector + int(profile.talent_bonus("shard_reclaimer"))
+	profile.core_shards += shards
+	mission_stats.shards += shards
 	bank_run_credits(bonus)
 	var final_sector := sector >= Catalog.SECTORS.size()
 	var material_count := 0
@@ -1620,6 +1654,7 @@ func _process(delta: float) -> void:
 		continuation.set_value("checkpoint", "act", 2 if run_cleared_through >= Catalog.SECTORS.size() else 1)
 		continuation.set_value("checkpoint", "difficulty", mission_difficulty)
 		continuation.set_value("checkpoint", "weapons", run_weapons.keys())
+		continuation.set_value("checkpoint", "module", run_module)
 		continuation.set_value("checkpoint", "equipped", player.equipped_suit())
 		continuation.set_value("checkpoint", "at_start", true)
 		continuation.set_value("checkpoint", "experience", int(player.experience))
@@ -1652,6 +1687,18 @@ func _process(delta: float) -> void:
 	)
 
 func advance_to_act_two() -> void:
+	player.cancel_charge()
+	player.set_physics_process(false)
+	if sector == 1 and run_module.is_empty():
+		if DisplayServer.get_name() == "headless":
+			run_module = "prism"
+		else:
+			var chooser := FoundryModule.new()
+			add_child(chooser)
+			chooser.choose()
+			run_module = await chooser.selected
+			chooser.queue_free()
+		player.run_module = run_module
 	var loading := ActLoadingScreen.new()
 	add_child(loading)
 	loading.show_loading(Catalog.info(sector).title)
@@ -1680,6 +1727,7 @@ func advance_to_act_two() -> void:
 	save.set_value("checkpoint", "act", 2)
 	save.set_value("checkpoint", "at_start", true)
 	save.set_value("checkpoint", "weapons", run_weapons.keys())
+	save.set_value("checkpoint", "module", run_module)
 	save.set_value("checkpoint", "experience", player.experience)
 	save.set_value("checkpoint", "credits", player.credits)
 	save.set_value("checkpoint", "salvage", player.salvage)

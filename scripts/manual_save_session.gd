@@ -93,6 +93,8 @@ func invalidate_defeated_run() -> Error:
 	data.set_value("archive", "loot_clears", profile.loot_clears)
 	data.set_value("archive", "normal_clears", profile.normal_clears)
 	data.set_value("archive", "hard_clears", profile.hard_clears)
+	data.set_value("archive", "pinned_blueprint", profile.pinned_blueprint)
+	data.set_value("archive", "blueprint_hunts", profile.blueprint_hunts)
 	for id in profile.blueprints:
 		data.set_value("blueprints", id, true)
 	for index in profile.memories:

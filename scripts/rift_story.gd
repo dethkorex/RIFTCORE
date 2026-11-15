@@ -124,10 +124,13 @@ const GUARDIAN_EXCHANGES := [
 
 static func deployment(sector: int, act: int) -> Array:
 	var index := clampi(sector - 1, 0, BRIEFINGS.size() - 1)
+	var advice: String = FIELD_ADVICE[index]
+	if sector == 1 and act == 2:
+		advice = "Take the low cooling tunnel for supplies, or time the furnace vents above it to reach a weapon cache. Magma Breaker or a charged saber wave can also purge the coolant and raise the bridge."
 	return [
 		["NOVA", BRIEFINGS[index] if act == 1 else SECOND_ACT[index]],
 		["RX-07", OPERATOR_BRIEF_RESPONSES[index][act - 1]],
-		["NOVA", FIELD_ADVICE[index]],
+		["NOVA", advice],
 	]
 
 static func boss_exchange(sector: int, act: int) -> Array:

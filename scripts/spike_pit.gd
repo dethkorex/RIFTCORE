@@ -5,6 +5,8 @@ extends Area3D
 @export var tint := Color("ff9c45")
 @export var shot_height := 6.4
 @export var period := 3.8
+@export var purge_relay: NodePath
+@onready var relief_valve := get_node_or_null(purge_relay) if not purge_relay.is_empty() else null
 
 const WARNING := 0.69
 const ASCENT := 0.86
@@ -94,7 +96,7 @@ func _physics_process(delta: float) -> void:
 	var near := operators.any(func(body):
 		return is_instance_valid(body) and body.health > 0.0 and absf(body.global_position.x - global_position.x) < 21.0
 	)
-	if not near:
+	if not near or (is_instance_valid(relief_valve) and relief_valve.shown_power == 1):
 		fireball.hide()
 		tell.hide()
 		warning_embers.hide()

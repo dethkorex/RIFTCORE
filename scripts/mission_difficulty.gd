@@ -23,3 +23,17 @@ static func combat_scale(sector: int, mode: int) -> float:
 
 static func enemy_speed_scale(sector: int, mode: int) -> float:
 	return ENEMY_SPEED[index(mode)] + minf(0.08, (recommended_level(sector, mode) - 1) * 0.002)
+
+
+static func boss_health_scale(sector: int, mode: int, act: int) -> float:
+	var scale := combat_scale(sector, mode)
+	return scale * (1.16 + 0.04 * index(mode)) if act == 1 else scale
+
+static func boss_recovery_scale(mode: int, miniboss := false) -> float:
+	return [0.88, 0.72, 0.58][index(mode)] if miniboss else [1.0, 0.86, 0.72][index(mode)]
+
+static func windup_time(base: float, mode: int, minimum: float = 0.42) -> float:
+	return maxf(minimum, base * [1.0, 0.94, 0.84][index(mode)])
+
+static func boss_pursuit_scale(mode: int, miniboss := false) -> float:
+	return [1.14, 1.24, 1.35][index(mode)] if miniboss else [1.0, 1.09, 1.17][index(mode)]

@@ -47,6 +47,10 @@ func _ready() -> void:
 	equipment.add_child(weapons)
 	buster = weapon_slot(weapons, "BUSTER", "arm")
 	weapon_slot(weapons, "SABER", "utility").text = "RX-07 Saber"
+	var module_id: String = operator.call().run_module if operator.is_valid() else ""
+	var modules := preload("res://scripts/foundry_run_module.gd").MODULES
+	if modules.has(module_id):
+		UI.label(equipment, "Run module · " + String(modules[module_id][0]), 16, UI.CYAN)
 	var sidebar := UI.column(layout, 6)
 	sidebar.custom_minimum_size.x = 341
 	UI.label(sidebar, "LB / RB   Switch tab", 14, UI.MUTED)

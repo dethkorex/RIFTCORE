@@ -19,13 +19,75 @@ const CHALLENGE_SETS := [
 ]
 
 const UPGRADES := [
-	{"id": "armor", "category": "Armor", "name": "Ceramic Armor", "prices": [15, 28], "effects": ["+12 starting HP", "+28 starting HP and 10% damage resistance"]},
-	{"id": "capacitor", "category": "Energy", "name": "Flux Capacitor", "prices": [19, 34], "effects": ["+15 starting energy", "+32 starting energy and 20% cheaper boss-weapon charge shots"]},
-	{"id": "buster", "category": "Weapons", "name": "Buster Overdrive", "prices": [25, 41], "effects": ["+15% Buster and saber damage", "+32% Buster and saber damage"]},
-	{"id": "dash", "category": "Mobility", "name": "Vector Drive", "prices": [31, 47], "effects": ["+10% dash speed and 15% shorter cooldown", "+20% dash speed and 32% shorter cooldown"]},
-	{"id": "storage", "category": "Station", "name": "Storage Expansion", "prices": [20, 36], "effects": ["+7 storage positions", "+14 storage positions"]},
-	{"id": "fabrication", "category": "Station", "name": "Fabrication Efficiency", "prices": [20, 36], "effects": ["20% scrap discount", "40% scrap discount"]},
+	{"id": "armor", "branch": "Survivability", "tier": 0, "name": "Ceramic Armor", "icon": "aegis",
+		"prices": [15, 28, 54], "levels": [1, 9, 16], "effects": ["+12 starting HP", "+28 starting HP and 10% damage resistance", "+46 starting HP and 14% damage resistance"]},
+	{"id": "field_reboot", "branch": "Survivability", "tier": 1, "name": "Field Reboot", "icon": "quick_heal",
+		"prices": [85, 145, 220], "levels": [8, 14, 22],
+		"effects": ["Revive one ally per boss attempt with 35% HP.", "Revive one ally per boss attempt with 50% HP.", "Revive one ally per boss attempt with 70% HP. The reboot completes faster."]},
+	{"id": "last_stand", "branch": "Survivability", "tier": 1, "name": "Last Stand", "icon": "impact_liner",
+		"prices": [65, 110, 175], "levels": [5, 12, 20], "values": [12, 20, 30], "effect": "Take %d%% less damage when below 30%% HP."},
+	{"id": "shock_dampers", "branch": "Survivability", "tier": 2, "name": "Shock Dampers", "icon": "armor_plate",
+		"prices": [85, 135, 200], "levels": [10, 17, 25], "values": [20, 35, 50], "effect": "Direct hits knock you back %d%% less."},
+	{"id": "phase_lining", "branch": "Survivability", "tier": 2, "name": "Phase Lining", "icon": "visor",
+		"prices": [88, 140, 215], "levels": [10, 17, 25], "values": [0.15, 0.28, 0.42], "effect": "Gain %.2f extra seconds of invulnerability after taking a hit."},
+	{"id": "capacitor", "branch": "Survivability", "tier": 2, "name": "Flux Capacitor", "icon": "charge_relay",
+		"prices": [85, 135, 205], "levels": [10, 17, 25], "effects": ["+15 starting energy", "+32 starting energy and 20% cheaper boss-weapon charge shots", "+50 starting energy and 30% cheaper boss-weapon charge shots"]},
+	{"id": "recovery_circuit", "branch": "Survivability", "tier": 3, "name": "Recovery Circuit", "icon": "quick_hybrid",
+		"prices": [120, 200, 300], "levels": [15, 23, 32], "values": [15, 30, 50], "effect": "Health and energy items restore %d%% more."},
+	{"id": "impact_converter", "branch": "Survivability", "tier": 3, "name": "Impact Converter", "icon": "quick_energy",
+		"prices": [130, 215, 325], "levels": [15, 23, 32], "values": [4, 7, 10], "effect": "Restore %d energy when you survive a damaging hit."},
+	{"id": "ghost_drive", "branch": "Survivability", "tier": 3, "name": "Ghost Drive", "icon": "air_jets",
+		"prices": [125, 205, 310], "levels": [15, 23, 32], "values": [0.08, 0.12, 0.16], "effect": "Avoid damage for the first %.2f seconds of a dash."},
+	{"id": "phoenix_protocol", "branch": "Survivability", "tier": 4, "name": "Phoenix Protocol", "icon": "quick_defense",
+		"prices": [230, 390, 650], "levels": [28, 40, 50], "values": [35, 65, 100], "effect": "Survive one lethal damage hit per act and recover to at least %d%% health."},
+	{"id": "buster", "branch": "Damage", "tier": 0, "name": "Buster Overdrive", "icon": "overdrive_arm",
+		"prices": [25, 41, 70], "levels": [1, 9, 16], "values": [15, 32, 48], "effect": "+%d%% Buster and saber damage."},
+	{"id": "saber_reach", "branch": "Damage", "tier": 1, "name": "Saber Reach", "icon": "quick_attack",
+		"prices": [60, 105, 170], "levels": [5, 12, 20], "values": [15, 25, 40], "effect": "+%d%% reach on close-range saber strikes."},
+	{"id": "accelerator", "branch": "Damage", "tier": 1, "name": "Rail Accelerator", "icon": "quick_speed",
+		"prices": [63, 108, 170], "levels": [5, 12, 20], "values": [15, 30, 50], "effect": "Standard Buster shots travel %d%% faster."},
+	{"id": "snap_charge", "branch": "Damage", "tier": 2, "name": "Snap Charge", "icon": "pulse_lens",
+		"prices": [92, 150, 220], "levels": [10, 17, 25], "values": [10, 20, 32], "effect": "Buster and saber need %d%% less time to fully charge."},
+	{"id": "magma_catalyst", "branch": "Damage", "tier": 2, "name": "Magma Catalyst", "icon": "talent_flame",
+		"prices": [88, 145, 215], "levels": [10, 17, 25], "values": [20, 40, 65], "effect": "Magma attacks deal %d%% more burn damage."},
+	{"id": "trigger_relay", "branch": "Damage", "tier": 2, "name": "Trigger Relay", "icon": "charge_regulator",
+		"prices": [82, 135, 205], "levels": [10, 17, 25], "values": [10, 20, 32], "effect": "Reduce the time between shots by %d%%."},
+	{"id": "overpressure", "branch": "Damage", "tier": 3, "name": "Overpressure", "icon": "charge_relay",
+		"prices": [120, 200, 300], "levels": [15, 23, 32], "values": [10, 20, 35], "effect": "+%d%% charged Buster and saber damage."},
+	{"id": "ripple_edge", "branch": "Damage", "tier": 3, "name": "Ripple Edge", "icon": "talent_pierce",
+		"prices": [125, 195, 290], "levels": [15, 23, 32], "values": [1, 2, 3], "effect": "A charged saber wave can strike %d additional targets."},
+	{"id": "dash", "branch": "Damage", "tier": 3, "name": "Vector Drive", "icon": "utility",
+		"prices": [105, 170, 255], "levels": [15, 23, 32], "effects": ["+10% dash speed and 15% shorter cooldown", "+20% dash speed and 32% shorter cooldown", "+28% dash speed and 44% shorter cooldown"]},
+	{"id": "echo_arsenal", "branch": "Damage", "tier": 4, "name": "Echo Arsenal", "icon": "talent_echo",
+		"prices": [250, 420, 690], "levels": [28, 40, 50], "values": [45, 70, 100], "effect": "Charged Buster and saber attacks fire a second volley at %d%% power. The echo costs no energy."},
+	{"id": "salvage_appraisal", "branch": "Scavenger", "tier": 0, "name": "Salvage Appraisal", "icon": "salvage_chip",
+		"prices": [24, 47, 80], "levels": [1, 9, 16], "values": [12, 25, 45], "effect": "Find %d%% more bolts in currency pickups."},
+	{"id": "storage", "branch": "Scavenger", "tier": 1, "name": "Storage Expansion", "icon": "recovery_bearing",
+		"prices": [20, 36, 68], "levels": [5, 13, 21], "effects": ["+7 gear storage positions", "+14 gear storage positions", "+21 gear storage positions"]},
+	{"id": "fabrication", "branch": "Scavenger", "tier": 1, "name": "Fabrication Efficiency", "icon": "repair_actuator",
+		"prices": [20, 36, 68], "levels": [5, 13, 21], "effects": ["20% scrap discount when crafting", "40% scrap discount when crafting", "60% scrap discount when crafting"]},
+	{"id": "vendor_license", "branch": "Scavenger", "tier": 2, "name": "Vendor License", "icon": "salvage_optic",
+		"prices": [82, 136, 210], "levels": [10, 17, 25], "values": [8, 16, 25], "effect": "Save %d%% on supplies and materials at the Station Shop."},
+	{"id": "recipe_decoder", "branch": "Scavenger", "tier": 2, "name": "Recipe Decoder", "icon": "core",
+		"prices": [88, 145, 220], "levels": [10, 17, 25], "values": [2, 4, 6], "effect": "Craft learned blueprints up to %d Player Levels early."},
+	{"id": "combat_telemetry", "branch": "Scavenger", "tier": 2, "name": "Combat Telemetry", "icon": "recon_optic",
+		"prices": [75, 120, 180], "levels": [10, 17, 25], "values": [6, 12, 20], "effect": "+%d%% Operator XP from defeating enemies and bosses."},
+	{"id": "recovery_crew", "branch": "Scavenger", "tier": 3, "name": "Recovery Crew", "icon": "arm",
+		"prices": [100, 180, 270], "levels": [15, 23, 32], "values": [2, 4, 7], "effect": "Extract with %d extra sector materials."},
+	{"id": "shard_reclaimer", "branch": "Scavenger", "tier": 3, "name": "Shard Reclaimer", "icon": "talent_shard",
+		"prices": [130, 205, 320], "levels": [15, 23, 32], "values": [2, 3, 5], "effect": "Bank %d bonus Core Shards on successful extraction."},
+	{"id": "resupply_contract", "branch": "Scavenger", "tier": 3, "name": "Resupply Contract", "icon": "talent_case",
+		"prices": [110, 180, 270], "levels": [15, 23, 32], "values": [1, 2, 3], "effect": "Send %d bonus Resupply Packs to Storage on extraction."},
+	{"id": "archive_mastery", "branch": "Scavenger", "tier": 4, "name": "Archive Mastery", "icon": "talent_decoder",
+		"prices": [220, 365, 620], "levels": [28, 40, 50], "values": [1, 2, 3], "effect": "Extract with up to %d extra undiscovered blueprints eligible for the sector and difficulty."},
 ]
+const TALENT_BRANCHES := ["Survivability", "Damage", "Scavenger"]
+const TALENT_TIER_COUNT := 5
+const FORMER_ROOTS := ["capacitor", "dash", "trigger_relay", "combat_telemetry"]
+const LEGACY_TALENT_LEVELS := [1, 5, 10, 15]
+const TALENT_RANKS := ["I", "II", "III"]
+const FIELD_REBOOT := "field_reboot"
+const HUNT_CLEARS := 3
 
 const Enhancements := preload("res://scripts/enhancement_catalog.gd")
 const Stock := preload("res://scripts/stock_catalog.gd")
@@ -37,6 +99,8 @@ const BLUEPRINT_POUCH_SIZE := 8
 var reconstruction_seen := false
 var briefed_acts := PackedInt32Array()
 var shop_announced_through := 1
+var pinned_blueprint := ""
+var blueprint_hunts: Dictionary = {}
 var blueprint_items := {}
 var blueprint_pouch: Array[String] = []
 var inventory := {}
@@ -163,6 +227,14 @@ func decode_from(data: ConfigFile) -> void:
 	operator_name = clean_operator_name(str(data.get_value("profile", "operator_name", "RX-07")))
 	materials.clear()
 	blueprints.clear()
+	blueprint_hunts.clear()
+	var hunts: Variant = data.get_value("archive", "blueprint_hunts", {})
+	if hunts is Dictionary:
+		for id in hunts:
+			if GEAR.has(id):
+				blueprint_hunts[id] = clampi(int(hunts[id]), 0, HUNT_CLEARS - 1)
+	var pin := String(data.get_value("archive", "pinned_blueprint", ""))
+	pinned_blueprint = pin if GEAR.has(pin) else ""
 	if data.has_section("blueprints"):
 		for id in data.get_section_keys("blueprints"):
 			if GEAR.has(id) and data.get_value("blueprints", id, false):
@@ -278,7 +350,7 @@ func decode_from(data: ConfigFile) -> void:
 			blueprints[id] = true
 	for upgrade in all_upgrades():
 		var id: String = upgrade.id
-		var saved_rank := clampi(int(data.get_value("upgrades", id, 0)), 0, 2)
+		var saved_rank := clampi(int(data.get_value("upgrades", id, 0)), 0, upgrade.prices.size())
 		if saved_rank > 0:
 			owned[id] = saved_rank
 
@@ -293,6 +365,8 @@ func encode_into(data: ConfigFile) -> void:
 	data.set_value("story", "reconstruction_seen", reconstruction_seen)
 	data.set_value("story", "briefed_acts", briefed_acts)
 	data.set_value("story", "shop_announced_through", shop_announced_through)
+	data.set_value("archive", "pinned_blueprint", pinned_blueprint)
+	data.set_value("archive", "blueprint_hunts", blueprint_hunts)
 	data.set_value("inventory", "stock", inventory)
 	data.set_value("inventory", "carried_materials", carried_materials)
 	data.set_value("inventory", "stored_supplies", stored_supplies)
@@ -337,6 +411,9 @@ static func recipe_level(id: String) -> int:
 	var rarity := int(GEAR[id].rarity)
 	return [1, 5, 15, 30][rarity] + (index % 5 if rarity > 0 else 0)
 
+func crafting_level(id: String) -> int:
+	return maxi(1, recipe_level(id) - int(talent_bonus("recipe_decoder")))
+
 func recipe_materials(id: String) -> Dictionary:
 	var index := id.get_slice("_", 2).to_int() if GEAR[id].has("sector") else LEGACY_GEAR.keys().find(id)
 	var rarity := int(GEAR[id].rarity)
@@ -358,8 +435,8 @@ func craft_limit(id: String) -> String:
 		return "Blueprint undiscovered."
 	if gear.has(id):
 		return "Blueprint already fabricated."
-	if player_level() < recipe_level(id):
-		return "Requires Player Level %d." % recipe_level(id)
+	if player_level() < crafting_level(id):
+		return "Requires Player Level %d." % crafting_level(id)
 	if stored_count() >= storage_capacity():
 		return "Storage is full."
 	var bill := recipe_materials(id)
@@ -614,7 +691,67 @@ func collect_blueprint(id: String) -> bool:
 	if not can_collect_blueprint(id):
 		return false
 	blueprint_items[id] = true
+	blueprint_hunts.erase(id)
+	if pinned_blueprint == id:
+		pinned_blueprint = ""
 	return true
+
+func blueprint_min_mode(id: String) -> int:
+	if not GEAR.has(id) or not GEAR[id].has("sector"):
+		return -1
+	var sector: int = GEAR[id].sector
+	for mode in Difficulty.NAMES.size():
+		for part in Blueprints.drop_pool(sector, mode, PLAYER_LEVEL_CAP, true):
+			if Blueprints.blueprint_id(sector, part) == id:
+				return mode
+	return -1
+
+func pin_blueprint(id: String) -> void:
+	if pinned_blueprint == id:
+		pinned_blueprint = ""
+	elif can_collect_blueprint(id) and loot_clears.has(GEAR[id].get("sector", 0)) and blueprint_min_mode(id) >= 0:
+		pinned_blueprint = id
+
+func advance_blueprint_hunt(sector: int, mode: int, operator_level: int) -> String:
+	var id := pinned_blueprint
+	if not can_collect_blueprint(id) or GEAR[id].get("sector", 0) != sector:
+		return ""
+	for part in Blueprints.drop_pool(sector, mode, operator_level, true):
+		if Blueprints.blueprint_id(sector, part) != id:
+			continue
+		var clears := int(blueprint_hunts.get(id, 0)) + 1
+		if clears >= HUNT_CLEARS:
+			return id if collect_blueprint(id) else ""
+		blueprint_hunts[id] = clears
+		return ""
+	return ""
+
+func apply_recovery_crew(sector: int, recovered: Dictionary) -> void:
+	var bonus := int(talent_bonus("recovery_crew"))
+	if bonus > 0:
+		var material := Materials.sector_key(sector)
+		recovered[material] = int(recovered.get(material, 0)) + bonus
+
+func apply_resupply_contract(recovered: Dictionary) -> int:
+	var packs := int(talent_bonus("resupply_contract"))
+	if packs > 0:
+		recovered["resupply_pack"] = int(recovered.get("resupply_pack", 0)) + packs
+	return packs
+
+func award_archive_mastery(sector: int, mode: int, operator_level: int) -> Array[String]:
+	var limit := int(talent_bonus("archive_mastery"))
+	var earned: Array[String] = []
+	if limit == 0:
+		return earned
+	var eligible := Blueprints.drop_pool(sector, mode, operator_level, true)
+	eligible.shuffle()
+	for part in eligible:
+		var id := Blueprints.blueprint_id(sector, part)
+		if collect_blueprint(id):
+			earned.append(GEAR[id].name)
+			if earned.size() == limit:
+				break
+	return earned
 
 func learn_blueprint(id: String) -> String:
 	if not GEAR.has(id) or not blueprint_items.has(id):
@@ -637,6 +774,9 @@ func supply_purchase_limit(id: String) -> int:
 	var item: Dictionary = stock[id]
 	return clampi(floori(float(STACK_MAX - supply_owned(id)) / int(item.get("quantity", 1))), 0, STACK_MAX)
 
+func supply_price(id: String) -> int:
+	return maxi(1, ceili(stock[id].price * (1.0 - talent_bonus("vendor_license") / 100.0)))
+
 func buy_supply(id: String, bundles := 1) -> String:
 	if not stock.has(id) or bundles < 1:
 		return "Item unavailable."
@@ -645,7 +785,7 @@ func buy_supply(id: String, bundles := 1) -> String:
 		return "Unlocks at Player Lv. %d." % item.shop_level
 	if bundles > supply_purchase_limit(id):
 		return "Stack full."
-	var cost: int = item.price * bundles
+	var cost := supply_price(id) * bundles
 	if credits < cost:
 		return "Not enough bolts."
 	var quantity: int = int(item.get("quantity", 1)) * bundles
@@ -794,26 +934,74 @@ func consume_quick(index: int, operator: RiftPlayer) -> bool:
 	return true
 
 func rank(id: String) -> int:
-	return clampi(int(owned.get(id, 0)), 0, 2)
+	return clampi(int(owned.get(id, 0)), 0, 3)
 
-func enhancement_level(id: String, current: int) -> int:
-	for item in enhancements:
-		if item.id == id:
-			return item.level
-	return (5 if id in ["storage", "fabrication"] else 1) + current * 8
+func talent_bonus(id: String) -> float:
+	var installed := rank(id)
+	if installed == 0:
+		return 0.0
+	for item in UPGRADES:
+		if item.id == id and item.has("values"):
+			return float(item.values[installed - 1])
+	return 0.0
+
+static func talent_effect(item: Dictionary, index: int) -> String:
+	return item.effects[index] if item.has("effects") else item.effect % item.values[index]
+
+func talent_branch(item: Dictionary) -> String:
+	if item.has("branch"):
+		return item.branch
+	match item.category:
+		"Armor", "Energy":
+			return "Survivability"
+		"Weapons", "Mobility":
+			return "Damage"
+		_:
+			return "Scavenger"
+
+func talent_tier(item: Dictionary) -> int:
+	if item.has("tier"):
+		return item.tier
+	for tier in range(LEGACY_TALENT_LEVELS.size() - 1, 0, -1):
+		if item.level >= LEGACY_TALENT_LEVELS[tier]:
+			return tier
+	return 0
+
+func talent_gate(branch: String, tier: int) -> String:
+	var catalog := all_upgrades()
+	for earlier in range(tier):
+		var unlocked := catalog.any(func(other):
+			if rank(other.id) == 0 or talent_branch(other) != branch:
+				return false
+			return talent_tier(other) == earlier or (earlier == 0 and other.id in FORMER_ROOTS)
+		)
+		if not unlocked:
+			return "Requires Tier %d talent" % (earlier + 1)
+	return ""
+
+func talent_lock(item: Dictionary) -> String:
+	var installed := rank(item.id)
+	if installed >= item.prices.size():
+		return "Installed"
+	var level: int = item.levels[installed]
+	if player_level() < level:
+		return "Requires Lv. %d" % level
+	var gate := talent_gate(talent_branch(item), talent_tier(item))
+	if not gate.is_empty():
+		return gate
+	if core_shards < int(item.prices[installed]):
+		return "Not enough Core Shards"
+	return ""
 
 func buy(id: String) -> String:
-	for item in all_upgrades():
+	for item in UPGRADES:
 		if item.id != id:
 			continue
 		var current := rank(id)
-		if current >= item.prices.size():
-			return "Maximum rank installed."
+		var reason := talent_lock(item)
+		if not reason.is_empty():
+			return reason + "."
 		var price: int = item.prices[current]
-		if player_level() < enhancement_level(id, current):
-			return "Player level too low for this rank."
-		if core_shards < price:
-			return "Not enough Core Shards."
 		core_shards -= price
 		owned[id] = current + 1
 		if save() != OK:
@@ -823,5 +1011,5 @@ func buy(id: String) -> String:
 			else:
 				owned[id] = current
 			return "Could not save the purchase."
-		return "%s %s installed." % [item.name, "I" if current == 0 else "II"]
+		return "%s %s installed." % [item.name, TALENT_RANKS[current]]
 	return "Unknown upgrade."

@@ -110,6 +110,7 @@ class Scene:
         self.exterior = EXTERIORS[sector][act-1]
         self.accent = ACCENTS[number - 2]
         self.chamber = ""
+        self.wall_ascent_center = None
 
     def header(self, old_header):
         sector_root = f"res://assets/campaign/{self.sector}"
@@ -352,7 +353,8 @@ size = Vector3(1.52, 1.25, 1.5)"""
         for i in range(n):
             x = a+(i+.5)*panel
             recess = .60 if (i+variation)%3==1 else 0
-            if (i+variation)%5 == 2:
+            near_ascent = self.wall_ascent_center is not None and abs(x-self.wall_ascent_center) < 5.4
+            if (i+variation)%5 == 2 and not near_ascent:
                 self.node(f"SectorFixture{i}", parent=parent, art="RCFixture",
                           pos=(x,floor+.75,-2.67-recess))
             if (i+variation)%3 == 0:
@@ -815,15 +817,11 @@ size = Vector3(1.52, 1.25, 1.5)"""
         ledge = floor+profile.ledge
         high = floor+profile.rise
         if profile.design == "climb":
-            # A full-story rise earns the hatch, with a wall-hike alternative.
             shaft = min(q-8.2, max(p+13.0, turn+6.1))
             self.stretch("TowerApproach",p,p+3,floor)
             self.deck("TowerApron",p+3,shaft-4.1,floor,ledge)
             self.deck("TowerFoot",shaft-4.1,shaft+2.22,ledge)
-            self.wall("TowerStop",shaft+2.32,ledge-.8,high)
-            self.wall("TowerGrip",shaft-2.65,ledge+1.9,high+2.55)
-            self.node("TowerHatch",art="RCHatch",pos=(shaft,high,0),
-                      deck_width=4.7,climb_height=high-ledge)
+            self.wall_kick_ascent(shaft, ledge, high)
             self.stretch("TowerGallery",shaft+2.35,q,high)
             self.cache(q-3.4,high,blueprint=False)
             return high, ledge-.9
@@ -853,6 +851,32 @@ size = Vector3(1.52, 1.25, 1.5)"""
                           scale=vec((end-start)/.8,.76,.68))
         self.spawns.append((far+1.45,landing))
         return high, min(floor,ledge,landing)-2.4
+
+    def wall_kick_ascent(self, shaft, ledge, high):
+        # Each wall uses the play plane. The west grip hangs above the walk-in,
+        # while the east face opens into a wider pocket below the upper gallery.
+        self.wall_ascent_center = shaft
+        lower_right, upper_left, transition = {
+            "frozen_reactor": (1.12, -1.60, .46),
+            "abyssal_plant": (1.24, -1.85, .55),
+            "buried_archives": (.96, -1.46, .50),
+            "sky_dock": (1.30, -1.66, .48),
+            "biolab": (.98, -1.71, .54),
+            "orbital_array": (1.22, -1.68, .48),
+            "riftcore_nexus": (1.08, -1.50, .52),
+        }[self.sector]
+        split = ledge+(high-ledge)*transition
+        self.wall("KickIntake", shaft+lower_right, ledge-.8, split)
+        self.wall("KickExit", shaft+2.32, split-.08, high)
+        self.wall("KickApproach", shaft-2.25, ledge+1.88, split+.30)
+        self.wall("KickReturn", shaft+upper_left, split-.08, high+2.35)
+        for name, x, y in (
+            ("LowerGripLight", shaft+lower_right-.48, ledge+1.6),
+            ("UpperGripLight", shaft+upper_left+.49, split+1.25),
+            ("CrestLight", shaft+3.45, high+1.55),
+        ):
+            self.node(name, kind="OmniLight3D", pos=(x,y,1.45),
+                      light_color=self.color(), light_energy=1.25, omni_range=3.8)
 
     def turnback_hazard(self, name, x, y):
         # Keep the escape lanes at their measured clearance and use each

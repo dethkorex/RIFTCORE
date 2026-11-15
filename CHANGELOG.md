@@ -1,10 +1,10 @@
-# RIFTCORE Alpha 6.1.11
+# RIFTCORE Alpha 6.2
 
-- The Station Shop gets stronger supplies and new materials every five Player Levels. Locked stock stays hidden, and NOVA announces new stock when you return to the station.
-- Clear each sector on Normal to unlock its Hard route. Clear all sectors on Hard to unlock Expert. Enemies hit harder, have more health, and patrol faster as difficulty increases.
-- A full wipe resets Operator Level, run suits, equipped gear, and quick slots. Open sectors, difficulty unlocks, Player Level, stored items, and permanent upgrades carry over. Buy permanent bonuses in the Workshop's Core Enhancements tab.
-- Hear new deployment briefings, boss exchanges, and reconstruction dialogue. Revisit gameplay tutorials in the NOVA Archive.
-- Explore refreshed sector interiors with new platform finishes, clearer enemy shields, and redesigned boss arenas.
-- Equipment now has its own Storage tab and shows compatible gear when you select a slot. Extracted loot goes to Storage, while purchases go to Carried Inventory.
+- Spend Core Shards in the Workshop’s new Core Ascension tree. Choose permanent talents in Survivability, Damage, and Scavenger, unlock stronger tiers, and rank up your favorites. NOVA explains the tree on your first visit.
+- Unlock Field Reboot to revive a downed teammate in co-op.
+- Boss suits have distinct attacks, effects, and transformation sequences, along with six new suit models.
+- Ember Foundry adds a choice of run modules between acts and a pressure relief valve in the Expert Forge Titan fight.
+- Seven campaign rooms now use alternating wall jumps. Harder difficulties sharpen enemy pressure and shorten boss openings.
+- Menu labels are centered on wider buttons, and Continue takes you back to your last operator.
 
 Co-op players should update together. Windows and Linux players can update through the launcher or Settings → Update Game.

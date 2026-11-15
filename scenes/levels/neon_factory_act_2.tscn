@@ -40,6 +40,14 @@
 
 [ext_resource type="Script" path="res://scripts/biome_zone.gd" id="ArenaJet"]
 
+[sub_resource type="StandardMaterial3D" id="PlaqueFinish"]
+albedo_color = Color(0.055, 0.08, 0.11, 1)
+metallic = 0.68
+
+[sub_resource type="BoxMesh" id="RoutePlaque"]
+material = SubResource("PlaqueFinish")
+size = Vector3(2.1, 0.33, 0.15)
+
 [sub_resource type="Environment" id="Interior"]
 background_mode = 1
 background_color = Color(0.043, 0.021, 0.016, 1)
@@ -1834,6 +1842,28 @@ position = Vector3(28.7500, 0.3000, 0.0000)
 rotation = Vector3(0.0000, 0.0000, -0.2355)
 scale = Vector3(0.4285, 1.0000, 1.0000)
 
+[node name="CoolingTunnelPlaque" type="Label3D" parent="DECOR"]
+position = Vector3(39.2, 0.42, -1.97)
+pixel_size = 0.004
+modulate = Color(0.45, 0.93, 1, 1)
+outline_size = 12
+text = "COOLING TUNNEL"
+
+[node name="Mount" type="MeshInstance3D" parent="DECOR/CoolingTunnelPlaque"]
+position = Vector3(0, 0, -0.09)
+mesh = SubResource("RoutePlaque")
+
+[node name="FurnaceGantryPlaque" type="Label3D" parent="DECOR"]
+position = Vector3(41.5, 4.90, -1.97)
+pixel_size = 0.004
+modulate = Color(1, 0.68, 0.34, 1)
+outline_size = 12
+text = "FURNACE GANTRY"
+
+[node name="Mount" type="MeshInstance3D" parent="DECOR/FurnaceGantryPlaque"]
+position = Vector3(0, 0, -0.09)
+mesh = SubResource("RoutePlaque")
+
 [node name="CoolingDeckLowerRamp" parent="TERRAIN" instance=ExtResource("Floor")]
 position = Vector3(35.0000, -0.6750, 0.0000)
 rotation = Vector3(0.0000, 0.0000, -0.1342)
@@ -1852,6 +1882,30 @@ position = Vector3(51.1250, -4.4000, 0.0000)
 script = ExtResource("Pit")
 width = 4.25
 tint = Color(1, 0.49, 0.19, 1)
+purge_relay = NodePath("../CoolingDeckBridgeCoupler")
+
+[node name="CoolingDeckHeatedBridge" parent="TERRAIN" instance=ExtResource("Bridge")]
+position = Vector3(51.125, -5.60, 0)
+scale = Vector3(0.72, 1, 1)
+
+[node name="CoolingDeckBridgeCoupler" type="StaticBody3D" parent="TERRAIN" groups=["factory_shot_relay"]]
+position = Vector3(47.45, -0.10, 0)
+script = ExtResource("RelayCode")
+collision_layer = 2
+collision_mask = 0
+floating = true
+heat_key = true
+platform_path = NodePath("../CoolingDeckHeatedBridge")
+travel = Vector3(0, 4.25, 0)
+operation = "PURGE COOLANT"
+
+[node name="Art" parent="TERRAIN/CoolingDeckBridgeCoupler" instance=ExtResource("Relay")]
+
+[node name="Collider" type="CollisionShape3D" parent="TERRAIN/CoolingDeckBridgeCoupler"]
+shape = SubResource("RelayShape")
+
+[node name="Lamp" type="MeshInstance3D" parent="TERRAIN/CoolingDeckBridgeCoupler"]
+mesh = SubResource("LampMesh")
 
 [node name="CoolingDeckLowerEast00" parent="TERRAIN" instance=ExtResource("Floor")]
 position = Vector3(56.2500, -1.3500, 0.0000)
@@ -1917,6 +1971,7 @@ position = Vector3(65.0000, 3.5500, 0.0000)
 script = ExtResource("ChestCode")
 collision_layer = 0
 materials = 5
+weapon_cache = true
 
 [node name="Trigger" type="CollisionShape3D" parent="TERRAIN/CoolingDeckUpperCache"]
 position = Vector3(0.0000, 0.6100, 0.0000)
@@ -1925,8 +1980,23 @@ shape = SubResource("ChestShape")
 [node name="Art" parent="TERRAIN/CoolingDeckUpperCache" instance=ExtResource("Chest")]
 position = Vector3(0.0000, 0.0000, 0.0000)
 
+[node name="FurnaceGantryVentWest" type="Area3D" parent="TERRAIN"]
+position = Vector3(54.2, 3.55, 0)
+script = ExtResource("Hazard")
+period = 3.7
+offset = 0.15
+
+[node name="FurnaceGantryVentEast" type="Area3D" parent="TERRAIN"]
+position = Vector3(61.1, 3.55, 0)
+script = ExtResource("Hazard")
+period = 3.7
+offset = 1.9
+
 [node name="CoolingDeckLowerSupply" parent="TERRAIN" instance=ExtResource("energy")]
-position = Vector3(51.0000, -0.9500, 0.0000)
+position = Vector3(63.0, -1.50, 0.0000)
+
+[node name="CoolingDeckRepairSupply" parent="TERRAIN" instance=ExtResource("repair")]
+position = Vector3(64.15, -1.50, 0.0000)
 
 [node name="KilnDuctDescent" parent="TERRAIN" instance=ExtResource("Floor")]
 position = Vector3(86.0000, -0.9250, 0.0000)

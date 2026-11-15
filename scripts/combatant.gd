@@ -14,9 +14,11 @@ var incoming_critical := false
 var health: float
 var invulnerable_time := 0.0
 var burn_left := 0.0
+var corrosion_left := 0.0
 var burn_clock := 0.0
 var burn_power := 0.0
 var burn_effect: Node3D
+var burn_source := 0
 
 func _ready() -> void:
 	health = max_health
@@ -51,9 +53,10 @@ func show_damage(amount: float, burning := false, critical := false) -> void:
 	counter.global_position = global_position + Vector3(randf_range(-0.08, 0.08), offset, 0.27)
 	counter.animate(amount, hurt_player, burning, critical)
 
-func ignite(power: float, seconds: float) -> void:
+func ignite(power: float, seconds: float, source := 0) -> void:
 	if health <= 0.0 or seconds <= 0.0:
 		return
+	burn_source = source
 	burn_left = maxf(seconds, burn_left)
 	burn_power = maxf(power, burn_power)
 	if not is_instance_valid(burn_effect):
@@ -61,8 +64,21 @@ func ignite(power: float, seconds: float) -> void:
 		burn_effect = preload("res://scripts/fire_burn_fx.gd").new()
 		add_child.call_deferred(burn_effect)
 
+func detonate_ally_burn(attacker: int) -> float:
+	if burn_left <= 0.0 or burn_source == 0 or attacker == 0 or attacker == burn_source:
+		return 0.0
+	var burst := burn_power * 3.0
+	burn_left = 0.0
+	burn_power = 0.0
+	burn_source = 0
+	if is_instance_valid(burn_effect):
+		burn_effect.queue_free()
+		burn_effect = null
+	return burst
+
 func _process(delta: float) -> void:
 	invulnerable_time = maxf(0.0, invulnerable_time - delta)
+	corrosion_left = maxf(0.0, corrosion_left - delta)
 	if burn_left <= 0.0 or health <= 0.0:
 		return
 	burn_left = maxf(0.0, burn_left - delta)

@@ -427,12 +427,6 @@ size = Vector3(18.488, 0.84, 4.8)
 [sub_resource type="BoxShape3D" id="BoxShape3D_0430"]
 size = Vector3(6.326, 0.84, 4.8)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_0433"]
-size = Vector3(0.79, 6.45, 4)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0436"]
-size = Vector3(0.79, 6.3, 4)
-
 [sub_resource type="BoxShape3D" id="BoxShape3D_0440"]
 size = Vector3(4.061, 0.84, 4.8)
 
@@ -807,6 +801,18 @@ size = Vector3(0.79, 3.82, 4)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_1064"]
 size = Vector3(0.79, 3.82, 4)
+
+[sub_resource type="BoxShape3D" id="WallKickAscentShape0"]
+size = Vector3(0.79, 3.512, 4)
+
+[sub_resource type="BoxShape3D" id="WallKickAscentShape1"]
+size = Vector3(0.79, 3.018, 4)
+
+[sub_resource type="BoxShape3D" id="WallKickAscentShape2"]
+size = Vector3(0.79, 1.132, 4)
+
+[sub_resource type="BoxShape3D" id="WallKickAscentShape3"]
+size = Vector3(0.79, 5.368, 4)
 
 [node name="AerowyrmSector" type="Node3D"]
 metadata/interior_layout = true
@@ -2716,34 +2722,71 @@ scale = Vector3(1.0533, 1, 1)
 position = Vector3(0, -0.42, 0)
 shape = SubResource("BoxShape3D_0430")
 
-[node name="TowerStop" type="StaticBody3D" parent="TERRAIN/Room04_Lift"]
-position = Vector3(233.86, 8.675, 0)
+[node name="KickIntake" type="StaticBody3D" parent="TERRAIN/Room04_Lift"]
+position = Vector3(232.84, 7.206, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
-[node name="Art" parent="TERRAIN/Room04_Lift/TowerStop" instance=ExtResource("RCWall")]
-scale = Vector3(1, 1.5176, 1)
+[node name="Art" parent="TERRAIN/Room04_Lift/KickIntake" instance=ExtResource("RCWall")]
+scale = Vector3(1, 0.82635, 1)
 
-[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room04_Lift/TowerStop"]
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room04_Lift/KickIntake"]
 position = Vector3(0, 0, 0)
-shape = SubResource("BoxShape3D_0433")
+shape = SubResource("WallKickAscentShape0")
 
-[node name="TowerGrip" type="StaticBody3D" parent="TERRAIN/Room04_Lift"]
-position = Vector3(228.89, 11.3, 0)
+[node name="KickExit" type="StaticBody3D" parent="TERRAIN/Room04_Lift"]
+position = Vector3(233.86, 10.391, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
-[node name="Art" parent="TERRAIN/Room04_Lift/TowerGrip" instance=ExtResource("RCWall")]
-scale = Vector3(1, 1.4824, 1)
+[node name="Art" parent="TERRAIN/Room04_Lift/KickExit" instance=ExtResource("RCWall")]
+scale = Vector3(1, 0.71012, 1)
 
-[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room04_Lift/TowerGrip"]
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room04_Lift/KickExit"]
 position = Vector3(0, 0, 0)
-shape = SubResource("BoxShape3D_0436")
+shape = SubResource("WallKickAscentShape1")
 
-[node name="TowerHatch" parent="TERRAIN/Room04_Lift" instance=ExtResource("RCHatch")]
-position = Vector3(231.54, 11.9, 0)
-deck_width = 4.7
-climb_height = 5.65
+[node name="KickApproach" type="StaticBody3D" parent="TERRAIN/Room04_Lift"]
+position = Vector3(229.29, 8.696, 0)
+rotation = Vector3(0, 0, 0)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/Room04_Lift/KickApproach" instance=ExtResource("RCWall")]
+scale = Vector3(1, 0.26635, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room04_Lift/KickApproach"]
+position = Vector3(0, 0, 0)
+shape = SubResource("WallKickAscentShape2")
+
+[node name="KickReturn" type="StaticBody3D" parent="TERRAIN/Room04_Lift"]
+position = Vector3(229.88, 11.566, 0)
+rotation = Vector3(0, 0, 0)
+collision_layer = 1
+
+[node name="Art" parent="TERRAIN/Room04_Lift/KickReturn" instance=ExtResource("RCWall")]
+scale = Vector3(1, 1.2631, 1)
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room04_Lift/KickReturn"]
+position = Vector3(0, 0, 0)
+shape = SubResource("WallKickAscentShape3")
+
+[node name="LowerGripLight" type="OmniLight3D" parent="TERRAIN/Room04_Lift"]
+position = Vector3(232.36, 7.85, 1.45)
+light_color = Color(0.2627, 0.9765, 0.7725, 1)
+light_energy = 1.25
+omni_range = 3.8
+
+[node name="UpperGripLight" type="OmniLight3D" parent="TERRAIN/Room04_Lift"]
+position = Vector3(230.37, 10.212, 1.45)
+light_color = Color(0.2627, 0.9765, 0.7725, 1)
+light_energy = 1.25
+omni_range = 3.8
+
+[node name="CrestLight" type="OmniLight3D" parent="TERRAIN/Room04_Lift"]
+position = Vector3(234.99, 13.45, 1.45)
+light_color = Color(0.2627, 0.9765, 0.7725, 1)
+light_energy = 1.25
+omni_range = 3.8
 
 [node name="TowerGallery00" type="StaticBody3D" parent="TERRAIN/Room04_Lift"]
 position = Vector3(235.92, 11.9, 0)

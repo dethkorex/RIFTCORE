@@ -243,16 +243,16 @@ const SECTORS := [
 ]
 
 const WEAPON_EFFECTS := {
-	"magma_breaker": "Fireballs ignite targets. A charged shot fires three fireballs in a spread.",
-	"thorn_swarm": "Fires two thorn projectiles. Charge to fire five in a wider spread.",
-	"frost_lance": "A fast lance pierces enemies and staggers susceptible targets. Charged shots pierce farther.",
-	"tidal_arc": "Fires a concentrated water projectile. Charging gives the single shot more damage.",
-	"data_lance": "A high-speed piercing beam. Charged shots pass through several enemies.",
-	"gale_edge": "Three wind blades push susceptible enemies back. Charge to fire five.",
-	"chimera_burst": "Fires a three-shot spread. Charge for five stronger projectiles.",
-	"singularity_shot": "Fires a slow-moving, concentrated projectile with a stronger charged shot.",
-	"scrap_reaver": "A slow, heavy projectile with high damage per hit. Charge for a stronger impact.",
-	"core_override": "Three piercing shots cover a wide angle. Charge for five stronger shots with extra piercing.",
+	"magma_breaker": "Fireballs ignite enemies and burn through vines. Charge to fan out three fireballs with wider ignition bursts.",
+	"thorn_swarm": "Fires twin thorns. Charge to plant a seed that roots nearby mobile enemies.",
+	"frost_lance": "Piercing ice lances interrupt mobile enemies. Charge for a longer freeze and more penetrations.",
+	"tidal_arc": "An ion bolt chains lightning between nearby enemies. Charge to reach up to four additional targets.",
+	"data_lance": "A piercing beam decodes enemy shields. The charged beam keeps most of its power as it passes through targets.",
+	"gale_edge": "Wind crescents shove mobile enemies back. Charge to cover more ground and push them farther.",
+	"chimera_burst": "Fires a spread of corrosive spores. Repeated hits on a tagged enemy deal bonus damage.",
+	"singularity_shot": "A gravity orb pulls mobile enemies toward its impact. Charging widens the pull and deals more splash damage.",
+	"scrap_reaver": "A heavy scrap shell blasts enemies away from the impact. Charge for a wider blast.",
+	"core_override": "Fires a piercing fan. Charge for a concentrated lance that restores energy on a kill, once per shot.",
 }
 
 static func info(number: int) -> Dictionary:

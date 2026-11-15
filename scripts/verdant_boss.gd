@@ -1,5 +1,6 @@
 extends Combatant
 
+const Difficulty := preload("res://scripts/mission_difficulty.gd")
 const WASP := preload("res://assets/machine_jungle/enemies/canopy_wasp.tscn")
 const TOXIN := Color("d45aff")
 const THORN := Color("a4ff5a")
@@ -9,6 +10,7 @@ var target: RiftPlayer
 var facing := -1.0
 var clock := 0.0
 var phase_time := 0.8
+var difficulty_mode := 0
 var attack := -1
 var pattern := 0
 var summons := 0
@@ -27,6 +29,9 @@ var reactor_light: OmniLight3D
 @onready var spore := armor.find_child("SporeBank", true, false) as Node3D
 @onready var left := armor.find_child("LegLeft", true, false) as Node3D
 @onready var right := armor.find_child("LegRight", true, false) as Node3D
+
+func configure_difficulty(mode: int) -> void:
+	difficulty_mode = mode
 
 func _ready() -> void:
 	max_health *= 1.22
@@ -81,7 +86,7 @@ func _physics_process(delta: float) -> void:
 	var anger := 1.0 - health / max_health
 	if attack < 0:
 		facing = signf(dx) if absf(dx) > 0.25 else facing
-	velocity.x = move_toward(velocity.x, facing * (3.2 + anger * 1.6) if attack < 0 and absf(dx) > 4.1 else 0.0, delta * 21.0)
+	velocity.x = move_toward(velocity.x, facing * (3.2 + anger * 1.6) * Difficulty.boss_pursuit_scale(difficulty_mode) if attack < 0 and absf(dx) > 4.1 else 0.0, delta * 21.0)
 	velocity.y -= 27.0 * delta
 	var previous_x := global_position.x
 	move_and_slide()
@@ -109,7 +114,7 @@ func _physics_process(delta: float) -> void:
 	if attack >= 0:
 		_release()
 		attack = -1
-		phase_time = 1.5 if exposed_left > 0.0 else lerpf(0.69, 0.30, anger)
+		phase_time = 1.5 if exposed_left > 0.0 else lerpf(0.69, 0.30, anger) * Difficulty.boss_recovery_scale(difficulty_mode)
 		return
 	if summons < 3 and anger > 0.25 + 0.25 * summons:
 		_summon()
@@ -119,7 +124,7 @@ func _physics_process(delta: float) -> void:
 	pattern += 1
 	strike_dir = facing
 	strike_x = clampf(target.global_position.x, arena_left - 0.7, arena_right + 0.8)
-	phase_time = 1.08 if attack == 3 else lerpf(0.76, 0.51, anger)
+	phase_time = Difficulty.windup_time(1.08 if attack == 3 else lerpf(0.76, 0.51, anger), difficulty_mode)
 	warning = Node3D.new()
 	add_child(warning)
 	warning.global_position = Vector3(global_position.x + facing * 4.15 if attack == 0 else strike_x, body_floor + 0.09, 0.0)
@@ -146,7 +151,7 @@ func _release() -> void:
 		exposed_left = 2.1
 		return
 	if attack == 1:
-		var count := 5 if health / max_health < 0.5 else 3
+		var count := (5 if health / max_health < 0.5 else 3) + difficulty_mode
 		for i in range(count):
 			var shot := RiftProjectile.new()
 			shot.collision_layer = 0

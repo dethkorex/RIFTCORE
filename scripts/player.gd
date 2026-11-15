@@ -1,6 +1,21 @@
 class_name RiftPlayer
 extends Combatant
 
+const SUIT_ASSETS := {
+	"frost_lance": preload("res://assets/models/mecha_main/RiftcoreFrostRigged.glb"), "tidal_arc": preload("res://assets/models/mecha_main/RiftcoreTidalRigged.glb"),
+	"data_lance": preload("res://assets/models/mecha_main/RiftcoreDataRigged.glb"), "gale_edge": preload("res://assets/models/mecha_main/RiftcoreGaleRigged.glb"),
+	"chimera_burst": preload("res://assets/models/mecha_main/RiftcoreChimeraRigged.glb"), "singularity_shot": preload("res://assets/models/mecha_main/RiftcoreSingularityRigged.glb"),
+}
+const SUIT_MUZZLES := {
+	"frost_lance": Vector3(-0.49863, 0.65111, 0.04263),
+	"tidal_arc": Vector3(-0.50318, 0.64968, -0.00074),
+	"data_lance": Vector3(-0.50203, 0.64698, -0.00515),
+	"gale_edge": Vector3(-0.51075, 0.64724, -0.03094),
+	"chimera_burst": Vector3(-0.50203, 0.64943, 0.02575),
+	"singularity_shot": Vector3(-0.49976, 0.64893, 0.06152),
+}
+const STANDARD_MUZZLE := Vector3(-0.5, 0.65, -0.042)
+
 const PACK_VFX := preload("res://scripts/pack_combat_vfx.gd")
 
 signal energy_changed(current: float, maximum: float)
@@ -18,6 +33,7 @@ const Catalog := preload("res://scripts/sector_catalog.gd")
 signal fell_into_pit
 signal shot_fired(projectile: RiftProjectile)
 signal melee_performed
+signal projectile_deflected(id: int)
 signal weapon_changed(title: String)
 signal lives_changed(count: int)
 signal life_picked_up
@@ -30,6 +46,19 @@ var charge_cost_multiplier := 1.0
 var salvage_multiplier := 1.0
 var xp_gain_multiplier := 1.0
 var healing_pickup_multiplier := 1.0
+var recovery_item_multiplier := 1.0
+var low_health_resistance := 0.0
+var contact_recoil_scale := 1.0
+var extra_hit_immunity := 0.0
+var impact_energy := 0.0
+var dash_guard_time := 0.0
+var phoenix_recovery := 0.0
+var phoenix_spent := false
+var standard_shot_speed := 1.0
+var charge_time_scale := 1.0
+var burn_damage_multiplier := 1.0
+var extra_saber_targets := 0
+var echo_power := 0.0
 var magma_unlocked := false
 var thorn_unlocked := false
 var thorn_active := false
@@ -41,6 +70,9 @@ var forge_armor: Dictionary = {}
 var base_suit_meshes: Array[MeshInstance3D] = []
 var fire_suit_mesh: MeshInstance3D
 var nature_suit_mesh: MeshInstance3D
+var reward_suit_meshes: Dictionary[String, MeshInstance3D] = {}
+var reward_coating: ShaderMaterial
+var suit_coatings: Dictionary[String, ShaderMaterial] = {}
 
 const RUN_THRESHOLD := 0.72
 const RUN_RELEASE_THRESHOLD := 0.64
@@ -94,6 +126,8 @@ var queued_charged := false
 var queued_pose := false
 var combo_hot := false
 var melee_lock := 0.0
+var run_module := ""
+var charged_damage_multiplier := 1.0
 var combo_step := 0
 var combo_queued := 0
 var combo_grace := 0.0
@@ -182,7 +216,7 @@ func _ready() -> void:
 		skeleton.add_child(slide_pose)
 		if buster_pose:
 			skeleton.move_child(buster_pose, -1)
-		install_fire_suit(skeleton)
+		install_suit_meshes(skeleton)
 	if animation_player:
 		make_locomotion_in_place()
 		build_combat_clips()
@@ -190,13 +224,15 @@ func _ready() -> void:
 			if animation_player.has_animation(clip):
 				animation_player.get_animation(clip).loop_mode = Animation.LOOP_LINEAR
 
-func install_fire_suit(skeleton: Skeleton3D) -> void:
+func install_suit_meshes(skeleton: Skeleton3D) -> void:
 	for object in skeleton.find_children("*", "MeshInstance3D", true, false):
 		var mesh := object as MeshInstance3D
 		if mesh.skin:
 			base_suit_meshes.append(mesh)
 	fire_suit_mesh = attach_suit_mesh(skeleton, preload("res://assets/models/mecha_main/RiftcoreFireRigged.glb"))
 	nature_suit_mesh = attach_suit_mesh(skeleton, preload("res://assets/models/mecha_main/RiftcoreNatureRigged.glb"))
+	reward_suit_meshes["magma_breaker"] = fire_suit_mesh
+	reward_suit_meshes["thorn_swarm"] = nature_suit_mesh
 
 func attach_suit_mesh(skeleton: Skeleton3D, suit: PackedScene) -> MeshInstance3D:
 	var imported := suit.instantiate() as Node3D
@@ -226,7 +262,7 @@ func bind_cannon_muzzle() -> void:
 	muzzle_skeleton = skeleton
 	muzzle_bone = bone
 	# Barrel rim center measured in the imported mesh's rest coordinates.
-	muzzle_offset = skeleton.get_bone_global_rest(bone).affine_inverse() * Vector3(-0.5, 0.65, -0.042)
+	muzzle_offset = skeleton.get_bone_global_rest(bone).affine_inverse() * STANDARD_MUZZLE
 	if animation_player:
 		buster_pose = preload("res://scripts/buster_pose.gd").new()
 		buster_pose.muzzle_bone = bone
@@ -318,9 +354,9 @@ func apply_supply(item: Dictionary) -> void:
 	var hp_before := health
 	var eng_before := energy
 	if item.get("hp", 0) > 0:
-		restore_health(item.hp)
+		restore_health(item.hp * recovery_item_multiplier)
 	if item.get("energy", 0) > 0:
-		restore_energy(item.energy)
+		restore_energy(item.energy * recovery_item_multiplier)
 	report_recovery(health - hp_before, energy - eng_before)
 	if item.has("stat"):
 		supplies[item.stat] = Vector2(item.gain, item.duration)
@@ -952,12 +988,11 @@ func show_restore_number(scene: Node, amount: float, hp: bool, offset: float, ti
 	counter.animate_restoration(amount, hp, tint)
 
 func refresh_suit_overlay() -> void:
-	var material := restore_shell if restore_shell else (charge_shell if full_charge_visual else null)
+	var material := restore_shell if restore_shell else (charge_shell if full_charge_visual else reward_coating)
 	for mesh in base_suit_meshes:
 		mesh.material_overlay = material
-	for mesh in [fire_suit_mesh, nature_suit_mesh]:
-		if is_instance_valid(mesh):
-			mesh.material_overlay = material
+	for mesh in reward_suit_meshes.values():
+		mesh.material_overlay = material
 
 func set_crouch(enabled: bool) -> void:
 	crouching = enabled
@@ -1002,7 +1037,7 @@ func update_charge(delta: float) -> void:
 	if not charge_held:
 		return
 	if not action_held("shoot"):
-		var full := charge_elapsed >= charge_time and energy >= charged_shot_cost()
+		var full := charge_elapsed >= charge_time * charge_time_scale and energy >= charged_shot_cost()
 		var pose_held := is_instance_valid(charge_orb)
 		cancel_charge()
 		if melee_lock <= 0.0:
@@ -1017,7 +1052,8 @@ func update_charge(delta: float) -> void:
 	present_charge(charge_elapsed, energy >= charged_shot_cost())
 
 func present_charge(held_time: float, has_energy: bool) -> void:
-	var primed := held_time >= charge_time and has_energy
+	var required_time := charge_time * charge_time_scale
+	var primed := held_time >= required_time and has_energy
 	if full_charge_visual != primed:
 		full_charge_visual = primed
 		if primed and charge_shell == null:
@@ -1041,7 +1077,7 @@ func present_charge(held_time: float, has_energy: bool) -> void:
 		tint = Color(Catalog.weapon(special_weapon).color)
 	elif thorn_active:
 		tint = Color("a8ff64")
-	charge_orb.charge(clampf(held_time / charge_time, 0.0, 1.0), tint, primed)
+	charge_orb.charge(clampf(held_time / required_time, 0.0, 1.0), tint, primed)
 	charge_orb.global_position = cannon_muzzle(facing)
 
 func cannon_muzzle(aim: float) -> Vector3:
@@ -1059,7 +1095,7 @@ func buster_power() -> float:
 
 func charged_shot_cost() -> float:
 	var base := 36.0 if magma_active else (30.0 if thorn_active or not special_weapon.is_empty() else 0.0)
-	return base * charge_cost_multiplier
+	return base * charge_cost_multiplier * (0.75 if run_module == "conduit" else 1.0)
 
 func shoot(charged := false, pose_held := false) -> void:
 	var magma := magma_active
@@ -1087,17 +1123,19 @@ func shoot(charged := false, pose_held := false) -> void:
 	if not special.is_empty():
 		launch_reward_weapon(muzzle, aim, charged, special)
 	elif thorn:
-		var count := 5 if charged else 2
+		var count := 1 if charged else 2
 		for i in range(count):
 			var angle := (i - (count - 1) * 0.5) * (0.18 if charged else 0.14)
-			launch_buster(muzzle, Vector3(aim * cos(angle), sin(angle), 0), charged, false, (30.0 if charged else 16.0) * level_damage_scale(), Color("a8ff64"), "thorn_swarm")
+			launch_buster(muzzle, Vector3(aim * cos(angle), sin(angle), 0), charged, false, (92.0 if charged else 16.0) * level_damage_scale(), Color("a8ff64"), "thorn_swarm")
 	elif magma and charged:
 		for spread in [-0.51, 0.0, 0.51]:
 			var direction := Vector3(aim * cos(spread), sin(spread), 0.0)
-			launch_buster(muzzle, direction, true, true, (62.0 if is_zero_approx(spread) else 45.0) * level_damage_scale())
+			launch_buster(muzzle, direction, true, true, (62.0 if is_zero_approx(spread) else 45.0) * level_damage_scale(), Color.TRANSPARENT, "magma_breaker")
 	else:
 		var power := (34.0 * level_damage_scale()) if magma else (buster_power() * (4.0 if charged else 1.0))
-		launch_buster(muzzle, Vector3(aim, 0, 0), charged, magma, power)
+		launch_buster(muzzle, Vector3(aim, 0, 0), charged, magma, power, Color.TRANSPARENT, "magma_breaker" if magma else "")
+	if not equipped_suit().is_empty():
+		RiftProjectile.suit_flash(get_parent(), muzzle, Color(Catalog.weapon(equipped_suit()).color), charged)
 	RiftAudio.play_effect(&"buster_charged" if charged else &"buster")
 
 func buster_range(muzzle: Vector3, direction: Vector3) -> float:
@@ -1116,23 +1154,31 @@ func buster_range(muzzle: Vector3, direction: Vector3) -> float:
 	var visible_range := clampf((boundary - muzzle.x) * signf(direction.x) + 3.2, 5.0, 20.0)
 	return maxf(25.0, visible_range * 2.0)
 
-func launch_buster(muzzle: Vector3, direction: Vector3, charged: bool, magma: bool, power: float, tint := Color.TRANSPARENT, weapon_id := "") -> void:
+func launch_buster(muzzle: Vector3, direction: Vector3, charged: bool, magma: bool, power: float, tint := Color.TRANSPARENT, weapon_id := "", echo := false) -> void:
 	var projectile := RiftProjectile.new()
 	projectile.collision_mask = 3 | 16 | (8 if magma else 0)
-	get_tree().current_scene.add_child(projectile)
+	get_parent().add_child(projectile)
 	projectile.global_position = muzzle
 	projectile.damage = power * (buster_damage_multiplier * (1.0 + supply_bonus("attack")) if magma or not weapon_id.is_empty() else 1.0)
+	projectile.source_operator = get_instance_id()
+	if charged:
+		projectile.damage *= charged_damage_multiplier
+		projectile.splits_on_impact = run_module == "prism" and not magma and weapon_id.is_empty()
 	projectile.weapon_id = weapon_id
 	projectile.range_remaining = buster_range(muzzle, direction)
 	if charged:
 		projectile.speed = 29.0
 	if magma:
 		projectile.speed = 24.0 if charged else 25.0
-		projectile.burn_power = (8.0 if charged else 4.5) * level_damage_scale()
+		projectile.burn_power = (8.0 if charged else 4.5) * level_damage_scale() * burn_damage_multiplier
+		if echo:
+			projectile.burn_power *= echo_power
+	elif weapon_id.is_empty():
+		projectile.speed *= standard_shot_speed
 	match weapon_id:
 		"frost_lance":
 			projectile.speed = 36.0
-			projectile.pierces = 2 if charged else 1
+			projectile.pierces = 3 if charged else 1
 		"data_lance":
 			projectile.speed = 42.0
 			projectile.pierces = 4 if charged else 1
@@ -1143,19 +1189,29 @@ func launch_buster(muzzle: Vector3, direction: Vector3, charged: bool, magma: bo
 		"scrap_reaver":
 			projectile.speed = 20.0
 		"core_override":
-			projectile.pierces = 2 if charged else 1
+			projectile.pierces = 3 if charged else 1
 	projectile.lifetime = projectile.range_remaining / projectile.speed + 0.15
 	var shot_color := (Color("ffae35") if charged else Color("ff681c")) if magma else (Color("73f4ff") if charged else Color.CYAN)
 	if tint.a > 0.0:
 		shot_color = tint
 	projectile.setup(direction, faction, shot_color, false, charged, magma)
 	shot_fired.emit(projectile)
+	if charged and not echo and echo_power > 0.0:
+		await get_tree().create_timer(0.11, false).timeout
+		if is_inside_tree() and not is_queued_for_deletion() and health > 0.0:
+			launch_buster(cannon_muzzle(direction.x), direction, true, magma, power * echo_power, shot_color.lerp(Color("cf9bff"), 0.6), weapon_id, true)
 
 func launch_reward_weapon(muzzle: Vector3, aim: float, charged: bool, id: String) -> void:
 	var info := Catalog.weapon(id)
 	var count := 1
 	var power := 35.0 if not charged else 111.0
 	match id:
+		"tidal_arc":
+			power = 31.0 if not charged else 94.0
+		"singularity_shot":
+			power = 27.0 if not charged else 79.0
+		"data_lance":
+			power = 30.0 if not charged else 102.0
 		"gale_edge":
 			count = 5 if charged else 3
 			power = 38.0 if charged else 15.0
@@ -1165,8 +1221,8 @@ func launch_reward_weapon(muzzle: Vector3, aim: float, charged: bool, id: String
 		"scrap_reaver":
 			power = 136.0 if charged else 47.0
 		"core_override":
-			count = 5 if charged else 3
-			power = 55.0 if charged else 23.0
+			count = 1 if charged else 3
+			power = 154.0 if charged else 23.0
 	for i in count:
 		var spread := (i - (count - 1) * 0.5) * (0.18 if charged else 0.13)
 		launch_buster(muzzle, Vector3(aim * cos(spread), sin(spread), 0), charged, false, power * level_damage_scale(), Color(info.color), id)
@@ -1184,7 +1240,7 @@ func cycle_weapon(step := 1) -> void:
 	if choices.size() > 1:
 		equip_sector_weapon(choices[posmod(choices.find(equipped) + step, choices.size())])
 
-func unlock_sector_weapon(id: String) -> void:
+func unlock_sector_weapon(id: String, equip := true) -> void:
 	if id not in run_weapon_ids:
 		run_weapon_ids.append(id)
 	if id == "magma_breaker":
@@ -1194,65 +1250,53 @@ func unlock_sector_weapon(id: String) -> void:
 	equip_sector_weapon(id)
 
 func equip_sector_weapon(id: String) -> void:
-	match id:
-		"magma_breaker":
-			set_magma_active(true)
-		"thorn_swarm":
-			set_thorn_active()
-		_:
-			set_magma_active(false)
-			if not id.is_empty() and id in run_weapon_ids:
-				var info := Catalog.weapon(id)
-				special_weapon = id
-				var armor := ShaderMaterial.new()
-				armor.shader = preload("res://assets/ui/reward_armor.gdshader")
-				armor.set_shader_parameter("suit_color", Color(info.color))
-				for mesh in base_suit_meshes:
-					mesh.material_overlay = armor
-				var light := get_node_or_null("CoreLight") as OmniLight3D
-				if light:
-					light.light_color = Color(info.color)
-				weapon_changed.emit(String(info.reward_name).to_upper())
+	if not id.is_empty() and id not in run_weapon_ids:
+		if not (id == "magma_breaker" and magma_unlocked or id == "thorn_swarm" and thorn_unlocked):
+			return
+	cancel_charge()
+	magma_active = id == "magma_breaker"
+	thorn_active = id == "thorn_swarm"
+	special_weapon = "" if magma_active or thorn_active else id
+	if SUIT_ASSETS.has(id) and not reward_suit_meshes.has(id) and is_instance_valid(muzzle_skeleton):
+		var packed := SUIT_ASSETS[id] as PackedScene
+		var armor := attach_suit_mesh(muzzle_skeleton, packed)
+		if is_instance_valid(armor):
+			reward_suit_meshes[id] = armor
+	var selected := reward_suit_meshes.get(id) as MeshInstance3D
+	var info := Catalog.weapon(id)
+	var tint := Color(info.get("color", "3ddcff"))
+	reward_coating = null
+	if not id.is_empty() and selected == null:
+		reward_coating = ShaderMaterial.new()
+		reward_coating.shader = preload("res://assets/ui/reward_armor.gdshader")
+		reward_coating.set_shader_parameter("suit_color", tint)
+	for mesh in base_suit_meshes:
+		mesh.visible = selected == null
+	for mesh in reward_suit_meshes.values():
+		mesh.visible = mesh == selected
+	refresh_suit_overlay()
+	if is_instance_valid(muzzle_skeleton):
+		var rim: Vector3 = SUIT_MUZZLES.get(id, STANDARD_MUZZLE)
+		muzzle_offset = muzzle_skeleton.get_bone_global_rest(muzzle_bone).affine_inverse() * rim
+		if buster_pose:
+			buster_pose.muzzle_offset = muzzle_offset
+			buster_pose.muzzle_local = Vector3.ZERO
+	var blade := find_child("EnergyBlade", true, false) as MeshInstance3D
+	if blade:
+		blade.material_override = RiftProjectile.light_paint(tint, 2.4) if not id.is_empty() else null
+	var light := get_node_or_null("CoreLight") as OmniLight3D
+	if light:
+		light.light_color = tint
+	weapon_changed.emit(String(info.get("reward_name", "Buster Cannon")).to_upper())
 
 func unlock_magma() -> void:
-	magma_unlocked = true
-	set_magma_active(true)
+	unlock_sector_weapon("magma_breaker")
 
 func set_thorn_active() -> void:
-	if not thorn_unlocked:
-		return
-	set_magma_active(false)
-	thorn_active = true
-	for mesh in base_suit_meshes:
-		mesh.hide()
-	if is_instance_valid(nature_suit_mesh):
-		nature_suit_mesh.show()
-	var light := get_node_or_null("CoreLight") as OmniLight3D
-	if light:
-		light.light_color = Color("a8ff64")
-	weapon_changed.emit("THORN SWARM")
+	equip_sector_weapon("thorn_swarm")
 
 func set_magma_active(enabled: bool) -> void:
-	if enabled and not magma_unlocked:
-		return
-	cancel_charge()
-	special_weapon = ""
-	thorn_active = false
-	magma_active = enabled
-	for mesh in base_suit_meshes:
-		mesh.visible = not enabled
-		mesh.material_overlay = null
-	if is_instance_valid(fire_suit_mesh):
-		fire_suit_mesh.visible = enabled
-	if is_instance_valid(nature_suit_mesh):
-		nature_suit_mesh.hide()
-	var blade_mesh := find_child("EnergyBlade", true, false) as MeshInstance3D
-	if blade_mesh:
-		blade_mesh.material_override = RiftProjectile.light_paint(Color("ff4e19"), 2.4) if enabled else null
-	var light := get_node_or_null("CoreLight") as OmniLight3D
-	if light:
-		light.light_color = Color("ff8e42") if enabled else Color("3ddcff")
-	weapon_changed.emit("MAGMA BREAKER" if enabled else "BUSTER CANNON")
+	equip_sector_weapon("magma_breaker" if enabled else "")
 
 func build_combat_clips() -> void:
 	if not animation_player.has_animation(&"slash") or not animation_player.has_animation_library(&""):
@@ -1320,7 +1364,7 @@ func update_melee(delta: float) -> void:
 	if saber_hold >= 0.0:
 		if action_held("melee") and not action_released("melee"):
 			saber_hold += delta
-			if saber_hold >= SABER_CHARGE_TIME and not saber_primed:
+			if saber_hold >= SABER_CHARGE_TIME * charge_time_scale and not saber_primed:
 				saber_primed = true
 				var ready := preload("res://scripts/attack_fx.gd")
 				ready.charge(get_parent(), global_position + Vector3(0, .7, .2),
@@ -1392,7 +1436,7 @@ func emit_saber_trail(duration: float, finisher: bool) -> void:
 func present_saber_charge(held_time: float, swinging: bool) -> void:
 	displayed_saber_charge = held_time
 	if slide_pose:
-		var amount := smoothstep(0.07, SABER_CHARGE_TIME * .86, held_time) if not swinging else 0.0
+		var amount := smoothstep(0.07, SABER_CHARGE_TIME * charge_time_scale * 0.86, held_time) if not swinging else 0.0
 		slide_pose.set("windup_target", amount)
 		if amount > 0.0:
 			slide_pose.influence = 1.0
@@ -1410,24 +1454,39 @@ func reflect_saber_pose(clip: String, held_time: float) -> void:
 			PACK_VFX.blade_trail(sword_pivot, SWING_DURATIONS[step] * .60, saber_tint(), step == 2)
 
 func launch_saber_wave() -> void:
-	var wave := RiftProjectile.new()
-	wave.collision_mask = 3 | 16
-	wave.range_remaining = buster_range(global_position, Vector3.RIGHT * combo_facing)
-	wave.speed = 22.0
-	wave.lifetime = wave.range_remaining / wave.speed + 0.15
-	wave.damage = buster_power() * melee_multiplier * 1.8
-	wave.pierces = 2
-	wave.burn_power = 3.8 * level_damage_scale() if combo_hot else 0.0
-	get_tree().current_scene.add_child(wave)
-	wave.global_position = global_position + Vector3(combo_facing * .72, .26, 0)
-	wave.setup(Vector3.RIGHT * combo_facing, "player", saber_tint(), false, true, combo_hot, 0, 0, true)
+	var aim := combo_facing
+	var hot := combo_hot
+	var tint := saber_tint()
+	var power := buster_power() * melee_multiplier * 1.8 * charged_damage_multiplier
+	spawn_saber_wave(aim, hot, tint, power, 1.0)
 	RiftAudio.play_effect(&"saber_charge_release")
 	melee_performed.emit()
+	if echo_power > 0.0:
+		await get_tree().create_timer(0.13, false).timeout
+		if is_inside_tree() and not is_queued_for_deletion() and health > 0.0:
+			spawn_saber_wave(aim, hot, tint.lerp(Color("cf9bff"), 0.6), power * echo_power, echo_power)
+
+func spawn_saber_wave(aim: float, hot: bool, tint: Color, power: float, burn_scale: float) -> void:
+	var wave := RiftProjectile.new()
+	wave.collision_mask = 3 | 16
+	wave.range_remaining = buster_range(global_position, Vector3.RIGHT * aim)
+	wave.speed = 22.0
+	wave.lifetime = wave.range_remaining / wave.speed + 0.15
+	wave.damage = power
+	wave.source_operator = get_instance_id()
+	wave.pierces = 2 + extra_saber_targets
+	wave.burn_power = 3.8 * level_damage_scale() * burn_damage_multiplier * burn_scale if hot else 0.0
+	get_parent().add_child(wave)
+	wave.global_position = global_position + Vector3(aim * .72, .26, 0)
+	wave.setup(Vector3.RIGHT * aim, "player", tint, false, true, hot, 0, 0, true)
+	shot_fired.emit(wave)
 
 func saber_tint() -> Color:
-	return Color("ff6525") if combo_hot else Color("35beff")
+	return Color(Catalog.weapon(equipped_suit()).get("color", "35beff"))
 
 func strike_melee() -> void:
+	if run_module == "deflector":
+		deflect_projectile()
 	var reach := melee_range + (0.25 if combo_step == 3 else 0.0)
 	var power := buster_power() * melee_multiplier * (1.22 if combo_step == 3 else 1.0)
 	for candidate in get_tree().get_nodes_in_group("damageable_enemies"):
@@ -1444,8 +1503,23 @@ func strike_melee() -> void:
 				RiftAudio.play_effect(&"saber_impact")
 				PACK_VFX.saber_hit.call_deferred(get_parent(), candidate.global_position + Vector3(0, 0.34, 0.3), combo_facing, saber_tint())
 				if combo_hot and candidate.has_method("ignite"):
-					candidate.ignite(3.8 * level_damage_scale(), 2.5)
+					candidate.ignite(3.8 * level_damage_scale() * burn_damage_multiplier, 2.5, get_instance_id())
 	melee_performed.emit()
+
+func deflect_projectile() -> void:
+	for shot in get_tree().get_nodes_in_group(&"rift_projectile"):
+		if not shot is RiftProjectile or shot.owner_faction != "enemy" or shot.spent or shot.is_queued_for_deletion():
+			continue
+		var offset: Vector3 = shot.global_position - global_position
+		if offset.x * combo_facing < 0.0 or absf(offset.x) > melee_range or absf(offset.y) > 1.1 or absf(offset.z) > 0.75:
+			continue
+		shot.spent = true
+		projectile_deflected.emit(shot.get_instance_id())
+		shot.queue_free()
+		restore_energy(5.0, true)
+		launch_buster(global_position + Vector3(combo_facing * 0.8, 0.3, 0.0), Vector3.RIGHT * combo_facing, false, false, buster_power() * 1.35, Color("75ffd2"))
+		RiftAudio.play_effect(&"saber_impact")
+		return
 
 static func locomotion_speed(axis: float, top_speed: float) -> float:
 	var tilt := absf(axis)
@@ -1530,20 +1604,14 @@ func mitigate_damage(amount: float) -> float:
 	return amount * damage_taken_scale * (1.0 - defense_rating())
 
 func defense_rating() -> float:
-	return 1.0 - (1.0 - defense_for_experience(experience)) * (1.0 - armor_resistance) * (1.0 - supply_bonus("defense"))
+	var last_stand := low_health_resistance if health < max_health * 0.30 else 0.0
+	return 1.0 - (1.0 - defense_for_experience(experience)) * (1.0 - armor_resistance) * (1.0 - supply_bonus("defense")) * (1.0 - last_stand)
 
 func take_damage(amount: float, source_position := Vector3.ZERO) -> void:
-	var before := health
-	super.take_damage(mitigate_damage(amount), source_position)
-	if health < before:
-		RiftAudio.play_effect(&"armor_hit")
-		if not remote_input:
-			RiftSettings.rumble()
-	if health < before and health > 0.0:
-		invulnerable_time = 0.65
+	if receive_hit(amount, source_position):
 		var away := signf(global_position.x - source_position.x)
-		velocity.x = (away if away != 0.0 else -facing) * 5.4
-		velocity.y = 2.9
+		velocity.x = (away if away != 0.0 else -facing) * 5.4 * contact_recoil_scale
+		velocity.y = 2.9 * contact_recoil_scale
 		contact_recoil = 0.115
 		dash_left = 0.0
 		clear_ladder_support()
@@ -1551,12 +1619,30 @@ func take_damage(amount: float, source_position := Vector3.ZERO) -> void:
 		ladder_lock = 0.24
 
 func take_projectile_damage(amount: float) -> void:
-	var before := health
-	super.take_damage(mitigate_damage(amount))
-	if health < before:
-		RiftAudio.play_effect(&"armor_hit")
-		if not remote_input:
-			RiftSettings.rumble()
-	if health < before and health > 0.0:
-		invulnerable_time = 0.65
+	receive_hit(amount, Vector3.ZERO)
 
+func receive_hit(amount: float, source_position: Vector3) -> bool:
+	if dash_left > 0.0 and dash_elapsed < dash_guard_time:
+		return false
+	var damage := mitigate_damage(amount)
+	if phoenix_recovery > 0.0 and not phoenix_spent and invulnerable_time <= 0.0 and health > 0.0 and damage >= health:
+		phoenix_spent = true
+		invulnerable_time = 1.3
+		restore_health(maxf(0.0, max_health * phoenix_recovery - health), true)
+		return false
+	var before := health
+	super.take_damage(damage, source_position)
+	return react_to_hit(before)
+
+func react_to_hit(previous_health: float) -> bool:
+	if health >= previous_health:
+		return false
+	RiftAudio.play_effect(&"armor_hit")
+	if not remote_input:
+		RiftSettings.rumble()
+	if health <= 0.0:
+		return false
+	invulnerable_time = 0.65 + extra_hit_immunity
+	if impact_energy > 0.0:
+		restore_energy(impact_energy, true)
+	return true

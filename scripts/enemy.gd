@@ -71,11 +71,13 @@ var sector_experience_scale := 1.0
 var operator_at_deploy: RiftPlayer
 var sector_number := 1
 var second_act := false
+var difficulty_mode := 0
 var shot_windup := 0.0
 var locked_aim := Vector3.ZERO
 
 func scale_for_sector(sector: int, act: int, health_scale: float, mode: int) -> void:
 	sector_number = sector
+	difficulty_mode = mode
 	second_act = act == 2
 	var steps := maxi(0, sector - 1)
 	max_health = [40.0, 55.0, 95.0, 60.0, 35.0][variant] * (1.0 + 0.30 * steps) * (1.32 if second_act else 1.0) * health_scale
@@ -299,7 +301,7 @@ func apply_guard_snapshot(state: int) -> void:
 	last_guard_state = state
 
 func hit_by_projectile(shot: RiftProjectile) -> bool:
-	if shot.owner_faction != "player" or shot.is_charged or not guard_active():
+	if shot.owner_faction != "player" or shot.is_charged or shot.weapon_id == "data_lance" or not guard_active():
 		return false
 	if (shot.global_position.x - global_position.x) * direction < 0.08:
 		return false
@@ -337,9 +339,9 @@ func prepare_shot() -> void:
 		shot_clock = 0.23
 		return
 	locked_aim = (target.global_position - origin).normalized()
-	shot_windup = 0.46 if variant in [Variant.HEAVY, Variant.TURRET] else 0.30
+	shot_windup = Difficulty.windup_time(0.46 if variant in [Variant.HEAVY, Variant.TURRET] else 0.30, difficulty_mode, 0.26)
 	refresh_defense()
-	shot_clock = (randf_range(1.2, 1.65) if variant == Variant.TURRET else randf_range(1.75, 2.6)) * (0.81 if second_act else 1.0)
+	shot_clock = (randf_range(1.2, 1.65) if variant == Variant.TURRET else randf_range(1.75, 2.6)) * (0.81 if second_act else 1.0) * Difficulty.boss_recovery_scale(difficulty_mode)
 	ATTACK_FX.charge(get_parent(), origin, ATTACK_FX.tint_for(sector_number), shot_windup)
 
 func fire_at_player() -> void:

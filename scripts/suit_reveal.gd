@@ -2,30 +2,15 @@ extends Node3D
 
 const UI := preload("res://scripts/rift_ui.gd")
 const COMBAT_VFX := preload("res://scripts/combat_vfx.gd")
-const ABILITIES := {
-	"magma_breaker": "Fireballs ignite enemies and burn through vines.
-Charge to fire three fireballs in a spread.",
-	"thorn_swarm": "Fires a two-thorn spread.
-Charge for a wider five-thorn burst.",
-	"frost_lance": "Fast piercing ice shots stagger enemies.
-Charged shots pass through extra targets.",
-	"tidal_arc": "Electrical shots arc to nearby enemies.",
-	"data_lance": "A fast beam that pierces multiple targets.",
-	"gale_edge": "Wide wind blades shove mobile enemies back.
-Charge to fan out five blades.",
-	"chimera_burst": "Fires a spread of shots that inflict burning.
-Charge for a wider five-shot burst.",
-	"singularity_shot": "A slow orb that strikes enemies near its target.",
-	"scrap_reaver": "Heavy scrap rounds deal splash damage.",
-	"core_override": "Fires a spread of piercing energy bolts.
-Charge for a five-bolt burst.",
-}
+const Catalog := preload("res://scripts/sector_catalog.gd")
 
-func play(actor: RiftPlayer, rig: SideCameraRig, hud: CanvasLayer, reward: Dictionary, floor_point: Vector3) -> void:
+func play(actor: RiftPlayer, rig: SideCameraRig, hud: CanvasLayer, reward: Dictionary, floor_point: Vector3, cosmetic_only := false) -> void:
+	name = "SuitReveal"
 	var id: String = reward.reward
 	var tint := Color(reward.color)
 	var feet := actor.standing_capsule.height * 0.5 + 0.025
 	var landing := floor_point + Vector3.UP * feet
+	var original_model_y := actor.model_root.position.y
 	global_position = floor_point + Vector3.UP * 0.04
 	var lens := rig.get_node("Camera3D") as Camera3D
 	var zoom := lens.position.z
@@ -33,7 +18,10 @@ func play(actor: RiftPlayer, rig: SideCameraRig, hud: CanvasLayer, reward: Dicti
 	var view := create_tween().set_parallel().set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
 	view.tween_property(rig, "global_position", focus, 0.58)
 	view.tween_property(lens, "position:z", zoom * 0.73, 0.58)
-	view.tween_property(actor, "global_position", landing + Vector3.UP * 0.41, 0.58)
+	if cosmetic_only:
+		view.tween_property(actor.model_root, "position:y", original_model_y + 0.41, 0.58)
+	else:
+		view.tween_property(actor, "global_position", landing + Vector3.UP * 0.41, 0.58)
 	actor.play_character_animation("idle", true)
 	actor.model_root.rotation = Vector3(0, -0.20, 0)
 	var aura := build_floor_light(tint)
@@ -43,13 +31,17 @@ func play(actor: RiftPlayer, rig: SideCameraRig, hud: CanvasLayer, reward: Dicti
 		aura.light_energy = 1.8 if equipped.is_empty() else 3.6
 		await get_tree().create_timer(0.32, false).timeout
 	var descent := create_tween().set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	descent.tween_property(actor, "global_position", landing, 0.20)
+	if cosmetic_only:
+		descent.tween_property(actor.model_root, "position:y", original_model_y, 0.20)
+	else:
+		descent.tween_property(actor, "global_position", landing, 0.20)
 	await descent.finished
 	actor.play_character_animation("land", true)
 	RiftAudio.stop_effect(&"titan_windup")
 	RiftAudio.play_effect(&"deploy_zap")
 	RiftAudio.play_effect(&"level_up")
 	COMBAT_VFX.explosion(self, tint)
+	RiftProjectile.suit_flash(self, global_position + Vector3.UP * 1.05, tint, true)
 	var light_out := create_tween()
 	light_out.tween_property(aura, "light_energy", 1.45, 0.43).from(5.0)
 	var plate := ability_card(hud, reward, tint)
@@ -96,7 +88,8 @@ func ability_card(hud: CanvasLayer, reward: Dictionary, tint: Color) -> PanelCon
 	var stack := UI.column(plate, 7)
 	UI.label(stack, "SUIT ACQUIRED", 15, tint)
 	UI.label(stack, String(reward.reward_name).to_upper(), 28)
-	UI.label(stack, ABILITIES[reward.reward], 17, UI.MUTED)
+	var details := UI.label(stack, Catalog.WEAPON_EFFECTS[reward.reward], 17, UI.MUTED)
+	details.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	UI.label(stack, "LB / RB  Cycle suits", 14, tint)
 	plate.modulate.a = 0.0
 	create_tween().tween_property(plate, "modulate:a", 1.0, 0.22)
