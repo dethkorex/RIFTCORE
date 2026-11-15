@@ -182,7 +182,7 @@ def make_level(info, act_two=False):
     def ext(key,path,typ='PackedScene'):refs[key]=(path,typ)
     for key in ['deck','perch','wall','lift','phase','relay','gate','arch']:ext(key,f'{prefix}/terrain/{key}.tscn')
     for key in ['scout','quad','heavy','turret','flyer']:ext(key,f'{prefix}/enemies/{key}.tscn')
-    for key in ['health_large','energy_large','energy_small','xp_orb','extra_life']:ext(key,'assets/pickups/'+key+'.tscn')
+    for key in ['health_large','energy_large','energy_small','extra_life']:ext(key,'assets/pickups/'+key+'.tscn')
     for key in ['checkpoint_beacon','deployment_pad','extraction_pad']:ext(key,'assets/neon_factory/'+key+'.tscn')
     for key in ['camera_rig','jungle_backdrop','factory_checkpoint','forge_safe_hall','biome_zone']:ext(key,'scripts/'+key+'.gd','Script')
     ext('panorama',prefix+'/panorama.png','Texture2D')
@@ -267,7 +267,8 @@ tonemap_mode = 2
     for i in [4,checkpoint_index+4,len(route)-5]:
         x,y,w,k=route[i]
         instance(f'CacheLedge{i}','perch',(x+1.4,y+1.85,0))
-        instance('InspectionExtraLife' if i==checkpoint_index+4 else f'XPReserve{i}','extra_life' if i==checkpoint_index+4 else 'xp_orb',(x+1.4,y+2.26,0),props='' if i==checkpoint_index+4 else 'large = true\nxp_amount = 60')
+        if i == checkpoint_index+4:
+            instance('InspectionExtraLife','extra_life',(x+1.4,y+2.26,0))
     if n in [5,10]:
         for i,(x,y,w,k) in enumerate(route):
             if k=='phase':instance(f'PhaseSafetyShelf{i}','perch',(x,y-2.1,0),props='scale = '+v(1.16,1,1))

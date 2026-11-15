@@ -7,7 +7,6 @@ const ATTACK_FX := preload("res://scripts/attack_fx.gd")
 @export var minion_scene: PackedScene
 const ZONE := preload("res://scripts/biome_zone.gd")
 const CARGO := preload("res://scripts/cargo_carrier.gd")
-const XP := preload("res://assets/pickups/xp_orb.tscn")
 const PATTERNS := {
 	3: ["ice_wall", "shards", "charge", "ice_burst"],
 	4: ["tentacles", "surge", "flood", "arc_fan"],
@@ -327,11 +326,6 @@ func check_supply() -> void:
 
 func _explode() -> void:
 	active = false
-	var orb := XP.instantiate()
-	orb.xp_amount = 68 + sector_number * 12
-	orb.large = true
-	orb.position = Vector3(global_position.x, floor_y + 0.42, 0)
-	get_parent().add_child.call_deferred(orb)
 	var blast := preload("res://scripts/pit_burst.gd").new()
 	get_parent().add_child.call_deferred(blast)
 	blast.set_deferred("global_position", global_position)

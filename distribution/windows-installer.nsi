@@ -37,7 +37,7 @@ FunctionEnd
 Section "RIFTCORE Playtest" Main
   SetShellVarContext current
   SetOutPath "$INSTDIR"
-  File /r "${PAYLOAD}/*"
+  File /r "${PAYLOAD_MASK}"
   FileOpen $0 "$INSTDIR\riftcore.install" w
   FileWrite $0 "RIFTCORE playtest installation"
   FileClose $0

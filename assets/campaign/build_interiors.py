@@ -366,16 +366,12 @@ size = Vector3(1.52, 1.25, 1.5)"""
         self.node("Collision", parent=target, kind="CollisionShape3D", shape=sub("RCRelayShape"))
         self.node("Lamp", parent=target, kind="MeshInstance3D", pos=(0,0,.26), mesh=sub("RCRelayLamp"))
 
-    def cache(self, x, y, blueprint=True):
+    def cache(self, x, y, _blueprint=True):
         # Keep the name unique within the sector's checkpoint state.
         self.cache_count += 1
-        part = (self.act-1)*6+self.cache_count-1
-        if self.cache_count > 6:
-            blueprint = False
         self.node(f"InteriorCache{self.cache_count:02d}", parent="TERRAIN", kind="Area3D", pos=(x,y,0),
                   group="factory_salvage_chest", script=ext("RCCacheScript"), sector=self.number,
-                  blueprint=f'"bp_{self.number:02d}_{part:02d}"' if blueprint else '""',
-                  bolts=60+self.number*13+self.act*22, materials=3+self.act, experience=25+self.number*4,
+                  materials=3+self.act,
                   collision_layer=0, collision_mask=1)
         path = f"TERRAIN/InteriorCache{self.cache_count:02d}"
         self.node("Casing", parent=path, art="RCCache")

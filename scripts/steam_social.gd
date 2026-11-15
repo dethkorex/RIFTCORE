@@ -2,12 +2,15 @@ extends Node
 
 const FRIEND := 4
 signal records_changed
-signal whispers_changed(steam_id: int)
+signal whispers_changed(contact: Variant)
+signal invites_changed
 
 const WHISPER_CHANNEL := 27
 const WHISPER_LIMIT := 300
 var whispers: Dictionary = {}
 var unread_whispers: Dictionary = {}
+var pinned: Dictionary = {}
+var invites: Dictionary = {}
 var next_whisper_at := 0
 
 const SEASON_SECONDS := 30 * 24 * 60 * 60
@@ -37,6 +40,7 @@ func _ready() -> void:
 		best_times = data.get_value("records", "times", {})
 		recent_players = data.get_value("records", "recent", {})
 		rift_friends = data.get_value("records", "friends", {})
+		pinned = data.get_value("records", "pinned", {})
 	if operator_id.is_empty():
 		operator_id = Crypto.new().generate_random_bytes(8).hex_encode()
 	refresh_season()
@@ -94,9 +98,36 @@ func receive_records(payload: Dictionary, alias: String) -> void:
 func toggle_rift_friend(id: String) -> void:
 	if rift_friends.has(id):
 		rift_friends.erase(id)
+		pinned.erase("rift:" + id)
 	elif recent_players.has(id):
 		rift_friends[id] = true
 	save_social()
+
+func toggle_pin(contact: String) -> bool:
+	var previous := pinned.duplicate()
+	if pinned.has(contact):
+		pinned.erase(contact)
+	else:
+		pinned[contact] = true
+	if save_social():
+		return true
+	pinned = previous
+	return false
+
+func record_invite(display_name: String, code: String) -> void:
+	if invites.size() >= 8 and not invites.has(code):
+		invites.erase(invites.keys()[0])
+	var ticket := {"name": display_name, "at": Time.get_ticks_msec()}
+	invites[code] = ticket
+	invites_changed.emit()
+	get_tree().create_timer(180.0).timeout.connect(func():
+		if invites.get(code) == ticket:
+			remove_invite(code)
+	)
+
+func remove_invite(code: String) -> void:
+	if invites.erase(code):
+		invites_changed.emit()
 
 func leaderboard(sector: int, operator_name: String) -> Array[Dictionary]:
 	refresh_season()
@@ -120,7 +151,7 @@ func connect_steam() -> void:
 		var configured := int(ProjectSettings.get_setting("riftcore/steam_app_id", 0))
 		var expected := configured if configured > 0 else OS.get_environment("SteamAppId").to_int()
 		if expected <= 0 or expected == 480:
-			message = "Live Steam presence is unavailable without a RIFTCORE Steamworks App ID. Room codes still work."
+			message = "Steam presence is unavailable in this build. Use a room code to invite a friend."
 			return
 		var result: Dictionary = steam.steamInitEx(expected, false)
 		ready_to_query = int(result.get("status", -1)) == 0
@@ -147,8 +178,7 @@ func _process(_delta: float) -> void:
 			if payload.size() <= WHISPER_LIMIT * 4 and can_whisper(sender):
 				var message_text := clean_whisper(payload.get_string_from_utf8())
 				if not message_text.is_empty():
-					unread_whispers[sender] = int(unread_whispers.get(sender, 0)) + 1
-					add_whisper(sender, message_text, false)
+					receive_whisper(sender, message_text)
 
 func can_whisper(id: int) -> bool:
 	return id >= STEAM_MIN and ready_to_query and steam.loggedOn() and steam.getFriendRelationship(id) == 3
@@ -165,26 +195,33 @@ func clean_whisper(raw: String) -> String:
 			cleaned += character
 	return cleaned.strip_edges()
 
-func send_whisper(id: int, raw: String) -> bool:
+func send_whisper(id: Variant, raw: String) -> bool:
 	var body := clean_whisper(raw)
 	var now := Time.get_ticks_msec()
-	if not can_whisper(id) or body.is_empty() or now < next_whisper_at:
+	if body.is_empty() or now < next_whisper_at:
+		return false
+	if id is String:
+		if not RiftRelay.whisper_to_operator(id.trim_prefix("rift:"), body):
+			return false
+	elif not can_whisper(id) or steam.sendMessageToUser(id, body.to_utf8_buffer(), steam.NETWORKING_SEND_RELIABLE_NO_NAGLE, WHISPER_CHANNEL) != 1:
 		return false
 	next_whisper_at = now + 500
-	if steam.sendMessageToUser(id, body.to_utf8_buffer(), steam.NETWORKING_SEND_RELIABLE_NO_NAGLE, WHISPER_CHANNEL) != 1:
-		return false
 	add_whisper(id, body, true)
 	return true
 
-func add_whisper(id: int, body: String, outgoing: bool) -> void:
+func receive_whisper(id: Variant, body: String) -> void:
+	unread_whispers[id] = int(unread_whispers.get(id, 0)) + 1
+	add_whisper(id, body, false)
+
+func add_whisper(id: Variant, body: String, outgoing: bool) -> void:
 	if not whispers.has(id):
 		if whispers.size() >= 32:
-			var oldest: int = whispers.keys()[0]
+			var oldest: Variant = whispers.keys()[0]
 			whispers.erase(oldest)
 			unread_whispers.erase(oldest)
 		whispers[id] = []
 	var conversation: Array = whispers[id]
-	conversation.append({"body": body, "outgoing": outgoing})
+	conversation.append({"body": body, "outgoing": outgoing, "at": Time.get_time_string_from_system().left(5)})
 	if conversation.size() > 50:
 		conversation.pop_front()
 	whispers_changed.emit(id)
@@ -205,7 +242,7 @@ func contacts() -> Array[Dictionary]:
 		var priority := 3
 		if connected and steam.getFriendRelationship(int(id)) == 3:
 			var display: String = steam.getFriendPersonaName(int(id))
-			if not display.is_empty() and display != "[unknown]":
+			if (name.is_empty() or name == id) and not display.is_empty() and display != "[unknown]":
 				name = display
 			var info: Dictionary = steam.getFriendGamePlayed(int(id))
 			if int(info.get("id", 0)) == app_id and app_id > 0:
@@ -244,13 +281,16 @@ func save_contact(id: String, alias: String) -> bool:
 	if not valid_id(id):
 		return false
 	var previous := followed.duplicate()
+	var previous_pins := pinned.duplicate()
 	if alias.is_empty():
 		followed.erase(id)
+		pinned.erase("steam:" + id)
 	else:
 		followed[id] = alias.left(40)
 	if save_social():
 		return true
 	followed = previous
+	pinned = previous_pins
 	return false
 
 func save_social() -> bool:
@@ -262,6 +302,7 @@ func save_social() -> bool:
 	data.set_value("records", "times", best_times)
 	data.set_value("records", "recent", recent_players)
 	data.set_value("records", "friends", rift_friends)
+	data.set_value("records", "pinned", pinned)
 	return data.save(storage_path) == OK
 
 func open_friends() -> void:

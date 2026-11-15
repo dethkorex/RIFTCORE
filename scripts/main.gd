@@ -3,7 +3,6 @@ extends Node
 const PauseOperator := preload("res://scripts/pause_operator_panel.gd")
 const Materials := preload("res://scripts/fabrication_catalog.gd")
 const Story := preload("res://scripts/rift_story.gd")
-const Drop := preload("res://scripts/material_pickup.gd")
 const UI := preload("res://scripts/rift_ui.gd")
 const FactoryHUD := preload("res://scripts/factory_hud.gd")
 const Catalog := preload("res://scripts/sector_catalog.gd")
@@ -92,7 +91,6 @@ func _ready() -> void:
 		or is_instance_valid(pause_menu) and pause_menu.is_visible_in_tree()
 		or is_instance_valid(coop_mission) and coop_mission.is_pause_open()
 		or is_instance_valid(home_hub) and (home_hub.is_pause_open() or home_hub.has_dialogue())
-		or is_instance_valid(invite_overlay) and invite_overlay.visible
 		or not get_tree().get_nodes_in_group(&"boss_dialogue").is_empty())
 	add_child(pointer)
 	RiftRelay.invite_received.connect(show_friend_invite)
@@ -131,48 +129,29 @@ func _ready() -> void:
 		show_main_menu()
 
 func show_friend_invite(display_name: String, code: String) -> void:
-	if not is_instance_valid(home_hub) or is_instance_valid(game_root) or not RiftRelay.can_receive_invite():
-		return
+	RiftSocial.record_invite(display_name, code)
 	if is_instance_valid(invite_overlay):
 		invite_overlay.queue_free()
 	var layer := CanvasLayer.new()
 	layer.layer = 175
 	invite_overlay = layer
 	add_child(layer)
-	var overlay := preload("res://scripts/controller_overlay.gd").new()
-	var dismiss := func():
-		invite_overlay = null
-		layer.hide()
-		layer.queue_free()
-	overlay.back_action = dismiss
-	overlay.pause_action = dismiss
-	overlay.theme = UI.theme()
-	layer.add_child(overlay)
-	overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	var backdrop := ColorRect.new()
-	backdrop.color = Color(0.015, 0.035, 0.075, 0.52)
-	overlay.add_child(backdrop)
-	backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	var center := CenterContainer.new()
-	overlay.add_child(center)
-	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	var panel := PanelContainer.new()
-	panel.custom_minimum_size.x = 355
-	center.add_child(panel)
-	var content := UI.column(panel, 8)
-	UI.label(content, "CO-OP INVITE", 27, UI.CYAN)
-	UI.label(content, "%s invited you to their party." % display_name, 17)
-	UI.button(content, "Join Party", func():
-		dismiss.call()
-		if RiftRelay.can_receive_invite():
-			RiftRelay.join_room(code)
-			home_hub.station_requested.emit("Social")
-			menu.show_page("Party")
-	, true).grab_focus()
-	UI.button(content, "Dismiss", dismiss)
-	get_tree().create_timer(25.0).timeout.connect(func():
-		if is_instance_valid(layer) and invite_overlay == layer:
-			dismiss.call()
+	var panel := UI.equipment_card(UI.VIOLET)
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.theme = UI.theme()
+	layer.add_child(panel)
+	panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+	panel.offset_left = -344
+	panel.offset_right = -22
+	panel.offset_top = 82
+	var content := UI.column(panel, 3)
+	content.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	UI.label(content, "%s invited you to a game" % display_name, 20, UI.CYAN)
+	UI.label(content, "Open Social → Invites to join", 16, UI.MUTED)
+	RiftAudio.play_effect(&"menu_confirm")
+	get_tree().create_timer(7.0).timeout.connect(func():
+		if is_instance_valid(layer):
+			layer.queue_free()
 	)
 
 func add_build_version() -> void:
@@ -297,7 +276,7 @@ func verify_coop_mission(host: bool, smoke_sector: int) -> void:
 		await get_tree().create_timer(0.8).timeout
 	var previous_credits: int = profile.credits
 	var previous_xp: int = profile.player_xp
-	var reward_blueprint := "bp_%02d_00" % smoke_sector
+	var reward_blueprint := "bp_%02d_%02d" % [smoke_sector, int(not host)]
 	profile.gear["impact_liner" if host else "pulse_lens"] = "stored"
 	var saved_gear: Dictionary = profile.gear.duplicate(true)
 	if not host:
@@ -378,7 +357,9 @@ func verify_coop_mission(host: bool, smoke_sector: int) -> void:
 			print("Campaign check failed to confirm the guest entered Act II")
 			finish_relay_check(false)
 			return
-		mission.team_blueprints.append(reward_blueprint)
+		for index in mission.operators.size():
+			mission.operators[index].credits += 19 + index * 11
+			mission.operators[index].recovered_blueprints["bp_%02d_%02d" % [smoke_sector, index]] = true
 		if not await clear_coop_test_boss(mission):
 			finish_relay_check(false)
 			return
@@ -1124,6 +1105,7 @@ func build_level() -> void:
 		enemy.max_health *= combat_scale
 		enemy.health = enemy.max_health
 		enemy.health_changed.emit(enemy.health, enemy.max_health)
+		enemy.operator_at_deploy = player
 		enemy.died.connect(_enemy_defeated)
 		remaining_enemies += 1
 	camera_rig = game_root.get_node("CameraRig") as SideCameraRig
@@ -1154,6 +1136,9 @@ func build_level() -> void:
 	repair_hall.operators = [player]
 	repair_hall.motor.reset()
 	bind_boss_signals()
+	for chest in get_tree().get_nodes_in_group(&"factory_salvage_chest"):
+		if game_root.is_ancestor_of(chest):
+			chest.difficulty = mission_difficulty
 	install_sector_pads()
 	SectorDetails.new().install(game_root, player, sector, act)
 
@@ -1191,7 +1176,9 @@ func bind_boss_signals() -> void:
 	boss.died.connect(func():
 		boss_defeated = true
 		RiftAudio.play_music(true, sector)
-		award_mission_xp((35 if act == 1 else 80) + sector * 8)
+		var defeat_xp := (35 if act == 1 else 80) + sector * 8
+		award_mission_xp(defeat_xp)
+		player.gain_experience(roundi(defeat_xp * player.xp_gain_multiplier))
 		var shards := 1 + sector + (3 if act == 2 else 0)
 		profile.core_shards += shards
 		factory_hud.core_shards = profile.core_shards
@@ -1201,9 +1188,7 @@ func bind_boss_signals() -> void:
 			var cache := BossCache.new()
 			cache.position = actors.to_local(Vector3(boss_spawn.x, gate.global_position.y + 0.52, 0.0))
 			actors.add_child.call_deferred(cache)
-			cache.opened.connect(func(): BossCache.spill(actors, cache.global_position, BossCache.roll_loot(sector, mission_difficulty)))
-		else:
-			Drop.roll_at(actors, boss.global_position + Vector3.UP * 0.25, sector, "miniboss")
+			cache.opened.connect(func(): BossCache.spill(actors, cache.global_position, BossCache.roll_loot(sector, mission_difficulty, player.level_for_experience(player.experience))))
 		open_factory_gate()
 		var info := Catalog.info(sector)
 		for minion in get_tree().get_nodes_in_group(&"arena_minions"):

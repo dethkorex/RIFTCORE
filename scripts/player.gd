@@ -28,7 +28,7 @@ var armor_resistance := 0.0
 var damage_taken_scale := 1.0
 var charge_cost_multiplier := 1.0
 var salvage_multiplier := 1.0
-var xp_pickup_multiplier := 1.0
+var xp_gain_multiplier := 1.0
 var healing_pickup_multiplier := 1.0
 var magma_unlocked := false
 var thorn_unlocked := false
@@ -302,7 +302,6 @@ func build_visuals() -> void:
 	core.omni_range = 3.5
 	add_child(core)
 
-var coop_xp_pickup: Callable
 var remote_input := false
 var local_prediction := false
 var supplies := {}

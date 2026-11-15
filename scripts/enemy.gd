@@ -4,7 +4,6 @@ extends Combatant
 signal shot_fired(shot: RiftProjectile)
 
 const XP_REWARDS := [12, 16, 26, 18, 16]
-const XP_ORB := preload("res://assets/pickups/xp_orb.tscn")
 const ATTACK_FX := preload("res://scripts/attack_fx.gd")
 const Catalog := preload("res://scripts/sector_catalog.gd")
 const ARMOR := preload("res://assets/enemies/security_finish.gdshader")
@@ -22,7 +21,7 @@ const LARGE_DROPS := [
 	preload("res://assets/pickups/energy_large.tscn"),
 	preload("res://assets/pickups/credits_large.tscn"),
 ]
-@export_range(0.0, 1.0) var drop_chance := 0.03
+@export_range(0.0, 1.0) var drop_chance := 0.018
 enum Variant { SCOUT, QUAD, HEAVY, TURRET, FLYER }
 @export var variant: Variant
 @export_range(0, 10) var detachment_sector := 0
@@ -64,6 +63,7 @@ var last_ground_local := Vector3.ZERO
 var gait_joints: Array[Node3D] = []
 var sector_damage_scale := 1.0
 var sector_experience_scale := 1.0
+var operator_at_deploy: RiftPlayer
 var sector_number := 1
 var second_act := false
 var shot_windup := 0.0
@@ -364,10 +364,9 @@ func attack_spread() -> Array:
 		return [-.16, .16] if variant == Variant.FLYER else [-.21, 0.0, .21]
 	return [0.0]
 
-func spawn_pickup(scene: PackedScene, at: Vector3, temporary: bool, experience := 0, anchor: StaticBody3D = null) -> void:
+func spawn_pickup(scene: PackedScene, at: Vector3, temporary: bool, anchor: StaticBody3D = null) -> void:
 	var pickup := scene.instantiate() as Area3D
 	pickup.expires = temporary
-	pickup.xp_amount = experience
 	var host := anchor if is_instance_valid(anchor) else get_parent_node_3d()
 	pickup.position = host.to_local(at)
 	host.add_child.call_deferred(pickup)
@@ -403,16 +402,24 @@ func find_drop_anchor() -> Dictionary:
 			return {"position": floor_hit.position + Vector3.UP * 0.42, "body": floor_hit.collider}
 	return {"position": Vector3(patrol_center, home_height - 0.18, 0), "body": null}
 
+func experience_reward() -> int:
+	return roundi(XP_REWARDS[variant] * sector_experience_scale)
+
+func roll_field_drop() -> PackedScene:
+	if global_position.y <= lower_death_limit() + 1.0 or randf() >= drop_chance:
+		return null
+	var pool := LARGE_DROPS if randf() < 0.16 else SMALL_DROPS
+	return pool.pick_random()
+
 func _on_died() -> void:
 	if not mission_enemy:
-		var anchor := find_drop_anchor()
-		var drop_position: Vector3 = anchor.position
-		spawn_pickup(XP_ORB, drop_position, false, roundi(XP_REWARDS[variant] * sector_experience_scale), anchor.body)
-		var host := anchor.body as Node3D if is_instance_valid(anchor.body) else get_parent_node_3d()
-		preload("res://scripts/material_pickup.gd").roll_at(host, drop_position + Vector3(0.42, 0.1, 0), sector_number, "elite" if variant == Variant.HEAVY else "enemy")
-		if global_position.y > lower_death_limit() + 1.0 and randf() < drop_chance:
-			var pool := LARGE_DROPS if randf() < 0.2 else SMALL_DROPS
-			spawn_pickup(pool.pick_random(), drop_position + Vector3.FORWARD * 0.25, true, 0, anchor.body)
+		var recipient := operator_at_deploy if is_instance_valid(operator_at_deploy) else target
+		if is_instance_valid(recipient) and recipient.health > 0.0:
+			recipient.gain_experience(roundi(experience_reward() * recipient.xp_gain_multiplier))
+		var reward := roll_field_drop()
+		if reward:
+			var anchor := find_drop_anchor()
+			spawn_pickup(reward, anchor.position + Vector3.FORWARD * 0.25, true, anchor.body)
 	set_physics_process(false)
 	set_deferred("collision_layer", 0)
 	if global_position.y <= lower_death_limit() + 1.0:

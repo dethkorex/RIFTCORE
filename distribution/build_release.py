@@ -91,9 +91,9 @@ def windows_installer(payload: Path, out: Path, nsis: Path) -> None:
     if not nsis.exists():
         raise RuntimeError("Windows installer compiler not found")
     switch = "/D" if sys.platform == "win32" else "-D"
-    subprocess.run([str(nsis), switch + "PAYLOAD=" + str(payload), switch + "OUTPUT=" + str(out),
+    subprocess.run([str(nsis), switch + "PAYLOAD_MASK=" + str(payload / "*"), switch + "OUTPUT=" + str(out),
                     switch + "BRAND_ICO=" + str(payload / "riftcore.ico"),
-                    str(DIST / "windows-installer.nsi")], check=True, timeout=240)
+                    str(DIST / "windows-installer.nsi")], check=True, timeout=600)
     if not out.is_file():
         raise RuntimeError("NSIS did not produce an installer")
 

@@ -1,7 +1,7 @@
 @tool
 extends Node3D
 
-enum Mark { PLUS, LIGHTNING, XP, NONE, MATERIAL, BLUEPRINT, SUPPLY }
+enum Mark { PLUS, LIGHTNING, NONE = 3, MATERIAL, BLUEPRINT, SUPPLY }
 
 @export var tint := Color("52ff80")
 @export var mark := Mark.PLUS
@@ -31,8 +31,6 @@ func _ready() -> void:
 			add_text("+", Color.WHITE, 0.00385)
 		Mark.LIGHTNING:
 			add_lightning()
-		Mark.XP:
-			add_text("XP", Color.BLACK, 0.00205)
 		Mark.MATERIAL:
 			add_text("MAT", Color("fff3e4"), 0.0016)
 		Mark.SUPPLY:
@@ -68,7 +66,7 @@ func add_text(symbol: String, ink: Color, units_per_pixel: float) -> void:
 	glyph.font_size = 104
 	glyph.pixel_size = units_per_pixel
 	glyph.modulate = ink
-	glyph.outline_size = 0 if mark == Mark.XP else 9
+	glyph.outline_size = 9
 	glyph.outline_modulate = tint.darkened(0.78)
 	glyph.position.z = RADIUS + 0.005
 	facing_camera.add_child(glyph)

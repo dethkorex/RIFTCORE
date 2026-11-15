@@ -12,7 +12,6 @@ const Miniboss := preload("res://scripts/sector_miniboss.gd")
 const Details := preload("res://scripts/sector_details.gd")
 const Loading := preload("res://scripts/act_loading_screen.gd")
 const Equipment := preload("res://scripts/equipment_stats.gd")
-const Materials := preload("res://scripts/fabrication_catalog.gd")
 const BossCache := preload("res://scripts/boss_loot_cache.gd")
 const BossIntro := preload("res://scripts/boss_intro.gd")
 const CampaignDoor := preload("res://scripts/campaign_door.gd")
@@ -26,7 +25,6 @@ const MAX_SNAPSHOT_LEAD := 0.10
 const PREDICTION_LAYER := 1 << 6
 const DIFFICULTY_PER_GUEST := 0.25
 const XP_BONUS := 1.5
-const Blueprints := preload("res://scripts/blueprint_catalog.gd")
 const Profile := preload("res://scripts/rogue_profile.gd")
 
 var host := false
@@ -57,6 +55,10 @@ var stage_props: Array[NodePath] = []
 var factory_trap_clock := 0.0
 var factory_relays: Array[Node3D] = []
 var foundry_boulders: Array[AnimatableBody3D] = []
+var personal_replicas: Dictionary[String, Area3D] = {}
+var personal_rewards: Array[Dictionary] = []
+var next_personal_drop := 0
+var personal_bolts := 0
 var moving_platforms: Array[AnimatableBody3D] = []
 var props_consumed: Array[int] = []
 var active_weapon_ids: Array = []
@@ -81,19 +83,14 @@ var clock := 0.0
 var outcome := ""
 var team_xp := 0
 var sector_seconds := 0.0
-var team_bolts := 0
-var team_blueprints: Array = []
 var security_defeated := 0
 var lives_lost := 0
-var team_materials: Dictionary = {}
 var extracted_results: Dictionary = {}
 var boss_cache: BossCache
 var cache_opened := false
-var cache_pickups: Array[Area3D] = []
 var quick_revision := 0
 var salvage_spills := {}
 const SalvageOrbs := preload("res://scripts/material_pickup.gd")
-var loot_rng := RandomNumberGenerator.new()
 var rewards_delivered := false
 var blueprint_count := 0
 var last_sent_axis := Vector2.ZERO
@@ -118,13 +115,14 @@ func _ready() -> void:
 		roster.sort()
 		roster.push_front(peer.get_host())
 	local_index = roster.find(peer.get_client_id())
+	for index in roster.size():
+		personal_rewards.append({"bolts": 0, "blueprints": [], "materials": {}})
 	difficulty = (1.0 + DIFFICULTY_PER_GUEST * (roster.size() - 1)) * Difficulty.combat_scale(sector, mode)
 	if host:
 		for id in roster.slice(1):
 			var loadout = Profile.new()
 			loadout.manual_only = true
 			remote_players[id] = {"profile": loadout, "loaded": false, "timeout": 0.0, "suspended": false, "input": -1, "edge": -1, "quick_revision": 0}
-	loot_rng.randomize()
 	for number in range(1, sector):
 		active_weapon_ids.append(Catalog.info(number).reward)
 	peer.expose_func(receive_input)
@@ -132,10 +130,10 @@ func _ready() -> void:
 	peer.expose_func(receive_operators)
 	peer.expose_func(receive_challenge_results)
 	peer.expose_func(receive_cache_open)
-	peer.expose_func(receive_cache_pickup)
 	peer.expose_func(receive_salvage_spill)
-	peer.expose_func(receive_salvage_pickup)
 	peer.expose_func(receive_supply)
+	peer.expose_func(receive_personal_loot)
+	peer.expose_func(receive_personal_pickup_taken)
 	peer.expose_func(receive_restore_feedback)
 	peer.expose_func(receive_boss_intro)
 	peer.expose_func(receive_shot)
@@ -214,6 +212,7 @@ func load_stage() -> void:
 	stage_props.clear()
 	factory_relays.clear()
 	foundry_boulders.clear()
+	personal_replicas.clear()
 	factory_trap_clock = 0.0
 	moving_platforms.clear()
 	props_consumed.clear()
@@ -223,7 +222,6 @@ func load_stage() -> void:
 	entrance_open = false
 	boss_defeated = false
 	cache_opened = false
-	cache_pickups.clear()
 	salvage_spills.clear()
 	checkpoint = Vector3.ZERO
 	last_boss_health = -1.0
@@ -273,7 +271,6 @@ func load_stage() -> void:
 			if index != local_index:
 				operator.collision_mask = 0
 		else:
-			operator.coop_xp_pickup = award_pickup_xp
 			operator.recovered_resources.connect(func(hp: float, eng: float):
 				peer.call_func(receive_restore_feedback, act, index, hp, eng)
 			)
@@ -305,7 +302,7 @@ func load_stage() -> void:
 		enemy.scale_for_sector(sector, act)
 		scale_opponent(enemy)
 		if host:
-			enemy.died.connect(earn_security_rewards.bind(enemy.variant))
+			enemy.died.connect(earn_security_rewards.bind(enemy))
 		else:
 			disable_replica(enemy)
 		enemies.append(enemy)
@@ -343,15 +340,18 @@ func load_stage() -> void:
 	for node in get_tree().get_nodes_in_group(&"factory_shot_relay"):
 		if stage.is_ancestor_of(node):
 			factory_relays.append(node)
+	if host:
+		stage.set_meta(&"personal_chest", send_salvage_spill)
+		stage.set_meta(&"personal_drone_loot", dispatch_drone_loot)
 	for node in stage.find_children("*", "Area3D", true, false):
-		if node.is_in_group(&"factory_interior_trap") or node.get_script() == preload("res://scripts/biome_zone.gd"):
+		if node.is_in_group(&"pit_flare") or node.is_in_group(&"factory_interior_trap") or node.get_script() == preload("res://scripts/biome_zone.gd"):
 			node.phase_time = func(): return factory_trap_clock
-		if node.get_script() == preload("res://scripts/foundry_vent.gd"):
+		if node.is_in_group(&"pit_flare") or node.get_script() == preload("res://scripts/foundry_vent.gd"):
 			node.authority = host
-		if node.scene_file_path.begins_with("res://assets/pickups/") or node.is_in_group(&"factory_salvage_chest"):
-			stage_props.append(stage.get_path_to(node))
-		if host and node.is_in_group(&"factory_salvage_chest"):
-			node.spilled.connect(send_salvage_spill)
+		if node.scene_file_path.begins_with("res://assets/pickups/"):
+			assign_map_pickup(node)
+		elif node.is_in_group(&"factory_salvage_chest"):
+			node.difficulty = mode
 	for supply in get_tree().get_nodes_in_group(&"factory_supply_carrier"):
 		if stage.is_ancestor_of(supply):
 			supply.authority = host
@@ -477,7 +477,7 @@ func on_boss_defeated() -> void:
 		if operator.has_meta("coop_down"):
 			operator.lives = maxi(1, operator.lives)
 			restore_operator.call_deferred(operator, gate.global_position + Vector3(3.0, 1.0, 0.0))
-	award_shared((35 if act == 1 else 80) + sector * 8, (60 if act == 1 else 100) + sector * 8, "miniboss" if act == 1 else "")
+	award_team_experience((35 if act == 1 else 80) + sector * 8)
 	if act == 2:
 		create_boss_cache()
 		var reward: String = Catalog.info(sector).reward
@@ -486,6 +486,139 @@ func on_boss_defeated() -> void:
 		for operator in operators:
 			operator.unlock_sector_weapon(reward)
 	update_doors()
+
+func collect_personal_totals() -> void:
+	for index in operators.size():
+		var operator := operators[index]
+		var ledger := personal_rewards[index]
+		ledger.bolts += operator.credits
+		operator.credits = 0
+		for id in operator.recovered_blueprints:
+			if not ledger.blueprints.has(id):
+				ledger.blueprints.append(id)
+		operator.recovered_blueprints.clear()
+		for id in operator.salvage:
+			ledger.materials[id] = int(ledger.materials.get(id, 0)) + int(operator.salvage[id])
+		operator.salvage.clear()
+
+func watch_personal_pickup(pickup: Area3D, key: String, index: int) -> void:
+	if index != local_index:
+		var signal_name := "taken" if pickup.has_signal("taken") else "collected"
+		pickup.connect(signal_name, func(): peer.call_func_on(roster[index], receive_personal_pickup_taken, act, key))
+
+func assign_map_pickup(source: Area3D) -> void:
+	var key := "map:" + String(stage.get_path_to(source))
+	if not host:
+		source.replica = true
+		source.collision_mask = 0
+		personal_replicas[key] = source
+		return
+	source.claimant = operators[local_index]
+	for index in operators.size():
+		if index == local_index:
+			continue
+		var pickup_scene := load(source.scene_file_path) as PackedScene
+		var copy := pickup_scene.instantiate() as Area3D
+		copy.transform = source.transform
+		copy.kind = source.kind
+		copy.large = source.large
+		copy.full_heal = source.full_heal
+		copy.expires = source.expires
+		copy.claimant = operators[index]
+		copy.local_copy = false
+		source.get_parent().add_child(copy)
+		watch_personal_pickup(copy, key, index)
+
+func make_personal_loot(at: Vector3, rewards: Dictionary, index: int) -> Array[Area3D]:
+	var terrain := stage.get_node("TERRAIN") as Node3D
+	var owner: RiftPlayer = operators[index] if host else null
+	if not rewards.has("pickup"):
+		return SalvageOrbs.spill(terrain, at, rewards, host, owner, index == local_index)
+	var name: String = rewards.pickup.get_file().get_basename()
+	if not name in ["health_small", "health_large", "energy_small", "energy_large", "credits_small", "credits_large"]:
+		return []
+	var packed := load("res://assets/pickups/" + name + ".tscn") as PackedScene
+	var orb := packed.instantiate() as Area3D
+	orb.claimant = owner
+	orb.replica = not host
+	orb.local_copy = index == local_index
+	orb.expires = rewards.get("temporary", false)
+	orb.position = terrain.to_local(at)
+	terrain.add_child.call_deferred(orb)
+	return [orb]
+
+func issue_personal_loot(at: Vector3, rewards: Dictionary, index: int) -> void:
+	var drops := make_personal_loot(at, rewards, index)
+	var keys := []
+	for pickup in drops:
+		var key := "drop:%d" % next_personal_drop
+		next_personal_drop += 1
+		keys.append(key)
+		watch_personal_pickup(pickup, key, index)
+	if index != local_index and not drops.is_empty():
+		peer.call_func_on(roster[index], receive_personal_loot, act, at, rewards, keys)
+
+func receive_personal_loot(remote_act: int, at: Vector3, rewards: Dictionary, keys: Array) -> void:
+	if host or remote_act != act or peer.get_sender_id() != peer.get_host():
+		return
+	var drops := make_personal_loot(at, rewards, local_index)
+	for index in mini(drops.size(), keys.size()):
+		var key: String = keys[index]
+		var pickup := drops[index]
+		personal_replicas[key] = pickup
+		pickup.tree_exited.connect(func(): personal_replicas.erase(key))
+
+func receive_personal_pickup_taken(remote_act: int, key: String) -> void:
+	if host or remote_act != act or peer.get_sender_id() != peer.get_host():
+		return
+	var replica := personal_replicas.get(key) as Area3D
+	if is_instance_valid(replica):
+		replica.queue_free()
+		RiftAudio.play_effect(&"pickup")
+	personal_replicas.erase(key)
+
+func dispatch_drone_loot(at: Vector3, standard: PackedScene, adaptive: bool) -> void:
+	for index in operators.size():
+		var reward: Dictionary = preload("res://scripts/cargo_crate.gd").supply_loot(standard, adaptive, operators[index])
+		issue_personal_loot(at, reward, index)
+
+func send_salvage_spill(key: String, at: Vector3, chest: Area3D) -> void:
+	for index in operators.size():
+		var level := RiftPlayer.level_for_experience(operators[index].experience)
+		issue_personal_loot(at, chest.roll_loot(level), index)
+	peer.call_func(receive_salvage_spill, act, key)
+
+func receive_salvage_spill(remote_act: int, key: String) -> void:
+	if host or remote_act != act or peer.get_sender_id() != peer.get_host() or salvage_spills.has(key):
+		return
+	var chest := stage.get_node("TERRAIN").get_node_or_null(NodePath(key))
+	if chest:
+		chest.finish_open()
+	salvage_spills[key] = []
+
+func create_boss_cache() -> void:
+	var actors := stage.get_node("Actors") as Node3D
+	boss_cache = BossCache.new()
+	boss_cache.authoritative = host
+	boss_cache.position = actors.to_local(Vector3(boss_position.x, gate.global_position.y + 0.52, 0.0))
+	actors.add_child.call_deferred(boss_cache)
+	if host:
+		boss_cache.opened.connect(func():
+			cache_opened = true
+			for index in operators.size():
+				var level := RiftPlayer.level_for_experience(operators[index].experience)
+				issue_personal_loot(boss_cache.global_position, BossCache.roll_loot(sector, mode, level), index)
+			peer.call_func(receive_cache_open)
+		)
+
+func receive_cache_open() -> void:
+	if host or act != 2 or peer.get_sender_id() != peer.get_host():
+		return
+	cache_opened = true
+	if is_instance_valid(boss_cache) and boss_cache.is_inside_tree():
+		boss_cache.finish_open()
+	elif is_instance_valid(boss_cache):
+		boss_cache.queue_free()
 
 func receive_restore_feedback(remote_act: int, index: int, hp: float, eng: float) -> void:
 	if not host and remote_act == act and peer.get_sender_id() == peer.get_host() and index >= 0 and index < operators.size():
@@ -498,60 +631,6 @@ func announce_supply(id: String) -> void:
 func receive_supply(id: String) -> void:
 	if not host and peer.get_sender_id() == peer.get_host() and local_profile.collect_supply(id):
 		announce_supply(id)
-
-func send_salvage_spill(key: String, at: Vector3, rewards: Dictionary, drops: Array[Area3D]) -> void:
-	peer.call_func(receive_salvage_spill, act, key, at, rewards)
-	for index in drops.size():
-		drops[index].collected.connect(func(): peer.call_func(receive_salvage_pickup, act, key, index))
-
-func receive_salvage_spill(remote_act: int, key: String, at: Vector3, rewards: Dictionary) -> void:
-	if host or remote_act != act or peer.get_sender_id() != peer.get_host() or salvage_spills.has(key):
-		return
-	var terrain := stage.get_node("TERRAIN") as Node3D
-	var chest := terrain.get_node_or_null(NodePath(key))
-	if chest:
-		chest.finish_open()
-	salvage_spills[key] = SalvageOrbs.spill(terrain, at, rewards, false)
-
-func receive_salvage_pickup(remote_act: int, key: String, index: int) -> void:
-	if host or remote_act != act or peer.get_sender_id() != peer.get_host():
-		return
-	var drops: Array = salvage_spills.get(key, [])
-	if index >= 0 and index < drops.size() and is_instance_valid(drops[index]):
-		drops[index].queue_free()
-
-func create_boss_cache() -> void:
-	var actors := stage.get_node("Actors") as Node3D
-	boss_cache = BossCache.new()
-	boss_cache.authoritative = host
-	boss_cache.position = actors.to_local(Vector3(boss_position.x, gate.global_position.y + 0.52, 0.0))
-	actors.add_child.call_deferred(boss_cache)
-	if host:
-		boss_cache.opened.connect(func():
-			cache_opened = true
-			var rewards := BossCache.roll_loot(sector, mode)
-			var at := boss_cache.global_position
-			cache_pickups = BossCache.spill(actors, at, rewards)
-			peer.call_func(receive_cache_open, at, rewards)
-			for index in cache_pickups.size():
-				cache_pickups[index].collected.connect(func(): peer.call_func(receive_cache_pickup, index))
-		)
-
-func receive_cache_open(at: Vector3, rewards: Dictionary) -> void:
-	if host or act != 2 or peer.get_sender_id() != peer.get_host():
-		return
-	cache_opened = true
-	if is_instance_valid(boss_cache) and boss_cache.is_inside_tree():
-		boss_cache.finish_open()
-	elif is_instance_valid(boss_cache):
-		boss_cache.queue_free()
-	var actors := stage.get_node("Actors") as Node3D
-	cache_pickups = BossCache.spill(actors, at, rewards, false)
-
-func receive_cache_pickup(index: int) -> void:
-	if not host and act == 2 and peer.get_sender_id() == peer.get_host() and index >= 0 and index < cache_pickups.size():
-		if is_instance_valid(cache_pickups[index]):
-			cache_pickups[index].queue_free()
 
 func update_doors() -> void:
 	if boss_defeated:
@@ -583,14 +662,18 @@ func check_campaign_progress() -> void:
 		if operator.health > 0.0 and operator.global_position.distance_to(exit_marker.global_position) <= 1.65:
 			if act == 1:
 				changing_act = true
-				peer.call_func(receive_act, 2, team_xp, team_bolts, active_weapon_ids)
+				peer.call_func(receive_act, 2, team_xp, active_weapon_ids)
 				change_act.call_deferred(2)
 			else:
-				extracted_results = challenge_results()
-				peer.call_func(receive_challenge_results, extracted_results)
-				award_shared(65 + sector * 12, 160 + (sector - 1) * 25, "")
-				peer.call_func(receive_outcome, true, team_xp, team_bolts, team_blueprints, sector_seconds)
-				finish_mission(true, team_xp, team_bolts, team_blueprints)
+				collect_personal_totals()
+				for index in operators.size():
+					if index != local_index:
+						var ledger := personal_rewards[index]
+						peer.call_func_on(roster[index], receive_challenge_results, challenge_results(index))
+						peer.call_func_on(roster[index], receive_outcome, true, team_xp, ledger.bolts, ledger.blueprints, sector_seconds)
+				extracted_results = challenge_results(local_index)
+				var ledger := personal_rewards[local_index]
+				finish_mission(true, team_xp, ledger.bolts, ledger.blueprints)
 			return
 
 func receive_boss_intro(remote_act: int, track: int) -> void:
@@ -617,11 +700,10 @@ func play_boss_intro(track: int) -> void:
 		boss.target = nearest_operator(boss.global_position)
 		boss.active = true
 
-func receive_act(next: int, xp: int, bolts: int, weapons: Array) -> void:
+func receive_act(next: int, xp: int, weapons: Array) -> void:
 	if not host and not changing_act and act == 1 and next == 2 and peer.get_sender_id() == peer.get_host():
 		changing_act = true
 		team_xp = xp
-		team_bolts = bolts
 		active_weapon_ids = weapons
 		change_act.call_deferred(next)
 
@@ -704,7 +786,7 @@ func update_personal_hud(operator: RiftPlayer) -> void:
 	personal_hud.health_capacity = operator.max_health
 	personal_hud.energy_capacity = operator.max_energy
 	personal_hud.lives = operator.lives
-	personal_hud.credits = team_bolts
+	personal_hud.credits = int(personal_rewards[local_index].bolts) if host else personal_bolts
 	personal_hud.core_shards = local_profile.core_shards
 	var suit := Catalog.weapon(operator.equipped_suit())
 	personal_hud.weapon = String(suit.get("reward_name", "STANDARD FRAME")).to_upper()
@@ -761,17 +843,7 @@ func _physics_process(delta: float) -> void:
 		for enemy in enemies:
 			if is_instance_valid(enemy):
 				enemy.target = nearest_operator(enemy.global_position)
-		for operator in operators:
-			if operator.credits > 0:
-				award_shared(0, operator.credits, "")
-				operator.credits = 0
-			for blueprint in operator.recovered_blueprints:
-				if not team_blueprints.has(blueprint):
-					team_blueprints.append(blueprint)
-			operator.recovered_blueprints.clear()
-			for id in operator.salvage:
-				team_materials[id] = int(team_materials.get(id, 0)) + int(operator.salvage[id])
-			operator.salvage.clear()
+		collect_personal_totals()
 		if is_instance_valid(boss) and boss_started:
 			boss.target = nearest_operator(boss.global_position)
 		for shot in get_tree().get_nodes_in_group(&"rift_projectile"):
@@ -858,27 +930,19 @@ func receive_input(axis: Vector2, current: int, down: int, up: int, sequence: in
 			if up & (1 << index):
 				operator.remote_released[INPUTS[index]] = true
 
-func award_pickup_xp(amount: int) -> void:
-	award_shared(amount, 0, "")
-
-func earn_security_rewards(variant: int) -> void:
+func earn_security_rewards(enemy: WalkerBot) -> void:
 	security_defeated += 1
-	var base: int = WalkerBot.XP_REWARDS[variant]
-	award_shared(base + (sector - 1) * 2, 12 + floori(base * 0.5), "elite" if variant == WalkerBot.Variant.HEAVY else "enemy")
+	award_team_experience(enemy.experience_reward())
+	for index in operators.size():
+		var reward := enemy.roll_field_drop()
+		if reward:
+			issue_personal_loot(enemy.find_drop_anchor().position, {"pickup": reward.resource_path, "temporary": true}, index)
 
-func award_shared(base_xp: int, bolts: int, source: String) -> void:
+func award_team_experience(base_xp: int) -> void:
 	if not outcome.is_empty():
 		return
 	var xp := roundi(base_xp * XP_BONUS)
 	team_xp += xp
-	team_bolts += bolts
-	if not source.is_empty():
-		var recovered := Materials.roll(sector, source, loot_rng, Difficulty.LOOT[mode])
-		for id in recovered:
-			team_materials[id] = int(team_materials.get(id, 0)) + int(recovered[id])
-		var blueprint := Blueprints.roll(sector, source, loot_rng, Difficulty.LOOT[mode])
-		if not blueprint.is_empty() and not team_blueprints.has(blueprint):
-			team_blueprints.append(blueprint)
 	for operator in operators:
 		if operator.health > 0.0:
 			operator.gain_experience(xp)
@@ -932,15 +996,15 @@ func broadcast_state(reliable_operators := false) -> void:
 			if other != index:
 				snapshot[other] = players[other].slice(0, 11) + [players[other][16], players[other][17]]
 		if reliable_operators:
-			peer.call_func_on(roster[index], receive_operators, act, snapshot, state_sequence)
+			peer.call_func_on(roster[index], receive_operators, act, snapshot, state_sequence, [personal_rewards[index].bolts, personal_rewards[index].blueprints.size()])
 		else:
-			peer.call_func_on_unreliable(roster[index], receive_operators, act, snapshot, state_sequence)
-	peer.call_func_unreliable(receive_state, act, security, boss_state, props_consumed, team_xp, team_bolts, team_blueprints.size(), state_sequence)
+			peer.call_func_on_unreliable(roster[index], receive_operators, act, snapshot, state_sequence, [personal_rewards[index].bolts, personal_rewards[index].blueprints.size()])
+	peer.call_func_unreliable(receive_state, act, security, boss_state, props_consumed, team_xp, state_sequence)
 	if (not boss_started and operators.any(func(operator): return operator.lives <= 0)) or (boss_started and operators.all(func(operator): return operator.health <= 0.0) and operators.any(func(operator): return operator.lives <= 0)):
 		peer.call_func(receive_outcome, false, 0, 0, [], 0.0)
 		finish_mission(false, 0, 0, [])
 
-func receive_state(remote_act: int, security: PackedFloat32Array, arena: Array, consumed: Array, xp: int, bolts: int, blueprints_found: int, sequence: int) -> void:
+func receive_state(remote_act: int, security: PackedFloat32Array, arena: Array, consumed: Array, xp: int, sequence: int) -> void:
 	if host or changing_act or remote_act != act or not outcome.is_empty() or peer.get_sender_id() != peer.get_host() or sequence <= latest_state or security.size() != enemies.size() * 6:
 		return
 	latest_state = sequence
@@ -1008,8 +1072,6 @@ func receive_state(remote_act: int, security: PackedFloat32Array, arena: Array, 
 			elif prop:
 				prop.hide()
 	team_xp = xp
-	team_bolts = bolts
-	blueprint_count = blueprints_found
 	enemy_targets.resize(enemies.size())
 	enemy_health.resize(enemies.size())
 	enemy_rotation.resize(enemies.size())
@@ -1019,9 +1081,11 @@ func receive_state(remote_act: int, security: PackedFloat32Array, arena: Array, 
 		enemy_rotation[index] = Vector2(security[offset + 3], security[offset + 4])
 		enemy_health[index] = security[offset + 5]
 
-func receive_operators(remote_act: int, players: Array, sequence: int) -> void:
+func receive_operators(remote_act: int, players: Array, sequence: int, rewards: Array) -> void:
 	if host or changing_act or remote_act != act or not outcome.is_empty() or peer.get_sender_id() != peer.get_host() or sequence <= latest_operators or players.size() != roster.size():
 		return
+	personal_bolts = int(rewards[0])
+	blueprint_count = int(rewards[1])
 	latest_operators = sequence
 	targets = players
 	snapshot_age = 0.0
@@ -1115,14 +1179,15 @@ func _process(delta: float) -> void:
 		teammates.insert(0, down)
 	partner_status.text = "\n".join(teammates)
 
-	stats.text = "Security %d left  ·  %d blueprints" % [enemies.filter(func(enemy): return is_instance_valid(enemy) and enemy.health > 0 and enemy.visible).size(), team_blueprints.size() if host else blueprint_count]
+	stats.text = "Security %d left  ·  %d blueprints" % [enemies.filter(func(enemy): return is_instance_valid(enemy) and enemy.health > 0 and enemy.visible).size(), personal_rewards[local_index].blueprints.size() if host else blueprint_count]
 	update_personal_hud(operators[local_index])
 
-func challenge_results() -> Dictionary:
+func challenge_results(index := 0) -> Dictionary:
 	if not extracted_results.is_empty() or not host:
 		return extracted_results
 	var count := 0
-	for amount in team_materials.values():
+	var ledger := personal_rewards[index]
+	for amount in ledger.materials.values():
 		count += int(amount)
 	var health := 100.0
 	var energy := 100.0
@@ -1130,8 +1195,8 @@ func challenge_results() -> Dictionary:
 		health = minf(health, 100.0 * operator.health / operator.max_health)
 		energy = minf(energy, 100.0 * operator.energy / operator.max_energy)
 	return {"act": 1, "clear": 1, "clean": int(lives_lost == 0), "kills": security_defeated,
-		"materials": count, "bolts": team_bolts, "time": sector_seconds, "health": health, "energy": energy,
-		"recovered": team_materials.duplicate()}
+		"materials": count, "bolts": ledger.bolts, "time": sector_seconds, "health": health, "energy": energy,
+		"recovered": ledger.materials.duplicate()}
 
 func receive_challenge_results(results: Dictionary) -> void:
 	if not host and peer.get_sender_id() == peer.get_host():
@@ -1168,14 +1233,14 @@ func finish_mission(success: bool, xp: int, bolts: int, blueprints: Array) -> vo
 			RiftSocial.record_clear(sector, sector_seconds)
 		var unlocked: Array[String] = []
 		for id in blueprints:
-			if id is String and Profile.GEAR.has(id) and Profile.GEAR[id].get("sector", 0) == sector and not unlocked.has(id):
+			if id is String and Profile.GEAR.has(id) and not unlocked.has(id):
 				unlocked.append(id)
 		xp = clampi(xp, 0, 10000)
 		bolts = clampi(bolts, 0, 10000)
 		team_xp = xp
-		team_bolts = bolts
+		personal_bolts = bolts
 		blueprint_count = unlocked.size()
-		message = "Mission complete. Each player earned %d XP, %d bolts and %d blueprints." % [xp, bolts, unlocked.size()]
+		message = "Mission complete. You earned %d XP, %d bolts and %d blueprints." % [xp, bolts, unlocked.size()]
 		if not rewards_delivered:
 			rewards_delivered = true
 			rewards_earned.emit(xp, bolts, unlocked, sector)

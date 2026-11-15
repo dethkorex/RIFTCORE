@@ -1,7 +1,6 @@
 extends Combatant
 
 const WASP := preload("res://assets/machine_jungle/enemies/canopy_wasp.tscn")
-const XP := preload("res://assets/pickups/xp_orb.tscn")
 const TOXIN := Color("d45aff")
 const THORN := Color("a4ff5a")
 var faction := "enemy"
@@ -197,14 +196,6 @@ func _summon() -> void:
 func _break_apart() -> void:
 	active = false
 	var burst := preload("res://scripts/pit_burst.gd").new()
-	var orb := XP.instantiate()
-	orb.xp_amount = 70
-	orb.large = true
-	get_parent().add_child.call_deferred(burst)
-	burst.set_deferred("global_position", global_position)
-	burst.ignite.call_deferred()
-	orb.position = Vector3(global_position.x, body_floor + 0.48, 0.0)
-	get_parent().add_child.call_deferred(orb)
 	RiftAudio.play_effect(&"enemy_break")
 	hide()
 	set_deferred("collision_layer", 0)

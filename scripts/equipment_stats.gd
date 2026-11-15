@@ -38,6 +38,6 @@ static func apply_modifiers(operator: RiftPlayer, stats: Dictionary) -> void:
 	operator.dash_speed *= float(stats.get("dash", 1.0))
 	operator.dash_cooldown *= float(stats.get("cooldown", 1.0))
 	operator.salvage_multiplier *= float(stats.get("bolts", 1.0))
-	operator.xp_pickup_multiplier *= float(stats.get("xp", 1.0))
+	operator.xp_gain_multiplier *= float(stats.get("xp", 1.0))
 	operator.healing_pickup_multiplier *= float(stats.get("healing", 1.0))
 	operator.armor_resistance = minf(operator.armor_resistance, 0.68)

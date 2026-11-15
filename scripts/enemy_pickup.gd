@@ -1,6 +1,8 @@
 extends Area3D
 
-enum Kind { HEALTH, ENERGY, CREDITS, XP, LIFE }
+signal taken
+
+enum Kind { HEALTH, ENERGY, CREDITS, LIFE = 4 }
 const TINTS := [Color("54ff96"), Color("369eff"), Color("ffce50"), Color("bf72ff"), Color("6dffdd")]
 const COMBAT_VFX := preload("res://scripts/combat_vfx.gd")
 
@@ -8,11 +10,15 @@ const COMBAT_VFX := preload("res://scripts/combat_vfx.gd")
 @export var large := false
 @export var expires := false
 @export var full_heal := false
-@export var xp_amount := 0
 var consumed := false
+var claimant: RiftPlayer
+var replica := false
+var local_copy := true
 
 func _ready() -> void:
 	collision_layer = 0
+	collision_mask = 0 if replica else 1
+	visible = local_copy
 	var shape := CollisionShape3D.new()
 	var sphere := SphereShape3D.new()
 	sphere.radius = 0.72 if large else 0.6
@@ -33,7 +39,7 @@ func _ready() -> void:
 func add_halo(visual: Node3D) -> void:
 	var halo := MeshInstance3D.new()
 	var quad := QuadMesh.new()
-	var radius := 1.18 if large else (0.65 if kind == Kind.XP else 0.94)
+	var radius := 1.18 if large else 0.94
 	quad.size = Vector2.ONE * radius
 	halo.mesh = quad
 	halo.position.z = -0.06
@@ -46,7 +52,7 @@ func add_halo(visual: Node3D) -> void:
 
 func _collect(body: Node3D) -> void:
 	var player := body as RiftPlayer
-	if consumed or player == null or player.health <= 0.0:
+	if consumed or replica or player == null or player.health <= 0.0 or (is_instance_valid(claimant) and player != claimant):
 		return
 	if kind == Kind.HEALTH and player.health >= player.max_health:
 		return
@@ -55,8 +61,10 @@ func _collect(body: Node3D) -> void:
 	if kind == Kind.LIFE and player.lives >= 5:
 		return
 	consumed = true
-	RiftAudio.play_effect(&"pickup")
-	collect_fx.call_deferred()
+	taken.emit()
+	if local_copy:
+		RiftAudio.play_effect(&"pickup")
+		collect_fx.call_deferred()
 	match kind:
 		Kind.HEALTH:
 			player.restore_health(player.max_health if full_heal else (50.0 if large else 25.0) * player.healing_pickup_multiplier, true)
@@ -65,12 +73,6 @@ func _collect(body: Node3D) -> void:
 		Kind.CREDITS:
 			player.credits += roundi((30.0 if large else 10.0) * player.salvage_multiplier)
 			player.credits_changed.emit(player.credits)
-		Kind.XP:
-			var xp := roundi((xp_amount if xp_amount > 0 else (50 if large else 10)) * player.xp_pickup_multiplier)
-			if player.coop_xp_pickup.is_valid():
-				player.coop_xp_pickup.call(xp)
-			else:
-				player.gain_experience(xp)
 		Kind.LIFE:
 			player.add_life()
 	queue_free()

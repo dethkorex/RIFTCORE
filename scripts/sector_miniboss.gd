@@ -23,7 +23,6 @@ const MODELS := [
 ]
 const BURST := preload("res://scripts/pit_burst.gd")
 const ATTACK_FX := preload("res://scripts/attack_fx.gd")
-const REWARD := preload("res://assets/pickups/xp_orb.tscn")
 
 var sector := 1
 var accent := Color.ORANGE
@@ -279,11 +278,6 @@ func fire(at: Vector3, direction: Vector3, power: float, speed: float, drill := 
 
 func break_apart() -> void:
 	active = false
-	var xp := REWARD.instantiate()
-	xp.xp_amount = 55 + sector * 9
-	xp.large = true
-	xp.position = Vector3(global_position.x, floor_y + 0.42, 0)
-	get_parent().add_child.call_deferred(xp)
 	var burst := BURST.new()
 	get_parent().add_child.call_deferred(burst)
 	burst.set_deferred("global_position", global_position)

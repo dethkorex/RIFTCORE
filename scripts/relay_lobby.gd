@@ -16,7 +16,7 @@ const Client := preload("res://addons/GD-Sync/MultiplayerClient.gd")
 const RelayEnums := preload("res://addons/GD-Sync/Scripts/Enums/Enums.gd")
 const Codes := "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 const CodeLength := 10
-const ROOM_PREFIX := "riftcore-coop-v12-"
+const ROOM_PREFIX := "riftcore-coop-v13-"
 const Difficulty := preload("res://scripts/mission_difficulty.gd")
 const MAX_PLAYERS := 4
 const RELAY_UNAVAILABLE := "Online rooms are unavailable. Solo play is available."
@@ -28,6 +28,9 @@ var room_code := ""
 var room_size := 0
 var available := false
 var pending_invite := 0
+var copy_on_join := false
+var party_operators: Dictionary[int, String] = {}
+var last_party_whisper: Dictionary[int, int] = {}
 var mission_active := false
 var mission_roster: Array = []
 var mission_mode := 0
@@ -83,6 +86,22 @@ func host_room() -> void:
 		code += Codes[byte % Codes.length()]
 	_open("host", code)
 
+func copy_invite_code() -> void:
+	if not can_copy_invite_code():
+		return
+	if connected_room.is_empty():
+		copy_on_join = true
+		host_room()
+	else:
+		DisplayServer.clipboard_set(connected_room)
+		_update("Room code copied. Send it to your friend.")
+
+func can_copy_invite_code() -> bool:
+	return available and pending.is_empty() and not mission_active and room_size < MAX_PLAYERS and (connected_room.is_empty() or relay.is_host())
+
+func can_invite_friend() -> bool:
+	return can_copy_invite_code() and pending_invite == 0 and RiftSocial.ready_to_query
+
 func join_room(entered_code: String) -> void:
 	if not pending.is_empty() or not connected_room.is_empty():
 		return
@@ -131,12 +150,7 @@ func _receive_invite_lobby_data(success: int, lobby: int, member: int) -> void:
 		invite_received.emit(Profile.clean_operator_name(steam.getFriendPersonaName(inviter)), code)
 
 func invite_friend(steam_id: int) -> void:
-	if not available or not RiftSocial.ready_to_query or not RiftSocial.steam.loggedOn():
-		return
-	if room_size >= MAX_PLAYERS or mission_active or pending_invite != 0 or not pending.is_empty():
-		return
-	if not connected_room.is_empty() and not relay.is_host():
-		_update("Only the party leader can send Steam invites.")
+	if not can_invite_friend() or not RiftSocial.can_whisper(steam_id):
 		return
 	pending_invite = steam_id
 	if connected_room.is_empty():
@@ -200,6 +214,7 @@ func _room_joined(lobby_name: String) -> void:
 	relay.expose_func(_receive_return, RelayEnums.EXPOSE_PERMISSION.HOST)
 	relay.expose_func(_receive_partner_position)
 	relay.expose_func(_receive_sector_records)
+	relay.expose_func(_receive_party_whisper)
 	relay.expose_func(_request_blueprint_drop)
 	relay.expose_func(_request_blueprint_pickup)
 	relay.expose_func(_receive_blueprint_drop, RelayEnums.EXPOSE_PERMISSION.HOST)
@@ -212,6 +227,9 @@ func _room_joined(lobby_name: String) -> void:
 	if joined_as_guest:
 		guest_joined.emit.call_deferred()
 	_players_changed(0)
+	if copy_on_join:
+		copy_on_join = false
+		copy_invite_code()
 	if pending_invite != 0:
 		_send_pending_invite.call_deferred()
 
@@ -256,8 +274,32 @@ func _receive_sector_records(payload: Dictionary, alias: String) -> void:
 			return
 		var new_player: bool = not RiftSocial.recent_players.has(String(payload.get("id", "")))
 		RiftSocial.receive_records(payload, Profile.clean_operator_name(alias))
+		var operator := String(payload.get("id", ""))
+		if RiftSocial.recent_players.has(operator) and not party_operators.has(sender) and party_operators.find_key(operator) == null:
+			party_operators[sender] = operator
+			changed.emit()
 		if new_player and RiftSocial.recent_players.has(String(payload.get("id", ""))):
 			share_sector_records.call_deferred()
+
+func whisper_to_operator(operator: String, body: String) -> bool:
+	var id: Variant = party_operators.find_key(operator)
+	if id == null or connected_room.is_empty() or not relay.lobby_get_all_clients().has(id):
+		return false
+	relay.call_func_on(id, _receive_party_whisper, body)
+	return true
+
+func _receive_party_whisper(body: String) -> void:
+	var sender: int = relay.get_sender_id()
+	if connected_room.is_empty() or not party_operators.has(sender) or not relay.lobby_get_all_clients().has(sender) or body.length() > RiftSocial.WHISPER_LIMIT:
+		return
+	var now := Time.get_ticks_msec()
+	if now - last_party_whisper.get(sender, -1000) < 450:
+		return
+	var message := RiftSocial.clean_whisper(body)
+	if message.is_empty():
+		return
+	last_party_whisper[sender] = now
+	RiftSocial.receive_whisper("rift:" + party_operators[sender], message)
 
 func can_deploy() -> bool:
 	return not mission_active and room_size >= 2 and is_instance_valid(relay) and relay.is_host()
@@ -341,6 +383,8 @@ func _finish_return() -> void:
 
 func _peer_left(client_id: int) -> void:
 	station_positions.erase(client_id)
+	party_operators.erase(client_id)
+	last_party_whisper.erase(client_id)
 	if relay.is_host() and not mission_active:
 		for key in blueprint_drops.keys():
 			if blueprint_drops[key].owner == client_id:
@@ -360,6 +404,9 @@ func leave(message := "Create a room or enter a friend’s room code.") -> void:
 	pending = ""
 	connected_room = ""
 	pending_invite = 0
+	copy_on_join = false
+	party_operators.clear()
+	last_party_whisper.clear()
 	room_code = ""
 	room_size = 0
 	request_timeout.stop()

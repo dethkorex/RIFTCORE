@@ -52,14 +52,14 @@ func finish_open() -> void:
 	RiftAudio.play_effect(&"enemy_break")
 	queue_free()
 
-static func roll_loot(sector: int, mode: int) -> Dictionary:
+static func roll_loot(sector: int, mode: int, level: int) -> Dictionary:
 	var loot_scale: float = Difficulty.LOOT[mode]
 	var bonus := Materials.roll(sector, "boss", rng, loot_scale)
 	for item in ["scrap", Materials.sector_key(sector)]:
 		bonus[item] = int(bonus.get(item, 0)) + 2
-	var source := "nightmare_cache" if mode == Difficulty.NIGHTMARE else "boss_cache"
-	return {"materials": bonus, "blueprint": Blueprints.roll(sector, source, rng, loot_scale),
-		"bolts": 45 + sector * 8, "supply": Orbs.supply_roll(rng, minf(.8, .48 * loot_scale), true)}
+	return {"materials": bonus, "blueprint": Blueprints.roll_cache(sector, mode, level, true, rng),
+		"supply": Orbs.supply_roll(rng, 1.0, mode != Difficulty.NORMAL)}
+
 
 static func spill(parent: Node3D, at: Vector3, rewards: Dictionary, authority := true) -> Array[Area3D]:
 	return Orbs.spill(parent, at, rewards, authority)

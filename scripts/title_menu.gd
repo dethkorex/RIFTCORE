@@ -27,7 +27,6 @@ var relay_paste: Button
 var relay_deploy: Button
 var relay_copy: Button
 var relay_leave: Button
-var steam_invite_buttons: Array[Button] = []
 
 var can_load := false
 var saved_sector := 1
@@ -50,7 +49,11 @@ var selected_sector := 1
 var selected_difficulty := 0
 var archive_sector := 1
 var pending_blueprint := ""
-var whisper_contact := 0
+var whisper_contact: Variant = 0
+var social_contact := ""
+var social_filter := 0
+var inbox_tab: Button
+var messages_tab: Button
 var inventory_slot := "frame"
 var inventory_status := ""
 var shop_item := ""
@@ -58,6 +61,7 @@ var focused_item := ""
 var station_panel := false
 var deploy_error := ""
 
+const SocialPanel := preload("res://scripts/social_panel.gd")
 const CoopSetup := preload("res://scripts/coop_setup.gd")
 const Story := preload("res://scripts/rift_story.gd")
 const EquipmentDisplay := preload("res://scripts/equipment_display.gd")
@@ -89,7 +93,7 @@ const HUB_TIPS := {
 	"Fabrication": ["Crafting", "Use materials to craft gear from learned blueprints. Core Shards are a separate currency for permanent upgrades under Core Enhancements."],
 	"Save Game": ["System / Save", "Save your progress manually here. Settings is on the next tab."],
 	"Storage": ["Equipment", "Equip or stow gear here. Learn a blueprint to unlock its recipe, or assign recovery items and buffs to the D-pad for use during a run."],
-	"Social": ["Social", "Create or join a group, add recent teammates, and compare best sector times."],
+	"Social": ["Social", "Find teammates, send a private message, and check game invites or sector records."],
 	"Challenges": ["Challenges", "Clear all five challenges in a sector to start its 24-hour reset timer."],
 	"Collection": ["NOVA Archive", "Read the story fragments and endings you’ve unlocked, or check the field guide."],
 }
@@ -98,6 +102,8 @@ func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	theme = UI.theme()
 	RiftRelay.changed.connect(refresh_online_room)
+	RiftSocial.invites_changed.connect(update_social_tabs)
+	RiftSocial.whispers_changed.connect(func(_id): update_social_tabs.call_deferred())
 	RiftSocial.records_changed.connect(func():
 		if is_visible_in_tree() and page == "Leaderboard":
 			show_page.call_deferred(page)
@@ -115,6 +121,8 @@ func show_page(next: String) -> void:
 		slot_requested.emit(replace_slot, true, new_operator_name)
 		return
 	page = next
+	inbox_tab = null
+	messages_tab = null
 	for child in get_children():
 		remove_child(child)
 		child.queue_free()
@@ -154,6 +162,11 @@ func show_page(next: String) -> void:
 			var button := UI.button(strip, label, show_page.bind(tab_page), false, 35)
 			if page == tab_page:
 				button.add_theme_color_override("font_color", UI.CYAN)
+			if tab_page == "Invites":
+				inbox_tab = button
+			elif tab_page == "Whispers":
+				messages_tab = button
+		update_social_tabs()
 		var hint := UI.label(strip, "LB / RB   Switch tab", 14, UI.MUTED)
 		hint.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
@@ -212,9 +225,13 @@ func show_page(next: String) -> void:
 		"Craft Item":
 			build_purchase(columns)
 		"Social":
-			build_social(columns)
+			SocialPanel.build_friends(self, columns)
 		"Whispers":
-			build_whispers(columns)
+			SocialPanel.build_messages(self, columns)
+		"Add Contact":
+			SocialPanel.build_add(self, columns)
+		"Invites":
+			SocialPanel.build_invites(self, columns)
 		"Party":
 			build_online_room(columns)
 		"Leaderboard":
@@ -251,9 +268,8 @@ func station_tabs() -> Dictionary:
 		return {"Fabrication": "Crafting", "Upgrades": "Core Enhancements"}
 	if page in ["Save Game", "Settings"]:
 		return {"Save Game": "Save Game", "Settings": "Settings"}
-	if page in ["Social", "Whispers", "Leaderboard"]:
-		var whispers := "Whispers" if RiftSocial.unread_whispers.is_empty() else "Whispers •"
-		return {"Social": "Friends", "Whispers": whispers, "Leaderboard": "Leaderboard"}
+	if page in ["Social", "Whispers", "Invites", "Leaderboard"]:
+		return {"Social": "Friends", "Whispers": "Messages", "Invites": "Invites", "Leaderboard": "Sector Records"}
 	return {}
 
 func build_station_header(header: HBoxContainer) -> void:
@@ -269,7 +285,7 @@ func build_station_header(header: HBoxContainer) -> void:
 		station_name = "WORKSHOP"
 	elif page in ["Save Game", "Settings"]:
 		station_name = "SYSTEM"
-	elif page in ["Social", "Whispers", "Party", "Leaderboard"]:
+	elif page in ["Social", "Whispers", "Party", "Invites", "Add Contact", "Leaderboard"]:
 		station_name = "SOCIAL"
 	var heading := UI.label(header, station_name, 25, UI.CYAN)
 	heading.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -368,7 +384,7 @@ func _input(event: InputEvent) -> void:
 func leave_page() -> void:
 	if page == "Settings" and find_children("RiftSettingsPanel", "", true, false).any(func(panel): return panel.installing):
 		return
-	if page == "Co-op Setup Guide":
+	if page in ["Co-op Setup Guide", "Add Contact"]:
 		show_page("Social")
 		return
 	if page in ["Party", "Social", "Leaderboard", "Co-op Sectors"] and party_from_deploy:
@@ -523,190 +539,34 @@ func show_sector_loot(entries: VBoxContainer) -> void:
 		mode.add_item(title)
 	entries.add_child(mode)
 	UI.style_button(mode)
-	var odds := UI.label(entries, "", 16, UI.CYAN)
+	var loot_list := UI.column(entries, 6)
 	var refresh := func(index: int):
-		var boost: float = Difficulty.LOOT[index]
-		var lines := PackedStringArray()
-		for rarity in Profile.RARITY_NAMES.size():
-			var chance := 100.0 * float(Blueprints.RATES["nightmare_cache" if index == Difficulty.NIGHTMARE else "boss_cache"][rarity]) * (1.0 + (boost - 1.0) * (0.5 + 0.25 * rarity))
-			lines.append("%s %.2f%%" % [Profile.RARITY_NAMES[rarity], chance])
-		odds.text = "Boss cache blueprint chances\n" + "  /  ".join(lines)
+		for child in loot_list.get_children():
+			loot_list.remove_child(child)
+			child.queue_free()
+		UI.label(loot_list, "Boss cache guarantees one blueprint and materials.", 16, UI.CYAN)
+		UI.label(loot_list, "Your operator level determines which of these recipes can drop.", 16, UI.MUTED)
+		UI.label(loot_list, "Materials", 21, UI.CYAN)
+		for id in Materials.pool(archive_sector):
+			UI.label(loot_list, Materials.label(id), 16)
+		for boss in [false, true]:
+			UI.label(loot_list, "Boss Cache" if boss else "Salvage Chests", 21, UI.CYAN)
+			for part in Blueprints.drop_pool(archive_sector, index, 100000, boss):
+				var item: Dictionary = Profile.GEAR[Blueprints.blueprint_id(archive_sector, part)]
+				UI.label(loot_list, "%s  ·  %s  ·  Lv. %d" % [item.name, Profile.RARITY_NAMES[item.rarity], item.level],
+					16, Profile.RARITY_COLORS[item.rarity])
 	mode.item_selected.connect(refresh)
 	refresh.call(0)
-	UI.label(entries, "Materials", 21, UI.CYAN)
-	for id in Materials.pool(archive_sector):
-		UI.label(entries, Materials.label(id), 16)
-	UI.label(entries, "Blueprints", 21, UI.CYAN)
-	for id in Profile.GEAR:
-		var item: Dictionary = Profile.GEAR[id]
-		if item.get("sector", 0) == archive_sector and not item.get("boss_only", false):
-			UI.label(entries, item.name + "  ·  " + Profile.RARITY_NAMES[item.rarity], 16, Profile.RARITY_COLORS[item.rarity])
-	UI.label(entries, "Boss Cache Exclusives", 21, UI.CYAN)
-	var cache_entries := VBoxContainer.new()
-	entries.add_child(cache_entries)
-	var show_cache := func(index: int):
-		for child in cache_entries.get_children():
-			cache_entries.remove_child(child)
-			child.queue_free()
-		for id in Profile.GEAR:
-			var item: Dictionary = Profile.GEAR[id]
-			if item.get("sector", 0) == archive_sector and item.get("boss_only", false) and item.get("nightmare_only", false) == (index == Difficulty.NIGHTMARE):
-				UI.label(cache_entries, item.name + "  ·  " + Profile.RARITY_NAMES[item.rarity], 16, Profile.RARITY_COLORS[item.rarity])
-	mode.item_selected.connect(show_cache)
-	show_cache.call(0)
 
-func build_social(columns: HBoxContainer) -> void:
-	steam_invite_buttons.clear()
-	RiftSocial.connect_steam()
-	RiftRelay.listen_for_steam_invites()
-	var list := card(columns, 1.2)
-	UI.label(list, "Friends", 30, UI.CYAN)
-	UI.label(list, "Add someone you recently grouped with to compare sector times.", 16, UI.MUTED)
-	var copy_notice := UI.label(list, "", 14, UI.CYAN)
-	var rows := scroll_entries(list)
-	for id in RiftSocial.recent_players:
-		var row := HBoxContainer.new()
-		rows.add_child(row)
-		var person := UI.label(row, RiftSocial.recent_players[id].name, 17)
-		person.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		var saved: bool = RiftSocial.rift_friends.has(id)
-		UI.button(row, "Remove Friend" if saved else "Add Friend", func():
-			RiftSocial.toggle_rift_friend(id)
-			show_page("Social")
-		, false, 34)
-	UI.label(rows, "Steam Contacts", 22, UI.CYAN)
-	for friend in RiftSocial.contacts():
-		var row := HBoxContainer.new()
-		rows.add_child(row)
-		var tint := UI.CYAN if friend.priority == 0 else UI.MUTED
-		var identity := UI.column(row, 2)
-		identity.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		UI.label(identity, friend.name, 17, tint)
-		UI.label(identity, "%s  ·  %s" % [friend.status, friend.id], 14, UI.MUTED)
-		UI.button(row, "Copy ID", func():
-			DisplayServer.clipboard_set(friend.id)
-			copy_notice.text = "Copied %s’s Steam ID." % friend.name
-		, false, 34)
-		UI.button(row, "Profile", RiftSocial.open_profile.bind(friend.id), false, 34)
-		if friend.priority <= 1 and (friend.saved or friend.priority == 0):
-			var invite := UI.button(row, "Quick Invite", RiftRelay.invite_friend.bind(int(friend.id)), false, 34)
-			steam_invite_buttons.append(invite)
-		if RiftSocial.can_whisper(int(friend.id)):
-			UI.button(row, "Whisper", func():
-				whisper_contact = int(friend.id)
-				show_page("Whispers")
-			, false, 34)
-		if not friend.saved:
-			UI.button(row, "Add Friend", func():
-				inventory_status = "Contact saved." if RiftSocial.save_contact(friend.id, friend.name) else "Could not save contact."
-				show_page("Social")
-			, false, 34)
-		else:
-			UI.button(row, "Remove", func():
-				var removed := RiftSocial.save_contact(friend.id, "")
-				inventory_status = "" if removed else "Could not remove contact."
-				show_page("Social")
-			, false, 34)
-	if RiftSocial.contacts().is_empty():
-		UI.label(rows, "No Steam contacts yet.", 16, UI.MUTED)
-	var tools := card(columns, 0.8)
-	UI.label(tools, "Add by Steam ID", 27, UI.CYAN)
-	UI.label(tools, "Paste a friend code, Steam ID, or numeric profile link.", 16, UI.MUTED)
-	var steam_id := LineEdit.new()
-	steam_id.placeholder_text = "Steam ID, friend code, or profile link"
-	steam_id.max_length = 160
-	tools.add_child(steam_id)
-	UI.button(tools, "Paste Steam ID", func():
-		steam_id.text = DisplayServer.clipboard_get().strip_edges().left(steam_id.max_length)
-		steam_id.grab_focus()
-		steam_id.caret_column = steam_id.text.length()
-	, false, 34)
-	var alias := LineEdit.new()
-	alias.placeholder_text = "Display name (optional)"
-	alias.max_length = 40
-	tools.add_child(alias)
-	var notice := UI.label(tools, inventory_status, 15, UI.VIOLET)
-	UI.button(tools, "Save Contact", func():
-		var id := RiftSocial.resolve_contact_id(steam_id.text)
-		if id.is_empty():
-			notice.text = "Use a Steam ID, numeric friend code, or a numeric Steam profile link."
-			return
-		if RiftSocial.save_contact(id, alias.text.strip_edges() if not alias.text.strip_edges().is_empty() else id):
-			inventory_status = "Contact saved."
-			show_page("Social")
-		else:
-			notice.text = "Could not save contact."
-	, false, 36)
-	tools.add_child(HSeparator.new())
-	UI.label(tools, RiftSocial.message, 15, UI.MUTED)
-	var invite_status := UI.label(tools, RiftRelay.status, 15, UI.CYAN)
-	var refresh_invite := func(): invite_status.text = RiftRelay.status
-	RiftRelay.changed.connect(refresh_invite)
-	invite_status.tree_exiting.connect(func(): RiftRelay.changed.disconnect(refresh_invite), CONNECT_ONE_SHOT)
-	UI.button(tools, "Refresh Steam Presence", show_page.bind("Social"), false, 36)
-	UI.button(tools, "Co-op Setup Guide", show_page.bind("Co-op Setup Guide"), false, 36)
-	refresh_steam_invites()
-
-func build_whispers(columns: HBoxContainer) -> void:
-	var contacts := card(columns, 0.8)
-	UI.label(contacts, "Steam Friends", 25, UI.CYAN)
-	var entries := scroll_entries(contacts)
-	var conversation := card(columns, 1.4)
-	var heading := UI.label(conversation, "Choose a friend", 25, UI.CYAN)
-	var history := RichTextLabel.new()
-	history.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	history.scroll_following = true
-	conversation.add_child(history)
-	var composer := LineEdit.new()
-	composer.placeholder_text = "Write a whisper"
-	composer.max_length = RiftSocial.WHISPER_LIMIT
-	composer.editable = false
-	conversation.add_child(composer)
-	var notice := UI.label(conversation, RiftSocial.message, 15, UI.MUTED)
-	var recipient := {"id": 0}
-	var redraw := func():
-		history.clear()
-		for line in RiftSocial.whispers.get(recipient.id, []):
-			history.add_text(("%s  " % ("You" if line.outgoing else heading.text)) + line.body + "\n")
-	var send := func():
-		if RiftSocial.send_whisper(recipient.id, composer.text):
-			composer.clear()
-			notice.text = ""
-		else:
-			notice.text = "Could not send. Check Steam and try again."
-	var button := UI.button(conversation, "Send Whisper", send, true, 34)
-	button.disabled = true
-	composer.text_submitted.connect(func(_value: String): send.call())
-	var friends := RiftSocial.contacts()
-	for friend in friends:
-		if not RiftSocial.can_whisper(int(friend.id)):
-			continue
-		var unread := "  •" if RiftSocial.unread_whispers.has(int(friend.id)) else ""
-		var select := UI.button(entries, friend.name + unread, func():
-			recipient.id = int(friend.id)
-			whisper_contact = recipient.id
-			RiftSocial.unread_whispers.erase(recipient.id)
-			heading.text = friend.name
-			composer.editable = true
-			button.disabled = false
-			notice.text = ""
-			redraw.call()
-		, false, 34)
-		if int(friend.id) == whisper_contact:
-			select.pressed.emit()
-	if entries.get_child_count() == 0:
-		UI.label(entries, "Add a Steam friend in Social to send whispers.", 17, UI.MUTED)
-	var refresh := func(id: int):
-		if id == recipient.id:
-			RiftSocial.unread_whispers.erase(id)
-			redraw.call()
-	RiftSocial.whispers_changed.connect(refresh)
-	history.tree_exiting.connect(func(): RiftSocial.whispers_changed.disconnect(refresh), CONNECT_ONE_SHOT)
-
-func refresh_steam_invites() -> void:
-	for invite in steam_invite_buttons:
-		if is_instance_valid(invite):
-			invite.disabled = not RiftRelay.available or not RiftRelay.pending.is_empty() or RiftRelay.pending_invite != 0 or RiftRelay.room_size >= RiftRelay.MAX_PLAYERS or RiftRelay.mission_active
+func update_social_tabs() -> void:
+	if is_instance_valid(inbox_tab):
+		var pending := RiftSocial.invites.size()
+		inbox_tab.text = "Invites (%d)" % pending if pending > 0 else "Invites"
+	if is_instance_valid(messages_tab):
+		var unread := 0
+		for count in RiftSocial.unread_whispers.values():
+			unread += int(count)
+		messages_tab.text = "Messages (%d)" % unread if unread > 0 else "Messages"
 
 func build_leaderboard(columns: HBoxContainer) -> void:
 	var panel := card(columns)
@@ -762,8 +622,6 @@ func build_online_room(columns: HBoxContainer) -> void:
 		relay_host.grab_focus()
 
 func refresh_online_room() -> void:
-	if page == "Social":
-		refresh_steam_invites()
 	if page != "Party" or not is_instance_valid(relay_status):
 		return
 	var joined := not RiftRelay.connected_room.is_empty()

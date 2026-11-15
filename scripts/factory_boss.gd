@@ -356,10 +356,6 @@ func die() -> void:
 	if motion == "rush" and elapsed < 0.92:
 		RiftAudio.stop_effect(&"titan_windup")
 	clear_attack()
-	var orb := preload("res://assets/pickups/xp_orb.tscn").instantiate() as Area3D
-	orb.large = true
-	orb.position = position - Vector3.UP
-	get_parent().add_child.call_deferred(orb)
 	set_deferred("collision_layer", 0)
 	RiftAudio.play_effect(&"enemy_break")
 	hide()

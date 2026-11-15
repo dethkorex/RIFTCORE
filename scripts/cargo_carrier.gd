@@ -45,11 +45,10 @@ func take_damage(amount: float, source_position := Vector3.ZERO) -> void:
 func drop_crate() -> void:
 	var crate := Crate.new()
 	crate.reward = reward
-	crate.supplies_only = supplies_only
-	crate.sector = int(get_tree().current_scene.get("sector")) if get_tree().current_scene and "sector" in get_tree().current_scene else 1
+	crate.adaptive_supply = adaptive_supply
+	crate.operator = supply_target
+	crate.authority = authority
 	if adaptive_supply:
-		var need_energy := is_instance_valid(supply_target) and supply_target.health / supply_target.max_health > 0.8
-		crate.reward = preload("res://assets/pickups/energy_large.tscn") if need_energy else preload("res://assets/pickups/health_large.tscn")
 		crate.add_to_group(&"boss_supply")
 	crate.position = position - Vector3.UP * 0.6
 	get_parent().add_child.call_deferred(crate)

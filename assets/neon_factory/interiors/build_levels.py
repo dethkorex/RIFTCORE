@@ -148,7 +148,7 @@ height = 0.44
         node("Trigger",path,"CollisionShape3D",(0,.9,0),shape=s("CheckpointShape"))
         asset("Beacon",path,"beacon",0,0,0.75)
     def chest(name,x,y,index):
-        node(name,"TERRAIN","Area3D",(x,y,0),group=["factory_salvage_chest"],script=e("ChestCode"),collision_layer=0,blueprint=f'"bp_01_{index:02}"',bolts=65+index*5,materials=3+index//3)
+        node(name,"TERRAIN","Area3D",(x,y,0),group=["factory_salvage_chest"],script=e("ChestCode"),collision_layer=0,materials=3+index//3)
         path="TERRAIN/"+name
         node("Trigger",path,"CollisionShape3D",(0,.61,0),shape=s("ChestShape"))
         asset("Art",path,"Chest",0,0,0)
