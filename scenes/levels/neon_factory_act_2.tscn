@@ -35,6 +35,11 @@
 [ext_resource type="Script" path="res://scripts/breakable_barricade.gd" id="Barricade"]
 [ext_resource type="PackedScene" path="res://assets/neon_factory/foundry/climb_platform_center.tscn" id="arena_hatch"]
 
+[ext_resource type="Script" path="res://scripts/sector_dressing.gd" id="SectorDressing"]
+[ext_resource type="Texture2D" path="res://assets/campaign/neon_factory/surfaces/sector_wall.jpg" id="SectorAlbedo"]
+
+[ext_resource type="Script" path="res://scripts/biome_zone.gd" id="ArenaJet"]
+
 [sub_resource type="Environment" id="Interior"]
 background_mode = 1
 background_color = Color(0.043, 0.021, 0.016, 1)
@@ -233,50 +238,6 @@ scale = Vector3(0.6483, 1.0000, 1.0000)
 position = Vector3(507.1425, -5.0500, 0.0000)
 rotation = Vector3(0.0000, 0.0000, 0.4956)
 scale = Vector3(3.5400, 1.0000, 1.0000)
-
-[node name="TurnbackCladding0" parent="DECOR" instance=ExtResource("Cave")]
-position = Vector3(454.0000, -11.5000, -3.1800)
-scale = Vector3(1.0000, 1.2500, 1.0000)
-
-[node name="TurnbackCladding1" parent="DECOR" instance=ExtResource("Cave")]
-position = Vector3(460.0000, -11.5000, -3.1800)
-scale = Vector3(1.0000, 1.2500, 1.0000)
-
-[node name="TurnbackCladding2" parent="DECOR" instance=ExtResource("Cave")]
-position = Vector3(466.0000, -11.5000, -3.1800)
-scale = Vector3(1.0000, 1.2500, 1.0000)
-
-[node name="TurnbackCladding3" parent="DECOR" instance=ExtResource("Cave")]
-position = Vector3(472.0000, -11.5000, -3.1800)
-scale = Vector3(1.0000, 1.2500, 1.0000)
-
-[node name="TurnbackCladding4" parent="DECOR" instance=ExtResource("Cave")]
-position = Vector3(478.0000, -11.5000, -3.1800)
-scale = Vector3(1.0000, 1.2500, 1.0000)
-
-[node name="TurnbackCladding5" parent="DECOR" instance=ExtResource("Cave")]
-position = Vector3(484.0000, -11.5000, -3.1800)
-scale = Vector3(1.0000, 1.2500, 1.0000)
-
-[node name="TurnbackCladding6" parent="DECOR" instance=ExtResource("Cave")]
-position = Vector3(490.0000, -11.5000, -3.1800)
-scale = Vector3(1.0000, 1.2500, 1.0000)
-
-[node name="TurnbackCladding7" parent="DECOR" instance=ExtResource("Cave")]
-position = Vector3(496.0000, -11.5000, -3.1800)
-scale = Vector3(1.0000, 1.2500, 1.0000)
-
-[node name="TurnbackCladding8" parent="DECOR" instance=ExtResource("Cave")]
-position = Vector3(502.0000, -11.5000, -3.1800)
-scale = Vector3(1.0000, 1.2500, 1.0000)
-
-[node name="TurnbackCladding9" parent="DECOR" instance=ExtResource("Cave")]
-position = Vector3(508.0000, -11.5000, -3.1800)
-scale = Vector3(1.0000, 1.2500, 1.0000)
-
-[node name="TurnbackCladding10" parent="DECOR" instance=ExtResource("Cave")]
-position = Vector3(514.0000, -11.5000, -3.1800)
-scale = Vector3(1.0000, 1.2500, 1.0000)
 
 [node name="HallRecovery00" parent="TERRAIN" instance=ExtResource("Floor")]
 position = Vector3(519.4850, 0.0000, 0.0000)
@@ -2952,7 +2913,7 @@ patrol_model = -1
 patrol_right_limit = 527.0
 
 [node name="Security03" type="CharacterBody3D" parent="Actors" groups=["level_enemies", "damageable_enemies"]]
-position = Vector3(69.0000, 4.4600, 0.0000)
+position = Vector3(76.0000, 3.6100, 0.0000)
 script = ExtResource("enemy")
 variant = 3
 detachment_sector = 1
@@ -2976,7 +2937,7 @@ patrol_model = 1
 patrol_right_limit = 527.0
 
 [node name="Security06" type="CharacterBody3D" parent="Actors" groups=["level_enemies", "damageable_enemies"]]
-position = Vector3(165.0000, 6.9100, 0.0000)
+position = Vector3(161.0000, 6.3100, 0.0000)
 script = ExtResource("enemy")
 variant = 4
 detachment_sector = 1
@@ -3016,7 +2977,7 @@ patrol_model = 0
 patrol_right_limit = 527.0
 
 [node name="Security11" type="CharacterBody3D" parent="Actors" groups=["level_enemies", "damageable_enemies"]]
-position = Vector3(280.0000, 7.1600, 0.0000)
+position = Vector3(286.0000, 6.1500, 0.0000)
 script = ExtResource("enemy")
 variant = 0
 detachment_sector = 1
@@ -3134,11 +3095,13 @@ position = Vector3(539.0000, 0.0000, 0.0000)
 position = Vector3(0.0000, 0.0000, 0.0000)
 rotation = Vector3(0.0000, -1.5708, 0.0000)
 scale = Vector3(0.9300, 1.7838, 1.0000)
+boss_entry = true
 
 [node name="PortalFrame" parent="Gate" instance=ExtResource("arch")]
 position = Vector3(-0.2500, 0.0000, 0.0000)
 rotation = Vector3(0.0000, -1.5708, 0.0000)
 scale = Vector3(1.8433, 2.2667, 1.1200)
+boss_entry = true
 
 [node name="Blocker" type="StaticBody3D" parent="Gate"]
 
@@ -3200,16 +3163,16 @@ scale = Vector3(1.1000, 1.1500, 0.9000)
 position = Vector3(573.0000, 0.0000, -2.6500)
 scale = Vector3(1.1000, 1.1500, 0.9000)
 
-[node name="TitanWestHatch" parent="TERRAIN" instance=ExtResource("arena_hatch")]
+[node name="TitanWestHatch" parent="TERRAIN" instance=ExtResource("arena_hatch") groups=["arena_player_deck"]]
 position = Vector3(550.0000, 4.2500, 0.0000)
 deck_width = 6.2
 climb_height = 4.25
 
-[node name="TitanHighRun" parent="TERRAIN" instance=ExtResource("Floor") groups=["factory_drop_through"]]
+[node name="TitanHighRun" parent="TERRAIN" instance=ExtResource("Floor") groups=["arena_player_deck", "factory_drop_through"]]
 position = Vector3(562.5000, 6.4500, 0.0000)
 scale = Vector3(1.5000, 1.0000, 1.0000)
 
-[node name="TitanEastDrop" parent="TERRAIN" instance=ExtResource("Floor") groups=["factory_drop_through"]]
+[node name="TitanEastDrop" parent="TERRAIN" instance=ExtResource("Floor") groups=["arena_player_deck", "factory_drop_through"]]
 position = Vector3(580.0000, 3.9500, 0.0000)
 scale = Vector3(1.0000, 1.0000, 1.0000)
 
@@ -3240,3 +3203,41 @@ position = Vector3(564.0000, 1.4500, 0.0000)
 position = Vector3(0.0000, 1.2300, 0.0000)
 script = ExtResource("camera")
 minimum_follow_y = -7.8
+
+[node name="FoundryTurnbackSurfaces" type="Node3D" parent="DECOR"]
+script = ExtResource("SectorDressing")
+albedo = ExtResource("SectorAlbedo")
+sector = 1
+left_edge = 451.0000
+right_edge = 517.0000
+cave_floor = -10.5000
+cave_roof = -1.5000
+arena = false
+
+[node name="FurnaceChamberSurfaces" type="Node3D" parent="DECOR"]
+script = ExtResource("SectorDressing")
+albedo = ExtResource("SectorAlbedo")
+sector = 1
+left_edge = 539.0000
+right_edge = 590.0000
+cave_floor = 0.0000
+cave_roof = 13.0000
+arena = true
+
+[node name="FurnaceReliefJet0" type="Area3D" parent="TERRAIN"]
+script = ExtResource("ArenaJet")
+position = Vector3(553.2800, 3.4500, 0)
+kind = 6
+dimensions = Vector3(4.35, 6.9, 2.65)
+period = 4.4
+offset = 0.55
+tint = Color(1, 0.56, 0.23, 1)
+
+[node name="FurnaceReliefJet1" type="Area3D" parent="TERRAIN"]
+script = ExtResource("ArenaJet")
+position = Vector3(576.2300, 3.4500, 0)
+kind = 6
+dimensions = Vector3(4.35, 6.9, 2.65)
+period = 4.4
+offset = 2.75
+tint = Color(1, 0.56, 0.23, 1)

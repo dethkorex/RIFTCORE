@@ -34,22 +34,8 @@ var panel_open := false
 var pause_menu: PauseMenu
 var reconstructing := false
 var story: CanvasLayer
-const NOVA := preload("res://assets/ui/nova_guide.svg")
-const RX07 := preload("res://assets/ui/rx07_menu.png")
-const ARRIVAL := [
-	["NOVA", "RX-07, can you hear me? I am NOVA. You are on the Deploy pad at Operations Station."],
-	["RX-07", "I can hear you. Why can't I remember getting here?"],
-	["NOVA", "The Architect built you. After the Blackout, Dr. Mara Voss installed the Rogue Protocol so you could choose your own orders."],
-	["RX-07", "Then tell me where you need me."],
-	["NOVA", "The Architect seized ten facilities. Start in Ember Foundry. Stop the Forge Titan and bring back its memory. We need those records to reach the Architect."],
-	["RX-07", "Understood. Put Ember Foundry on the deployment map."],
-]
-const RECONSTRUCTION := [
-	["NOVA", "You're back, RX-07. When a frame is lost, I can recode you from the operator pattern."],
-	["RX-07", "Then put me back where I fell."],
-	["NOVA", "I can restore you here. The deployment is gone, so you'll start again in Ember Foundry. Your banked bolts and permanent enhancements are still here."],
-	["RX-07", "All right. Let's make this run count."],
-]
+const Story := preload("res://scripts/rift_story.gd")
+const StoryDialogue := preload("res://scripts/story_dialogue.gd")
 var pads: Array[Dictionary] = []
 var bank_label: Label
 var bolts_label: Label
@@ -106,6 +92,7 @@ func _ready() -> void:
 	RiftRelay.changed.connect(refresh_partner_room)
 	refresh_partner_room()
 	update_station()
+	announce_shop_restock.call_deferred()
 
 func materialize_operator(sequence := "") -> void:
 	reconstructing = true
@@ -140,70 +127,39 @@ func materialize_operator(sequence := "") -> void:
 	await get_tree().create_timer(0.26).timeout
 	avatar.play_character_animation("idle", true)
 	if not sequence.is_empty():
-		await play_station_story(ARRIVAL if sequence == "arrival" else RECONSTRUCTION)
+		await play_station_story(Story.ARRIVAL if sequence == "arrival" else Story.RECONSTRUCTION)
 	await create_tween().tween_property(camera, "position", opening, 0.42).finished
 	reconstructing = false
 	update_station()
+	announce_shop_restock()
 
 func has_dialogue() -> bool:
 	return is_instance_valid(story) and story.visible and not story.is_queued_for_deletion()
 
-func play_station_story(lines: Array) -> void:
-	story = CanvasLayer.new()
-	story.layer = 39
+func announce_shop_restock() -> void:
+	if not profile or panel_open or reconstructing or has_dialogue() or DisplayServer.get_name() == "headless":
+		return
+	var milestone: int = profile.shop_milestone()
+	if milestone <= profile.shop_announced_through:
+		return
+	velocity_x = 0.0
+	avatar.play_character_animation("idle", true)
+	await play_station_story(Story.shop_restock(milestone), "Continue")
+	profile.shop_announced_through = milestone
+	profile.save()
+
+func play_station_story(lines: Array, finish_label := "Back to Station") -> void:
+	if DisplayServer.get_name() == "headless":
+		return
+	story = StoryDialogue.new()
 	add_child(story)
-	var box := PanelContainer.new()
-	box.add_theme_stylebox_override("panel", UI.frame(Color("0c182cf5"), UI.CYAN, 4))
-	story.add_child(box)
-	box.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
-	box.offset_left = -408
-	box.offset_right = 408
-	box.anchor_top = 0.80
-	box.anchor_bottom = 0.80
-	box.offset_top = -197
-	box.offset_bottom = -23
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 16)
-	box.add_child(row)
-	var portrait := TextureRect.new()
-	portrait.custom_minimum_size = Vector2(112, 112)
-	portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	var frame_box := PanelContainer.new()
-	frame_box.add_theme_stylebox_override("panel", UI.frame(Color("081222"), UI.CYAN, 2))
-	row.add_child(frame_box)
-	frame_box.add_child(portrait)
-	var pane := VBoxContainer.new()
-	pane.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row.add_child(pane)
-	var speaker := UI.label(pane, "", 23, UI.CYAN)
-	var speech := UI.label(pane, "", 22)
-	speech.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	var reader := preload("res://scripts/dialogue_typewriter.gd").new()
-	story.add_child(reader)
-	reader.body = speech
-	var next := UI.button(pane, "Next", reader.advance, true, 36)
-	reader.next = next
-	UI.label(pane, "START  Skip dialogue", 14, UI.MUTED)
-	var pilot := AtlasTexture.new()
-	pilot.atlas = RX07
-	var source := RX07.get_size()
-	pilot.region = Rect2(source.x * 0.35, source.y * 0.05, source.x * 0.31, source.y * 0.46)
-	for index in lines.size():
-		var line: Array = lines[index]
-		speaker.text = line[0]
-		var guide: bool = line[0] == "NOVA"
-		portrait.texture = NOVA if guide else pilot
-		speaker.add_theme_color_override("font_color", UI.VIOLET if guide else UI.CYAN)
-		next.text = "Next" if index < lines.size() - 1 else "Back to Station"
-		await reader.show_line(line[1])
-		if reader.skipped:
-			break
-	story.hide()
+	update_station()
+	await story.play(lines, finish_label)
 	story.queue_free()
+	update_station()
 
 func _physics_process(delta: float) -> void:
-	if panel_open or reconstructing:
+	if panel_open or reconstructing or has_dialogue():
 		return
 	var input_axis := Input.get_axis("move_left", "move_right")
 	if absf(input_axis) < 0.15:
@@ -286,8 +242,8 @@ func update_station() -> void:
 	if nearest != current_station and nearest >= 0:
 		RiftAudio.play_effect(&"menu_move")
 	current_station = nearest
-	prompt.visible = nearest >= 0 and not panel_open and not reconstructing
-	station_notice.visible = nearest >= 0 and not panel_open and not reconstructing
+	prompt.visible = nearest >= 0 and not panel_open and not reconstructing and not has_dialogue()
+	station_notice.visible = prompt.visible
 	if nearest >= 0:
 		prompt.text = STATIONS[nearest].name.to_upper()
 		prompt.modulate = STATIONS[nearest].color.lerp(Color.WHITE, 0.32)
@@ -300,6 +256,8 @@ func set_panel_open(open: bool) -> void:
 	velocity_x = 0.0
 	avatar.play_character_animation("idle", true)
 	update_station()
+	if not open:
+		announce_shop_restock.call_deferred()
 
 func set_bank(amount: int, shards: int, level: int) -> void:
 	bank_label.text = "RX-07   /   PLAYER %02d" % level
@@ -309,7 +267,7 @@ func set_bank(amount: int, shards: int, level: int) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouse and not is_pause_open():
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	if panel_open or reconstructing:
+	if panel_open or reconstructing or has_dialogue():
 		return
 	if not RiftRelay.connected_room.is_empty() and (event.is_action_pressed("pause") or event.is_action_pressed("ui_cancel")):
 		get_viewport().set_input_as_handled()
@@ -329,7 +287,7 @@ func is_pause_open() -> bool:
 	return is_instance_valid(pause_menu) and pause_menu.is_open()
 
 func activate_station() -> void:
-	if panel_open or reconstructing or current_station < 0:
+	if panel_open or reconstructing or has_dialogue() or current_station < 0:
 		return
 	var destination: String = STATIONS[current_station].page
 	if destination == "Title":

@@ -68,6 +68,7 @@ func configure(number: int, tint: Color, weakness: String, gate_position: Vector
 
 func _ready() -> void:
 	super._ready()
+	ignore_arena_access_decks()
 	add_to_group("damageable_enemies")
 	var body := CollisionShape3D.new()
 	var hull := CapsuleShape3D.new()

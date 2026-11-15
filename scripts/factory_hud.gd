@@ -77,6 +77,7 @@ func show_quick_slots(profile) -> void:
 				quantity.text = "×%d" % remaining if remaining > 0 else "—"
 		refresh.call()
 		profile.quick_changed.connect(refresh)
+		icon.tree_exiting.connect(func(): profile.quick_changed.disconnect(refresh), CONNECT_ONE_SHOT)
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE

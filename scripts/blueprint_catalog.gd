@@ -43,7 +43,7 @@ static func blueprint_level(sector: int, part: int) -> int:
 	var rarity := rarity_for(part)
 	if rarity == 0:
 		return baseline + part % 4
-	return baseline + [0, 4, 7, 10][rarity] + part % 3
+	return mini(Difficulty.PLAYER_LEVEL_CAP, baseline + [0, 4, 7, 10][rarity] + part % 3)
 
 static func maximum_rarity(sector: int, mode: int) -> int:
 	return mini(3, floori(float(sector - 1) / 3.0) + mode)

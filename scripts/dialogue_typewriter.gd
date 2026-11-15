@@ -9,6 +9,10 @@ var skipped := false
 var waiting := false
 var auto_advance := false
 
+static func automatic_seconds(text: String) -> float:
+	var duration := float(text.length()) / 48.0
+	return maxf(3.4, duration + 0.75)
+
 func show_line(text: String, automatic := false) -> void:
 	if skipped:
 		return
@@ -22,7 +26,7 @@ func show_line(text: String, automatic := false) -> void:
 	writing.tween_property(body, "visible_characters", text.length(), duration)
 	if automatic:
 		next.hide()
-		writing.tween_interval(maxf(0.75, 3.4 - duration))
+		writing.tween_interval(automatic_seconds(text) - duration)
 		writing.tween_callback(finish_line)
 	else:
 		writing.tween_callback(func():
@@ -36,6 +40,11 @@ func advance() -> void:
 		return
 	finish_line()
 
+func skip() -> void:
+	skipped = true
+	if waiting:
+		finish_line()
+
 func finish_line() -> void:
 	waiting = false
 	if writing and writing.is_running():
@@ -47,9 +56,8 @@ func _input(event: InputEvent) -> void:
 		return
 	if event is InputEventJoypadButton and event.pressed and event.button_index == JOY_BUTTON_START:
 		get_viewport().set_input_as_handled()
-		skipped = true
-		finish_line()
-	elif event.is_action_pressed(&"ui_accept"):
+		skip()
+	elif not auto_advance and event.is_action_pressed(&"ui_accept"):
 		get_viewport().set_input_as_handled()
 		if not event.is_echo():
 			advance()

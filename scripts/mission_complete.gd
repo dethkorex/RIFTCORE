@@ -2,9 +2,10 @@ extends RefCounted
 
 const UI := preload("res://scripts/rift_ui.gd")
 const Materials := preload("res://scripts/fabrication_catalog.gd")
+const Profile := preload("res://scripts/rogue_profile.gd")
 
 static func build(stack: VBoxContainer, sector_name: String, stats: Dictionary, materials: Dictionary,
-		blueprints: Array[String], bolts: int, lives: int, deaths: int, ending: String, exit: Callable) -> void:
+		blueprints: Array[String], supplies: Dictionary, bolts: int, lives: int, deaths: int, ending: String, exit: Callable) -> void:
 	UI.label(stack, "DEPLOYMENT COMPLETE", 43, UI.CYAN)
 	UI.label(stack, sector_name + "  /  EXTRACTION SUMMARY", 21, UI.WHITE)
 	var body := HBoxContainer.new()
@@ -53,6 +54,9 @@ static func build(stack: VBoxContainer, sector_name: String, stats: Dictionary, 
 		reward(rewards, name, "Blueprint", UI.VIOLET)
 	for id in materials:
 		reward(rewards, Materials.label(id), "×%d" % materials[id], UI.CYAN)
+	for id in supplies:
+		if Profile.stock.has(id) and int(supplies[id]) > 0:
+			reward(rewards, Profile.stock[id].name, "×%d sent to Storage" % supplies[id], UI.CYAN)
 	if lives > 0:
 		reward(rewards, "Challenge reward", "+%d reserve lives" % lives, Color("ffd079"))
 	if rewards.get_child_count() == 0:

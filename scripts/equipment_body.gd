@@ -17,10 +17,10 @@ var profile
 var selected := "frame"
 var preview_actor: RiftPlayer
 
-func install(data, active: String, action: Callable, workshop := false) -> void:
+func install(data, active: String, action: Callable) -> void:
 	profile = data
 	selected = active
-	custom_minimum_size = Vector2(386, 260)
+	custom_minimum_size = Vector2(320, 216)
 	size_flags_vertical = Control.SIZE_EXPAND_FILL
 	var screen := SubViewportContainer.new()
 	screen.stretch = true
@@ -42,6 +42,8 @@ func install(data, active: String, action: Callable, workshop := false) -> void:
 	actor.collision_mask = 0
 	actor.model_root.rotation.y = 0
 	actor.play_character_animation("idle", true)
+	if actor.animation_player:
+		actor.animation_player.advance(0.0)
 	var silhouette := ShaderMaterial.new()
 	silhouette.shader = preload("res://assets/ui/equipment_silhouette.gdshader")
 	for mesh in actor.model_root.find_children("*", "MeshInstance3D", true, false):
@@ -54,25 +56,25 @@ func install(data, active: String, action: Callable, workshop := false) -> void:
 	camera.make_current()
 	var order := ["visor", "frame", "core", "arm", "utility"]
 	for slot in order:
-		var id: String = profile.equipped_for(slot) if profile and not workshop else ""
+		var id: String = profile.equipped_for(slot) if profile else ""
 		var name: String = PROFILE.GEAR_SLOTS[slot]
 		var detail := "Empty" if id.is_empty() else String(PROFILE.GEAR[id].name)
-		if workshop:
-			var count := 0
-			for upgrade in profile.all_upgrades():
-				if String(upgrade.get("slot", PROFILE.UPGRADE_SLOTS.get(upgrade.id, ""))) == slot and profile.rank(upgrade.id) > 0:
-					count += 1
-			detail = "%d installed" % count
 		var button := UI.button(self, name + "\n" + detail, action.bind(slot) if action.is_valid() else Callable(), slot == selected)
 		if not action.is_valid():
 			button.add_theme_stylebox_override("disabled", button.get_theme_stylebox("normal"))
 			button.add_theme_color_override("font_disabled_color", UI.WHITE)
 		button.icon = ICONS.icon(slot if id.is_empty() else id, slot)
 		button.expand_icon = true
-		button.add_theme_constant_override("icon_max_width", 24)
-		button.add_theme_constant_override("h_separation", 7)
+		button.add_theme_constant_override("icon_max_width", 18)
+		button.add_theme_constant_override("h_separation", 5)
 		button.add_theme_font_size_override("font_size", 14)
-		button.tooltip_text = name if id.is_empty() else String(PROFILE.GEAR[id].perk)
+		if not button.has_theme_stylebox_override(&"disabled"):
+			button.add_theme_stylebox_override(&"disabled", button.get_theme_stylebox(&"disabled").duplicate())
+		for state in [&"normal", &"hover", &"pressed", &"disabled"]:
+			var style := button.get_theme_stylebox(state)
+			style.content_margin_left = 10
+			style.content_margin_right = 8
+		button.tooltip_text = name if id.is_empty() else "%s · %s\n%s" % [name, detail, PROFILE.GEAR[id].perk]
 		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		buttons[slot] = button
 		if action.is_valid() and slot == selected:
@@ -100,7 +102,7 @@ func place_sockets() -> void:
 		var wide := minf(size.x * 0.35, 168.0)
 		button.custom_minimum_size.x = 0.0
 		button.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-		button.size = Vector2(wide, 50.0)
+		button.size = Vector2(wide, 44.0)
 		button.position = Vector2(9.0 if socket.left else size.x - wide - 9.0, size.y * float(socket.row) - button.size.y * 0.5)
 	queue_redraw()
 

@@ -23,7 +23,7 @@ def make(act):
         ("Threshold",kit+"zone_threshold.glb","PackedScene"),
         ("FactorySky","res://scripts/jungle_backdrop.gd","Script"),
         ("FactoryPanorama","res://assets/neon_factory/foundry/foundry_panorama.jpg","Texture2D"),
-        ("Bridge",kit+"powered_bridge.tscn","PackedScene"),("Shutter","res://assets/neon_factory/interiors/service_shutter.tscn","PackedScene"),("Relay","res://assets/neon_factory/foundry/power_coupler.tscn","PackedScene"),
+        ("Bridge",kit+"powered_bridge.tscn","PackedScene"),("ArenaLift",kit+"warden_lift.tscn","PackedScene"),("Shutter","res://assets/neon_factory/interiors/service_shutter.tscn","PackedScene"),("Relay","res://assets/neon_factory/foundry/power_coupler.tscn","PackedScene"),
         ("Supply","res://scripts/cargo_carrier.gd","Script"),("Chest",kit+"salvage_chest.glb","PackedScene"),("RelayCode","res://scripts/factory_interior_relay.gd","Script"),
         ("ChestCode","res://scripts/factory_salvage_chest.gd","Script"),("Hazard","res://scripts/foundry_vent.gd","Script"),("Boulder","res://scripts/foundry_boulder.gd","Script"),
         ("Pit","res://scripts/spike_pit.gd","Script"),
@@ -266,8 +266,8 @@ height = 0.44
             deck("WardenEntryStep",gx+5,gx+9,2.72,drop=True,thickness=.6)
             deck("WardenSideShelf",gx+10.5,gx+17,3.45,drop=True)
             deck("WardenRecoveryIsland",gx+34,gx+41,2.75,drop=True,thickness=.6)
-            relay("WardenLiftRelay","WardenEvadeLift",gx+24.0,1.27,gx+30.6,2.70,2.25,
-                  True,operation="EVADE LIFT",projectile_only=True)
+            relay("WardenLiftRelay","WardenEvadeLift",gx+24.0,1.27,gx+30.6,.14,4.81,
+                  True,art="ArenaLift",operation="EVADE LIFT",projectile_only=True)
         else:
             asset("TitanWestHatch","TERRAIN","arena_hatch",gx+11,4.25,
                   deck_width=6.2,climb_height=4.25)
@@ -519,7 +519,7 @@ height = 0.44
             ("ManifoldSupplyDrone",35.4,1.18,"energy"),("ApronSupplyDrone",149.0,7.78,"repair"),
             ("RiserSupplyDrone",294.7,1.62,"energy"),
         ]: supply(name,x,y,reward)
-        enemies([(29,.18,0),(46,-1.35,2),(69,3.55,4),(87.2,-1.25,1),(144,6.15,0),(165,6,4),(202,-8.5,3),(224,5,2),(231,-2.1,3),(260,-1.87,2),(280,6.25,1),(322,6.15,2),(374,-1.35,0),(466.1,.6,4)],gate)
+        enemies([(29,.18,0),(46,-1.35,2),(76,2.7,4),(87.2,-1.25,1),(144,6.15,0),(161,5.4,4),(202,-8.5,3),(224,5,2),(231,-2.1,3),(260,-1.87,2),(286,5.24,1),(322,6.15,2),(374,-1.35,0),(466.1,.6,4)],gate)
     wall("AirlockEnd",-13,0,14)
     arena(hall,gate,exit,0)
     file.write_text(outfit("neon_factory", '\n'.join(header)+'\n\n'+'\n\n'.join(nodes)+'\n'),encoding="utf8")

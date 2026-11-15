@@ -16,7 +16,7 @@ const Client := preload("res://addons/GD-Sync/MultiplayerClient.gd")
 const RelayEnums := preload("res://addons/GD-Sync/Scripts/Enums/Enums.gd")
 const Codes := "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 const CodeLength := 10
-const ROOM_PREFIX := "riftcore-coop-v13-"
+const ROOM_PREFIX := "riftcore-coop-v14-"
 const Difficulty := preload("res://scripts/mission_difficulty.gd")
 const MAX_PLAYERS := 4
 const RELAY_UNAVAILABLE := "Online rooms are unavailable. Solo play is available."
@@ -34,6 +34,7 @@ var last_party_whisper: Dictionary[int, int] = {}
 var mission_active := false
 var mission_roster: Array = []
 var mission_mode := 0
+var hard_sectors: Array = []
 var nightmare_unlocked := false
 var steam_invite_lobbies: Dictionary = {}
 var local_name := "RX-07"
@@ -76,6 +77,7 @@ func _initialize_client() -> void:
 	)
 	relay.client_joined.connect(_players_changed)
 	relay.client_left.connect(_peer_left)
+	relay.player_data_changed.connect(_difficulty_data_changed)
 	relay.kicked.connect(func(_reason: String): leave("You were removed from the room."))
 
 func host_room() -> void:
@@ -223,7 +225,7 @@ func _room_joined(lobby_name: String) -> void:
 	connected_room = room_code
 	pending = ""
 	relay.player_set_data("operator_name", local_name)
-	relay.player_set_data("nightmare_unlocked", nightmare_unlocked)
+	_publish_difficulty_unlocks()
 	if joined_as_guest:
 		guest_joined.emit.call_deferred()
 	_players_changed(0)
@@ -304,24 +306,49 @@ func _receive_party_whisper(body: String) -> void:
 func can_deploy() -> bool:
 	return not mission_active and room_size >= 2 and is_instance_valid(relay) and relay.is_host()
 
-func set_nightmare_unlocked(value: bool) -> void:
-	nightmare_unlocked = value
+func set_difficulty_unlocks(sectors: Array, expert: bool) -> void:
+	hard_sectors = sectors.duplicate()
+	nightmare_unlocked = expert
 	if not connected_room.is_empty() and is_instance_valid(relay):
-		relay.player_set_data("nightmare_unlocked", value)
+		_publish_difficulty_unlocks()
 
-func party_can_play_nightmare() -> bool:
-	if not nightmare_unlocked or not is_instance_valid(relay):
+func _publish_difficulty_unlocks() -> void:
+	relay.player_set_data("hard_sectors", hard_sectors)
+	relay.player_set_data("nightmare_unlocked", nightmare_unlocked)
+
+func _difficulty_data_changed(client_id: int, key: String, _value: Variant) -> void:
+	if not connected_room.is_empty() and not mission_active and client_id != relay.get_client_id() and key in ["hard_sectors", "nightmare_unlocked"]:
+		changed.emit()
+
+func can_play_difficulty(sector: int, mode: int) -> bool:
+	match mode:
+		Difficulty.NORMAL:
+			return true
+		Difficulty.HARD:
+			return hard_sectors.has(sector)
+		Difficulty.NIGHTMARE:
+			return nightmare_unlocked
+	return false
+
+func party_can_play_difficulty(sector: int, mode: int) -> bool:
+	if not can_play_difficulty(sector, mode) or not is_instance_valid(relay):
 		return false
 	for id in relay.lobby_get_all_clients():
-		if id != relay.get_client_id() and not relay.player_get_data(id, "nightmare_unlocked", false):
+		if id == relay.get_client_id():
+			continue
+		if mode == Difficulty.HARD:
+			var sectors: Variant = relay.player_get_data(id, "hard_sectors", [])
+			if not sectors is Array or not sectors.has(sector):
+				return false
+		if mode == Difficulty.NIGHTMARE and relay.player_get_data(id, "nightmare_unlocked", false) != true:
 			return false
 	return true
 
 func deploy(sector := 1, mode := 0) -> void:
 	if not can_deploy() or sector < 1 or sector > unlocked_sector:
 		return
-	if mode == Difficulty.NIGHTMARE and not party_can_play_nightmare():
-		_update("Everyone in the party must unlock Nightmare first.")
+	if not party_can_play_difficulty(sector, mode):
+		_update("Everyone in the party must clear this sector on Normal first." if mode == Difficulty.HARD else "Everyone in the party must clear all sectors on Hard first.")
 		return
 	mission_roster = relay.lobby_get_all_clients().duplicate()
 	mission_roster.erase(relay.get_client_id())
@@ -331,7 +358,7 @@ func deploy(sector := 1, mode := 0) -> void:
 		return
 	_clear_blueprint_drops()
 	mission_active = true
-	mission_mode = clampi(mode, 0, 2)
+	mission_mode = mode
 	relay.lobby_close()
 	relay.call_func(_receive_deploy, sector, mission_roster, mission_mode)
 	deploy_requested.emit(true, sector)
@@ -339,7 +366,7 @@ func deploy(sector := 1, mode := 0) -> void:
 func _receive_deploy(sector: int, roster: Array, mode: int) -> void:
 	if mission_active or connected_room.is_empty() or sector < 1 or sector > 10 or relay.get_sender_id() != relay.get_host():
 		return
-	if mode == Difficulty.NIGHTMARE and not nightmare_unlocked:
+	if not can_play_difficulty(sector, mode):
 		return
 	if roster.size() < 2 or roster.size() > MAX_PLAYERS or roster[0] != relay.get_host() or not roster.has(relay.get_client_id()):
 		return
@@ -347,7 +374,7 @@ func _receive_deploy(sector: int, roster: Array, mode: int) -> void:
 	if roster.any(func(id): return not id is int or roster.count(id) != 1 or not members.has(id)):
 		return
 	mission_roster = roster.duplicate()
-	mission_mode = clampi(mode, 0, 2)
+	mission_mode = mode
 	_clear_blueprint_drops()
 	mission_active = true
 	deploy_requested.emit(false, sector)

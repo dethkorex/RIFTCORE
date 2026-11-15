@@ -3,6 +3,7 @@ extends Node
 const PauseOperator := preload("res://scripts/pause_operator_panel.gd")
 const Materials := preload("res://scripts/fabrication_catalog.gd")
 const Story := preload("res://scripts/rift_story.gd")
+const StoryDialogue := preload("res://scripts/story_dialogue.gd")
 const UI := preload("res://scripts/rift_ui.gd")
 const FactoryHUD := preload("res://scripts/factory_hud.gd")
 const Catalog := preload("res://scripts/sector_catalog.gd")
@@ -91,7 +92,7 @@ func _ready() -> void:
 		or is_instance_valid(pause_menu) and pause_menu.is_visible_in_tree()
 		or is_instance_valid(coop_mission) and coop_mission.is_pause_open()
 		or is_instance_valid(home_hub) and (home_hub.is_pause_open() or home_hub.has_dialogue())
-		or not get_tree().get_nodes_in_group(&"boss_dialogue").is_empty())
+		or get_tree().has_group(&"interactive_dialogue"))
 	add_child(pointer)
 	RiftRelay.invite_received.connect(show_friend_invite)
 	var arguments := OS.get_cmdline_user_args()
@@ -598,6 +599,7 @@ func start_coop_mission(is_host: bool, number: int) -> void:
 	coop_mission.roster = RiftRelay.mission_roster.duplicate()
 	coop_mission.mode = RiftRelay.mission_mode
 	coop_mission.rewards_earned.connect(bank_coop_rewards)
+	coop_mission.operator_wiped.connect(reset_defeated_run)
 	coop_mission.exit_requested.connect(func():
 		if is_host and not coop_mission.outcome.is_empty():
 			RiftRelay.return_to_station()
@@ -612,13 +614,14 @@ func bank_coop_rewards(xp: int, bolts: int, blueprints: Array, number: int) -> v
 	var results: Dictionary = coop_mission.challenge_results()
 	profile.record_challenges(number, results)
 	profile.deposit_materials(results.get("recovered", {}))
+	profile.deposit_supplies(results.get("supplies", {}))
 	profile.award_player_xp(xp)
 	profile.credits += bolts
 	profile.unlock_sector(mini(number + 1, Catalog.SECTORS.size()))
-	if not profile.memories.has(number):
+	if number <= Story.MEMORIES.size() and not profile.memories.has(number):
 		profile.memories.append(number)
 	if number == Catalog.SECTORS.size():
-		var ending := "secret" if profile.memories.size() == Story.MEMORIES.size() else "standard"
+		var ending := "secret" if Story.has_all_memories(profile.memories) else "standard"
 		if not profile.endings.has(ending):
 			profile.endings.append(ending)
 	for id in blueprints:
@@ -627,6 +630,7 @@ func bank_coop_rewards(xp: int, bolts: int, blueprints: Array, number: int) -> v
 func close_coop_mission(message: String) -> void:
 	if not is_instance_valid(coop_mission):
 		return
+	profile.finish_field_supplies({}, false)
 	remove_child(coop_mission)
 	coop_mission.queue_free()
 	coop_mission = null
@@ -650,15 +654,13 @@ func refresh_menu_save() -> void:
 	menu.saved_difficulty = Difficulty.NORMAL
 	menu.saved_level = 1
 	menu.saved_experience = 0
-	menu.run_cleared_through = 0
 	menu.at_sector_start = false
 	menu.run_unlocks = []
 	if save:
 		menu.saved_sector = clampi(int(save.get_value("checkpoint", "sector", 1)), 1, Catalog.SECTORS.size())
-		menu.run_cleared_through = clampi(int(save.get_value("checkpoint", "run_cleared_through", menu.saved_sector - 1)), 0, Catalog.SECTORS.size())
 		profile.unlock_sector(menu.saved_sector)
 		menu.saved_act = clampi(int(save.get_value("checkpoint", "act", 1)), 1, 2)
-		menu.saved_difficulty = Difficulty.index(int(save.get_value("checkpoint", "difficulty", 0)))
+		menu.saved_difficulty = profile.available_difficulty(menu.saved_sector, int(save.get_value("checkpoint", "difficulty", Difficulty.NORMAL)))
 		menu.saved_experience = clampi(int(save.get_value("checkpoint", "experience", 0)), 0, 1000000)
 		menu.saved_level = RiftPlayer.level_for_experience(menu.saved_experience)
 		menu.at_sector_start = bool(save.get_value("checkpoint", "at_start", false))
@@ -735,9 +737,13 @@ func write_checkpoint(data: ConfigFile) -> Error:
 	return OK
 
 func open_home_hub() -> void:
+	var checkpoint := read_checkpoint()
+	if checkpoint and checkpoint.has_section_key("checkpoint", "recovered_supplies"):
+		var supplies: Dictionary = profile.finish_field_supplies(checkpoint.get_value("checkpoint", "recovered_supplies").duplicate(), true)
+		checkpoint.set_value("checkpoint", "recovered_supplies", supplies)
 	RiftRelay.local_name = profile.operator_name
 	RiftRelay.unlocked_sector = profile.unlocked_sector
-	RiftRelay.set_nightmare_unlocked(profile.nightmare_unlocked())
+	RiftRelay.set_difficulty_unlocks(profile.normal_clears.keys(), profile.nightmare_unlocked())
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	if is_instance_valid(home_hub):
 		return
@@ -799,23 +805,26 @@ func remove_home_hub() -> void:
 		home_hub = null
 
 func deploy_selected_sector(number: int, selected_difficulty := 0) -> void:
+	if number < 1 or number > profile.unlocked_sector:
+		return
 	var mode := Difficulty.index(selected_difficulty)
-	if mode == Difficulty.NIGHTMARE and not profile.nightmare_unlocked():
+	if profile.available_difficulty(number, mode) != mode:
 		return
 	if not RiftRelay.connected_room.is_empty():
 		RiftRelay.deploy(number, mode)
 		return
 	var save := read_checkpoint()
 	if save == null:
-		if number == 1:
-			mission_difficulty = mode
-			start_game()
+		mission_difficulty = mode
+		start_game(true, number)
 		return
 	var current := int(save.get_value("checkpoint", "sector", 1))
 	var cleared := clampi(int(save.get_value("checkpoint", "run_cleared_through", current - 1)), 0, Catalog.SECTORS.size())
-	if number < 1 or number > mini(cleared + 1, Catalog.SECTORS.size()):
-		return
 	if number != current or (mode != int(save.get_value("checkpoint", "difficulty", 0)) and bool(save.get_value("checkpoint", "at_start", false))):
+		if number != current:
+			for key in ["salvage", "blueprints", "recovered_supplies"]:
+				if save.has_section_key("checkpoint", key):
+					save.erase_section_key("checkpoint", key)
 		save.set_value("checkpoint", "sector", number)
 		save.set_value("checkpoint", "difficulty", mode)
 		save.set_value("checkpoint", "act", 1)
@@ -831,11 +840,12 @@ func deploy_selected_sector(number: int, selected_difficulty := 0) -> void:
 			return
 	load_game()
 
-func start_game(play_intro := true) -> void:
+func start_game(play_intro := true, first_sector := 1) -> void:
 	if is_instance_valid(game_root):
 		return
 	if play_intro:
-		sector = 1
+		profile.finish_field_supplies({}, false)
+		sector = first_sector
 		run_cleared_through = 0
 		act = 1
 		sector_deaths = 0
@@ -873,12 +883,25 @@ func play_deploy_intro() -> void:
 	player.show()
 	player.play_character_animation("land", true)
 	await get_tree().create_timer(0.25, false).timeout
+	await play_deployment_briefing()
 	factory_hud.announce("ACT 2" if act == 2 else "START", Color("71efff"))
 	if act == 1:
 		RiftAudio.play_effect(&"voice_start")
 	player.invulnerable_time = 0.5
 	player.set_physics_process(true)
 	deploying = false
+
+func play_deployment_briefing() -> void:
+	if DisplayServer.get_name() == "headless" or not profile.claim_briefing(sector, act):
+		return
+	player.invulnerable_time = maxf(player.invulnerable_time, 0.5)
+	await play_story_lines(Story.deployment(sector, act), "Begin Act")
+
+func play_story_lines(lines: Array, finish_label: String) -> void:
+	var dialogue := StoryDialogue.new()
+	game_root.add_child(dialogue)
+	await dialogue.play(lines, finish_label)
+	dialogue.queue_free()
 
 func find_safe_spawn() -> Vector3:
 	var from_editor := player.global_position
@@ -910,10 +933,8 @@ func load_game(show_deployment := true) -> void:
 		if not is_instance_valid(menu):
 			start_game()
 		return
-	mission_difficulty = Difficulty.index(int(save.get_value("checkpoint", "difficulty", 0)))
-	if mission_difficulty == Difficulty.NIGHTMARE and not profile.nightmare_unlocked():
-		mission_difficulty = Difficulty.HARD
 	sector = clampi(int(save.get_value("checkpoint", "sector", 1)), 1, Catalog.SECTORS.size())
+	mission_difficulty = profile.available_difficulty(sector, int(save.get_value("checkpoint", "difficulty", Difficulty.NORMAL)))
 	run_cleared_through = clampi(int(save.get_value("checkpoint", "run_cleared_through", sector - 1)), 0, Catalog.SECTORS.size())
 	act = clampi(int(save.get_value("checkpoint", "act", 1)), 1, 2)
 	var saved_lives := clampi(int(save.get_value("checkpoint", "lives", 3)), 1, 5)
@@ -942,6 +963,7 @@ func load_game(show_deployment := true) -> void:
 	player.credits = maxi(int(save.get_value("checkpoint", "credits", 0)), 0)
 	player.salvage = save.get_value("checkpoint", "salvage", {})
 	player.recovered_blueprints = save.get_value("checkpoint", "blueprints", {})
+	player.recovered_supplies = save.get_value("checkpoint", "recovered_supplies", {}).duplicate()
 	var restored_relays: Array = save.get_value("checkpoint", "interior_relays", [])
 	for relay in get_tree().get_nodes_in_group(&"factory_shot_relay"):
 		if not game_root.is_ancestor_of(relay):
@@ -999,10 +1021,10 @@ func load_checkpoint_location(save: ConfigFile) -> void:
 func build_pause_menu() -> void:
 	var stack := overlay()
 	var layout := HBoxContainer.new()
-	layout.add_theme_constant_override("separation", 18)
+	layout.add_theme_constant_override("separation", 12)
 	stack.add_child(layout)
-	stack = UI.column(layout, 10)
-	stack.custom_minimum_size.x = 198
+	stack = UI.column(layout, 8)
+	stack.custom_minimum_size.x = 176
 	var readout := PauseOperator.new()
 	readout.operator = func(): return player
 	readout.profile = profile
@@ -1062,11 +1084,11 @@ func overlay(sidebar := false, wide := false) -> VBoxContainer:
 		center.remove_child(panel)
 		pause_menu.add_child(panel)
 		panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-		panel.offset_left = 155
-		panel.offset_right = -155
-		panel.offset_top = 55
-		panel.offset_bottom = -55
-	return UI.column(panel, 12)
+		panel.offset_left = 88
+		panel.offset_right = -88
+		panel.offset_top = 38
+		panel.offset_bottom = -38
+	return UI.column(panel, 9)
 
 func show_pause_settings() -> void:
 	var stack := overlay(false, true)
@@ -1086,8 +1108,11 @@ func build_level() -> void:
 		game_root = stage.instantiate()
 		add_child(game_root)
 	player = game_root.get_node("Actors/RiftcoreMecha") as RiftPlayer
-	game_root.get_node("Actors").set_meta("loot_scale", Difficulty.LOOT[mission_difficulty])
+	var actors_root := game_root.get_node("Actors")
+	actors_root.set_meta("loot_scale", Difficulty.LOOT[mission_difficulty])
 	var combat_scale := Difficulty.combat_scale(sector, mission_difficulty)
+	actors_root.set_meta("opponent_health_scale", combat_scale)
+	actors_root.set_meta("mission_difficulty", mission_difficulty)
 	player.damage_taken_scale = combat_scale
 	player.experience = 0
 	player.quick_profile = profile
@@ -1101,10 +1126,7 @@ func build_level() -> void:
 		if not game_root.is_ancestor_of(enemy):
 			continue
 		enemy.target = player
-		enemy.scale_for_sector(sector, act)
-		enemy.max_health *= combat_scale
-		enemy.health = enemy.max_health
-		enemy.health_changed.emit(enemy.health, enemy.max_health)
+		enemy.scale_for_sector(sector, act, combat_scale, mission_difficulty)
 		enemy.operator_at_deploy = player
 		enemy.died.connect(_enemy_defeated)
 		remaining_enemies += 1
@@ -1211,8 +1233,7 @@ func bind_boss_signals() -> void:
 			reveal_suit.call_deferred(info)
 		else:
 			factory_hud.announce(message.to_upper(), Color(info.color))
-		if act == 1:
-			factory_hud.exit_task = "ENTER THE ACT 2 GATE"
+		factory_hud.exit_task = Story.objective(sector, act, true, Miniboss.TITLES[sector - 1])
 		var barrier := game_root.get_node("ExitBarrier") as StaticBody3D
 		barrier.get_node("CollisionShape3D").set_deferred("disabled", true)
 		var release := barrier.create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
@@ -1249,7 +1270,7 @@ func build_hud() -> void:
 	hud = CanvasLayer.new()
 	add_child(hud)
 	factory_hud = FactoryHUD.new()
-	factory_hud.exit_task = "DEFEAT THE MINIBOSS" if act == 1 else "REACH SECTOR EXTRACTION"
+	factory_hud.exit_task = Story.objective(sector, act, false, Miniboss.TITLES[sector - 1])
 	factory_hud.boss_name = String(Miniboss.TITLES[sector - 1] if act == 1 else Catalog.info(sector).boss).to_upper()
 	factory_hud.boss_health = boss.health
 	factory_hud.boss_max_health = boss.max_health
@@ -1340,6 +1361,7 @@ func save_checkpoint(manual_combat_snapshot := false) -> void:
 	save.set_value("checkpoint", "credits", player.credits)
 	save.set_value("checkpoint", "salvage", player.salvage)
 	save.set_value("checkpoint", "blueprints", player.recovered_blueprints)
+	save.set_value("checkpoint", "recovered_supplies", player.recovered_supplies.duplicate())
 	save.set_value("checkpoint", "mission_stats", mission_stats)
 	save.set_value("checkpoint", "lives", player.lives)
 	save.set_value("checkpoint", "sector_deaths", sector_deaths)
@@ -1446,14 +1468,18 @@ func confirm_reconstruction() -> void:
 	return_to_command_deck()
 
 func expire_run_on_death() -> void:
+	profile.finish_field_supplies(player.recovered_supplies, false)
 	bank_run_credits()
-	profile.unlocked_sector = 1
+	reset_defeated_run()
+
+func reset_defeated_run() -> void:
 	clear_checkpoint()
 	if save_session:
 		var error := save_session.invalidate_defeated_run()
 		if error != OK:
 			push_warning("Could not invalidate the defeated run on disk: %s" % error_string(error))
-	profile.lose_equipped_gear()
+	else:
+		profile.lose_equipped_gear()
 	run_cleared_through = 0
 	run_weapons.clear()
 
@@ -1560,13 +1586,15 @@ func _process(delta: float) -> void:
 	var replay := sector <= run_cleared_through
 	run_cleared_through = maxi(run_cleared_through, sector)
 	var bonus := 160 + 25 * (sector - 1)
-	profile.record_sector_clear(sector, mission_difficulty)
+	var hard_unlocked: bool = profile.record_sector_clear(sector, mission_difficulty)
 	var recovered := player.salvage.duplicate()
 	var recovered_blueprints: Array[String] = []
 	for id in player.recovered_blueprints:
 		if profile.collect_blueprint(id):
 			recovered_blueprints.append(profile.GEAR[id].name)
 	profile.deposit_materials(recovered)
+	var recovered_supplies: Dictionary = profile.finish_field_supplies(player.recovered_supplies, true)
+	profile.deposit_supplies(recovered_supplies)
 	player.salvage.clear()
 	player.recovered_blueprints.clear()
 	profile.core_shards += 4 + sector
@@ -1600,19 +1628,25 @@ func _process(delta: float) -> void:
 		var error := write_checkpoint(continuation)
 		if error != OK:
 			push_warning("Could not save the next sector deployment: %s" % error_string(error))
-	get_tree().paused = true
 	var ending := ""
+	var extraction_dialogue: Array = Story.hard_unlock(sector) if hard_unlocked else []
 	if final_sector:
-		var recovered_all := profile.memories.size() == Story.MEMORIES.size()
+		var recovered_all := Story.has_all_memories(profile.memories)
 		var ending_id := "secret" if recovered_all else "standard"
 		if not profile.endings.has(ending_id):
 			profile.endings.append(ending_id)
 			profile.save()
 		ending = Story.ending(recovered_all)
+		extraction_dialogue.append_array(Story.ending_exchange(recovered_all))
+	if not extraction_dialogue.is_empty() and DisplayServer.get_name() != "headless":
+		player.invulnerable_time = maxf(player.invulnerable_time, 0.5)
+		player.set_physics_process(false)
+		await play_story_lines(extraction_dialogue, "View Results")
+	get_tree().paused = true
 	var stack := overlay()
 	stack.get_parent().custom_minimum_size.x = 1050
 	preload("res://scripts/mission_complete.gd").build(
-		stack, Catalog.info(sector).title, mission_stats, recovered, recovered_blueprints,
+		stack, Catalog.info(sector).title, mission_stats, recovered, recovered_blueprints, recovered_supplies,
 		player.credits + bonus + int(reward.get("credits", 0)), int(reward.get("lives", 0)), sector_deaths,
 		ending, return_to_command_deck
 	)
@@ -1650,6 +1684,7 @@ func advance_to_act_two() -> void:
 	save.set_value("checkpoint", "credits", player.credits)
 	save.set_value("checkpoint", "salvage", player.salvage)
 	save.set_value("checkpoint", "blueprints", player.recovered_blueprints)
+	save.set_value("checkpoint", "recovered_supplies", player.recovered_supplies.duplicate())
 	save.set_value("checkpoint", "mission_stats", mission_stats)
 	save.set_value("checkpoint", "lives", player.lives)
 	save.set_value("checkpoint", "sector_deaths", sector_deaths)
@@ -1685,6 +1720,7 @@ func advance_to_act_two() -> void:
 	loading.begin()
 	await get_tree().create_timer(0.70, false).timeout
 	await loading.fade_out()
+	await play_deployment_briefing()
 	player.invulnerable_time = 0.5
 	player.set_physics_process(true)
 	advancing_act = false
@@ -1760,7 +1796,7 @@ func on_joy_connection_changed(device: int, connected: bool) -> void:
 	toggle_pause()
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed("pause") and game_root and not sector_complete and not advancing_act and not arena_intro and not suit_reveal_active and player.visible:
+	if event.is_action_pressed("pause") and game_root and not deploying and not sector_complete and not advancing_act and not arena_intro and not suit_reveal_active and player.visible:
 		toggle_pause()
 		get_viewport().set_input_as_handled()
 
@@ -1781,6 +1817,7 @@ func toggle_pause() -> void:
 		pause_menu = null
 
 func restart_run() -> void:
+	profile.finish_field_supplies(player.recovered_supplies, false)
 	bank_run_credits()
 	get_tree().paused = false
 	get_tree().set_meta(&"restart_factory", true)
@@ -1794,6 +1831,7 @@ func return_to_title() -> void:
 
 
 func return_to_command_deck() -> void:
+	profile.finish_field_supplies(player.recovered_supplies, false)
 	bank_run_credits()
 	get_tree().paused = false
 	get_tree().set_meta(&"open_command_deck", true)

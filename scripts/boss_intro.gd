@@ -2,31 +2,8 @@ extends Node
 
 const UI := preload("res://scripts/rift_ui.gd")
 const CombatVFX := preload("res://scripts/combat_vfx.gd")
-const OPERATOR_PORTRAIT := preload("res://assets/ui/rx07_menu.png")
-const MINIBOSS_LINES := [
-	"Factory breach confirmed. I will seal it myself.",
-	"The canopy shuts its jaws here.",
-	"Your core will freeze before you cross this hatch.",
-	"Bulkhead sealed. Pressure rising.",
-	"Every intruder leaves a record. Yours ends here.",
-	"Launch window closed. Clear my runway.",
-	"Containment breach. Beginning sterilization.",
-	"Unregistered signal. I am cutting your transmission.",
-	"Your frame will look better on the scrap pile.",
-	"Entry denied. The Nexus belongs to the Rift.",
-]
-const BOSS_LINES := [
-	"That little cannon will barely scratch my drill.",
-	"I have had a long time to grow roots in this place.",
-	"When the reactor stops, so do you.",
-	"The pressure outside is nothing compared to what I can do.",
-	"I read your approach a thousand moves ago.",
-	"One pass is all I need to cut you down.",
-	"The lab made me to survive. What did they make you for?",
-	"All that noise, and you still cannot break orbit.",
-	"Everything breaks down. I decide what gets rebuilt.",
-	"I can hear every version of you that failed to reach me.",
-]
+const Story := preload("res://scripts/rift_story.gd")
+const StoryDialogue := preload("res://scripts/story_dialogue.gd")
 
 func play(rig: SideCameraRig, boss: Node3D, floor_y: float, title: String, tint: Color, sector: int, act: int, online := false) -> void:
 	var camera := rig.get_node("Camera3D") as Camera3D
@@ -95,9 +72,13 @@ func play(rig: SideCameraRig, boss: Node3D, floor_y: float, title: String, tint:
 	name_reveal.tween_interval(1.25)
 	name_reveal.tween_property(label, "modulate:a", 0.0, 0.33)
 	await name_reveal.finished
-	var portrait := await capture_portrait(camera, head, height)
-	await play_dialogue(layer, title, tint, sector, act, portrait, online)
-
+	if DisplayServer.get_name() != "headless":
+		var portrait := await capture_portrait(camera, head, height)
+		var dialogue := StoryDialogue.new()
+		dialogue.add_to_group(&"boss_dialogue")
+		add_child(dialogue)
+		await dialogue.play(Story.boss_exchange(sector, act), "Begin Fight", online, title, portrait, tint, online)
+		dialogue.queue_free()
 	var target := rig.target
 	var position := target.global_position if is_instance_valid(target) else landing
 	var facing := target.facing if is_instance_valid(target) else 1.0
@@ -137,67 +118,3 @@ func capture_portrait(camera: Camera3D, head: Vector3, height: float) -> Texture
 	var span := maxi(2, roundi(absf(point.y - edge.y) * factor.y * 2.0))
 	var crop := Rect2i(Vector2i(point * factor) - Vector2i(span, span) / 2, Vector2i(span, span))
 	return ImageTexture.create_from_image(frame.get_region(crop.intersection(Rect2i(Vector2i.ZERO, frame.get_size()))))
-
-func play_dialogue(layer: CanvasLayer, title: String, tint: Color, sector: int, act: int, boss_image: Texture2D, online: bool) -> void:
-	var screen := MarginContainer.new()
-	screen.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	layer.add_child(screen)
-	screen.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
-	screen.offset_left = -416
-	screen.offset_right = 416
-	screen.anchor_top = 0.80
-	screen.anchor_bottom = 0.80
-	screen.offset_top = -146
-	screen.offset_bottom = -21
-	var box := HBoxContainer.new()
-	box.add_theme_constant_override("separation", 12)
-	screen.add_child(box)
-
-	var operator_image := AtlasTexture.new()
-	operator_image.atlas = OPERATOR_PORTRAIT
-	var source := OPERATOR_PORTRAIT.get_size()
-	operator_image.region = Rect2(source.x * 0.35, source.y * 0.05, source.x * 0.31, source.y * 0.46)
-	var operator_panel := portrait_panel(box, operator_image, UI.CYAN)
-	var panel := PanelContainer.new()
-	panel.add_theme_stylebox_override("panel", UI.frame(Color("0b172aed"), tint, 13))
-	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	box.add_child(panel)
-	var dialogue := UI.column(panel, 5)
-	var speaker := UI.label(dialogue, title.to_upper(), 23, tint.lightened(0.25))
-	var line := UI.label(dialogue, "", 22, UI.WHITE)
-	var boss_panel := portrait_panel(box, boss_image, tint.lightened(0.3))
-	var index := clampi(sector - 1, 0, BOSS_LINES.size() - 1)
-	var reader := preload("res://scripts/dialogue_typewriter.gd").new()
-	layer.add_child(reader)
-	reader.body = line
-	reader.next = UI.button(dialogue, "Next", reader.advance, true, 36)
-	UI.label(dialogue, "START  Skip dialogue", 14, UI.MUTED)
-	reader.add_to_group(&"boss_dialogue")
-	operator_panel.modulate.a = 0.52
-	var automatic := online or DisplayServer.get_name() == "headless"
-	var started_at := Time.get_ticks_msec()
-	await reader.show_line(MINIBOSS_LINES[index] if act == 1 else BOSS_LINES[index], automatic)
-	if not reader.skipped:
-		speaker.text = "RX-07"
-		speaker.add_theme_color_override("font_color", UI.CYAN)
-		boss_panel.modulate.a = 0.52
-		operator_panel.modulate.a = 1.0
-		reader.next.text = "Begin Fight"
-		await reader.show_line("I need through. It is your call how this ends." if act == 1 else ("Then you know what comes next." if sector == BOSS_LINES.size() else "I have a sector to clear. Stand down."), automatic)
-	var skipped := bool(reader.skipped)
-	reader.queue_free()
-	screen.queue_free()
-	if online and skipped:
-		await get_tree().create_timer(maxf(0.0, 6.8 - (Time.get_ticks_msec() - started_at) * 0.001), false).timeout
-
-func portrait_panel(row: HBoxContainer, portrait: Texture2D, tint: Color) -> PanelContainer:
-	var panel := PanelContainer.new()
-	panel.add_theme_stylebox_override("panel", UI.frame(Color("0b172a"), tint, 6))
-	row.add_child(panel)
-	var image := TextureRect.new()
-	image.custom_minimum_size = Vector2(112, 106)
-	image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	image.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-	image.texture = portrait
-	panel.add_child(image)
-	return panel

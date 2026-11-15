@@ -79,3 +79,20 @@ func _process(delta: float) -> void:
 		burn_effect = null
 		burn_power = 0.0
 
+
+func ignore_arena_access_decks() -> void:
+	# Arena decks carry the operators, while the boss keeps its lane and floor collision.
+	for deck in get_tree().get_nodes_in_group(&"arena_player_deck"):
+		if deck is PhysicsBody3D:
+			add_collision_exception_with(deck)
+		for body in deck.find_children("*", "PhysicsBody3D", true, false):
+			add_collision_exception_with(body)
+
+func arena_supply_anchor(index: int) -> Node3D:
+	var stage := get_parent().get_parent()
+	var arena := stage.get_node_or_null("TERRAIN/BossWing")
+	if arena:
+		for platform: Node3D in arena.get_children():
+			if int(platform.get_meta(&"boss_supply_anchor", -1)) == index:
+				return platform
+	return null

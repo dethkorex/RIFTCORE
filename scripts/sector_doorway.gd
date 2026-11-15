@@ -11,6 +11,7 @@ const PALETTES := {
 }
 @export_enum("foundry", "jungle", "cryo", "pressure", "archive", "flight", "lab", "orbital", "scrap", "rift") var style := "foundry"
 @export var sealed := false
+@export var boss_entry := false
 @export var width := 3.75
 @export var height := 4.22
 @export var trim_texture: Texture2D
@@ -22,7 +23,16 @@ var signal_light: Material
 
 func _ready() -> void:
 	var colors: Array = PALETTES[style]
-	shell = finish(colors[0], 0.46, trim_texture)
+	shell = finish(colors[0], 0.46)
+	if trim_texture:
+		var surface := ShaderMaterial.new()
+		surface.shader = preload("res://assets/campaign/sector_surface.gdshader")
+		surface.set_shader_parameter("terrain_albedo", trim_texture)
+		surface.set_shader_parameter("texture_scale", .42)
+		surface.set_shader_parameter("reflected_light", .24)
+		surface.set_shader_parameter("roughness", .56)
+		surface.set_shader_parameter("metal", .30)
+		shell = surface
 	trim = finish(colors[1], 0.50)
 	recess = finish(colors[2], 0.25)
 	signal_light = finish(colors[3], 0.12)
@@ -33,6 +43,8 @@ func _ready() -> void:
 		build_shutter()
 	else:
 		build_frame()
+		if boss_entry:
+			build_lock_frame()
 
 func finish(hex: String, metal: float, image: Texture2D = null) -> StandardMaterial3D:
 	var surface := StandardMaterial3D.new()
@@ -81,6 +93,18 @@ func build_frame() -> void:
 	for z in [-0.37, 0.37]:
 		slab("Lintel signal", Vector3(0, height - crown * 0.69, z), Vector3(width * 0.43, 0.050, 0.045), signal_light)
 
+func build_lock_frame() -> void:
+	# The motor stays above the swept opening. All depth hardware is visual.
+	var crown := height - .19
+	slab("Blast lock cassette", Vector3(0,crown,0), Vector3(width * 0.78,.55,1.15), recess, .18)
+	for side in [-1,1]:
+		var x := float(side) * width * .39
+		slab("Load-bearing corner armor", Vector3(x,crown-.13,0), Vector3(.59,.65,1.27), trim, .13)
+		var a := Vector3(x,crown-.05,.63)
+		var b := Vector3(x*.60,crown-.05,.63)
+		bar("Lock status rail", a, b, .067, .051, signal_light)
+		slab("Jamb actuator", Vector3(side*width*.438,height*.55,0), Vector3(.32,height*.55,.95), shell, .092)
+
 func build_shutter() -> void:
 	var panel_w := width * 0.495
 	slab("Pressure backing", Vector3(0,height * 0.49,0), Vector3(width * 0.965,height * 0.98,0.41), recess)
@@ -90,10 +114,18 @@ func build_shutter() -> void:
 		for row in range(3):
 			var y := height * (0.22 + 0.28 * row)
 			slab("Recessed panel", Vector3(x,y,0.315), Vector3(panel_w * 0.80,height * 0.204,0.105), recess)
-			slab("Raised armor bevel", Vector3(x,y - .030,0.378), Vector3(panel_w * 0.67,height * 0.143,0.075), trim)
+			var armor := slab("Raised armor bevel", Vector3(x,y - .030,0.378),
+				Vector3(panel_w * 0.67,height * 0.143,0.075), shell if trim_texture else trim, .092)
+			if boss_entry:
+				armor.rotation.z = side * 0.095
+			for face in [-1, 1]:
+				slab("Interlock tooth", Vector3(x,y,float(face)*.28), Vector3(panel_w*.73,.083,.17), trim, .032)
 			slab("Lock indicator", Vector3(side * .13,y,0.386), Vector3(.068,height * 0.083,0.036), signal_light)
 		signature(Vector3(x,height * 0.51,0.39), side)
 		slab("Edge lock", Vector3(side * (width * 0.48),height * 0.46,0.02), Vector3(.18,height * 0.59,.59), trim)
+	for edge in [-1, 1]:
+		slab("Door clearance stripe", Vector3(0,height*.80,float(edge)*.273),
+			Vector3(width*.90,.062,.073), signal_light, .014)
 
 func signature(at: Vector3, side: int) -> void:
 	match style:

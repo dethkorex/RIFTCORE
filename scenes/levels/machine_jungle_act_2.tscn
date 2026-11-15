@@ -32,8 +32,8 @@
 
 [ext_resource type="PackedScene" path="res://scenes/levels/verdant_colossus.tscn" id="boss"]
 
-[ext_resource type="PackedScene" path="res://assets/campaign/machine_jungle/interior/machine_jungle_deck.glb" id="RCDeck"]
-[ext_resource type="PackedScene" path="res://assets/campaign/machine_jungle/interior/machine_jungle_wall.glb" id="RCWall"]
+[ext_resource type="PackedScene" path="res://assets/campaign/machine_jungle/surfaces/deck.tscn" id="RCDeck"]
+[ext_resource type="PackedScene" path="res://assets/campaign/machine_jungle/surfaces/shaft.tscn" id="RCWall"]
 [ext_resource type="PackedScene" path="res://assets/campaign/machine_jungle/interior/machine_jungle_room.glb" id="RCRoom"]
 [ext_resource type="PackedScene" path="res://assets/campaign/machine_jungle/interior/machine_jungle_fixture.glb" id="RCFixture"]
 [ext_resource type="PackedScene" path="res://assets/neon_factory/interiors/shot_relay.glb" id="RCDoorRelay"]
@@ -49,6 +49,9 @@
 [ext_resource type="Texture2D" path="res://assets/machine_jungle/jungle_panorama.png" id="RCPanorama"]
 [ext_resource type="PackedScene" path="res://assets/campaign/machine_jungle/interior/jungle_root_bank.glb" id="RCJungleBank"]
 [ext_resource type="PackedScene" path="res://assets/campaign/machine_jungle/interior/jungle_cave_mouth.glb" id="RCJungleMouth"]
+
+[ext_resource type="Script" path="res://scripts/sector_dressing.gd" id="SectorDressing"]
+[ext_resource type="Texture2D" path="res://assets/campaign/machine_jungle/surfaces/sector_wall.jpg" id="SectorAlbedo"]
 
 [sub_resource type="BoxShape3D" id="Checkpoint"]
 size = Vector3(2.1, 1.9, 1.8)
@@ -879,11 +882,13 @@ position = Vector3(608.25, 1.9, 0)
 [node name="Door" parent="Gate" instance=ExtResource("gate")]
 rotation = Vector3(0, -1.5708, 0)
 scale = Vector3(0.64, 1.8108, 1)
+boss_entry = true
 
 [node name="PortalFrame" parent="Gate" instance=ExtResource("arch")]
 position = Vector3(-0.25, 0, 0)
 rotation = Vector3(0, -1.5708, 0)
 scale = Vector3(1.1733, 2.3, 1.12)
+boss_entry = true
 
 [node name="Blocker" type="StaticBody3D" parent="Gate"]
 
@@ -1546,27 +1551,15 @@ rotation = Vector3(0, -1.5708, 0)
 
 [node name="InteriorCladding_3" type="Node3D" parent="TERRAIN/Room02_Gallery"]
 
-[node name="Bulkhead0" parent="TERRAIN/Room02_Gallery/InteriorCladding_3" instance=ExtResource("RCRoom")]
-position = Vector3(118.25, -2.7, -3.4)
-scale = Vector3(0.75, 2.925, 1)
-
 [node name="BayLight0" type="OmniLight3D" parent="TERRAIN/Room02_Gallery/InteriorCladding_3"]
 position = Vector3(118.25, 18.8, -1.85)
 light_color = Color(0.5294, 0.8627, 0.2392, 1)
 light_energy = 0.8
 omni_range = 8.5
 
-[node name="Bulkhead1" parent="TERRAIN/Room02_Gallery/InteriorCladding_3" instance=ExtResource("RCRoom")]
-position = Vector3(122.75, -2.7, -4)
-scale = Vector3(0.75, 2.925, 1)
-
 [node name="Ceiling0" parent="TERRAIN/Room02_Gallery/InteriorCladding_3" instance=ExtResource("RCDeck")]
 position = Vector3(120.5, 20.7, -1.25)
 scale = Vector3(1.5, 1.6, 1.9)
-
-[node name="Foundation0" parent="TERRAIN/Room02_Gallery/InteriorCladding_3" instance=ExtResource("RCRoom")]
-position = Vector3(120.5, -10.6, -2.2)
-scale = Vector3(1.5, 1, 1)
 
 [node name="OverheadLoop" type="Node3D" parent="TERRAIN"]
 metadata/left = 125
@@ -1956,18 +1949,6 @@ omni_range = 7.0
 
 [node name="InteriorCladding_10" type="Node3D" parent="TERRAIN/OverheadLoop"]
 
-[node name="Bulkhead0" parent="TERRAIN/OverheadLoop/InteriorCladding_10" instance=ExtResource("RCRoom")]
-position = Vector3(128.5, -3.7, -4)
-scale = Vector3(1.1667, 3.2375, 1)
-
-[node name="Bulkhead1" parent="TERRAIN/OverheadLoop/InteriorCladding_10" instance=ExtResource("RCRoom")]
-position = Vector3(135.5, -3.7, -3.4)
-scale = Vector3(1.1667, 3.2375, 1)
-
-[node name="Bulkhead2" parent="TERRAIN/OverheadLoop/InteriorCladding_10" instance=ExtResource("RCRoom")]
-position = Vector3(142.5, -3.7, -3.4)
-scale = Vector3(1.1667, 3.2375, 1)
-
 [node name="SectorFixture2" parent="TERRAIN/OverheadLoop/InteriorCladding_10" instance=ExtResource("RCFixture")]
 position = Vector3(142.5, -1.85, -2.67)
 
@@ -1977,56 +1958,20 @@ light_color = Color(0.5294, 0.8627, 0.2392, 1)
 light_energy = 0.8
 omni_range = 8.5
 
-[node name="Bulkhead3" parent="TERRAIN/OverheadLoop/InteriorCladding_10" instance=ExtResource("RCRoom")]
-position = Vector3(149.5, -3.7, -4)
-scale = Vector3(1.1667, 3.2375, 1)
-
-[node name="Bulkhead4" parent="TERRAIN/OverheadLoop/InteriorCladding_10" instance=ExtResource("RCRoom")]
-position = Vector3(156.5, -3.7, -3.4)
-scale = Vector3(1.1667, 3.2375, 1)
-
-[node name="Bulkhead5" parent="TERRAIN/OverheadLoop/InteriorCladding_10" instance=ExtResource("RCRoom")]
-position = Vector3(163.5, -3.7, -3.4)
-scale = Vector3(1.1667, 3.2375, 1)
-
 [node name="BayLight5" type="OmniLight3D" parent="TERRAIN/OverheadLoop/InteriorCladding_10"]
 position = Vector3(163.5, 20.3, -1.85)
 light_color = Color(0.5294, 0.8627, 0.2392, 1)
 light_energy = 0.8
 omni_range = 8.5
 
-[node name="Bulkhead6" parent="TERRAIN/OverheadLoop/InteriorCladding_10" instance=ExtResource("RCRoom")]
-position = Vector3(170.5, -3.7, -4)
-scale = Vector3(1.1667, 3.2375, 1)
-
-[node name="Bulkhead7" parent="TERRAIN/OverheadLoop/InteriorCladding_10" instance=ExtResource("RCRoom")]
-position = Vector3(177.5, -3.7, -3.4)
-scale = Vector3(1.1667, 3.2375, 1)
-
 [node name="SectorFixture7" parent="TERRAIN/OverheadLoop/InteriorCladding_10" instance=ExtResource("RCFixture")]
 position = Vector3(177.5, -1.85, -2.67)
-
-[node name="Bulkhead8" parent="TERRAIN/OverheadLoop/InteriorCladding_10" instance=ExtResource("RCRoom")]
-position = Vector3(184.5, -3.7, -3.4)
-scale = Vector3(1.1667, 3.2375, 1)
 
 [node name="BayLight8" type="OmniLight3D" parent="TERRAIN/OverheadLoop/InteriorCladding_10"]
 position = Vector3(184.5, 20.3, -1.85)
 light_color = Color(0.5294, 0.8627, 0.2392, 1)
 light_energy = 0.8
 omni_range = 8.5
-
-[node name="Bulkhead9" parent="TERRAIN/OverheadLoop/InteriorCladding_10" instance=ExtResource("RCRoom")]
-position = Vector3(191.5, -3.7, -4)
-scale = Vector3(1.1667, 3.2375, 1)
-
-[node name="Bulkhead10" parent="TERRAIN/OverheadLoop/InteriorCladding_10" instance=ExtResource("RCRoom")]
-position = Vector3(198.5, -3.7, -3.4)
-scale = Vector3(1.1667, 3.2375, 1)
-
-[node name="Bulkhead11" parent="TERRAIN/OverheadLoop/InteriorCladding_10" instance=ExtResource("RCRoom")]
-position = Vector3(205.5, -3.7, -3.4)
-scale = Vector3(1.1667, 3.2375, 1)
 
 [node name="BayLight11" type="OmniLight3D" parent="TERRAIN/OverheadLoop/InteriorCladding_10"]
 position = Vector3(205.5, 20.3, -1.85)
@@ -2038,57 +1983,29 @@ omni_range = 8.5
 position = Vector3(131, 22.2, -1.25)
 scale = Vector3(2, 1.6, 1.9)
 
-[node name="Foundation0" parent="TERRAIN/OverheadLoop/InteriorCladding_10" instance=ExtResource("RCRoom")]
-position = Vector3(131, -11.6, -2.2)
-scale = Vector3(2, 1, 1)
-
 [node name="Ceiling1" parent="TERRAIN/OverheadLoop/InteriorCladding_10" instance=ExtResource("RCDeck")]
 position = Vector3(143, 22.2, -1.25)
 scale = Vector3(2, 1.6, 1.9)
-
-[node name="Foundation1" parent="TERRAIN/OverheadLoop/InteriorCladding_10" instance=ExtResource("RCRoom")]
-position = Vector3(143, -11.6, -2.2)
-scale = Vector3(2, 1, 1)
 
 [node name="Ceiling2" parent="TERRAIN/OverheadLoop/InteriorCladding_10" instance=ExtResource("RCDeck")]
 position = Vector3(155, 22.2, -1.25)
 scale = Vector3(2, 1.6, 1.9)
 
-[node name="Foundation2" parent="TERRAIN/OverheadLoop/InteriorCladding_10" instance=ExtResource("RCRoom")]
-position = Vector3(155, -11.6, -2.2)
-scale = Vector3(2, 1, 1)
-
 [node name="Ceiling3" parent="TERRAIN/OverheadLoop/InteriorCladding_10" instance=ExtResource("RCDeck")]
 position = Vector3(167, 22.2, -1.25)
 scale = Vector3(2, 1.6, 1.9)
-
-[node name="Foundation3" parent="TERRAIN/OverheadLoop/InteriorCladding_10" instance=ExtResource("RCRoom")]
-position = Vector3(167, -11.6, -2.2)
-scale = Vector3(2, 1, 1)
 
 [node name="Ceiling4" parent="TERRAIN/OverheadLoop/InteriorCladding_10" instance=ExtResource("RCDeck")]
 position = Vector3(179, 22.2, -1.25)
 scale = Vector3(2, 1.6, 1.9)
 
-[node name="Foundation4" parent="TERRAIN/OverheadLoop/InteriorCladding_10" instance=ExtResource("RCRoom")]
-position = Vector3(179, -11.6, -2.2)
-scale = Vector3(2, 1, 1)
-
 [node name="Ceiling5" parent="TERRAIN/OverheadLoop/InteriorCladding_10" instance=ExtResource("RCDeck")]
 position = Vector3(191, 22.2, -1.25)
 scale = Vector3(2, 1.6, 1.9)
 
-[node name="Foundation5" parent="TERRAIN/OverheadLoop/InteriorCladding_10" instance=ExtResource("RCRoom")]
-position = Vector3(191, -11.6, -2.2)
-scale = Vector3(2, 1, 1)
-
 [node name="Ceiling6" parent="TERRAIN/OverheadLoop/InteriorCladding_10" instance=ExtResource("RCDeck")]
 position = Vector3(203, 22.2, -1.25)
 scale = Vector3(2, 1.6, 1.9)
-
-[node name="Foundation6" parent="TERRAIN/OverheadLoop/InteriorCladding_10" instance=ExtResource("RCRoom")]
-position = Vector3(203, -11.6, -2.2)
-scale = Vector3(2, 1, 1)
 
 [node name="Room03_Fall" type="Node3D" parent="TERRAIN"]
 position = Vector3(0, 0, 0)
@@ -2223,38 +2140,14 @@ shape = SubResource("BoxShape3D_0280")
 
 [node name="InteriorCladding_4" type="Node3D" parent="TERRAIN/Room03_Fall"]
 
-[node name="Bulkhead0" parent="TERRAIN/Room03_Fall/InteriorCladding_4" instance=ExtResource("RCRoom")]
-position = Vector3(212.33, -7.3, -4)
-scale = Vector3(1.1111, 3.3, 1)
-
-[node name="Bulkhead1" parent="TERRAIN/Room03_Fall/InteriorCladding_4" instance=ExtResource("RCRoom")]
-position = Vector3(219, -7.3, -3.4)
-scale = Vector3(1.1111, 3.3, 1)
-
-[node name="Bulkhead2" parent="TERRAIN/Room03_Fall/InteriorCladding_4" instance=ExtResource("RCRoom")]
-position = Vector3(225.67, -7.3, -3.4)
-scale = Vector3(1.1111, 3.3, 1)
-
 [node name="BayLight2" type="OmniLight3D" parent="TERRAIN/Room03_Fall/InteriorCladding_4"]
 position = Vector3(225.67, 17.2, -1.85)
 light_color = Color(0.5294, 0.8627, 0.2392, 1)
 light_energy = 0.8
 omni_range = 8.5
 
-[node name="Bulkhead3" parent="TERRAIN/Room03_Fall/InteriorCladding_4" instance=ExtResource("RCRoom")]
-position = Vector3(232.33, -7.3, -4)
-scale = Vector3(1.1111, 3.3, 1)
-
 [node name="SectorFixture3" parent="TERRAIN/Room03_Fall/InteriorCladding_4" instance=ExtResource("RCFixture")]
 position = Vector3(232.33, -5.45, -3.27)
-
-[node name="Bulkhead4" parent="TERRAIN/Room03_Fall/InteriorCladding_4" instance=ExtResource("RCRoom")]
-position = Vector3(239, -7.3, -3.4)
-scale = Vector3(1.1111, 3.3, 1)
-
-[node name="Bulkhead5" parent="TERRAIN/Room03_Fall/InteriorCladding_4" instance=ExtResource("RCRoom")]
-position = Vector3(245.67, -7.3, -3.4)
-scale = Vector3(1.1111, 3.3, 1)
 
 [node name="BayLight5" type="OmniLight3D" parent="TERRAIN/Room03_Fall/InteriorCladding_4"]
 position = Vector3(245.67, 17.2, -1.85)
@@ -2266,33 +2159,17 @@ omni_range = 8.5
 position = Vector3(214, 19.1, -1.25)
 scale = Vector3(1.6667, 1.6, 1.9)
 
-[node name="Foundation0" parent="TERRAIN/Room03_Fall/InteriorCladding_4" instance=ExtResource("RCRoom")]
-position = Vector3(214, -15.2, -2.2)
-scale = Vector3(1.6667, 1, 1)
-
 [node name="Ceiling1" parent="TERRAIN/Room03_Fall/InteriorCladding_4" instance=ExtResource("RCDeck")]
 position = Vector3(224, 19.1, -1.25)
 scale = Vector3(1.6667, 1.6, 1.9)
-
-[node name="Foundation1" parent="TERRAIN/Room03_Fall/InteriorCladding_4" instance=ExtResource("RCRoom")]
-position = Vector3(224, -15.2, -2.2)
-scale = Vector3(1.6667, 1, 1)
 
 [node name="Ceiling2" parent="TERRAIN/Room03_Fall/InteriorCladding_4" instance=ExtResource("RCDeck")]
 position = Vector3(234, 19.1, -1.25)
 scale = Vector3(1.6667, 1.6, 1.9)
 
-[node name="Foundation2" parent="TERRAIN/Room03_Fall/InteriorCladding_4" instance=ExtResource("RCRoom")]
-position = Vector3(234, -15.2, -2.2)
-scale = Vector3(1.6667, 1, 1)
-
 [node name="Ceiling3" parent="TERRAIN/Room03_Fall/InteriorCladding_4" instance=ExtResource("RCDeck")]
 position = Vector3(244, 19.1, -1.25)
 scale = Vector3(1.6667, 1.6, 1.9)
-
-[node name="Foundation3" parent="TERRAIN/Room03_Fall/InteriorCladding_4" instance=ExtResource("RCRoom")]
-position = Vector3(244, -15.2, -2.2)
-scale = Vector3(1.6667, 1, 1)
 
 [node name="Room04_Shaft" type="Node3D" parent="TERRAIN"]
 position = Vector3(0, 0, 0)
@@ -2529,52 +2406,20 @@ shape = SubResource("BoxShape3D_0356")
 
 [node name="InteriorCladding_5" type="Node3D" parent="TERRAIN/Room04_Shaft"]
 
-[node name="Bulkhead0" parent="TERRAIN/Room04_Shaft/InteriorCladding_5" instance=ExtResource("RCRoom")]
-position = Vector3(252.44, -7.3, -3.4)
-scale = Vector3(1.1458, 3.7563, 1)
-
-[node name="Bulkhead1" parent="TERRAIN/Room04_Shaft/InteriorCladding_5" instance=ExtResource("RCRoom")]
-position = Vector3(259.31, -7.3, -3.4)
-scale = Vector3(1.1458, 3.7563, 1)
-
 [node name="BayLight1" type="OmniLight3D" parent="TERRAIN/Room04_Shaft/InteriorCladding_5"]
 position = Vector3(259.31, 20.85, -1.85)
 light_color = Color(0.5294, 0.8627, 0.2392, 1)
 light_energy = 0.8
 omni_range = 8.5
 
-[node name="Bulkhead2" parent="TERRAIN/Room04_Shaft/InteriorCladding_5" instance=ExtResource("RCRoom")]
-position = Vector3(266.19, -7.3, -4)
-scale = Vector3(1.1458, 3.7563, 1)
-
 [node name="SectorFixture2" parent="TERRAIN/Room04_Shaft/InteriorCladding_5" instance=ExtResource("RCFixture")]
 position = Vector3(266.19, -5.45, -3.27)
-
-[node name="Bulkhead3" parent="TERRAIN/Room04_Shaft/InteriorCladding_5" instance=ExtResource("RCRoom")]
-position = Vector3(273.06, -7.3, -3.4)
-scale = Vector3(1.1458, 3.7563, 1)
-
-[node name="Bulkhead4" parent="TERRAIN/Room04_Shaft/InteriorCladding_5" instance=ExtResource("RCRoom")]
-position = Vector3(279.94, -7.3, -3.4)
-scale = Vector3(1.1458, 3.7563, 1)
 
 [node name="BayLight4" type="OmniLight3D" parent="TERRAIN/Room04_Shaft/InteriorCladding_5"]
 position = Vector3(279.94, 20.85, -1.85)
 light_color = Color(0.5294, 0.8627, 0.2392, 1)
 light_energy = 0.8
 omni_range = 8.5
-
-[node name="Bulkhead5" parent="TERRAIN/Room04_Shaft/InteriorCladding_5" instance=ExtResource("RCRoom")]
-position = Vector3(286.81, -7.3, -4)
-scale = Vector3(1.1458, 3.7563, 1)
-
-[node name="Bulkhead6" parent="TERRAIN/Room04_Shaft/InteriorCladding_5" instance=ExtResource("RCRoom")]
-position = Vector3(293.69, -7.3, -3.4)
-scale = Vector3(1.1458, 3.7563, 1)
-
-[node name="Bulkhead7" parent="TERRAIN/Room04_Shaft/InteriorCladding_5" instance=ExtResource("RCRoom")]
-position = Vector3(300.56, -7.3, -3.4)
-scale = Vector3(1.1458, 3.7563, 1)
 
 [node name="SectorFixture7" parent="TERRAIN/Room04_Shaft/InteriorCladding_5" instance=ExtResource("RCFixture")]
 position = Vector3(300.56, -5.45, -2.67)
@@ -2589,41 +2434,21 @@ omni_range = 8.5
 position = Vector3(254.5, 22.75, -1.25)
 scale = Vector3(1.8333, 1.6, 1.9)
 
-[node name="Foundation0" parent="TERRAIN/Room04_Shaft/InteriorCladding_5" instance=ExtResource("RCRoom")]
-position = Vector3(254.5, -15.2, -2.2)
-scale = Vector3(1.8333, 1, 1)
-
 [node name="Ceiling1" parent="TERRAIN/Room04_Shaft/InteriorCladding_5" instance=ExtResource("RCDeck")]
 position = Vector3(265.5, 22.75, -1.25)
 scale = Vector3(1.8333, 1.6, 1.9)
-
-[node name="Foundation1" parent="TERRAIN/Room04_Shaft/InteriorCladding_5" instance=ExtResource("RCRoom")]
-position = Vector3(265.5, -15.2, -2.2)
-scale = Vector3(1.8333, 1, 1)
 
 [node name="Ceiling2" parent="TERRAIN/Room04_Shaft/InteriorCladding_5" instance=ExtResource("RCDeck")]
 position = Vector3(276.5, 22.75, -1.25)
 scale = Vector3(1.8333, 1.6, 1.9)
 
-[node name="Foundation2" parent="TERRAIN/Room04_Shaft/InteriorCladding_5" instance=ExtResource("RCRoom")]
-position = Vector3(276.5, -15.2, -2.2)
-scale = Vector3(1.8333, 1, 1)
-
 [node name="Ceiling3" parent="TERRAIN/Room04_Shaft/InteriorCladding_5" instance=ExtResource("RCDeck")]
 position = Vector3(287.5, 22.75, -1.25)
 scale = Vector3(1.8333, 1.6, 1.9)
 
-[node name="Foundation3" parent="TERRAIN/Room04_Shaft/InteriorCladding_5" instance=ExtResource("RCRoom")]
-position = Vector3(287.5, -15.2, -2.2)
-scale = Vector3(1.8333, 1, 1)
-
 [node name="Ceiling4" parent="TERRAIN/Room04_Shaft/InteriorCladding_5" instance=ExtResource("RCDeck")]
 position = Vector3(298.5, 22.75, -1.25)
 scale = Vector3(1.8333, 1.6, 1.9)
-
-[node name="Foundation4" parent="TERRAIN/Room04_Shaft/InteriorCladding_5" instance=ExtResource("RCRoom")]
-position = Vector3(298.5, -15.2, -2.2)
-scale = Vector3(1.8333, 1, 1)
 
 [node name="Room05_Switchback" type="Node3D" parent="TERRAIN"]
 position = Vector3(0, 0, 0)
@@ -3708,48 +3533,20 @@ shape = SubResource("BoxShape3D_0642")
 
 [node name="InteriorCladding_6" type="Node3D" parent="TERRAIN/Room05_Switchback"]
 
-[node name="Bulkhead0" parent="TERRAIN/Room05_Switchback/InteriorCladding_6" instance=ExtResource("RCRoom")]
-position = Vector3(307.47, -13.75, -3.4)
-scale = Vector3(1.1556, 4.85, 1)
-
 [node name="BayLight0" type="OmniLight3D" parent="TERRAIN/Room05_Switchback/InteriorCladding_6"]
 position = Vector3(307.47, 23.15, -1.85)
 light_color = Color(0.5294, 0.8627, 0.2392, 1)
 light_energy = 0.8
 omni_range = 8.5
 
-[node name="Bulkhead1" parent="TERRAIN/Room05_Switchback/InteriorCladding_6" instance=ExtResource("RCRoom")]
-position = Vector3(314.4, -13.75, -4)
-scale = Vector3(1.1556, 4.85, 1)
-
 [node name="SectorFixture1" parent="TERRAIN/Room05_Switchback/InteriorCladding_6" instance=ExtResource("RCFixture")]
 position = Vector3(314.4, -11.9, -3.27)
-
-[node name="Bulkhead2" parent="TERRAIN/Room05_Switchback/InteriorCladding_6" instance=ExtResource("RCRoom")]
-position = Vector3(321.33, -13.75, -3.4)
-scale = Vector3(1.1556, 4.85, 1)
-
-[node name="Bulkhead3" parent="TERRAIN/Room05_Switchback/InteriorCladding_6" instance=ExtResource("RCRoom")]
-position = Vector3(328.27, -13.75, -3.4)
-scale = Vector3(1.1556, 4.85, 1)
 
 [node name="BayLight3" type="OmniLight3D" parent="TERRAIN/Room05_Switchback/InteriorCladding_6"]
 position = Vector3(328.27, 23.15, -1.85)
 light_color = Color(0.5294, 0.8627, 0.2392, 1)
 light_energy = 0.8
 omni_range = 8.5
-
-[node name="Bulkhead4" parent="TERRAIN/Room05_Switchback/InteriorCladding_6" instance=ExtResource("RCRoom")]
-position = Vector3(335.2, -13.75, -4)
-scale = Vector3(1.1556, 4.85, 1)
-
-[node name="Bulkhead5" parent="TERRAIN/Room05_Switchback/InteriorCladding_6" instance=ExtResource("RCRoom")]
-position = Vector3(342.13, -13.75, -3.4)
-scale = Vector3(1.1556, 4.85, 1)
-
-[node name="Bulkhead6" parent="TERRAIN/Room05_Switchback/InteriorCladding_6" instance=ExtResource("RCRoom")]
-position = Vector3(349.07, -13.75, -3.4)
-scale = Vector3(1.1556, 4.85, 1)
 
 [node name="SectorFixture6" parent="TERRAIN/Room05_Switchback/InteriorCladding_6" instance=ExtResource("RCFixture")]
 position = Vector3(349.07, -11.9, -2.67)
@@ -3760,38 +3557,14 @@ light_color = Color(0.5294, 0.8627, 0.2392, 1)
 light_energy = 0.8
 omni_range = 8.5
 
-[node name="Bulkhead7" parent="TERRAIN/Room05_Switchback/InteriorCladding_6" instance=ExtResource("RCRoom")]
-position = Vector3(356, -13.75, -4)
-scale = Vector3(1.1556, 4.85, 1)
-
-[node name="Bulkhead8" parent="TERRAIN/Room05_Switchback/InteriorCladding_6" instance=ExtResource("RCRoom")]
-position = Vector3(362.93, -13.75, -3.4)
-scale = Vector3(1.1556, 4.85, 1)
-
-[node name="Bulkhead9" parent="TERRAIN/Room05_Switchback/InteriorCladding_6" instance=ExtResource("RCRoom")]
-position = Vector3(369.87, -13.75, -3.4)
-scale = Vector3(1.1556, 4.85, 1)
-
 [node name="BayLight9" type="OmniLight3D" parent="TERRAIN/Room05_Switchback/InteriorCladding_6"]
 position = Vector3(369.87, 23.15, -1.85)
 light_color = Color(0.5294, 0.8627, 0.2392, 1)
 light_energy = 0.8
 omni_range = 8.5
 
-[node name="Bulkhead10" parent="TERRAIN/Room05_Switchback/InteriorCladding_6" instance=ExtResource("RCRoom")]
-position = Vector3(376.8, -13.75, -4)
-scale = Vector3(1.1556, 4.85, 1)
-
-[node name="Bulkhead11" parent="TERRAIN/Room05_Switchback/InteriorCladding_6" instance=ExtResource("RCRoom")]
-position = Vector3(383.73, -13.75, -3.4)
-scale = Vector3(1.1556, 4.85, 1)
-
 [node name="SectorFixture11" parent="TERRAIN/Room05_Switchback/InteriorCladding_6" instance=ExtResource("RCFixture")]
 position = Vector3(383.73, -11.9, -2.67)
-
-[node name="Bulkhead12" parent="TERRAIN/Room05_Switchback/InteriorCladding_6" instance=ExtResource("RCRoom")]
-position = Vector3(390.67, -13.75, -3.4)
-scale = Vector3(1.1556, 4.85, 1)
 
 [node name="BayLight12" type="OmniLight3D" parent="TERRAIN/Room05_Switchback/InteriorCladding_6"]
 position = Vector3(390.67, 23.15, -1.85)
@@ -3799,77 +3572,37 @@ light_color = Color(0.5294, 0.8627, 0.2392, 1)
 light_energy = 0.8
 omni_range = 8.5
 
-[node name="Bulkhead13" parent="TERRAIN/Room05_Switchback/InteriorCladding_6" instance=ExtResource("RCRoom")]
-position = Vector3(397.6, -13.75, -4)
-scale = Vector3(1.1556, 4.85, 1)
-
-[node name="Bulkhead14" parent="TERRAIN/Room05_Switchback/InteriorCladding_6" instance=ExtResource("RCRoom")]
-position = Vector3(404.53, -13.75, -3.4)
-scale = Vector3(1.1556, 4.85, 1)
-
 [node name="Ceiling0" parent="TERRAIN/Room05_Switchback/InteriorCladding_6" instance=ExtResource("RCDeck")]
 position = Vector3(310.5, 25.05, -1.25)
 scale = Vector3(2.1667, 1.6, 1.9)
-
-[node name="Foundation0" parent="TERRAIN/Room05_Switchback/InteriorCladding_6" instance=ExtResource("RCRoom")]
-position = Vector3(310.5, -21.65, -2.2)
-scale = Vector3(2.1667, 1, 1)
 
 [node name="Ceiling1" parent="TERRAIN/Room05_Switchback/InteriorCladding_6" instance=ExtResource("RCDeck")]
 position = Vector3(323.5, 25.05, -1.25)
 scale = Vector3(2.1667, 1.6, 1.9)
 
-[node name="Foundation1" parent="TERRAIN/Room05_Switchback/InteriorCladding_6" instance=ExtResource("RCRoom")]
-position = Vector3(323.5, -21.65, -2.2)
-scale = Vector3(2.1667, 1, 1)
-
 [node name="Ceiling2" parent="TERRAIN/Room05_Switchback/InteriorCladding_6" instance=ExtResource("RCDeck")]
 position = Vector3(336.5, 25.05, -1.25)
 scale = Vector3(2.1667, 1.6, 1.9)
-
-[node name="Foundation2" parent="TERRAIN/Room05_Switchback/InteriorCladding_6" instance=ExtResource("RCRoom")]
-position = Vector3(336.5, -21.65, -2.2)
-scale = Vector3(2.1667, 1, 1)
 
 [node name="Ceiling3" parent="TERRAIN/Room05_Switchback/InteriorCladding_6" instance=ExtResource("RCDeck")]
 position = Vector3(349.5, 25.05, -1.25)
 scale = Vector3(2.1667, 1.6, 1.9)
 
-[node name="Foundation3" parent="TERRAIN/Room05_Switchback/InteriorCladding_6" instance=ExtResource("RCRoom")]
-position = Vector3(349.5, -21.65, -2.2)
-scale = Vector3(2.1667, 1, 1)
-
 [node name="Ceiling4" parent="TERRAIN/Room05_Switchback/InteriorCladding_6" instance=ExtResource("RCDeck")]
 position = Vector3(362.5, 25.05, -1.25)
 scale = Vector3(2.1667, 1.6, 1.9)
-
-[node name="Foundation4" parent="TERRAIN/Room05_Switchback/InteriorCladding_6" instance=ExtResource("RCRoom")]
-position = Vector3(362.5, -21.65, -2.2)
-scale = Vector3(2.1667, 1, 1)
 
 [node name="Ceiling5" parent="TERRAIN/Room05_Switchback/InteriorCladding_6" instance=ExtResource("RCDeck")]
 position = Vector3(375.5, 25.05, -1.25)
 scale = Vector3(2.1667, 1.6, 1.9)
 
-[node name="Foundation5" parent="TERRAIN/Room05_Switchback/InteriorCladding_6" instance=ExtResource("RCRoom")]
-position = Vector3(375.5, -21.65, -2.2)
-scale = Vector3(2.1667, 1, 1)
-
 [node name="Ceiling6" parent="TERRAIN/Room05_Switchback/InteriorCladding_6" instance=ExtResource("RCDeck")]
 position = Vector3(388.5, 25.05, -1.25)
 scale = Vector3(2.1667, 1.6, 1.9)
 
-[node name="Foundation6" parent="TERRAIN/Room05_Switchback/InteriorCladding_6" instance=ExtResource("RCRoom")]
-position = Vector3(388.5, -21.65, -2.2)
-scale = Vector3(2.1667, 1, 1)
-
 [node name="Ceiling7" parent="TERRAIN/Room05_Switchback/InteriorCladding_6" instance=ExtResource("RCDeck")]
 position = Vector3(401.5, 25.05, -1.25)
 scale = Vector3(2.1667, 1.6, 1.9)
-
-[node name="Foundation7" parent="TERRAIN/Room05_Switchback/InteriorCladding_6" instance=ExtResource("RCRoom")]
-position = Vector3(401.5, -21.65, -2.2)
-scale = Vector3(2.1667, 1, 1)
 
 [node name="Room06_Bridge" type="Node3D" parent="TERRAIN"]
 position = Vector3(0, 0, 0)
@@ -4070,38 +3803,14 @@ shape = SubResource("BoxShape3D_0729")
 
 [node name="InteriorCladding_7" type="Node3D" parent="TERRAIN/Room06_Bridge"]
 
-[node name="Bulkhead0" parent="TERRAIN/Room06_Bridge/InteriorCladding_7" instance=ExtResource("RCRoom")]
-position = Vector3(411.14, -1.15, -4)
-scale = Vector3(1.0476, 2.725, 1)
-
 [node name="SectorFixture0" parent="TERRAIN/Room06_Bridge/InteriorCladding_7" instance=ExtResource("RCFixture")]
 position = Vector3(411.14, 0.7, -3.27)
-
-[node name="Bulkhead1" parent="TERRAIN/Room06_Bridge/InteriorCladding_7" instance=ExtResource("RCRoom")]
-position = Vector3(417.43, -1.15, -3.4)
-scale = Vector3(1.0476, 2.725, 1)
-
-[node name="Bulkhead2" parent="TERRAIN/Room06_Bridge/InteriorCladding_7" instance=ExtResource("RCRoom")]
-position = Vector3(423.71, -1.15, -3.4)
-scale = Vector3(1.0476, 2.725, 1)
 
 [node name="BayLight2" type="OmniLight3D" parent="TERRAIN/Room06_Bridge/InteriorCladding_7"]
 position = Vector3(423.71, 18.75, -1.85)
 light_color = Color(0.5294, 0.8627, 0.2392, 1)
 light_energy = 0.8
 omni_range = 8.5
-
-[node name="Bulkhead3" parent="TERRAIN/Room06_Bridge/InteriorCladding_7" instance=ExtResource("RCRoom")]
-position = Vector3(430, -1.15, -4)
-scale = Vector3(1.0476, 2.725, 1)
-
-[node name="Bulkhead4" parent="TERRAIN/Room06_Bridge/InteriorCladding_7" instance=ExtResource("RCRoom")]
-position = Vector3(436.29, -1.15, -3.4)
-scale = Vector3(1.0476, 2.725, 1)
-
-[node name="Bulkhead5" parent="TERRAIN/Room06_Bridge/InteriorCladding_7" instance=ExtResource("RCRoom")]
-position = Vector3(442.57, -1.15, -3.4)
-scale = Vector3(1.0476, 2.725, 1)
 
 [node name="SectorFixture5" parent="TERRAIN/Room06_Bridge/InteriorCladding_7" instance=ExtResource("RCFixture")]
 position = Vector3(442.57, 0.7, -2.67)
@@ -4112,41 +3821,21 @@ light_color = Color(0.5294, 0.8627, 0.2392, 1)
 light_energy = 0.8
 omni_range = 8.5
 
-[node name="Bulkhead6" parent="TERRAIN/Room06_Bridge/InteriorCladding_7" instance=ExtResource("RCRoom")]
-position = Vector3(448.86, -1.15, -4)
-scale = Vector3(1.0476, 2.725, 1)
-
 [node name="Ceiling0" parent="TERRAIN/Room06_Bridge/InteriorCladding_7" instance=ExtResource("RCDeck")]
 position = Vector3(413.5, 20.65, -1.25)
 scale = Vector3(1.8333, 1.6, 1.9)
-
-[node name="Foundation0" parent="TERRAIN/Room06_Bridge/InteriorCladding_7" instance=ExtResource("RCRoom")]
-position = Vector3(413.5, -9.05, -2.2)
-scale = Vector3(1.8333, 1, 1)
 
 [node name="Ceiling1" parent="TERRAIN/Room06_Bridge/InteriorCladding_7" instance=ExtResource("RCDeck")]
 position = Vector3(424.5, 20.65, -1.25)
 scale = Vector3(1.8333, 1.6, 1.9)
 
-[node name="Foundation1" parent="TERRAIN/Room06_Bridge/InteriorCladding_7" instance=ExtResource("RCRoom")]
-position = Vector3(424.5, -9.05, -2.2)
-scale = Vector3(1.8333, 1, 1)
-
 [node name="Ceiling2" parent="TERRAIN/Room06_Bridge/InteriorCladding_7" instance=ExtResource("RCDeck")]
 position = Vector3(435.5, 20.65, -1.25)
 scale = Vector3(1.8333, 1.6, 1.9)
 
-[node name="Foundation2" parent="TERRAIN/Room06_Bridge/InteriorCladding_7" instance=ExtResource("RCRoom")]
-position = Vector3(435.5, -9.05, -2.2)
-scale = Vector3(1.8333, 1, 1)
-
 [node name="Ceiling3" parent="TERRAIN/Room06_Bridge/InteriorCladding_7" instance=ExtResource("RCDeck")]
 position = Vector3(446.5, 20.65, -1.25)
 scale = Vector3(1.8333, 1.6, 1.9)
-
-[node name="Foundation3" parent="TERRAIN/Room06_Bridge/InteriorCladding_7" instance=ExtResource("RCRoom")]
-position = Vector3(446.5, -9.05, -2.2)
-scale = Vector3(1.8333, 1, 1)
 
 [node name="Room07_Gallery" type="Node3D" parent="TERRAIN"]
 position = Vector3(0, 0, 0)
@@ -4331,39 +4020,19 @@ shape = SubResource("BoxShape3D_0793")
 
 [node name="InteriorCladding_8" type="Node3D" parent="TERRAIN/Room07_Gallery"]
 
-[node name="Bulkhead0" parent="TERRAIN/Room07_Gallery/InteriorCladding_8" instance=ExtResource("RCRoom")]
-position = Vector3(454.51, -5, -3.4)
-scale = Vector3(0.83556, 3.2062, 1)
-
-[node name="Bulkhead1" parent="TERRAIN/Room07_Gallery/InteriorCladding_8" instance=ExtResource("RCRoom")]
-position = Vector3(459.52, -5, -3.4)
-scale = Vector3(0.83556, 3.2062, 1)
-
 [node name="BayLight1" type="OmniLight3D" parent="TERRAIN/Room07_Gallery/InteriorCladding_8"]
 position = Vector3(459.52, 18.75, -1.85)
 light_color = Color(0.5294, 0.8627, 0.2392, 1)
 light_energy = 0.8
 omni_range = 8.5
 
-[node name="Bulkhead2" parent="TERRAIN/Room07_Gallery/InteriorCladding_8" instance=ExtResource("RCRoom")]
-position = Vector3(464.53, -5, -4)
-scale = Vector3(0.83556, 3.2062, 1)
-
 [node name="Ceiling0" parent="TERRAIN/Room07_Gallery/InteriorCladding_8" instance=ExtResource("RCDeck")]
 position = Vector3(455.76, 20.65, -1.25)
 scale = Vector3(1.2533, 1.6, 1.9)
 
-[node name="Foundation0" parent="TERRAIN/Room07_Gallery/InteriorCladding_8" instance=ExtResource("RCRoom")]
-position = Vector3(455.76, -12.9, -2.2)
-scale = Vector3(1.2533, 1, 1)
-
 [node name="Ceiling1" parent="TERRAIN/Room07_Gallery/InteriorCladding_8" instance=ExtResource("RCDeck")]
 position = Vector3(463.28, 20.65, -1.25)
 scale = Vector3(1.2533, 1.6, 1.9)
-
-[node name="Foundation1" parent="TERRAIN/Room07_Gallery/InteriorCladding_8" instance=ExtResource("RCRoom")]
-position = Vector3(463.28, -12.9, -2.2)
-scale = Vector3(1.2533, 1, 1)
 
 [node name="ExteriorView" type="Node3D" parent="TERRAIN/Room07_Gallery"]
 metadata/begin = 467.04
@@ -4387,21 +4056,9 @@ scale = Vector3(1.175, 0.71, 1)
 
 [node name="InteriorCladding_10" type="Node3D" parent="TERRAIN/Room07_Gallery"]
 
-[node name="Bulkhead0" parent="TERRAIN/Room07_Gallery/InteriorCladding_10" instance=ExtResource("RCRoom")]
-position = Vector3(490.89, -5, -4)
-scale = Vector3(0.90083, 3.2062, 1)
-
-[node name="Bulkhead1" parent="TERRAIN/Room07_Gallery/InteriorCladding_10" instance=ExtResource("RCRoom")]
-position = Vector3(496.3, -5, -3.4)
-scale = Vector3(0.90083, 3.2062, 1)
-
 [node name="Ceiling0" parent="TERRAIN/Room07_Gallery/InteriorCladding_10" instance=ExtResource("RCDeck")]
 position = Vector3(493.6, 20.65, -1.25)
 scale = Vector3(1.8017, 1.6, 1.9)
-
-[node name="Foundation0" parent="TERRAIN/Room07_Gallery/InteriorCladding_10" instance=ExtResource("RCRoom")]
-position = Vector3(493.6, -12.9, -2.2)
-scale = Vector3(1.8017, 1, 1)
 
 [node name="BasementTurnback" type="Node3D" parent="TERRAIN"]
 
@@ -4801,31 +4458,11 @@ shape = SubResource("BoxShape3D_0906")
 
 [node name="InteriorCladding_53" type="Node3D" parent="TERRAIN/BasementTurnback"]
 
-[node name="Bulkhead0" parent="TERRAIN/BasementTurnback/InteriorCladding_53" instance=ExtResource("RCRoom")]
-position = Vector3(502.42, -14.5, -3.4)
-scale = Vector3(1.1402, 4.45, 1)
-
-[node name="Bulkhead1" parent="TERRAIN/BasementTurnback/InteriorCladding_53" instance=ExtResource("RCRoom")]
-position = Vector3(509.26, -14.5, -3.4)
-scale = Vector3(1.1402, 4.45, 1)
-
 [node name="BayLight1" type="OmniLight3D" parent="TERRAIN/BasementTurnback/InteriorCladding_53"]
 position = Vector3(509.26, 19.2, -1.85)
 light_color = Color(0.5294, 0.8627, 0.2392, 1)
 light_energy = 0.8
 omni_range = 8.5
-
-[node name="Bulkhead2" parent="TERRAIN/BasementTurnback/InteriorCladding_53" instance=ExtResource("RCRoom")]
-position = Vector3(516.1, -14.5, -4)
-scale = Vector3(1.1402, 4.45, 1)
-
-[node name="Bulkhead3" parent="TERRAIN/BasementTurnback/InteriorCladding_53" instance=ExtResource("RCRoom")]
-position = Vector3(522.94, -14.5, -3.4)
-scale = Vector3(1.1402, 4.45, 1)
-
-[node name="Bulkhead4" parent="TERRAIN/BasementTurnback/InteriorCladding_53" instance=ExtResource("RCRoom")]
-position = Vector3(529.79, -14.5, -3.4)
-scale = Vector3(1.1402, 4.45, 1)
 
 [node name="SectorFixture4" parent="TERRAIN/BasementTurnback/InteriorCladding_53" instance=ExtResource("RCFixture")]
 position = Vector3(529.79, -12.65, -2.67)
@@ -4836,38 +4473,14 @@ light_color = Color(0.5294, 0.8627, 0.2392, 1)
 light_energy = 0.8
 omni_range = 8.5
 
-[node name="Bulkhead5" parent="TERRAIN/BasementTurnback/InteriorCladding_53" instance=ExtResource("RCRoom")]
-position = Vector3(536.63, -14.5, -4)
-scale = Vector3(1.1402, 4.45, 1)
-
-[node name="Bulkhead6" parent="TERRAIN/BasementTurnback/InteriorCladding_53" instance=ExtResource("RCRoom")]
-position = Vector3(543.47, -14.5, -3.4)
-scale = Vector3(1.1402, 4.45, 1)
-
-[node name="Bulkhead7" parent="TERRAIN/BasementTurnback/InteriorCladding_53" instance=ExtResource("RCRoom")]
-position = Vector3(550.31, -14.5, -3.4)
-scale = Vector3(1.1402, 4.45, 1)
-
 [node name="BayLight7" type="OmniLight3D" parent="TERRAIN/BasementTurnback/InteriorCladding_53"]
 position = Vector3(550.31, 19.2, -1.85)
 light_color = Color(0.5294, 0.8627, 0.2392, 1)
 light_energy = 0.8
 omni_range = 8.5
 
-[node name="Bulkhead8" parent="TERRAIN/BasementTurnback/InteriorCladding_53" instance=ExtResource("RCRoom")]
-position = Vector3(557.15, -14.5, -4)
-scale = Vector3(1.1402, 4.45, 1)
-
-[node name="Bulkhead9" parent="TERRAIN/BasementTurnback/InteriorCladding_53" instance=ExtResource("RCRoom")]
-position = Vector3(563.99, -14.5, -3.4)
-scale = Vector3(1.1402, 4.45, 1)
-
 [node name="SectorFixture9" parent="TERRAIN/BasementTurnback/InteriorCladding_53" instance=ExtResource("RCFixture")]
 position = Vector3(563.99, -12.65, -2.67)
-
-[node name="Bulkhead10" parent="TERRAIN/BasementTurnback/InteriorCladding_53" instance=ExtResource("RCRoom")]
-position = Vector3(570.83, -14.5, -3.4)
-scale = Vector3(1.1402, 4.45, 1)
 
 [node name="BayLight10" type="OmniLight3D" parent="TERRAIN/BasementTurnback/InteriorCladding_53"]
 position = Vector3(570.83, 19.2, -1.85)
@@ -4879,49 +4492,25 @@ omni_range = 8.5
 position = Vector3(505.27, 21.1, -1.25)
 scale = Vector3(2.0904, 1.6, 1.9)
 
-[node name="Foundation0" parent="TERRAIN/BasementTurnback/InteriorCladding_53" instance=ExtResource("RCRoom")]
-position = Vector3(505.27, -22.4, -2.2)
-scale = Vector3(2.0904, 1, 1)
-
 [node name="Ceiling1" parent="TERRAIN/BasementTurnback/InteriorCladding_53" instance=ExtResource("RCDeck")]
 position = Vector3(517.81, 21.1, -1.25)
 scale = Vector3(2.0904, 1.6, 1.9)
-
-[node name="Foundation1" parent="TERRAIN/BasementTurnback/InteriorCladding_53" instance=ExtResource("RCRoom")]
-position = Vector3(517.81, -22.4, -2.2)
-scale = Vector3(2.0904, 1, 1)
 
 [node name="Ceiling2" parent="TERRAIN/BasementTurnback/InteriorCladding_53" instance=ExtResource("RCDeck")]
 position = Vector3(530.36, 21.1, -1.25)
 scale = Vector3(2.0904, 1.6, 1.9)
 
-[node name="Foundation2" parent="TERRAIN/BasementTurnback/InteriorCladding_53" instance=ExtResource("RCRoom")]
-position = Vector3(530.36, -22.4, -2.2)
-scale = Vector3(2.0904, 1, 1)
-
 [node name="Ceiling3" parent="TERRAIN/BasementTurnback/InteriorCladding_53" instance=ExtResource("RCDeck")]
 position = Vector3(542.9, 21.1, -1.25)
 scale = Vector3(2.0904, 1.6, 1.9)
-
-[node name="Foundation3" parent="TERRAIN/BasementTurnback/InteriorCladding_53" instance=ExtResource("RCRoom")]
-position = Vector3(542.9, -22.4, -2.2)
-scale = Vector3(2.0904, 1, 1)
 
 [node name="Ceiling4" parent="TERRAIN/BasementTurnback/InteriorCladding_53" instance=ExtResource("RCDeck")]
 position = Vector3(555.44, 21.1, -1.25)
 scale = Vector3(2.0904, 1.6, 1.9)
 
-[node name="Foundation4" parent="TERRAIN/BasementTurnback/InteriorCladding_53" instance=ExtResource("RCRoom")]
-position = Vector3(555.44, -22.4, -2.2)
-scale = Vector3(2.0904, 1, 1)
-
 [node name="Ceiling5" parent="TERRAIN/BasementTurnback/InteriorCladding_53" instance=ExtResource("RCDeck")]
 position = Vector3(567.98, 21.1, -1.25)
 scale = Vector3(2.0904, 1.6, 1.9)
-
-[node name="Foundation5" parent="TERRAIN/BasementTurnback/InteriorCladding_53" instance=ExtResource("RCRoom")]
-position = Vector3(567.98, -22.4, -2.2)
-scale = Vector3(2.0904, 1, 1)
 
 [node name="Room08_Hall" type="Node3D" parent="TERRAIN"]
 position = Vector3(0, 0, 0)
@@ -5062,27 +4651,11 @@ shape = SubResource("BoxShape3D_0969")
 
 [node name="InteriorCladding_9" type="Node3D" parent="TERRAIN/Room08_Hall"]
 
-[node name="Bulkhead0" parent="TERRAIN/Room08_Hall/InteriorCladding_9" instance=ExtResource("RCRoom")]
-position = Vector3(577.25, 0.8, -3.4)
-scale = Vector3(1, 2.725, 1)
-
 [node name="BayLight0" type="OmniLight3D" parent="TERRAIN/Room08_Hall/InteriorCladding_9"]
 position = Vector3(577.25, 20.7, -1.85)
 light_color = Color(0.5294, 0.8627, 0.2392, 1)
 light_energy = 0.8
 omni_range = 8.5
-
-[node name="Bulkhead1" parent="TERRAIN/Room08_Hall/InteriorCladding_9" instance=ExtResource("RCRoom")]
-position = Vector3(583.25, 0.8, -4)
-scale = Vector3(1, 2.725, 1)
-
-[node name="Bulkhead2" parent="TERRAIN/Room08_Hall/InteriorCladding_9" instance=ExtResource("RCRoom")]
-position = Vector3(589.25, 0.8, -3.4)
-scale = Vector3(1, 2.725, 1)
-
-[node name="Bulkhead3" parent="TERRAIN/Room08_Hall/InteriorCladding_9" instance=ExtResource("RCRoom")]
-position = Vector3(595.25, 0.8, -3.4)
-scale = Vector3(1, 2.725, 1)
 
 [node name="SectorFixture3" parent="TERRAIN/Room08_Hall/InteriorCladding_9" instance=ExtResource("RCFixture")]
 position = Vector3(595.25, 2.65, -2.67)
@@ -5097,17 +4670,9 @@ omni_range = 8.5
 position = Vector3(580.25, 22.6, -1.25)
 scale = Vector3(2, 1.6, 1.9)
 
-[node name="Foundation0" parent="TERRAIN/Room08_Hall/InteriorCladding_9" instance=ExtResource("RCRoom")]
-position = Vector3(580.25, -7.1, -2.2)
-scale = Vector3(2, 1, 1)
-
 [node name="Ceiling1" parent="TERRAIN/Room08_Hall/InteriorCladding_9" instance=ExtResource("RCDeck")]
 position = Vector3(592.25, 22.6, -1.25)
 scale = Vector3(2, 1.6, 1.9)
-
-[node name="Foundation1" parent="TERRAIN/Room08_Hall/InteriorCladding_9" instance=ExtResource("RCRoom")]
-position = Vector3(592.25, -7.1, -2.2)
-scale = Vector3(2, 1, 1)
 
 [node name="BossWing" type="Node3D" parent="TERRAIN"]
 
@@ -5164,27 +4729,11 @@ position = Vector3(659.25, 1.9, 0)
 
 [node name="InteriorCladding_3" type="Node3D" parent="TERRAIN/BossWing"]
 
-[node name="Bulkhead0" parent="TERRAIN/BossWing/InteriorCladding_3" instance=ExtResource("RCRoom")]
-position = Vector3(601.41, 0.8, -3.4)
-scale = Vector3(1.0507, 2.8875, 1)
-
 [node name="BayLight0" type="OmniLight3D" parent="TERRAIN/BossWing/InteriorCladding_3"]
 position = Vector3(601.41, 22, -1.85)
 light_color = Color(0.5294, 0.8627, 0.2392, 1)
 light_energy = 0.8
 omni_range = 8.5
-
-[node name="Bulkhead1" parent="TERRAIN/BossWing/InteriorCladding_3" instance=ExtResource("RCRoom")]
-position = Vector3(607.71, 0.8, -4)
-scale = Vector3(1.0507, 2.8875, 1)
-
-[node name="Bulkhead2" parent="TERRAIN/BossWing/InteriorCladding_3" instance=ExtResource("RCRoom")]
-position = Vector3(614.01, 0.8, -3.4)
-scale = Vector3(1.0507, 2.8875, 1)
-
-[node name="Bulkhead3" parent="TERRAIN/BossWing/InteriorCladding_3" instance=ExtResource("RCRoom")]
-position = Vector3(620.32, 0.8, -3.4)
-scale = Vector3(1.0507, 2.8875, 1)
 
 [node name="BayLight3" type="OmniLight3D" parent="TERRAIN/BossWing/InteriorCladding_3"]
 position = Vector3(620.32, 22, -1.85)
@@ -5192,38 +4741,14 @@ light_color = Color(0.5294, 0.8627, 0.2392, 1)
 light_energy = 0.8
 omni_range = 8.5
 
-[node name="Bulkhead4" parent="TERRAIN/BossWing/InteriorCladding_3" instance=ExtResource("RCRoom")]
-position = Vector3(626.62, 0.8, -4)
-scale = Vector3(1.0507, 2.8875, 1)
-
 [node name="SectorFixture4" parent="TERRAIN/BossWing/InteriorCladding_3" instance=ExtResource("RCFixture")]
 position = Vector3(626.62, 2.65, -3.27)
-
-[node name="Bulkhead5" parent="TERRAIN/BossWing/InteriorCladding_3" instance=ExtResource("RCRoom")]
-position = Vector3(632.93, 0.8, -3.4)
-scale = Vector3(1.0507, 2.8875, 1)
-
-[node name="Bulkhead6" parent="TERRAIN/BossWing/InteriorCladding_3" instance=ExtResource("RCRoom")]
-position = Vector3(639.23, 0.8, -3.4)
-scale = Vector3(1.0507, 2.8875, 1)
 
 [node name="BayLight6" type="OmniLight3D" parent="TERRAIN/BossWing/InteriorCladding_3"]
 position = Vector3(639.23, 22, -1.85)
 light_color = Color(0.5294, 0.8627, 0.2392, 1)
 light_energy = 0.8
 omni_range = 8.5
-
-[node name="Bulkhead7" parent="TERRAIN/BossWing/InteriorCladding_3" instance=ExtResource("RCRoom")]
-position = Vector3(645.54, 0.8, -4)
-scale = Vector3(1.0507, 2.8875, 1)
-
-[node name="Bulkhead8" parent="TERRAIN/BossWing/InteriorCladding_3" instance=ExtResource("RCRoom")]
-position = Vector3(651.84, 0.8, -3.4)
-scale = Vector3(1.0507, 2.8875, 1)
-
-[node name="Bulkhead9" parent="TERRAIN/BossWing/InteriorCladding_3" instance=ExtResource("RCRoom")]
-position = Vector3(658.14, 0.8, -3.4)
-scale = Vector3(1.0507, 2.8875, 1)
 
 [node name="SectorFixture9" parent="TERRAIN/BossWing/InteriorCladding_3" instance=ExtResource("RCFixture")]
 position = Vector3(658.14, 2.65, -2.67)
@@ -5238,46 +4763,27 @@ omni_range = 8.5
 position = Vector3(604.56, 23.9, -1.25)
 scale = Vector3(2.1013, 1.6, 1.9)
 
-[node name="Foundation0" parent="TERRAIN/BossWing/InteriorCladding_3" instance=ExtResource("RCRoom")]
-position = Vector3(604.56, -7.1, -2.2)
-scale = Vector3(2.1013, 1, 1)
-
 [node name="Ceiling1" parent="TERRAIN/BossWing/InteriorCladding_3" instance=ExtResource("RCDeck")]
 position = Vector3(617.17, 23.9, -1.25)
 scale = Vector3(2.1013, 1.6, 1.9)
-
-[node name="Foundation1" parent="TERRAIN/BossWing/InteriorCladding_3" instance=ExtResource("RCRoom")]
-position = Vector3(617.17, -7.1, -2.2)
-scale = Vector3(2.1013, 1, 1)
 
 [node name="Ceiling2" parent="TERRAIN/BossWing/InteriorCladding_3" instance=ExtResource("RCDeck")]
 position = Vector3(629.78, 23.9, -1.25)
 scale = Vector3(2.1013, 1.6, 1.9)
 
-[node name="Foundation2" parent="TERRAIN/BossWing/InteriorCladding_3" instance=ExtResource("RCRoom")]
-position = Vector3(629.78, -7.1, -2.2)
-scale = Vector3(2.1013, 1, 1)
-
 [node name="Ceiling3" parent="TERRAIN/BossWing/InteriorCladding_3" instance=ExtResource("RCDeck")]
 position = Vector3(642.38, 23.9, -1.25)
 scale = Vector3(2.1013, 1.6, 1.9)
-
-[node name="Foundation3" parent="TERRAIN/BossWing/InteriorCladding_3" instance=ExtResource("RCRoom")]
-position = Vector3(642.38, -7.1, -2.2)
-scale = Vector3(2.1013, 1, 1)
 
 [node name="Ceiling4" parent="TERRAIN/BossWing/InteriorCladding_3" instance=ExtResource("RCDeck")]
 position = Vector3(654.99, 23.9, -1.25)
 scale = Vector3(2.1013, 1.6, 1.9)
 
-[node name="Foundation4" parent="TERRAIN/BossWing/InteriorCladding_3" instance=ExtResource("RCRoom")]
-position = Vector3(654.99, -7.1, -2.2)
-scale = Vector3(2.1013, 1, 1)
-
-[node name="TacticalDeck0" type="StaticBody3D" parent="TERRAIN/BossWing" groups=["factory_drop_through"]]
-position = Vector3(616.25, 5.55, 0)
+[node name="TacticalDeck0" type="StaticBody3D" parent="TERRAIN/BossWing" groups=["arena_player_deck", "factory_drop_through"]]
+position = Vector3(616.25, 5.6500, 0.0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
+metadata/boss_supply_anchor = 0
 
 [node name="Art" parent="TERRAIN/BossWing/TacticalDeck0" instance=ExtResource("RCDeck")]
 scale = Vector3(1.3333, 0.54762, 1)
@@ -5292,7 +4798,7 @@ light_color = Color(0.5294, 0.8627, 0.2392, 1)
 light_energy = 1.55
 omni_range = 5.6
 
-[node name="TacticalDeck1" type="StaticBody3D" parent="TERRAIN/BossWing" groups=["factory_drop_through"]]
+[node name="TacticalDeck1" type="StaticBody3D" parent="TERRAIN/BossWing" groups=["arena_player_deck", "factory_drop_through"]]
 position = Vector3(636.95, 7.95, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
@@ -5310,10 +4816,11 @@ light_color = Color(0.5294, 0.8627, 0.2392, 1)
 light_energy = 1.55
 omni_range = 5.6
 
-[node name="ArenaVineHatch" parent="TERRAIN/BossWing" instance=ExtResource("RCHatch")]
+[node name="ArenaVineHatch" parent="TERRAIN/BossWing" instance=ExtResource("RCHatch") groups=["arena_player_deck"]]
 position = Vector3(646.36, 6.4, 0)
 deck_width = 5
 climb_height = 4.5
+metadata/boss_supply_anchor = 1
 
 [node name="TacticalLight2" type="OmniLight3D" parent="TERRAIN/BossWing"]
 position = Vector3(646.36, 7.5, -1.6)
@@ -5368,3 +4875,113 @@ scale = Vector3(1, 0.89882, 1)
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/BossWing/ExitBarrierHeader"]
 position = Vector3(0, 0, 0)
 shape = SubResource("BoxShape3D_1046")
+
+[node name="SectorSurfaces" type="Node3D" parent="TERRAIN/Room02_Gallery/InteriorCladding_3"]
+script = ExtResource("SectorDressing")
+albedo = ExtResource("SectorAlbedo")
+sector = 2
+left_edge = 116.0000
+right_edge = 125.0000
+cave_floor = -1.6000
+cave_roof = 20.7000
+arena = false
+
+[node name="SectorSurfaces" type="Node3D" parent="TERRAIN/OverheadLoop/InteriorCladding_10"]
+script = ExtResource("SectorDressing")
+albedo = ExtResource("SectorAlbedo")
+sector = 2
+left_edge = 124.9999
+right_edge = 209.0001
+cave_floor = -2.6000
+cave_roof = 22.2000
+arena = false
+
+[node name="SectorSurfaces" type="Node3D" parent="TERRAIN/Room03_Fall/InteriorCladding_4"]
+script = ExtResource("SectorDressing")
+albedo = ExtResource("SectorAlbedo")
+sector = 2
+left_edge = 208.9967
+right_edge = 249.0033
+cave_floor = -6.2000
+cave_roof = 19.1000
+arena = false
+
+[node name="SectorSurfaces" type="Node3D" parent="TERRAIN/Room04_Shaft/InteriorCladding_5"]
+script = ExtResource("SectorDressing")
+albedo = ExtResource("SectorAlbedo")
+sector = 2
+left_edge = 249.0026
+right_edge = 303.9974
+cave_floor = -6.2000
+cave_roof = 22.7504
+arena = false
+
+[node name="SectorSurfaces" type="Node3D" parent="TERRAIN/Room05_Switchback/InteriorCladding_6"]
+script = ExtResource("SectorDressing")
+albedo = ExtResource("SectorAlbedo")
+sector = 2
+left_edge = 304.0032
+right_edge = 407.9968
+cave_floor = -12.6500
+cave_roof = 25.0500
+arena = false
+
+[node name="SectorSurfaces" type="Node3D" parent="TERRAIN/Room06_Bridge/InteriorCladding_7"]
+script = ExtResource("SectorDressing")
+albedo = ExtResource("SectorAlbedo")
+sector = 2
+left_edge = 407.9972
+right_edge = 452.0028
+cave_floor = -0.0500
+cave_roof = 20.6500
+arena = false
+
+[node name="SectorSurfaces" type="Node3D" parent="TERRAIN/Room07_Gallery/InteriorCladding_8"]
+script = ExtResource("SectorDressing")
+albedo = ExtResource("SectorAlbedo")
+sector = 2
+left_edge = 452.0033
+right_edge = 467.0367
+cave_floor = -3.9000
+cave_roof = 20.6496
+arena = false
+
+[node name="SectorSurfaces" type="Node3D" parent="TERRAIN/Room07_Gallery/InteriorCladding_10"]
+script = ExtResource("SectorDressing")
+albedo = ExtResource("SectorAlbedo")
+sector = 2
+left_edge = 488.1875
+right_edge = 499.0025
+cave_floor = -3.9000
+cave_roof = 20.6496
+arena = false
+
+[node name="SectorSurfaces" type="Node3D" parent="TERRAIN/BasementTurnback/InteriorCladding_53"]
+script = ExtResource("SectorDressing")
+albedo = ExtResource("SectorAlbedo")
+sector = 2
+left_edge = 498.9994
+right_edge = 574.2506
+cave_floor = -13.4000
+cave_roof = 21.1000
+arena = false
+
+[node name="SectorSurfaces" type="Node3D" parent="TERRAIN/Room08_Hall/InteriorCladding_9"]
+script = ExtResource("SectorDressing")
+albedo = ExtResource("SectorAlbedo")
+sector = 2
+left_edge = 574.2500
+right_edge = 598.2500
+cave_floor = 1.9000
+cave_roof = 22.6000
+arena = false
+
+[node name="SectorSurfaces" type="Node3D" parent="TERRAIN/BossWing/InteriorCladding_3"]
+script = ExtResource("SectorDressing")
+albedo = ExtResource("SectorAlbedo")
+sector = 2
+left_edge = 598.2579
+right_edge = 661.2921
+cave_floor = 1.9000
+cave_roof = 23.9000
+arena = true

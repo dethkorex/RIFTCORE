@@ -51,6 +51,7 @@ var world_impact := false
 
 func _ready() -> void:
 	super._ready()
+	ignore_arena_access_decks()
 	died.connect(die)
 	health_changed.connect(check_supplies)
 	floor_height = global_position.y - chassis_height

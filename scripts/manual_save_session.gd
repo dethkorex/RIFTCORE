@@ -67,6 +67,8 @@ func save_slot() -> Error:
 	return error
 
 func invalidate_defeated_run() -> Error:
+	run = ConfigFile.new()
+	profile.lose_equipped_gear()
 	if not owns_slot:
 		return OK
 	var data := read_slot(slot)
@@ -74,16 +76,22 @@ func invalidate_defeated_run() -> Error:
 		return OK
 	if data.has_section("checkpoint"):
 		data.erase_section("checkpoint")
-	data.set_value("profile", "unlocked_sector", 1)
+	data.set_value("profile", "unlocked_sector", profile.unlocked_sector)
+	data.set_value("profile", "credits", profile.credits)
+	data.set_value("profile", "materials", profile.materials)
 	data.set_value("profile", "player_xp", profile.player_xp)
+	data.set_value("story", "shop_announced_through", profile.shop_announced_through)
 	data.set_value("profile", "core_shards", profile.core_shards)
 	data.set_value("profile", "reserve_lives", profile.reserve_lives)
 	data.set_value("inventory", "stock", profile.inventory)
+	data.set_value("inventory", "carried_materials", profile.carried_materials)
+	data.set_value("inventory", "stored_supplies", profile.stored_supplies)
 	data.set_value("inventory", "quick", profile.quick_slots)
 	data.set_value("inventory", "blueprints", profile.blueprint_items)
 	data.set_value("inventory", "blueprint_pouch", profile.blueprint_pouch)
 	data.set_value("challenge_cycles", "sectors", profile.challenge_cycles)
 	data.set_value("archive", "loot_clears", profile.loot_clears)
+	data.set_value("archive", "normal_clears", profile.normal_clears)
 	data.set_value("archive", "hard_clears", profile.hard_clears)
 	for id in profile.blueprints:
 		data.set_value("blueprints", id, true)
@@ -91,11 +99,12 @@ func invalidate_defeated_run() -> Error:
 		data.set_value("archive", "fragment_%d" % index, true)
 	for ending in profile.endings:
 		data.set_value("archive", ending, true)
-	for id in Profile.GEAR:
-		if profile.gear.get(id) in ["equipped", "carried"] and data.has_section_key("equipment", id):
-			data.erase_section_key("equipment", id)
-		elif data.get_value("equipment", id, "") == "equipped":
-			data.set_value("equipment", id, "stored")
+	for id in profile.owned:
+		data.set_value("upgrades", id, profile.rank(id))
+	if data.has_section("equipment"):
+		data.erase_section("equipment")
+	for id in profile.gear:
+		data.set_value("equipment", id, profile.gear[id])
 	return write_slot(data)
 
 func persist_blueprint_trade() -> Error:

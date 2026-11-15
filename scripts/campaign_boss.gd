@@ -44,6 +44,7 @@ var lamp: OmniLight3D
 func _ready() -> void:
 	max_health *= 1.24
 	super._ready()
+	ignore_arena_access_decks()
 	floor_y = global_position.y - 1.55
 	var level := get_parent().get_parent()
 	left = level.get_node("Gate").global_position.x + 2.3
@@ -308,13 +309,17 @@ func summon() -> void:
 	add.target = target
 	add.position = Vector3(clampf(global_position.x - facing * 5.2, left, right), floor_y + 2.5, 0)
 	add.add_to_group("arena_minions")
-	get_parent().add_child(add)
-	add.scale_for_sector(sector_number)
+	var actors := get_parent()
+	actors.add_child(add)
+	add.scale_for_sector(sector_number, 2, actors.get_meta("opponent_health_scale", 1.0), actors.get_meta("mission_difficulty", 0))
 
 func check_supply() -> void:
 	if supply_index >= 2 or health / max_health > [0.66, 0.32][supply_index]:
 		return
-	var platform := get_parent().get_parent().get_node("TERRAIN/ArenaPerch%d" % supply_index) as Node3D
+	var platform := arena_supply_anchor(supply_index)
+	supply_index += 1
+	if not platform:
+		return
 	var cargo := CARGO.new()
 	cargo.adaptive_supply = true
 	cargo.supply_target = target
@@ -322,7 +327,6 @@ func check_supply() -> void:
 	var landing: Vector3 = platform.supply_landing_point() if platform.has_method("supply_landing_point") else platform.global_position
 	cargo.position = get_parent_node_3d().to_local(landing + Vector3.UP * 2.3)
 	get_parent().add_child.call_deferred(cargo)
-	supply_index += 1
 
 func _explode() -> void:
 	active = false

@@ -31,6 +31,7 @@ var reactor_light: OmniLight3D
 func _ready() -> void:
 	max_health *= 1.22
 	super._ready()
+	ignore_arena_access_decks()
 	body_floor = global_position.y - 1.55
 	var level := get_parent().get_parent()
 	var gate := level.get_node_or_null("Gate") as Node3D
@@ -55,8 +56,10 @@ func take_damage(amount: float, source_position := Vector3.ZERO) -> void:
 func dispatch_canopy_supply() -> void:
 	if supply_threshold >= 2 or health / max_health > [0.65, 0.35][supply_threshold]:
 		return
-	var terrain := get_parent().get_parent().get_node("TERRAIN")
-	var perch := terrain.get_node("Canopy6" if supply_threshold == 0 else "RootPerchWestUpper") as Node3D
+	var perch := arena_supply_anchor(supply_threshold)
+	supply_threshold += 1
+	if not perch:
+		return
 	var drone := preload("res://scripts/cargo_carrier.gd").new()
 	drone.adaptive_supply = true
 	drone.supply_target = target
@@ -64,7 +67,6 @@ func dispatch_canopy_supply() -> void:
 	var landing: Vector3 = perch.supply_landing_point() if perch.has_method("supply_landing_point") else perch.global_position
 	drone.position = get_parent_node_3d().to_local(landing + Vector3.UP * 2.3)
 	get_parent().add_child.call_deferred(drone)
-	supply_threshold += 1
 
 func _physics_process(delta: float) -> void:
 	if not active or health <= 0.0 or not is_instance_valid(target):

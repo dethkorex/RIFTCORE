@@ -5,7 +5,10 @@ signal shot_fired(shot: RiftProjectile)
 
 const XP_REWARDS := [12, 16, 26, 18, 16]
 const ATTACK_FX := preload("res://scripts/attack_fx.gd")
+const Guard := preload("res://scripts/enemy_guard.gd")
 const Catalog := preload("res://scripts/sector_catalog.gd")
+const Difficulty := preload("res://scripts/mission_difficulty.gd")
+const PATROL_SPEEDS := [2.4, 3.6, 1.35, 0.0, 2.5]
 const ARMOR := preload("res://assets/enemies/security_finish.gdshader")
 const HEIGHT_ATLAS := preload("res://assets/enemies/security_height.png")
 const ALBEDO_ATLAS := preload("res://assets/enemies/security_trim.png")
@@ -28,7 +31,9 @@ enum Variant { SCOUT, QUAD, HEAVY, TURRET, FLYER }
 @export_range(-1, 5) var patrol_model := -1
 const STANDARD_ROLES := [Variant.SCOUT, Variant.QUAD, Variant.HEAVY, Variant.TURRET, Variant.FLYER, Variant.FLYER]
 const STANCE_COLORS := [Color("ffc278"), Color("8deeee"), Color("eadb68"), Color("9bb7ff"), Color("d99bff"), Color("f5e9a6")]
-var defense_marker: MeshInstance3D
+var defense_marker: Guard
+var guard_hit_count := 0
+var last_guard_state := -1
 var maneuver_time := 0.0
 var attacks_launched := 0
 var has_defense := false
@@ -69,11 +74,12 @@ var second_act := false
 var shot_windup := 0.0
 var locked_aim := Vector3.ZERO
 
-func scale_for_sector(sector: int, act := 1) -> void:
+func scale_for_sector(sector: int, act: int, health_scale: float, mode: int) -> void:
 	sector_number = sector
 	second_act = act == 2
 	var steps := maxi(0, sector - 1)
-	max_health = [40.0, 55.0, 95.0, 60.0, 35.0][variant] * (1.0 + 0.30 * steps) * (1.32 if second_act else 1.0)
+	max_health = [40.0, 55.0, 95.0, 60.0, 35.0][variant] * (1.0 + 0.30 * steps) * (1.32 if second_act else 1.0) * health_scale
+	move_speed = PATROL_SPEEDS[variant] * Difficulty.enemy_speed_scale(sector, mode)
 	health = max_health
 	sector_damage_scale = (1.0 + 0.20 * steps) * (1.20 if second_act else 1.0)
 	sector_experience_scale = 1.0 + 0.10 * steps
@@ -84,7 +90,7 @@ func _ready() -> void:
 		variant = STANDARD_ROLES[patrol_model]
 	has_defense = variant == Variant.HEAVY or patrol_model == 3
 	max_health = [40.0, 55.0, 95.0, 60.0, 35.0][variant]
-	move_speed = [2.4, 3.6, 1.35, 0.0, 2.5][variant]
+	move_speed = PATROL_SPEEDS[variant]
 	super._ready()
 	patrol_center = global_position.x
 	home_height = global_position.y
@@ -92,10 +98,10 @@ func _ready() -> void:
 	install_model()
 	install_health_bar()
 	if has_defense:
-		var mask := BoxMesh.new()
-		mask.size = Vector3(0.045, 1.30, 0.76)
-		defense_marker = ATTACK_FX.piece(self, mask, Vector3.ZERO, Vector3.ONE, Color("b77cf5"))
-		defense_marker.hide()
+		defense_marker = Guard.new()
+		add_child(defense_marker)
+		defense_marker.install($CollisionShape3D.shape as BoxShape3D)
+		refresh_defense()
 	died.connect(_on_died)
 
 func build_visuals() -> void:
@@ -205,7 +211,6 @@ func _physics_process(delta: float) -> void:
 	shot_clock -= delta
 	attack_time = maxf(0.0, attack_time - delta)
 	maneuver_time = maxf(0.0, maneuver_time - delta)
-	refresh_defense()
 	var tracking := false
 	if is_instance_valid(target) and target.health > 0.0:
 		var distance := target.global_position.x - global_position.x
@@ -249,6 +254,7 @@ func _physics_process(delta: float) -> void:
 	velocity.x = minf(velocity.x, (patrol_right_limit - global_position.x) / delta)
 	move_and_slide()
 	if robot and not is_zero_approx(direction):
+		refresh_defense()
 		robot.rotation.y = lerp_angle(robot.rotation.y, direction * PI * 0.5, 1.0 - exp(-14.0 * delta))
 		robot.rotation.z = direction * (attack_time * 0.32 if attack_time > 0.0 else clampf(velocity.x * -0.025, -0.09, 0.09))
 		var striding := is_on_floor() and stagger_left <= 0.0 and absf(velocity.x) > 0.28
@@ -273,11 +279,24 @@ func _physics_process(delta: float) -> void:
 
 func refresh_defense() -> void:
 	if defense_marker:
-		defense_marker.position.x = direction * .76
-		defense_marker.visible = guard_active()
+		defense_marker.update_pose(direction, guard_active())
 
 func guard_active() -> bool:
-	return has_defense and attack_time <= 0.0 and shot_windup <= 0.0 and stagger_left <= 0.0
+	return health > 0.0 and has_defense and attack_time <= 0.0 and shot_windup <= 0.0 and stagger_left <= 0.0
+
+func guard_snapshot() -> int:
+	var stance := (1 if direction < 0.0 else 2) if guard_active() else 0
+	return posmod(guard_hit_count, 64) * 3 + stance
+
+func apply_guard_snapshot(state: int) -> void:
+	if not defense_marker:
+		return
+	var stance := posmod(state, 3)
+	var side := -1.0 if stance == 1 else 1.0
+	defense_marker.update_pose(side, stance > 0)
+	if stance > 0 and last_guard_state >= 0 and state - stance != last_guard_state - posmod(last_guard_state, 3):
+		defense_marker.flash_at(defense_marker.global_position)
+	last_guard_state = state
 
 func hit_by_projectile(shot: RiftProjectile) -> bool:
 	if shot.owner_faction != "player" or shot.is_charged or not guard_active():
@@ -287,6 +306,10 @@ func hit_by_projectile(shot: RiftProjectile) -> bool:
 	# A closed front plate blocks basic buster fire. Charged fire, melee,
 	# attacking from behind or shooting while the enemy fires defeat it.
 	shot_clock = minf(shot_clock, .45)
+	guard_hit_count += 1
+	defense_marker.update_pose(direction, true)
+	defense_marker.flash_at(shot.global_position)
+	RiftAudio.play_effect(&"armor_hit")
 	return true
 
 func take_damage(amount: float, source_position := Vector3.ZERO) -> void:
@@ -298,6 +321,7 @@ func take_damage(amount: float, source_position := Vector3.ZERO) -> void:
 			side = -direction
 		stagger_left = 0.18
 		recoil = 0.0 if variant == Variant.TURRET or planted_override else side * (3.2 if variant == Variant.HEAVY else 5.0)
+		refresh_defense()
 
 func damage_on_contact(body: RiftPlayer) -> void:
 	if contact_lock > 0.0 or health <= 0.0:
@@ -314,6 +338,7 @@ func prepare_shot() -> void:
 		return
 	locked_aim = (target.global_position - origin).normalized()
 	shot_windup = 0.46 if variant in [Variant.HEAVY, Variant.TURRET] else 0.30
+	refresh_defense()
 	shot_clock = (randf_range(1.2, 1.65) if variant == Variant.TURRET else randf_range(1.75, 2.6)) * (0.81 if second_act else 1.0)
 	ATTACK_FX.charge(get_parent(), origin, ATTACK_FX.tint_for(sector_number), shot_windup)
 

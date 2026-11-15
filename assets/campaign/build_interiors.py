@@ -112,8 +112,14 @@ class Scene:
         self.chamber = ""
 
     def header(self, old_header):
-        assets = [(f"RC{kind}", f"res://assets/campaign/{self.sector}/interior/{self.sector}_{stem}.glb", "PackedScene")
+        sector_root = f"res://assets/campaign/{self.sector}"
+        assets = [(f"RC{kind}", f"{sector_root}/surfaces/{'shaft' if kind == 'Wall' else stem}.tscn"
+                   if kind in ("Deck", "Wall") else f"{sector_root}/interior/{self.sector}_{stem}.glb", "PackedScene")
                   for kind, stem in self.assets.items()]
+        assets.extend([
+            ("SectorDressing", "res://scripts/sector_dressing.gd", "Script"),
+            ("SectorAlbedo", f"{sector_root}/surfaces/sector_wall.jpg", "Texture2D"),
+        ])
         assets += [("RCDoorRelay", FACTORY + "shot_relay.glb", "PackedScene"),
                    ("RCCache", FACTORY + "salvage_chest.glb", "PackedScene"),
                    ("RCRelayScript", "res://scripts/factory_interior_relay.gd", "Script"),
@@ -164,8 +170,9 @@ size = Vector3(1.52, 1.25, 1.5)"""
         if art is None:
             tag += f' type="{kind}"'
         tag += f' parent="{parent}"'
-        if group:
-            tag += f' groups=["{group}"]'
+        groups = list(group) if isinstance(group, tuple) else [group] if group else []
+        if groups:
+            tag += ' groups=[' + ', '.join(f'"{item}"' for item in groups) + ']'
         if art:
             tag += f" instance={ext(art)}"
         lines = [tag + "]"]
@@ -175,22 +182,25 @@ size = Vector3(1.52, 1.25, 1.5)"""
         self.nodes.append("\n".join(lines))
         return f"{parent}/{name}" if parent != "." else name
 
-    def solid(self, name, art, pos, dimensions, art_scale, offset=0, angle=0, moving=False, layer=1, drop=False):
+    def solid(self, name, art, pos, dimensions, art_scale, offset=0, angle=0, moving=False, layer=1, drop=False,
+              arena_deck=False, **properties):
+        groups = ("arena_player_deck",) if arena_deck else ()
+        if drop:
+            groups += ("factory_drop_through",)
         body = self.node(name, pos=pos, kind="AnimatableBody3D" if moving else "StaticBody3D",
-                         rotation=vec(0, 0, angle), collision_layer=layer,
-                         group="factory_drop_through" if drop else None)
+                         rotation=vec(0, 0, angle), collision_layer=layer, group=groups, **properties)
         self.node("Art", parent=body, art="RC" + art, scale=vec(*art_scale))
         shape = f"BoxShape3D_{len(self.nodes):04d}"
         self.shapes.append(f'[sub_resource type="BoxShape3D" id="{shape}"]\nsize = {vec(*dimensions)}')
         self.node("Collision", parent=body, kind="CollisionShape3D", pos=(0, offset, 0), shape=sub(shape))
 
-    def deck(self, name, a, b, low, high=None, thin=False, moving=False):
+    def deck(self, name, a, b, low, high=None, thin=False, moving=False, **properties):
         high = low if high is None else high
         length = math.hypot(b-a, high-low)
         height = .46 if thin else .84
         drop = thin and not moving and not name.startswith(("Sump", "Shutter", "Gate", "Compact"))
         self.solid(name, "Deck", ((a+b)/2, (low+high)/2, 0), (length+.006, height, 4.8),
-                   (length/6, height/.84, 1), -height/2, math.atan2(high-low,b-a), moving, drop=drop)
+                   (length/6, height/.84, 1), -height/2, math.atan2(high-low,b-a), moving, drop=drop, **properties)
 
     def stretch_tiles(self, name, a, b, y, thin=False):
         n = max(1, math.ceil((b-a)/7.5))
@@ -333,35 +343,34 @@ size = Vector3(1.52, 1.25, 1.5)"""
             a = opening_end
         parent = self.node(f"InteriorCladding_{variation}")
         roof += ROOF_CLEARANCE
+        self.node("SectorSurfaces", parent=parent, script=ext("SectorDressing"), albedo=ext("SectorAlbedo"),
+                  sector=self.number, left_edge=a, right_edge=b, cave_floor=floor, cave_roof=roof,
+                  arena=str(self.chamber.endswith("/BossWing")).lower())
         length = b-a
         n = math.ceil(length/7.0)
         panel = length/n
         for i in range(n):
             x = a+(i+.5)*panel
             recess = .60 if (i+variation)%3==1 else 0
-            self.node(f"Bulkhead{i}", parent=parent, art="RCRoom", pos=(x,floor-1.1,-3.4-recess),
-                      scale=vec(panel/6, (roof-floor+1.1)/8, 1))
             if (i+variation)%5 == 2:
                 self.node(f"SectorFixture{i}", parent=parent, art="RCFixture",
                           pos=(x,floor+.75,-2.67-recess))
             if (i+variation)%3 == 0:
                 self.node(f"BayLight{i}", parent=parent, kind="OmniLight3D", pos=(x,roof-1.9,-1.85),
                           light_color=self.color(), light_energy=.8, omni_range=8.5)
-        # Ceiling and lower skirt extend off the gameplay plane.
+        # Ceiling extends off the gameplay plane.
         for i in range(math.ceil(length/13)):
             x = a+(i+.5)*length/math.ceil(length/13)
             self.node(f"Ceiling{i}", parent=parent, art="RCDeck", pos=(x,roof,-1.25),
                       scale=vec(length/math.ceil(length/13)/6,1.6,1.9))
-            self.node(f"Foundation{i}", parent=parent, art="RCRoom", pos=(x,floor-9,-2.2),
-                      scale=vec(length/math.ceil(length/13)/6,1,1))
 
-    def relay(self, x, y, name, dy, lift, operation=None, dx=0):
+    def relay(self, x, y, name, dy, lift, operation=None, dx=0, hold=None, delay=None):
         target = self.node(f"{name}Relay", kind="StaticBody3D", pos=(x,y+1,0), group="factory_shot_relay",
                            script=ext("RCRelayScript"), collision_layer=16, collision_mask=0,
                            platform_path=f'NodePath("../{name}")', travel=vec(dx,dy,0),
                            operation=f'"{operation or DEVICE_NAMES[self.number-2][int(lift)]}"', lift=str(lift).lower(),
-                           repeat_hold=5.2 if self.number in (6,9) else 6.5,
-                           departure_delay=1.15 if lift else 0.0)
+                           repeat_hold=hold if hold is not None else (5.2 if self.number in (6,9) else 6.5),
+                           departure_delay=delay if delay is not None else (1.15 if lift else 0.0))
         self.node("Casing", parent=target, art="RCDoorRelay", pos=(0,-.26,0))
         self.node("Collision", parent=target, kind="CollisionShape3D", shape=sub("RCRelayShape"))
         self.node("Lamp", parent=target, kind="MeshInstance3D", pos=(0,0,.26), mesh=sub("RCRelayLamp"))
@@ -766,32 +775,38 @@ size = Vector3(1.52, 1.25, 1.5)"""
         at = gate+width*location
         for index,(fraction,length,height) in enumerate(decks):
             x = gate+width*fraction
-            if mechanic=="vine" and fraction==location:
-                self.node("ArenaVineHatch",art="RCHatch",pos=(x,floor+height,0),
-                          deck_width=length,climb_height=height)
+            launch_shelf = self.act == 1 and index == 0 and mechanic in ("cover", "phase")
+            height = (2.45 if mechanic == "phase" else 2.55) if launch_shelf else max(height, 2.69 if self.act == 1 else 3.75)
+            supply = {"metadata/boss_supply_anchor": int(index != 0)} if self.act == 2 and index in (0, len(decks)-1) else {}
+            vine_hatch = mechanic == "vine" and fraction == location
+            ladder_hatch = self.sector == "buried_archives" and self.act == 2 and index == 1
+            if vine_hatch or ladder_hatch:
+                self.node("ArenaVineHatch" if vine_hatch else f"TacticalDeck{index}",art="RCHatch",pos=(x,floor+height,0),group="arena_player_deck",
+                          deck_width=length,climb_height=height, **supply)
             else:
-                self.deck(f"TacticalDeck{index}",x-length/2,x+length/2,floor+height,thin=True)
+                self.deck(f"TacticalDeck{index}",x-length/2,x+length/2,floor+height,thin=True,
+                          arena_deck=True, **supply)
             self.node(f"TacticalLight{index}",kind="OmniLight3D",
                       pos=(x,floor+height+1.1,-1.6),
                       light_color=self.color(),light_energy=1.55,omni_range=5.6)
         if mechanic=="lift":
-            self.deck("ArenaElevator",at-1.65,at+1.65,floor+2.48,thin=True,moving=True)
+            rest = .14
+            self.deck("ArenaElevator",at-1.65,at+1.65,floor+rest,thin=True,moving=True,arena_deck=True)
             nearby = min(decks,key=lambda deck:abs(deck[0]-location))
             destination = nearby[2] + .80
-            # Tall lift destinations clear the neighbouring gallery; the
-            # player can step or jump off either side during the dwell.
-            self.relay(at-2.9,floor,"ArenaElevator",max(1.15,destination-2.47),True,"DODGE LIFT")
+            self.relay(at-2.9,floor+.04,"ArenaElevator",destination-rest,True,"DODGE LIFT",
+                       hold=3.8, delay=.68)
         elif mechanic=="cover":
             self.solid("ProjectileShield","Wall",(at,floor+1.42,0),(.76,2.85,2.5),(1,2.85/4.25,.62),layer=128)
         elif mechanic=="phase":
-            self.node("ArenaPhaseDeck",art="RCPhase",pos=(at,floor+3.2,0),
-                      period=4.35 if self.act==1 else 3.65,phase_offset=1.2)
+            self.node("ArenaPhaseDeck",art="RCPhase",pos=(at,floor+(3.2 if self.act == 1 else 3.75),0),
+                      group="arena_player_deck", period=4.35 if self.act==1 else 3.65,phase_offset=1.2)
         elif mechanic!="vine":
             effect = {"current": 1, "gravity": 3, "vent": 6}[mechanic]
             sign = {"current": "CURRENT / JUMP CLEAR", "gravity": "FLOAT FIELD", "vent": "VENT / QUICK ESCAPE"}[mechanic]
             # Make the gravity/vent recovery influence large enough to reach
             # the next deck, while leaving the boss's floor continuous.
-            self.field("ArenaMovementField",at,floor,effect,sign,direction=-1 if self.act==2 else 1,width=5.8,field_height=7.6 if mechanic=="gravity" else 2.6)
+            self.field("ArenaMovementField",at,floor,effect,sign,direction=-1 if self.act==2 else 1,width=5.8,field_height={"gravity":7.6, "vent":6.84, "current":2.6}[mechanic])
 
     def signature_room(self, profile, p, q, floor):
         # Room edges remain level; route changes are carried into the next room.
@@ -1166,6 +1181,8 @@ size = Vector3(1.52, 1.25, 1.5)"""
                                                        "ForgeHallDoor/","ArenaUnifiedFloor/")) or
                       key.startswith(("TERRAIN/MidpointCheckpoint/","TERRAIN/ForgeHallCheckpoint/"))):
                 continue
+            if key in ("Gate/Door", "Gate/PortalFrame") and "boss_entry =" not in block:
+                block += "\nboss_entry = true"
             result.append(block)
         used_ext = set(re.findall(r'ExtResource\("([^"]+)"\)',"\n".join(result+self.nodes)))
         header = self.header(header)

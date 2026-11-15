@@ -50,6 +50,7 @@ static func contact_title(contact: Dictionary) -> String:
 
 static func contact_button(row: VBoxContainer, contact: Dictionary, select: Callable) -> Button:
 	var button := UI.button(row, contact_title(contact), select.bind(contact), false, 34)
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	button.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	button.tooltip_text = contact.status

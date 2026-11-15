@@ -20,6 +20,7 @@ var inventory_tiles: Dictionary = {}
 var inventory_snapshot: Dictionary = {}
 var inventory_empty: Label
 var selected_supply := ""
+var supply_source := &"inventory"
 var selected_slot := 0
 var item_detail: Label
 var item_feedback: Label
@@ -32,7 +33,7 @@ var refresh_in := 0.0
 func _ready() -> void:
 	size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var layout := HBoxContainer.new()
-	layout.add_theme_constant_override("separation", 16)
+	layout.add_theme_constant_override("separation", 12)
 	add_child(layout)
 	var equipment := UI.column(layout, 8)
 	equipment.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -40,14 +41,14 @@ func _ready() -> void:
 	var body := EquipmentBody.new()
 	equipment.add_child(body)
 	body.install(profile, "", Callable())
-	body.custom_minimum_size.y = 276
+	body.custom_minimum_size.y = 225
 	var weapons := HBoxContainer.new()
 	weapons.add_theme_constant_override("separation", 7)
 	equipment.add_child(weapons)
 	buster = weapon_slot(weapons, "BUSTER", "arm")
 	weapon_slot(weapons, "SABER", "utility").text = "RX-07 Saber"
 	var sidebar := UI.column(layout, 6)
-	sidebar.custom_minimum_size.x = 322
+	sidebar.custom_minimum_size.x = 341
 	UI.label(sidebar, "LB / RB   Switch tab", 14, UI.MUTED)
 	sections = TabContainer.new()
 	sections.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -104,7 +105,7 @@ func build_inventory() -> void:
 	panel.add_theme_constant_override("separation", 5)
 	sections.add_child(panel)
 	var scroll := ScrollContainer.new()
-	scroll.custom_minimum_size.y = 120
+	scroll.custom_minimum_size.y = 156
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -114,7 +115,7 @@ func build_inventory() -> void:
 	contents.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	inventory_empty = UI.label(contents, "No items in inventory.", 16, UI.MUTED)
 	inventory_grid = GridContainer.new()
-	inventory_grid.columns = 4
+	inventory_grid.columns = 6
 	inventory_grid.add_theme_constant_override("h_separation", UI.ITEM_GAP)
 	inventory_grid.add_theme_constant_override("v_separation", UI.ITEM_GAP)
 	contents.add_child(inventory_grid)
@@ -143,6 +144,7 @@ func select_inventory_item(key: String, equip := false) -> void:
 %s" % [item.name, item.count, item.detail]
 	if equip:
 		selected_supply = String(item.get("supply", ""))
+		supply_source = item.get("source", &"inventory")
 	if equip and not selected_supply.is_empty():
 		item_feedback.text = "Choose a D-pad slot for %s." % item.name
 		equip_buttons[selected_slot].grab_focus()
@@ -154,7 +156,8 @@ func edit_slot(index: int) -> void:
 		item_feedback.text = "Select a supply above to equip it."
 		return
 	var previous: Dictionary = profile.quick_slots[index].duplicate()
-	item_feedback.text = profile.assign_quick(index, selected_supply)
+	var player := operator.call() as RiftPlayer
+	item_feedback.text = profile.assign_quick(index, selected_supply, supply_source, player.recovered_supplies)
 	if previous != profile.quick_slots[index]:
 		selected_supply = ""
 		if quick_edited.is_valid():
@@ -163,7 +166,8 @@ func edit_slot(index: int) -> void:
 
 func clear_slot() -> void:
 	var previous: Dictionary = profile.quick_slots[selected_slot].duplicate()
-	item_feedback.text = profile.clear_quick(selected_slot)
+	var player := operator.call() as RiftPlayer
+	item_feedback.text = profile.clear_quick(selected_slot, player.recovered_supplies)
 	if previous != profile.quick_slots[selected_slot] and quick_edited.is_valid():
 		quick_edited.call()
 	refresh()
@@ -205,7 +209,7 @@ func reload_inventory(contents: Dictionary) -> void:
 		var tile: Button = buttons[index]
 		var columns := inventory_grid.columns
 		if index + columns >= buttons.size():
-			tile.focus_neighbor_bottom = tile.get_path_to(equip_buttons[index % columns])
+			tile.focus_neighbor_bottom = tile.get_path_to(equip_buttons[mini(equip_buttons.size() - 1, (index % columns) * equip_buttons.size() / columns)])
 	for index in equip_buttons.size():
 		var button := equip_buttons[index]
 		var top: Control = buttons[mini(index, buttons.size() - 1)] if not buttons.is_empty() else sections.get_tab_bar()
@@ -278,23 +282,29 @@ func refresh() -> void:
 		equip_buttons[index].icon = quick_icons[index].texture
 	refresh_slot_details()
 	var contents := {}
-	for id in profile.inventory:
-		if Profile.stock.has(id) and int(profile.inventory[id]) > 0:
-			var supply: Dictionary = Profile.stock[id]
-			contents[id] = {"name": supply.name, "count": profile.inventory[id], "detail": supply.detail,
-				"icon": supply.icon, "rarity": supply.rarity, "supply": id}
-	var materials: Dictionary = profile.materials.duplicate()
-	for id in player.salvage:
-		materials[id] = int(materials.get(id, 0)) + int(player.salvage[id])
-	for id in materials:
-		if int(materials[id]) > 0:
-			contents["material:" + id] = {"name": Materials.label(id), "count": materials[id],
-				"detail": "Crafting material", "icon": "core", "rarity": 0}
-	var blueprints: Dictionary = profile.blueprint_items.duplicate()
-	blueprints.merge(player.recovered_blueprints)
-	for id in blueprints:
+	add_supplies(contents, profile.inventory, &"inventory")
+	add_supplies(contents, player.recovered_supplies, &"field")
+	var material_sources := {"carried": profile.carried_materials, "recovered": player.salvage}
+	for source in material_sources:
+		for id in material_sources[source]:
+			var amount := int(material_sources[source][id])
+			if amount > 0:
+				contents["%s:material:%s" % [source, id]] = {"name": Materials.label(id), "count": amount,
+					"detail": "Goes to Storage on extraction." if source == "recovered" else "Stow this at Equipment to use it for crafting.",
+					"icon": "core", "rarity": 0}
+	for id in player.recovered_blueprints:
 		if Profile.GEAR.has(id):
 			var gear: Dictionary = Profile.GEAR[id]
 			contents["blueprint:" + id] = {"name": gear.name + " Blueprint", "count": 1,
 				"detail": "Learn this recipe at the station.", "icon": id, "slot": gear.slot, "rarity": gear.rarity}
 	reload_inventory(contents)
+
+func add_supplies(contents: Dictionary, supplies: Dictionary, source: StringName) -> void:
+	for id in supplies:
+		if Profile.stock.has(id) and int(supplies[id]) > 0:
+			var supply: Dictionary = Profile.stock[id]
+			var detail: String = supply.detail
+			if source == &"field":
+				detail += "  ·  Unused units go to Storage on extraction."
+			contents["field:" + id if source == &"field" else id] = {"name": supply.name, "count": supplies[id], "detail": detail,
+				"icon": supply.icon, "rarity": supply.rarity, "supply": id, "source": source}

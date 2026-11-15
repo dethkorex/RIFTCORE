@@ -305,10 +305,11 @@ func build_visuals() -> void:
 var remote_input := false
 var local_prediction := false
 var supplies := {}
+var recovered_supplies := {}
 var quick_profile
 
 func collect_supply(id: String) -> bool:
-	if not quick_profile or not quick_profile.collect_supply(id):
+	if not quick_profile or not quick_profile.collect_field_supply(id, recovered_supplies):
 		return false
 	supply_found.emit(id)
 	return true
@@ -1120,7 +1121,7 @@ func launch_buster(muzzle: Vector3, direction: Vector3, charged: bool, magma: bo
 	projectile.collision_mask = 3 | 16 | (8 if magma else 0)
 	get_tree().current_scene.add_child(projectile)
 	projectile.global_position = muzzle
-	projectile.damage = power * (buster_damage_multiplier if magma or not weapon_id.is_empty() else 1.0)
+	projectile.damage = power * (buster_damage_multiplier * (1.0 + supply_bonus("attack")) if magma or not weapon_id.is_empty() else 1.0)
 	projectile.weapon_id = weapon_id
 	projectile.range_remaining = buster_range(muzzle, direction)
 	if charged:

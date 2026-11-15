@@ -31,7 +31,7 @@ var progress: ProgressBar
 var installing := false
 
 func _ready() -> void:
-	add_theme_constant_override("separation", 15)
+	add_theme_constant_override("separation", 8)
 	size_flags_vertical = Control.SIZE_EXPAND_FILL
 	UI.label(self, "LB / RB   Switch tab", 14, UI.MUTED)
 	tabs = TabContainer.new()
@@ -93,17 +93,20 @@ func _ready() -> void:
 func settings_tab(title: String, heading: String) -> VBoxContainer:
 	var panel := VBoxContainer.new()
 	panel.name = title
-	panel.add_theme_constant_override("separation", 12)
+	panel.add_theme_constant_override("separation", 8)
 	tabs.add_child(panel)
 	UI.label(panel, heading, 25, UI.CYAN)
 	return panel
 
 func add_selector(panel: VBoxContainer, title: String, options: Array, index: int) -> OptionButton:
 	var row := HBoxContainer.new()
+	row.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	panel.add_child(row)
-	UI.label(row, title, 17, UI.MUTED).custom_minimum_size.x = 150
+	var caption := UI.label(row, title, 17, UI.MUTED)
+	caption.custom_minimum_size.x = 168
+	caption.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	var choice := OptionButton.new()
-	choice.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	choice.custom_minimum_size = Vector2(234, 34)
 	row.add_child(choice)
 	UI.style_button(choice)
 	for label in options:
@@ -115,6 +118,8 @@ func add_toggle(panel: Control, title: String, state: bool, action: Callable) ->
 	var toggle := CheckButton.new()
 	toggle.text = title
 	toggle.button_pressed = state
+	toggle.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	toggle.custom_minimum_size.y = 33
 	panel.add_child(toggle)
 	UI.style_button(toggle)
 	toggle.toggled.connect(action)
@@ -122,19 +127,22 @@ func add_toggle(panel: Control, title: String, state: bool, action: Callable) ->
 
 func add_slider(panel: VBoxContainer, title: String, value: float, minimum: int, maximum: int, increment: int, action: Callable) -> void:
 	var row := HBoxContainer.new()
+	row.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	panel.add_child(row)
-	UI.label(row, title, 17).custom_minimum_size.x = 150
+	var name := UI.label(row, title, 17)
+	name.custom_minimum_size.x = 168
+	name.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	var slider := HSlider.new()
 	slider.min_value = minimum
 	slider.max_value = maximum
 	slider.step = increment
 	slider.value = value
-	slider.custom_minimum_size.y = 28
-	slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	slider.custom_minimum_size = Vector2(260, 27)
 	row.add_child(slider)
 	var caption := UI.label(row, "%d%%" % value, 17, UI.CYAN)
 	caption.custom_minimum_size.x = 55
 	caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	caption.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	slider.value_changed.connect(func(next: float):
 		caption.text = "%d%%" % next
 		action.call(next)
@@ -159,12 +167,12 @@ func build_bindings(title: String, device: String) -> void:
 	panel.add_child(scroll)
 	var grid := GridContainer.new()
 	grid.columns = 2
-	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	grid.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	grid.add_theme_constant_override("v_separation", 5)
 	scroll.add_child(grid)
 	for action in RiftSettings.ACTIONS:
 		var caption := UI.label(grid, RiftSettings.ACTIONS[action], 17)
-		caption.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		caption.custom_minimum_size.x = 168
 		caption.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		var button := UI.button(grid, RiftSettings.binding_label(action, device), begin_capture.bind(action, device), false, 34)
 		button.custom_minimum_size.x = 190
@@ -177,7 +185,7 @@ func build_bindings(title: String, device: String) -> void:
 
 func build_controller_bindings() -> void:
 	var panel := settings_tab("Controller", "Controller Bindings")
-	panel.add_theme_constant_override("separation", 7)
+	panel.add_theme_constant_override("separation", 6)
 	var options := HBoxContainer.new()
 	options.add_theme_constant_override("separation", 12)
 	panel.add_child(options)
@@ -203,8 +211,8 @@ func build_controller_bindings() -> void:
 	vibration.custom_minimum_size = Vector2(124, 28)
 
 	var groups := HBoxContainer.new()
-	groups.add_theme_constant_override("separation", 22)
-	groups.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	groups.add_theme_constant_override("separation", 18)
+	groups.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	panel.add_child(groups)
 	var movement := build_action_column(groups, "Movement", ["move_left", "move_right", "jump", "crouch", "climb_up", "climb_down"])
 	var combat := build_action_column(groups, "Combat and suits", ["dash", "shoot", "melee", "swap_weapon", "previous_suit", "pause"])
@@ -250,7 +258,7 @@ func build_controller_bindings() -> void:
 
 func build_action_column(parent: HBoxContainer, heading: String, actions: Array) -> Array[Control]:
 	var column := VBoxContainer.new()
-	column.custom_minimum_size.x = 305
+	column.custom_minimum_size.x = 247
 	column.add_theme_constant_override("separation", 4)
 	parent.add_child(column)
 	UI.label(column, heading, 16, UI.CYAN)

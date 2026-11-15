@@ -19,12 +19,12 @@ const CHALLENGE_SETS := [
 ]
 
 const UPGRADES := [
-	{"id": "armor", "name": "Ceramic Armor", "prices": [15, 28], "effects": ["+12 starting HP", "+28 starting HP and 10% damage resistance"]},
-	{"id": "capacitor", "name": "Flux Capacitor", "prices": [19, 34], "effects": ["+15 starting energy", "+32 starting energy and 20% cheaper boss-weapon charge shots"]},
-	{"id": "buster", "name": "Buster Overdrive", "prices": [25, 41], "effects": ["+15% Buster and saber damage", "+32% Buster and saber damage"]},
-	{"id": "dash", "name": "Vector Drive", "prices": [31, 47], "effects": ["+10% dash speed and 15% shorter cooldown", "+20% dash speed and 32% shorter cooldown"]},
-	{"id": "storage", "name": "Storage Expansion", "prices": [20, 36], "effects": ["+7 storage positions", "+14 storage positions"]},
-	{"id": "fabrication", "name": "Fabrication Efficiency", "prices": [20, 36], "effects": ["20% scrap discount", "40% scrap discount"]},
+	{"id": "armor", "category": "Armor", "name": "Ceramic Armor", "prices": [15, 28], "effects": ["+12 starting HP", "+28 starting HP and 10% damage resistance"]},
+	{"id": "capacitor", "category": "Energy", "name": "Flux Capacitor", "prices": [19, 34], "effects": ["+15 starting energy", "+32 starting energy and 20% cheaper boss-weapon charge shots"]},
+	{"id": "buster", "category": "Weapons", "name": "Buster Overdrive", "prices": [25, 41], "effects": ["+15% Buster and saber damage", "+32% Buster and saber damage"]},
+	{"id": "dash", "category": "Mobility", "name": "Vector Drive", "prices": [31, 47], "effects": ["+10% dash speed and 15% shorter cooldown", "+20% dash speed and 32% shorter cooldown"]},
+	{"id": "storage", "category": "Station", "name": "Storage Expansion", "prices": [20, 36], "effects": ["+7 storage positions", "+14 storage positions"]},
+	{"id": "fabrication", "category": "Station", "name": "Fabrication Efficiency", "prices": [20, 36], "effects": ["20% scrap discount", "40% scrap discount"]},
 ]
 
 const Enhancements := preload("res://scripts/enhancement_catalog.gd")
@@ -35,13 +35,16 @@ const QUICK_MAX := 3
 const STACK_MAX := 100
 const BLUEPRINT_POUCH_SIZE := 8
 var reconstruction_seen := false
+var briefed_acts := PackedInt32Array()
+var shop_announced_through := 1
 var blueprint_items := {}
 var blueprint_pouch: Array[String] = []
 var inventory := {}
+var carried_materials := {}
+var stored_supplies := {}
 var quick_slots: Array[Dictionary] = [{}, {}, {}, {}]
 
 const GEAR_SLOTS := {"frame": "Frame", "core": "Core", "utility": "Utility", "visor": "Visor", "arm": "Arm Module"}
-const UPGRADE_SLOTS := {"armor": "frame", "capacitor": "core", "buster": "core", "dash": "utility", "storage": "utility", "fabrication": "core"}
 const RARITY_NAMES := ["Common", "Rare", "Epic", "Legendary"]
 const RARITY_COLORS := [Color("b5c9de"), Color("68c9ff"), Color("d0a0ff"), Color("ffca68")]
 const Blueprints := preload("res://scripts/blueprint_catalog.gd")
@@ -88,7 +91,7 @@ var blueprints: Dictionary = {}
 
 var path := "user://riftcore_profile.cfg"
 const Materials := preload("res://scripts/fabrication_catalog.gd")
-const PLAYER_LEVEL_CAP := 50
+const PLAYER_LEVEL_CAP := Difficulty.PLAYER_LEVEL_CAP
 const Story := preload("res://scripts/rift_story.gd")
 var memories: Array[int] = []
 var endings: Array[String] = []
@@ -104,6 +107,7 @@ var unlocked_sector := 1
 var completed_challenges: Dictionary = {}
 var challenge_cycles: Dictionary = {}
 var loot_clears: Dictionary = {}
+var normal_clears: Dictionary = {}
 var hard_clears: Dictionary = {}
 var reserve_lives := 0
 var gear := {}
@@ -124,8 +128,24 @@ func restore() -> void:
 		return
 	decode_from(data)
 
+func claim_briefing(sector: int, act: int) -> bool:
+	var key := (sector - 1) * 2 + act
+	if briefed_acts.has(key):
+		return false
+	briefed_acts.append(key)
+	return true
+
 func player_level() -> int:
 	return mini(PLAYER_LEVEL_CAP, RiftPlayer.level_for_experience(player_xp))
+
+func shop_milestone() -> int:
+	var level := player_level()
+	var milestone := 1
+	for item in stock.values():
+		var required: int = item.shop_level
+		if required <= level:
+			milestone = maxi(milestone, required)
+	return milestone
 
 func award_player_xp(amount: int) -> void:
 	player_xp = mini(RiftPlayer.experience_threshold(PLAYER_LEVEL_CAP), player_xp + maxi(amount, 0))
@@ -138,6 +158,8 @@ func storage_capacity() -> int:
 
 func decode_from(data: ConfigFile) -> void:
 	reconstruction_seen = bool(data.get_value("story", "reconstruction_seen", false))
+	var saved_briefings: Variant = data.get_value("story", "briefed_acts", PackedInt32Array())
+	briefed_acts = saved_briefings if saved_briefings is PackedInt32Array else PackedInt32Array()
 	operator_name = clean_operator_name(str(data.get_value("profile", "operator_name", "RX-07")))
 	materials.clear()
 	blueprints.clear()
@@ -147,6 +169,8 @@ func decode_from(data: ConfigFile) -> void:
 				blueprints[id] = true
 	blueprint_items.clear()
 	inventory.clear()
+	carried_materials.clear()
+	stored_supplies.clear()
 	quick_slots = [{}, {}, {}, {}]
 	var saved_blueprints: Variant = data.get_value("inventory", "blueprints", {})
 	if saved_blueprints is Dictionary:
@@ -160,18 +184,36 @@ func decode_from(data: ConfigFile) -> void:
 			if id is String and can_collect_blueprint(id) and blueprint_pouch.size() < BLUEPRINT_POUCH_SIZE:
 				blueprint_pouch.append(id)
 	var items: Variant = data.get_value("inventory", "stock", {})
+	var separated := data.has_section_key("inventory", "stored_supplies")
 	if items is Dictionary:
 		for id in items:
 			if stock.has(id) and not stock[id].has("material"):
-				inventory[id] = clampi(int(items[id]), 0, STACK_MAX)
+				var destination := inventory if separated else stored_supplies
+				destination[id] = clampi(int(items[id]), 0, STACK_MAX)
+	var stored: Variant = data.get_value("inventory", "stored_supplies", {})
+	if stored is Dictionary:
+		for id in stored:
+			if stock.has(id) and not stock[id].has("material"):
+				stored_supplies[id] = maxi(0, int(stored[id]))
+	var carried: Variant = data.get_value("inventory", "carried_materials", {})
+	if carried is Dictionary:
+		for item in stock.values():
+			if item.has("material") and carried.has(item.material):
+				carried_materials[item.material] = clampi(int(carried[item.material]), 0, STACK_MAX)
 	var assigned: Variant = data.get_value("inventory", "quick", [])
 	if assigned is Array:
 		for index in mini(quick_slots.size(), assigned.size()):
 			if assigned[index] is Dictionary:
 				var id := String(assigned[index].get("id", ""))
 				var count := clampi(int(assigned[index].get("count", 0)), 0, 5)
+				var field := clampi(int(assigned[index].get("field", 0)), 0, mini(count, QUICK_MAX))
+				if not data.has_section_key("checkpoint", "recovered_supplies"):
+					count -= field
+					field = 0
 				if count > 0 and stock.has(id) and not stock[id].has("material"):
 					quick_slots[index] = {"id": id, "count": mini(count, QUICK_MAX)}
+					if field > 0:
+						quick_slots[index].field = field
 					if count > QUICK_MAX:
 						inventory[id] = mini(STACK_MAX, int(inventory.get(id, 0)) + count - QUICK_MAX)
 	memories.clear()
@@ -193,6 +235,8 @@ func decode_from(data: ConfigFile) -> void:
 		materials["scrap"] = legacy_bolts / 50
 	player_xp = 0
 	award_player_xp(int(data.get_value("profile", "player_xp", 0)))
+	var shop_level := shop_milestone()
+	shop_announced_through = clampi(int(data.get_value("story", "shop_announced_through", shop_level)), 1, shop_level)
 	var skin := String(data.get_value("profile", "cosmetic", "Standard"))
 	cosmetic = skin if player_level() >= cosmetic_level(skin) else "Standard"
 	credits = maxi(0, int(data.get_value("profile", "credits", 0)))
@@ -205,6 +249,16 @@ func decode_from(data: ConfigFile) -> void:
 	loot_clears = clears if clears is Dictionary else {}
 	var hard: Variant = data.get_value("archive", "hard_clears", {})
 	hard_clears = hard if hard is Dictionary else {}
+	var normal: Variant = data.get_value("archive", "normal_clears", false)
+	normal_clears = normal if normal is Dictionary else {}
+	if not normal is Dictionary:
+		# Older profiles only saved their highest clear. Keep their earned access.
+		for number in range(1, Catalog.SECTORS.size() + 1):
+			if loot_clears.has(number) or hard_clears.get(number, false):
+				normal_clears[number] = true
+	for number in range(1, Catalog.SECTORS.size()):
+		if normal_clears.get(number, false) or hard_clears.get(number, false):
+			unlocked_sector = maxi(unlocked_sector, number + 1)
 	for number in memories:
 		if not loot_clears.has(number):
 			loot_clears[number] = 0
@@ -237,7 +291,11 @@ func save() -> Error:
 
 func encode_into(data: ConfigFile) -> void:
 	data.set_value("story", "reconstruction_seen", reconstruction_seen)
+	data.set_value("story", "briefed_acts", briefed_acts)
+	data.set_value("story", "shop_announced_through", shop_announced_through)
 	data.set_value("inventory", "stock", inventory)
+	data.set_value("inventory", "carried_materials", carried_materials)
+	data.set_value("inventory", "stored_supplies", stored_supplies)
 	data.set_value("inventory", "quick", quick_slots)
 	data.set_value("inventory", "blueprints", blueprint_items)
 	data.set_value("inventory", "blueprint_pouch", blueprint_pouch)
@@ -261,6 +319,7 @@ func encode_into(data: ConfigFile) -> void:
 		data.set_value("challenges", id, true)
 	data.set_value("challenge_cycles", "sectors", challenge_cycles)
 	data.set_value("archive", "loot_clears", loot_clears)
+	data.set_value("archive", "normal_clears", normal_clears)
 	data.set_value("archive", "hard_clears", hard_clears)
 	for id in gear:
 		data.set_value("equipment", id, gear[id])
@@ -353,12 +412,16 @@ func move_gear(id: String) -> String:
 
 func lose_equipped_gear() -> void:
 	var previous := gear.duplicate()
+	var previous_quick := quick_slots.duplicate()
 	for id in gear.keys():
-		if gear[id] in ["equipped", "carried"]:
+		if gear[id] == "equipped":
 			gear.erase(id)
-	if gear.size() != previous.size() and save() != OK:
+	quick_slots = [{}, {}, {}, {}]
+	if save() != OK:
 		gear = previous
+		quick_slots = previous_quick
 		push_warning("Could not save equipment loss.")
+	quick_changed.emit()
 
 static func challenge_key(sector: int, tier: int) -> String:
 	return "%d_%d" % [sector, tier + 1]
@@ -366,10 +429,24 @@ static func challenge_key(sector: int, tier: int) -> String:
 static func challenge_credits(sector: int, tier: int) -> int:
 	return CHALLENGES[tier].credits + (sector - 1) * CHALLENGES[tier].step
 
-func record_sector_clear(sector: int, mode: int) -> void:
+func record_sector_clear(sector: int, mode: int) -> bool:
 	loot_clears[sector] = maxi(int(loot_clears.get(sector, 0)), mode)
+	if mode == Difficulty.NORMAL and not hard_unlocked(sector):
+		normal_clears[sector] = true
+		return true
 	if mode == Difficulty.HARD:
 		hard_clears[sector] = true
+	return false
+
+func hard_unlocked(sector: int) -> bool:
+	return normal_clears.get(sector, false)
+
+func available_difficulty(sector: int, requested: int) -> int:
+	if requested == Difficulty.NIGHTMARE and nightmare_unlocked():
+		return Difficulty.NIGHTMARE
+	if requested >= Difficulty.HARD and hard_unlocked(sector):
+		return Difficulty.HARD
+	return Difficulty.NORMAL
 
 func hard_clear_count() -> int:
 	var count := 0
@@ -554,7 +631,7 @@ func learn_blueprint(id: String) -> String:
 
 func supply_owned(id: String) -> int:
 	var item: Dictionary = stock[id]
-	return int(materials.get(item.material, 0)) if item.has("material") else int(inventory.get(id, 0))
+	return int(carried_materials.get(item.material, 0)) if item.has("material") else int(inventory.get(id, 0))
 
 func supply_purchase_limit(id: String) -> int:
 	var item: Dictionary = stock[id]
@@ -564,13 +641,15 @@ func buy_supply(id: String, bundles := 1) -> String:
 	if not stock.has(id) or bundles < 1:
 		return "Item unavailable."
 	var item: Dictionary = stock[id]
+	if player_level() < int(item.shop_level):
+		return "Unlocks at Player Lv. %d." % item.shop_level
 	if bundles > supply_purchase_limit(id):
 		return "Stack full."
 	var cost: int = item.price * bundles
 	if credits < cost:
 		return "Not enough bolts."
 	var quantity: int = int(item.get("quantity", 1)) * bundles
-	var target := materials if item.has("material") else inventory
+	var target := carried_materials if item.has("material") else inventory
 	var key: String = item.get("material", id)
 	var before := supply_owned(id)
 	credits -= cost
@@ -579,58 +658,113 @@ func buy_supply(id: String, bundles := 1) -> String:
 		credits += cost
 		target[key] = before
 		return "Could not save the purchase."
-	return "Purchased %s ×%d." % [item.name, quantity]
+	return "Purchased %s ×%d. Added to carried inventory." % [item.name, quantity]
 
-func collect_supply(id: String) -> bool:
+func collect_field_supply(id: String, recovered: Dictionary) -> bool:
 	if not stock.has(id) or stock[id].has("material"):
 		return false
-	var previous := int(inventory.get(id, 0))
+	var previous := int(recovered.get(id, 0))
 	if previous >= STACK_MAX:
 		return false
-	inventory[id] = previous + 1
-	if save() != OK:
-		inventory[id] = previous
-		return false
+	recovered[id] = previous + 1
 	return true
 
-func assign_quick(index: int, id: String) -> String:
+func stow_purchase(id: String) -> String:
+	if not stock.has(id) or supply_owned(id) <= 0:
+		return "No carried items to stow."
+	var item: Dictionary = stock[id]
+	var source := carried_materials if item.has("material") else inventory
+	var target := materials if item.has("material") else stored_supplies
+	var key: String = item.get("material", id)
+	var count := int(source[key])
+	var stored := int(target.get(key, 0))
+	source.erase(key)
+	target[key] = stored + count
+	if save() != OK:
+		source[key] = count
+		target[key] = stored
+		return "Could not stow the item."
+	return "%s ×%d moved to Storage." % [item.name, count]
+
+func finish_field_supplies(recovered: Dictionary, extracted: bool) -> Dictionary:
+	var loot := recovered.duplicate() if extracted else {}
+	for index in quick_slots.size():
+		var slot := quick_slots[index]
+		var field := int(slot.get("field", 0))
+		if field > 0:
+			if extracted:
+				loot[slot.id] = int(loot.get(slot.id, 0)) + field
+			slot.count -= field
+			slot.erase("field")
+			if slot.count == 0:
+				quick_slots[index] = {}
+	recovered.clear()
+	quick_changed.emit()
+	return loot
+
+func deposit_supplies(recovered: Dictionary) -> void:
+	for id in recovered:
+		if stock.has(id) and not stock[id].has("material"):
+			stored_supplies[id] = int(stored_supplies.get(id, 0)) + maxi(0, int(recovered[id]))
+
+func assign_quick(index: int, id: String, source := &"inventory", recovered := {}) -> String:
 	if index < 0 or index >= quick_slots.size() or not stock.has(id) or stock[id].has("material"):
 		return "Invalid quick slot."
 	var previous := quick_slots[index].duplicate()
 	var old_id := String(previous.get("id", ""))
 	var old_count := int(previous.get("count", 0))
-	var before := int(inventory.get(id, 0))
-	if not old_id.is_empty() and old_id != id and int(inventory.get(old_id, 0)) + old_count > STACK_MAX:
+	var old_field := int(previous.get("field", 0))
+	var pocket := recovered if source == &"field" else stored_supplies if source == &"storage" else inventory
+	var before := int(pocket.get(id, 0))
+	if not old_id.is_empty() and old_id != id and (int(inventory.get(old_id, 0)) + old_count - old_field > STACK_MAX
+			or int(recovered.get(old_id, 0)) + old_field > STACK_MAX):
 		return "Make room for the previous stack."
 	var amount := mini(QUICK_MAX - (old_count if old_id == id else 0), before)
 	if amount <= 0:
 		return "Slot is full or the item is out of stock."
 	var snapshot := inventory.duplicate()
+	var field_snapshot := recovered.duplicate()
 	if not old_id.is_empty() and old_id != id:
-		inventory[old_id] = int(inventory.get(old_id, 0)) + old_count
-	inventory[id] = before - amount
+		inventory[old_id] = int(inventory.get(old_id, 0)) + old_count - old_field
+		if old_field > 0:
+			recovered[old_id] = int(recovered.get(old_id, 0)) + old_field
+	pocket[id] = before - amount
 	quick_slots[index] = {"id": id, "count": amount + (old_count if old_id == id else 0)}
+	var field := (old_field if old_id == id else 0) + (amount if source == &"field" else 0)
+	if field > 0:
+		quick_slots[index].field = field
 	if save() != OK:
 		inventory = snapshot
+		recovered.assign(field_snapshot)
+		if source == &"storage":
+			stored_supplies[id] = before
 		quick_slots[index] = previous
 		return "Could not save the quick slot."
 	quick_changed.emit()
 	return "%s assigned." % stock[id].name
 
-func clear_quick(index: int) -> String:
+func clear_quick(index: int, recovered := {}) -> String:
+	if index < 0 or index >= quick_slots.size():
+		return "Invalid quick slot."
 	var slot := quick_slots[index]
 	var id := String(slot.get("id", ""))
 	if id.is_empty():
 		return "Slot is empty."
 	var count := int(slot.get("count", 0))
+	var field := int(slot.get("field", 0))
 	var previous := int(inventory.get(id, 0))
-	if previous + count > STACK_MAX:
+	var previous_field := int(recovered.get(id, 0))
+	if previous + count - field > STACK_MAX or previous_field + field > STACK_MAX:
 		return "Inventory stack is full."
-	inventory[id] = previous + count
+	inventory[id] = previous + count - field
+	if field > 0:
+		recovered[id] = previous_field + field
 	quick_slots[index] = {}
 	if save() != OK:
 		quick_slots[index] = slot
 		inventory[id] = previous
+		if field > 0:
+			recovered[id] = previous_field
 		return "Could not save the quick slot."
 	quick_changed.emit()
 	return "Stack returned to inventory."
@@ -647,8 +781,13 @@ func consume_quick(index: int, operator: RiftPlayer) -> bool:
 	if not item.has("stat") and not (item.get("hp", 0) > 0 and operator.health < operator.max_health) and not (item.get("energy", 0) > 0 and operator.energy < operator.max_energy):
 		return false
 	slot.count = count - 1
+	var field := int(slot.get("field", 0))
+	if field > 0:
+		slot.field = field - 1
 	if save() != OK:
 		slot.count = count
+		if field > 0:
+			slot.field = field
 		return false
 	operator.apply_supply(item)
 	quick_changed.emit()

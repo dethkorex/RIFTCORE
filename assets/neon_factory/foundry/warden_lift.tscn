@@ -1,0 +1,53 @@
+[gd_scene format=3]
+
+[sub_resource type="StandardMaterial3D" id="DeckMetal"]
+albedo_color = Color(0.14, 0.13, 0.145, 1)
+metallic = 0.65
+roughness = 0.44
+
+[sub_resource type="StandardMaterial3D" id="EdgeLight"]
+albedo_color = Color(0.26, 0.79, 0.87, 1)
+emission_enabled = true
+emission = Color(0.17, 0.67, 0.72, 1)
+emission_energy_multiplier = 1.25
+
+[sub_resource type="BoxMesh" id="Platform"]
+material = SubResource("DeckMetal")
+size = Vector3(6, 0.12, 4.56)
+
+[sub_resource type="BoxMesh" id="Edge"]
+material = SubResource("EdgeLight")
+size = Vector3(5.76, 0.024, 0.06)
+
+[sub_resource type="BoxMesh" id="End"]
+material = SubResource("EdgeLight")
+size = Vector3(0.06, 0.024, 4.08)
+
+[sub_resource type="BoxShape3D" id="Shape"]
+size = Vector3(6, 0.12, 4.8)
+
+[node name="WardenLift" type="AnimatableBody3D"]
+
+[node name="Deck" type="MeshInstance3D" parent="."]
+position = Vector3(0, -0.06, 0)
+mesh = SubResource("Platform")
+
+[node name="FrontStrip" type="MeshInstance3D" parent="."]
+position = Vector3(0, -0.006, 2.14)
+mesh = SubResource("Edge")
+
+[node name="RearStrip" type="MeshInstance3D" parent="."]
+position = Vector3(0, -0.006, -2.14)
+mesh = SubResource("Edge")
+
+[node name="LeftStrip" type="MeshInstance3D" parent="."]
+position = Vector3(-2.85, -0.006, 0)
+mesh = SubResource("End")
+
+[node name="RightStrip" type="MeshInstance3D" parent="."]
+position = Vector3(2.85, -0.006, 0)
+mesh = SubResource("End")
+
+[node name="Collider" type="CollisionShape3D" parent="."]
+position = Vector3(0, -0.06, 0)
+shape = SubResource("Shape")

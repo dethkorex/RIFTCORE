@@ -135,6 +135,19 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: riftcore-playtest
+      - name: Install and start the Windows release
+        shell: pwsh
+        run: |
+          $setup = Start-Process -FilePath (Join-Path $PWD 'RIFTCORE-Windows-x64-Setup.exe') -ArgumentList '/S' -Wait -PassThru
+          if ($setup.ExitCode -ne 0) { exit $setup.ExitCode }
+          $installation = Join-Path $env:LOCALAPPDATA 'RIFTCORE'
+          $tag = (Get-Content -Raw update.json | ConvertFrom-Json).tag
+          foreach ($relative in @('RIFTCORE.exe', "versions/$tag/RIFTCORE.exe")) {
+            $binary = Join-Path $installation $relative
+            $log = Join-Path $env:RUNNER_TEMP ('installed-' + $relative.Replace('/', '-') + '.log')
+            $launch = Start-Process -FilePath $binary -ArgumentList @('--headless', '--quit-after', '120', '--log-file', ('"' + $log + '"')) -Wait -PassThru
+            if ($launch.ExitCode -ne 0 -or !(Test-Path -LiteralPath $log) -or (Select-String -LiteralPath $log -Pattern 'SCRIPT ERROR:|Failed to load' -Quiet)) { exit 1 }
+          }
       - name: Start the exported Windows build and check Social
         shell: pwsh
         run: |

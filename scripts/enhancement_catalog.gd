@@ -1,6 +1,6 @@
 extends RefCounted
 
-const SOCKETS := ["frame", "core", "utility", "visor", "arm"]
+const CATEGORIES := {"frame": "Armor", "core": "Energy", "utility": "Mobility", "visor": "Salvage", "arm": "Weapons"}
 const BASE_NAMES := {
 	"frame": ["Ceramic Mesh", "Titan Lining", "Reactive Plating", "Impact Foam", "Bastion Skin", "Fiber Shell", "Pulse Insulation", "Kinetic Brace", "Chassis Ribbing", "Aegis Lattice"],
 	"core": ["Flux Spine", "Cell Matrix", "Reactor Buffer", "Ion Tray", "Nova Coil", "Phase Capacitor", "Charge Mirror", "Dual Reactor", "Pulse Stack", "Nexus Battery"],
@@ -11,13 +11,13 @@ const BASE_NAMES := {
 
 static func catalog() -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
-	for slot in SOCKETS:
+	for family in CATEGORIES:
 		for index in 10:
 			var rarity := mini(index / 3, 3)
 			var fraction := 0.004 + index * 0.001
 			var stats: Dictionary
 			var detail: String
-			match slot:
+			match family:
 				"frame":
 					stats = {"hp": 2 + index, "resist": fraction}
 					detail = "+%d HP  ·  %.1f%% resistance" % [stats.hp, fraction * 100]
@@ -29,11 +29,11 @@ static func catalog() -> Array[Dictionary]:
 					detail = "+%.1f%% run speed  ·  +%.1f%% dash speed" % [fraction * 100, fraction * 150]
 				"visor":
 					stats = {"bolts": 1.0 + fraction * 3, "xp": 1.0 + fraction * 2}
-					detail = "+%.1f%% bolted salvage  ·  +%.1f%% pickup XP" % [fraction * 300, fraction * 200]
+					detail = "+%.1f%% bolts from pickups  ·  +%.1f%% XP from kills" % [fraction * 300, fraction * 200]
 				_:
 					stats = {"attack": 1.0 + fraction * 2}
 					detail = "+%.1f%% Buster and blade damage" % (fraction * 200)
-			result.append({"id": "socket_%s_%02d" % [slot, index], "name": BASE_NAMES[slot][index],
-				"slot": slot, "rarity": rarity, "prices": [[45, 90, 175, 350][rarity] + index * 8],
+			result.append({"id": "socket_%s_%02d" % [family, index], "name": BASE_NAMES[family][index],
+				"category": CATEGORIES[family], "rarity": rarity, "prices": [[45, 90, 175, 350][rarity] + index * 8],
 				"effects": [detail], "level": 2 + index * 2, "stats": stats})
 	return result

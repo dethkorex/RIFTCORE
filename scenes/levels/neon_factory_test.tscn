@@ -9,6 +9,7 @@
 [ext_resource type="Script" path="res://scripts/jungle_backdrop.gd" id="FactorySky"]
 [ext_resource type="Texture2D" path="res://assets/neon_factory/foundry/foundry_panorama.jpg" id="FactoryPanorama"]
 [ext_resource type="PackedScene" path="res://assets/neon_factory/foundry/powered_bridge.tscn" id="Bridge"]
+[ext_resource type="PackedScene" path="res://assets/neon_factory/foundry/warden_lift.tscn" id="ArenaLift"]
 [ext_resource type="PackedScene" path="res://assets/neon_factory/interiors/service_shutter.tscn" id="Shutter"]
 [ext_resource type="PackedScene" path="res://assets/neon_factory/foundry/power_coupler.tscn" id="Relay"]
 [ext_resource type="Script" path="res://scripts/cargo_carrier.gd" id="Supply"]
@@ -34,6 +35,11 @@
 [ext_resource type="PackedScene" path="res://assets/pickups/extra_life.tscn" id="life"]
 [ext_resource type="Script" path="res://scripts/breakable_barricade.gd" id="Barricade"]
 [ext_resource type="PackedScene" path="res://assets/neon_factory/foundry/climb_platform_center.tscn" id="arena_hatch"]
+
+[ext_resource type="Script" path="res://scripts/sector_dressing.gd" id="SectorDressing"]
+[ext_resource type="Texture2D" path="res://assets/campaign/neon_factory/surfaces/sector_wall.jpg" id="SectorAlbedo"]
+
+[ext_resource type="Script" path="res://scripts/biome_zone.gd" id="ArenaJet"]
 
 [sub_resource type="Environment" id="Interior"]
 background_mode = 1
@@ -199,46 +205,6 @@ offset = 0.85
 position = Vector3(458.9112, -4.9250, 0.0000)
 rotation = Vector3(0.0000, 0.0000, 0.4956)
 scale = Vector3(3.4524, 1.0000, 1.0000)
-
-[node name="TurnbackCladding0" parent="DECOR" instance=ExtResource("Cave")]
-position = Vector3(412.0000, -11.2500, -3.1800)
-scale = Vector3(1.0000, 1.2500, 1.0000)
-
-[node name="TurnbackCladding1" parent="DECOR" instance=ExtResource("Cave")]
-position = Vector3(418.0000, -11.2500, -3.1800)
-scale = Vector3(1.0000, 1.2500, 1.0000)
-
-[node name="TurnbackCladding2" parent="DECOR" instance=ExtResource("Cave")]
-position = Vector3(424.0000, -11.2500, -3.1800)
-scale = Vector3(1.0000, 1.2500, 1.0000)
-
-[node name="TurnbackCladding3" parent="DECOR" instance=ExtResource("Cave")]
-position = Vector3(430.0000, -11.2500, -3.1800)
-scale = Vector3(1.0000, 1.2500, 1.0000)
-
-[node name="TurnbackCladding4" parent="DECOR" instance=ExtResource("Cave")]
-position = Vector3(436.0000, -11.2500, -3.1800)
-scale = Vector3(1.0000, 1.2500, 1.0000)
-
-[node name="TurnbackCladding5" parent="DECOR" instance=ExtResource("Cave")]
-position = Vector3(442.0000, -11.2500, -3.1800)
-scale = Vector3(1.0000, 1.2500, 1.0000)
-
-[node name="TurnbackCladding6" parent="DECOR" instance=ExtResource("Cave")]
-position = Vector3(448.0000, -11.2500, -3.1800)
-scale = Vector3(1.0000, 1.2500, 1.0000)
-
-[node name="TurnbackCladding7" parent="DECOR" instance=ExtResource("Cave")]
-position = Vector3(454.0000, -11.2500, -3.1800)
-scale = Vector3(1.0000, 1.2500, 1.0000)
-
-[node name="TurnbackCladding8" parent="DECOR" instance=ExtResource("Cave")]
-position = Vector3(460.0000, -11.2500, -3.1800)
-scale = Vector3(1.0000, 1.2500, 1.0000)
-
-[node name="TurnbackCladding9" parent="DECOR" instance=ExtResource("Cave")]
-position = Vector3(466.0000, -11.2500, -3.1800)
-scale = Vector3(1.0000, 1.2500, 1.0000)
 
 [node name="HallRecovery00" parent="TERRAIN" instance=ExtResource("Floor")]
 position = Vector3(471.0225, 0.0000, 0.0000)
@@ -2752,11 +2718,13 @@ position = Vector3(491.0000, 0.0000, 0.0000)
 position = Vector3(0.0000, 0.0000, 0.0000)
 rotation = Vector3(0.0000, -1.5708, 0.0000)
 scale = Vector3(0.9300, 1.7838, 1.0000)
+boss_entry = true
 
 [node name="PortalFrame" parent="Gate" instance=ExtResource("arch")]
 position = Vector3(-0.2500, 0.0000, 0.0000)
 rotation = Vector3(0.0000, -1.5708, 0.0000)
 scale = Vector3(1.8433, 2.2667, 1.1200)
+boss_entry = true
 
 [node name="Blocker" type="StaticBody3D" parent="Gate"]
 
@@ -2818,20 +2786,20 @@ scale = Vector3(1.1000, 1.1500, 0.9000)
 position = Vector3(525.0000, 0.0000, -2.6500)
 scale = Vector3(1.1000, 1.1500, 0.9000)
 
-[node name="WardenEntryStep" parent="TERRAIN" instance=ExtResource("Floor") groups=["factory_drop_through"]]
-position = Vector3(498.0000, 2.7200, 0.0000)
+[node name="WardenEntryStep" parent="TERRAIN" instance=ExtResource("Floor") groups=["arena_player_deck", "factory_drop_through"]]
+position = Vector3(498.0000, 3.5300, 0.0000)
 scale = Vector3(0.6667, 0.6000, 1.0000)
 
-[node name="WardenSideShelf" parent="TERRAIN" instance=ExtResource("Floor") groups=["factory_drop_through"]]
+[node name="WardenSideShelf" parent="TERRAIN" instance=ExtResource("Floor") groups=["arena_player_deck", "factory_drop_through"]]
 position = Vector3(504.7500, 3.4500, 0.0000)
 scale = Vector3(1.0833, 1.0000, 1.0000)
 
-[node name="WardenRecoveryIsland" parent="TERRAIN" instance=ExtResource("Floor") groups=["factory_drop_through"]]
-position = Vector3(528.5000, 2.7500, 0.0000)
+[node name="WardenRecoveryIsland" parent="TERRAIN" instance=ExtResource("Floor") groups=["arena_player_deck", "factory_drop_through"]]
+position = Vector3(528.5000, 3.5400, 0.0000)
 scale = Vector3(1.1667, 0.6000, 1.0000)
 
-[node name="WardenEvadeLift" parent="TERRAIN" instance=ExtResource("Bridge")]
-position = Vector3(521.6000, 2.7000, 0.0000)
+[node name="WardenEvadeLift" parent="TERRAIN" instance=ExtResource("ArenaLift") groups=["arena_player_deck"]]
+position = Vector3(521.6000, 0.1400, 0.0000)
 
 [node name="WardenLiftRelay" type="StaticBody3D" parent="TERRAIN" groups=["factory_shot_relay"]]
 position = Vector3(515.0000, 1.2700, 0.0000)
@@ -2841,7 +2809,7 @@ collision_mask = 0
 departure_delay = 1.15
 floating = true
 platform_path = NodePath("../WardenEvadeLift")
-travel = Vector3(0.0000, 2.2500, 0.0000)
+travel = Vector3(0.0000, 4.8100, 0.0000)
 operation = "EVADE LIFT"
 lift = true
 
@@ -2882,3 +2850,32 @@ position = Vector3(516.0000, 1.4500, 0.0000)
 position = Vector3(0.0000, 1.2300, 0.0000)
 script = ExtResource("camera")
 minimum_follow_y = -7.8
+
+[node name="FoundryTurnbackSurfaces" type="Node3D" parent="DECOR"]
+script = ExtResource("SectorDressing")
+albedo = ExtResource("SectorAlbedo")
+sector = 1
+left_edge = 409.0000
+right_edge = 469.0000
+cave_floor = -10.2500
+cave_roof = -1.2500
+arena = false
+
+[node name="FurnaceChamberSurfaces" type="Node3D" parent="DECOR"]
+script = ExtResource("SectorDressing")
+albedo = ExtResource("SectorAlbedo")
+sector = 1
+left_edge = 491.0000
+right_edge = 542.0000
+cave_floor = 0.0000
+cave_roof = 13.0000
+arena = true
+
+[node name="FurnaceReliefJet0" type="Area3D" parent="TERRAIN"]
+script = ExtResource("ArenaJet")
+position = Vector3(522.1100, 3.4500, 0)
+kind = 6
+dimensions = Vector3(4.35, 6.9, 2.65)
+period = 4.9
+offset = 0.55
+tint = Color(1, 0.56, 0.23, 1)

@@ -34,12 +34,14 @@ var saved_act := 1
 var saved_difficulty := 0
 var saved_level := 1
 var saved_experience := 0
-var run_cleared_through := 0
 var at_sector_start := false
 var run_unlocks: Array = []
 var profile
 var shop_status := ""
 var shop_category := "All Items"
+var enhancement_category := "Armor"
+var enhancement_focus := ""
+const ENHANCEMENT_CATEGORIES := ["Armor", "Energy", "Weapons", "Mobility", "Salvage", "Station"]
 const SHOP_FILTERS := {"All Items": "visor", "Supplies": "frame", "Materials": "core", "Buffs": "utility", "Cores": "core"}
 var challenge_sector := 1
 var focus_operator_actions := false
@@ -48,6 +50,7 @@ var roster_selection: Button
 var selected_sector := 1
 var selected_difficulty := 0
 var archive_sector := 1
+var tutorial_topic := 0
 var pending_blueprint := ""
 var whisper_contact: Variant = 0
 var social_contact := ""
@@ -64,6 +67,7 @@ var deploy_error := ""
 const SocialPanel := preload("res://scripts/social_panel.gd")
 const CoopSetup := preload("res://scripts/coop_setup.gd")
 const Story := preload("res://scripts/rift_story.gd")
+const FieldManual := preload("res://scripts/field_manual.gd")
 const EquipmentDisplay := preload("res://scripts/equipment_display.gd")
 const EquipmentStats := preload("res://scripts/equipment_stats.gd")
 const UI := preload("res://scripts/rift_ui.gd")
@@ -78,8 +82,11 @@ const EquipmentBody := preload("res://scripts/equipment_body.gd")
 const EquipmentIcons := preload("res://scripts/equipment_icons.gd")
 
 var equipment_view := "Gear"
+var equipment_slot := ""
 var storage_filter := "All"
-const STORAGE_FILTERS := {"All": "visor", "Equipment": "arm", "Augments": "core", "Supplies": "frame", "Blueprints": "visor", "Materials": "utility"}
+var show_carried := false
+const EQUIPMENT_TABS := ["Gear", "Storage", "Boss Abilities", "Blueprint Pouch"]
+const STORAGE_FILTERS := {"All": "visor", "Equipment": "arm", "Supplies": "frame", "Blueprints": "visor", "Materials": "utility"}
 var leaderboard_sector := 1
 var party_from_deploy := false
 var layout: VBoxContainer
@@ -140,8 +147,8 @@ func show_page(next: String) -> void:
 	add_child(margins)
 	margins.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	for side in ["left", "right", "top", "bottom"]:
-		margins.add_theme_constant_override("margin_" + side, 27)
-	layout = UI.column(margins, 12)
+		margins.add_theme_constant_override("margin_" + side, 20 if side in ["left", "right"] else 17)
+	layout = UI.column(margins, 9)
 	var header := HBoxContainer.new()
 	layout.add_child(header)
 	if station_panel:
@@ -172,7 +179,7 @@ func show_page(next: String) -> void:
 		hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		hint.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	var columns := HBoxContainer.new()
-	columns.add_theme_constant_override("separation", 14)
+	columns.add_theme_constant_override("separation", 12)
 	columns.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	layout.add_child(columns)
 	match page:
@@ -209,7 +216,7 @@ func show_page(next: String) -> void:
 		"New run":
 			var confirmation := card(columns)
 			UI.label(confirmation, "Start a new run?", 34, UI.CYAN)
-			UI.label(confirmation, "Your current deployment, run XP and level unlocks will be reset.", 20, UI.MUTED)
+			UI.label(confirmation, "Start at Operator Lv. 1 with the standard frame. Previously opened sectors stay unlocked.", 20, UI.MUTED)
 			UI.button(confirmation, "Start in Ember Foundry", deploy, true).grab_focus()
 			UI.button(confirmation, "Keep current run", show_page.bind("Sector select"))
 		"Upgrades":
@@ -238,6 +245,8 @@ func show_page(next: String) -> void:
 			build_leaderboard(columns)
 		"Collection":
 			build_archive(columns)
+		"Tutorials":
+			build_tutorials(columns)
 		"Challenges":
 			build_challenges(columns)
 		"Co-op Setup Guide":
@@ -268,6 +277,8 @@ func station_tabs() -> Dictionary:
 		return {"Fabrication": "Crafting", "Upgrades": "Core Enhancements"}
 	if page in ["Save Game", "Settings"]:
 		return {"Save Game": "Save Game", "Settings": "Settings"}
+	if page in ["Collection", "Tutorials"]:
+		return {"Collection": "NOVA Archive", "Tutorials": "Tutorials"}
 	if page in ["Social", "Whispers", "Invites", "Leaderboard"]:
 		return {"Social": "Friends", "Whispers": "Messages", "Invites": "Invites", "Leaderboard": "Sector Records"}
 	return {}
@@ -283,8 +294,12 @@ func build_station_header(header: HBoxContainer) -> void:
 	var station_name := page.to_upper()
 	if page in ["Fabrication", "Upgrades", "Craft Item"]:
 		station_name = "WORKSHOP"
+	elif page == "Storage":
+		station_name = "EQUIPMENT"
 	elif page in ["Save Game", "Settings"]:
 		station_name = "SYSTEM"
+	elif page in ["Collection", "Tutorials"]:
+		station_name = "NOVA ARCHIVE"
 	elif page in ["Social", "Whispers", "Party", "Invites", "Add Contact", "Leaderboard"]:
 		station_name = "SOCIAL"
 	var heading := UI.label(header, station_name, 25, UI.CYAN)
@@ -301,7 +316,9 @@ func open_station(next: String) -> void:
 	shop_item = ""
 	focused_item = ""
 	equipment_view = "Gear"
+	equipment_slot = ""
 	storage_filter = "All"
+	show_carried = false
 	shop_category = "All Items"
 	party_from_deploy = false
 	show()
@@ -427,9 +444,9 @@ func card(parent: Container, ratio := 1.0) -> VBoxContainer:
 	var panel := PanelContainer.new()
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	panel.size_flags_stretch_ratio = ratio
-	panel.add_theme_stylebox_override("panel", UI.texture_frame("panel_base_large", 40, Vector2(22, 18)))
+	panel.add_theme_stylebox_override("panel", UI.texture_frame("panel_base_large", 40, Vector2(17, 13)))
 	parent.add_child(panel)
-	return UI.column(panel, 12)
+	return UI.column(panel, 8)
 
 func portrait(parent: VBoxContainer) -> void:
 	var hero := TextureRect.new()
@@ -483,6 +500,7 @@ func build_start_screen() -> void:
 		buttons.append(UI.button(stack, label, func(): hub_requested.emit(), true))
 	buttons.append(UI.button(stack, "Operators", open_slot_picker.bind("Load Game"), buttons.is_empty()))
 	buttons.append(UI.button(stack, "Settings", show_page.bind("Settings")))
+	buttons.append(UI.button(stack, "Tutorials", show_page.bind("Tutorials")))
 	buttons.append(UI.button(stack, "Quit Game", get_tree().quit))
 	for i in range(buttons.size()):
 		var button := buttons[i]
@@ -493,6 +511,32 @@ func build_start_screen() -> void:
 		button.focus_neighbor_bottom = button.get_path_to(buttons[(i + 1) % buttons.size()])
 	UI.label(stack, "RX-07    //    SYSTEM READY", 13, UI.MUTED)
 	buttons[0].grab_focus()
+
+func build_tutorials(columns: HBoxContainer) -> void:
+	var topics := card(columns, 0.58)
+	UI.label(topics, "Tutorials", 28, UI.CYAN)
+	var choices := scroll_entries(topics)
+	var manual := card(columns, 1.42)
+	var content := scroll_entries(manual)
+	var heading := UI.label(content, "", 30, UI.CYAN)
+	var guide := UI.label(content, "", 20)
+	var details := UI.label(content, "", 18, UI.MUTED)
+	var buttons: Array[Button] = []
+	var select := func(index: int):
+		tutorial_topic = index
+		var entry: Array = FieldManual.TOPICS[index]
+		heading.text = entry[0]
+		guide.text = entry[1]
+		details.text = entry[2]
+		for i in buttons.size():
+			buttons[i].add_theme_color_override("font_color", UI.CYAN if i == index else UI.WHITE)
+	for index in FieldManual.TOPICS.size():
+		var button := UI.button(choices, FieldManual.TOPICS[index][0], func(): buttons[index].grab_focus(), false, 33)
+		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		button.focus_entered.connect(select.bind(index))
+		buttons.append(button)
+	select.call(tutorial_topic)
+	buttons[tutorial_topic].grab_focus()
 
 func build_archive(columns: HBoxContainer) -> void:
 	var archive := card(columns, 1.65)
@@ -622,6 +666,9 @@ func build_online_room(columns: HBoxContainer) -> void:
 		relay_host.grab_focus()
 
 func refresh_online_room() -> void:
+	if page in ["Sector select", "Level select", "Co-op Sectors"]:
+		refresh_deployment.call_deferred()
+		return
 	if page != "Party" or not is_instance_valid(relay_status):
 		return
 	var joined := not RiftRelay.connected_room.is_empty()
@@ -786,32 +833,55 @@ func show_save_result(result: String) -> void:
 	save_status.text = result
 
 func build_workshop(columns: HBoxContainer) -> void:
-	var fitting := card(columns)
-	UI.label(fitting, "RX-07 Upgrade Sockets", 26, UI.CYAN)
-	var body := EquipmentBody.new()
-	fitting.add_child(body)
-	body.install(profile, inventory_slot, select_inventory_slot, true)
-	var store := card(columns, 1.15)
-	UI.label(store, "Core Enhancements  /  " + String(Profile.GEAR_SLOTS[inventory_slot]), 29, UI.CYAN)
+	var categories := card(columns, 0.64)
+	UI.label(categories, "Core Enhancements", 28, UI.CYAN)
+	UI.label(categories, "Purchased enhancements stay active through reconstruction and leave every gear slot free.", 17, UI.MUTED)
+	categories.add_child(HSeparator.new())
+	var selection: Button
+	for category in ENHANCEMENT_CATEGORIES:
+		var filter := UI.button(categories, category, func():
+			enhancement_category = category
+			shop_status = ""
+			show_page("Upgrades")
+		, false, 37)
+		filter.size_flags_horizontal = Control.SIZE_FILL
+		filter.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		if category == enhancement_category:
+			filter.add_theme_color_override("font_color", UI.CYAN)
+			selection = filter
+	var store := card(columns, 1.55)
+	UI.label(store, enhancement_category, 29, UI.CYAN)
 	UI.label(store, "%d Core Shards  ·  Player Lv. %d" % [profile.core_shards, profile.player_level()], 17, Color("ffd079"))
+	if not shop_status.is_empty():
+		UI.label(store, shop_status, 15, UI.VIOLET)
 	var rows := scroll_entries(store)
 	for upgrade in profile.all_upgrades():
-		if String(upgrade.get("slot", Profile.UPGRADE_SLOTS.get(upgrade.id, ""))) != inventory_slot:
+		if upgrade.category != enhancement_category:
 			continue
 		var installed: int = profile.rank(upgrade.id)
 		var maxed: bool = installed >= upgrade.prices.size()
 		var tier: int = upgrade.get("rarity", 0)
 		var box := UI.equipment_card(Profile.RARITY_COLORS[tier])
 		rows.add_child(box)
-		var row := UI.column(box, 3)
-		UI.label(row, "%s  ·  %s" % [upgrade.name, Profile.RARITY_NAMES[tier]], 18, Profile.RARITY_COLORS[tier])
-		UI.label(row, String(upgrade.effects[mini(installed, upgrade.effects.size() - 1)]), 15, UI.MUTED)
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 14)
+		box.add_child(row)
+		var description := UI.column(row, 3)
+		description.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		UI.label(description, "%s  ·  %s" % [upgrade.name, Profile.RARITY_NAMES[tier]], 18, Profile.RARITY_COLORS[tier])
+		if installed > 0:
+			UI.label(description, "Active  ·  %s" % upgrade.effects[installed - 1], 15, UI.CYAN)
+		if not maxed:
+			UI.label(description, String(upgrade.effects[installed]), 15, UI.MUTED)
 		var cost: int = 0 if maxed else upgrade.prices[installed]
 		var required: int = profile.enhancement_level(upgrade.id, installed)
 		var button := UI.button(row, "Installed" if maxed else ("Install  /  %d shards  ·  Lv. %d" % [cost, required]), purchase_upgrade.bind(upgrade.id), false, 33)
+		button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		button.disabled = maxed or profile.core_shards < cost or profile.player_level() < required
-	if not shop_status.is_empty():
-		UI.label(store, shop_status, 15, UI.VIOLET)
+		if not button.disabled and upgrade.id == enhancement_focus:
+			selection = button
+	enhancement_focus = ""
+	selection.grab_focus()
 
 func shop_type(item: Dictionary) -> String:
 	if item.has("material"):
@@ -823,17 +893,19 @@ func shop_type(item: Dictionary) -> String:
 	return "Supply"
 
 func build_shop(columns: HBoxContainer) -> void:
+	var player_level: int = profile.player_level()
 	var catalog := card(columns, 1.08)
 	var heading := HBoxContainer.new()
 	heading.add_theme_constant_override("separation", 20)
 	catalog.add_child(heading)
 	UI.label(heading, "Station Shop", 31, UI.CYAN).autowrap_mode = TextServer.AUTOWRAP_OFF
-	var subtitle := UI.label(heading, "Supplies and Materials", 16, Color("ffd079"))
+	var subtitle := UI.label(heading, "Player Lv. %d" % player_level, 16, Color("ffd079"))
 	subtitle.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	subtitle.autowrap_mode = TextServer.AUTOWRAP_OFF
 	var filters := HBoxContainer.new()
 	filters.add_theme_constant_override("separation", 6)
 	catalog.add_child(filters)
+	var active_filter: Button
 	for category in SHOP_FILTERS:
 		var tab := UI.button(filters, category, func():
 			shop_category = category
@@ -841,15 +913,24 @@ func build_shop(columns: HBoxContainer) -> void:
 		, false, 34)
 		if category == shop_category:
 			tab.add_theme_color_override("font_color", UI.CYAN)
+			active_filter = tab
 		tab.icon = EquipmentIcons.icon(SHOP_FILTERS[category], SHOP_FILTERS[category])
 		tab.expand_icon = true
 		tab.add_theme_constant_override("icon_max_width", 16)
 
 	var items: Array[String] = []
 	for id in Profile.stock:
-		var type := shop_type(Profile.stock[id])
+		var item: Dictionary = Profile.stock[id]
+		if item.shop_level > player_level:
+			continue
+		var type := shop_type(item)
 		if shop_category == "All Items" or (shop_category == "Supplies" and type in ["Supply", "Energy Cell"]) or (shop_category == "Materials" and type == "Material") or (shop_category == "Buffs" and type == "Buff") or (shop_category == "Cores" and type == "Core Material"):
 			items.append(id)
+	items.sort_custom(func(left: String, right: String) -> bool:
+		var a: Dictionary = Profile.stock[left]
+		var b: Dictionary = Profile.stock[right]
+		return a.name < b.name if a.shop_level == b.shop_level else a.shop_level < b.shop_level
+	)
 	var list_header := shop_columns(catalog, "ITEM (%d)" % items.size(), "TYPE", "PRICE", Color("a6c7df"))
 	var gutter := Control.new()
 	gutter.custom_minimum_size.x = 39
@@ -860,6 +941,11 @@ func build_shop(columns: HBoxContainer) -> void:
 	entries.add_theme_constant_override("separation", 4)
 
 	var info := card(columns, 1.0)
+	if items.is_empty():
+		focused_item = ""
+		UI.label(info, "No stock in this category at Player Lv. %d." % player_level, 20, UI.MUTED)
+		active_filter.grab_focus()
+		return
 	var title := UI.label(info, "", 40, UI.CYAN)
 	info.add_child(HSeparator.new())
 	var rarity := UI.label(info, "", 20)
@@ -882,8 +968,7 @@ func build_shop(columns: HBoxContainer) -> void:
 	var description := UI.label(facts, "", 20, UI.WHITE)
 	var type_value := shop_fact(facts, "Type")
 	var price_value := shop_fact(facts, "Price")
-	shop_fact(facts, "Stock").text = "Unlimited"
-	var owned := shop_fact(facts, "Owned")
+	var owned := shop_fact(facts, "In inventory")
 	var order := UI.equipment_card(Color("3b7fa8"))
 	info.add_child(order)
 	var controls := UI.column(order, 4)
@@ -907,7 +992,7 @@ func build_shop(columns: HBoxContainer) -> void:
 	buy.expand_icon = true
 	buy.add_theme_constant_override("icon_max_width", 24)
 	buy.add_theme_font_size_override("font_size", 21)
-	var message := UI.label(info, inventory_status, 15, UI.VIOLET)
+	var message := UI.label(info, "Purchases go to Carried Inventory. Stow them at Equipment." if inventory_status.is_empty() else inventory_status, 15, UI.MUTED if inventory_status.is_empty() else UI.VIOLET)
 	message.custom_minimum_size.y = 18
 
 	var adjust := func(step: int):
@@ -919,7 +1004,7 @@ func build_shop(columns: HBoxContainer) -> void:
 		total.text = "%d bolts" % cost
 		buy.text = "BUY  /  %d BOLTS" % cost
 		buy.disabled = limit == 0 or profile.credits < cost
-		buy.tooltip_text = "Inventory stack is full" if limit == 0 else ("Not enough bolts" if buy.disabled else "")
+		buy.tooltip_text = "Inventory stack is full" if limit == 0 else ("Not enough bolts" if buy.disabled else "Goes to carried inventory.")
 	var minus := UI.button(quantity_row, "‹", adjust.bind(-1), false, 34)
 	quantity_row.move_child(minus, 0)
 	var plus := UI.button(quantity_row, "›", adjust.bind(1), false, 34)
@@ -939,12 +1024,6 @@ func build_shop(columns: HBoxContainer) -> void:
 		owned.text = str(profile.supply_owned(id))
 		quantity.text = "1"
 		adjust.call(0)
-	if items.is_empty():
-		buy.disabled = true
-		minus.disabled = true
-		plus.disabled = true
-		UI.label(entries, "No products in this category.", 17, UI.MUTED)
-		return
 	var selected: String = focused_item if focused_item in items else items[0]
 	for id in items:
 		var item: Dictionary = Profile.stock[id]
@@ -976,7 +1055,9 @@ func build_shop(columns: HBoxContainer) -> void:
 		cells.add_child(name_stack)
 		cells.move_child(name_stack, 1)
 		name_stack.add_child(name_label)
-		UI.label(name_stack, Profile.RARITY_NAMES[item.rarity], 14, Profile.RARITY_COLORS[item.rarity]).autowrap_mode = TextServer.AUTOWRAP_OFF
+		var tag_label := UI.label(name_stack, Profile.RARITY_NAMES[item.rarity], 14, Profile.RARITY_COLORS[item.rarity])
+		tag_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+		tag_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		record.focus_entered.connect(reveal.bind(id))
 		record.focus_neighbor_right = record.get_path_to(plus)
 		if id == selected:
@@ -1082,6 +1163,7 @@ func select_challenge_sector(number: int, details: VBoxContainer) -> void:
 
 func purchase_upgrade(id: String) -> void:
 	shop_status = profile.buy(id)
+	enhancement_focus = id
 	show_page("Upgrades")
 
 func build_sector(columns: HBoxContainer) -> void:
@@ -1091,7 +1173,7 @@ func build_level_select(columns: HBoxContainer) -> void:
 	var route := card(columns, 1.75)
 	var connected := not RiftRelay.connected_room.is_empty()
 	var cooperative := connected and RiftRelay.can_deploy()
-	var last_sector := mini(Catalog.SECTORS.size(), RiftRelay.unlocked_sector if cooperative else run_cleared_through + 1)
+	var last_sector: int = mini(Catalog.SECTORS.size(), profile.unlocked_sector if profile else 1)
 	selected_sector = clampi(selected_sector, 1, last_sector)
 	UI.label(route, "DEPLOYMENT MAP", 32, UI.CYAN)
 	var actions := HBoxContainer.new()
@@ -1133,6 +1215,10 @@ func build_level_select(columns: HBoxContainer) -> void:
 			choice.grab_focus()
 	show_mission_intel(intel, connected, cooperative)
 
+func refresh_deployment() -> void:
+	if is_visible_in_tree() and page in ["Sector select", "Level select", "Co-op Sectors"]:
+		show_page(page)
+
 func show_mission_intel(panel: VBoxContainer, connected: bool, can_deploy: bool) -> void:
 	for child in panel.get_children():
 		panel.remove_child(child)
@@ -1152,35 +1238,37 @@ func show_mission_intel(panel: VBoxContainer, connected: bool, can_deploy: bool)
 		UI.label(panel, "The party leader chooses when to deploy.", 17, UI.MUTED)
 		return
 	if not connected and can_load and selected_sector == saved_sector and not at_sector_start:
-		UI.label(panel, "This checkpoint resumes with its saved difficulty.", 16, UI.MUTED)
+		UI.label(panel, "Resume this checkpoint to continue on the difficulty shown below.", 16, UI.MUTED)
 		add_stat_group(panel, "RECOMMENDED", "%s  /  Lv. %d" % [Difficulty.NAMES[saved_difficulty], Difficulty.recommended_level(selected_sector, saved_difficulty)])
 		var resume := UI.button(panel, "Resume Checkpoint", func(): load_requested.emit(), true)
 		resume.name = "Deploy"
 		return
 	var mode := OptionButton.new()
-	var nightmare_available: bool = profile.nightmare_unlocked() and (not connected or RiftRelay.party_can_play_nightmare())
+	var hard_available: bool = profile.hard_unlocked(selected_sector) and (not connected or RiftRelay.party_can_play_difficulty(selected_sector, Difficulty.HARD))
+	var expert_available: bool = profile.nightmare_unlocked() and (not connected or RiftRelay.party_can_play_difficulty(selected_sector, Difficulty.NIGHTMARE))
 	for index in Difficulty.NAMES.size():
-		var locked := index == Difficulty.NIGHTMARE and not nightmare_available
+		var locked := (index == Difficulty.HARD and not hard_available) or (index == Difficulty.NIGHTMARE and not expert_available)
 		mode.add_item("%s  /  Lv. %d%s" % [Difficulty.NAMES[index], Difficulty.recommended_level(selected_sector, index), "  /  Locked" if locked else ""])
 		mode.set_item_disabled(index, locked)
-	if not nightmare_available and selected_difficulty == Difficulty.NIGHTMARE:
-		selected_difficulty = Difficulty.HARD
+	if mode.is_item_disabled(selected_difficulty):
+		selected_difficulty = Difficulty.HARD if hard_available else Difficulty.NORMAL
 	mode.select(selected_difficulty)
 	panel.add_child(mode)
 	UI.style_button(mode)
 	var difficulty_hint := UI.label(panel, "", 16, UI.MUTED)
 	var refresh := func(index: int):
 		selected_difficulty = index
-		difficulty_hint.text = "Recommended Lv. %d  ·  %.2f× sector health and damage%s" % [
+		difficulty_hint.text = "Recommended Lv. %d  ·  %.2f× enemy HP and damage  ·  +%d%% enemy movement%s" % [
 			Difficulty.recommended_level(selected_sector, index), Difficulty.combat_scale(selected_sector, index),
+			roundi((Difficulty.enemy_speed_scale(selected_sector, index) - 1.0) * 100),
 			"  ·  Better rare loot" if index > Difficulty.NORMAL else "",
 		]
 	refresh.call(selected_difficulty)
 	mode.item_selected.connect(refresh)
-	if not nightmare_available:
-		var unlock_text := "Nightmare requires every party member to clear all sectors on Hard." if connected else "Nightmare unlocks at %d / %d Hard clears." % [Catalog.SECTORS.size(), Catalog.SECTORS.size()]
-		if not connected:
-			unlock_text += "  %d complete." % profile.hard_clear_count()
+	if not hard_available:
+		UI.label(panel, "Everyone must clear this sector on Normal to unlock Hard." if connected else "Clear this sector on Normal to unlock Hard.", 15, UI.MUTED)
+	if not expert_available:
+		var unlock_text := "Everyone must clear all sectors on Hard to unlock Expert." if connected else "Clear all sectors on Hard to unlock Expert (%d / %d)." % [profile.hard_clear_count(), Catalog.SECTORS.size()]
 		UI.label(panel, unlock_text, 15, UI.MUTED)
 	var button := UI.button(panel, "Deploy", func(): sector_requested.emit(selected_sector, selected_difficulty), true)
 	button.name = "Deploy"
@@ -1330,8 +1418,7 @@ func build_item_grid(parent: VBoxContainer, items: Array[String], blueprints: bo
 		tile.focus_entered.connect(reveal.bind(id))
 		tiles.append(tile)
 	var fit_columns := func():
-		var width := entries.size.x
-		var columns := clampi(floori((width + UI.ITEM_GAP) / (UI.ITEM_SIZE + UI.ITEM_GAP)), 1, max_columns)
+		var columns := UI.item_grid_columns(entries.get_parent(), max_columns)
 		grid.columns = columns
 		for index in tiles.size():
 			var tile := tiles[index]
@@ -1431,14 +1518,15 @@ func confirm_gear_purchase() -> void:
 	show_page("Fabrication")
 
 func build_storage(columns: HBoxContainer) -> void:
-	var fitted := card(columns, 0.92)
+	var fitted := card(columns, 0.78)
 	UI.label(fitted, "RX-07 Equipment", 28, UI.CYAN)
 	var body := EquipmentBody.new()
 	fitted.add_child(body)
-	body.install(profile, storage_filter, func(slot: String):
-		storage_filter = slot
+	body.install(profile, equipment_slot if equipment_view == "Gear" else "", func(slot: String):
+		equipment_slot = slot
 		focused_item = profile.equipped_for(slot)
-		open_equipment_view("Gear")
+		equipment_view = "Gear"
+		show_page("Storage")
 	)
 	var actor := body.preview_actor
 	EquipmentStats.apply(actor, profile)
@@ -1448,23 +1536,39 @@ func build_storage(columns: HBoxContainer) -> void:
 	add_stat_group(fitted, "ENG  /  HP", "%.0f energy  /  %.0f max health" % [actor.max_energy, actor.max_health])
 	add_stat_group(fitted, "SPD", "%.1f run  /  %.1f dash" % [actor.move_speed, actor.dash_speed])
 
-	var equipment := card(columns, 1.15)
+	var equipment := card(columns, 1.35)
 	var tabs := HBoxContainer.new()
 	tabs.add_theme_constant_override("separation", 8)
 	equipment.add_child(tabs)
-	for section in ["Gear", "Boss Abilities", "Blueprint Pouch"]:
+	var active_tab: Button
+	for section in EQUIPMENT_TABS:
 		var tab := UI.button(tabs, section, open_equipment_view.bind(section), false, 35)
+		tab.set_meta("equipment_tab", true)
 		if section == equipment_view:
+			active_tab = tab
 			tab.add_theme_color_override("font_color", UI.CYAN)
-			if not Profile.GEAR_SLOTS.has(storage_filter):
-				tab.grab_focus()
+			tab.grab_focus()
 	match equipment_view:
-		"Gear":
-			var first_filter := build_storage_grid(equipment)
+		"Gear", "Storage":
+			UI.label(fitted, "QUICK SLOTS", 16, UI.CYAN)
+			var quick_slots := build_quick_assignments(fitted)
+			var first_action := active_tab
+			if equipment_view == "Storage":
+				first_action = build_storage_grid(equipment, "", quick_slots)
+			elif equipment_slot.is_empty():
+				UI.label(equipment, "SELECT AN EQUIPMENT SLOT", 24, UI.CYAN)
+				UI.label(equipment, "Choose a socket on RX-07 to see compatible gear and installed augments.", 17, UI.MUTED)
+				body.buttons.visor.grab_focus()
+			else:
+				var first_item := build_storage_grid(equipment, equipment_slot)
+				if first_item:
+					first_action = first_item
+				else:
+					body.buttons[equipment_slot].grab_focus()
 			for socket in ["core", "arm"]:
 				var button: Button = body.buttons[socket]
-				button.focus_neighbor_right = button.get_path_to(first_filter)
-			first_filter.focus_neighbor_left = first_filter.get_path_to(body.buttons.core)
+				button.focus_neighbor_right = button.get_path_to(first_action)
+			first_action.focus_neighbor_left = first_action.get_path_to(body.buttons.core)
 		"Boss Abilities":
 			build_boss_abilities(equipment)
 		"Blueprint Pouch":
@@ -1473,9 +1577,9 @@ func build_storage(columns: HBoxContainer) -> void:
 	if not inventory_status.is_empty():
 		UI.label(equipment, inventory_status, 16, UI.VIOLET)
 
-func storage_items() -> Dictionary:
+func storage_items(carried := false) -> Dictionary:
 	var items := {}
-	for id in Profile.GEAR:
+	for id in ([] if carried else Profile.GEAR.keys()):
 		var gear: Dictionary = Profile.GEAR[id]
 		if profile.gear.has(id):
 			items[id] = {"kind": "Equipment", "name": gear.name, "slot": gear.slot, "icon": EquipmentIcons.icon(id, gear.slot),
@@ -1483,52 +1587,48 @@ func storage_items() -> Dictionary:
 		if profile.blueprint_items.has(id):
 			items["blueprint/" + id] = {"kind": "Blueprints", "name": gear.name + " Blueprint", "slot": "", "icon": EquipmentIcons.icon(id, gear.slot),
 				"rarity": gear.rarity, "detail": "Learn this blueprint to unlock its recipe in Crafting.", "badge": "Recipe", "id": id}
-	for upgrade in profile.all_upgrades():
-		var rank: int = profile.rank(upgrade.id)
-		if rank == 0:
-			continue
-		var slot := String(upgrade.get("slot", Profile.UPGRADE_SLOTS.get(upgrade.id, "")))
-		items[upgrade.id] = {"kind": "Augments", "name": upgrade.name, "slot": slot, "icon": EquipmentIcons.icon(slot, slot),
-			"rarity": upgrade.get("rarity", 0), "detail": upgrade.effects[rank - 1], "badge": "Active"}
 	for id in Profile.stock:
 		var item: Dictionary = Profile.stock[id]
 		var material: bool = item.has("material")
-		var quantity := int(profile.materials.get(item.material, 0)) if material else int(profile.inventory.get(id, 0))
+		var quantity: int = profile.supply_owned(id) if carried else int(profile.materials.get(item.material, 0) if material else profile.stored_supplies.get(id, 0))
 		if quantity > 0:
 			items[id] = {"kind": "Materials" if material else "Supplies", "name": item.name, "slot": "", "icon": EquipmentIcons.icon(item.icon, item.icon),
 				"rarity": item.rarity, "detail": "Used to fabricate equipment." if material else item.detail, "badge": "×%d" % quantity}
 	return items
 
-func build_storage_grid(parent: VBoxContainer) -> Button:
-	var toolbar := HBoxContainer.new()
-	parent.add_child(toolbar)
-	UI.label(toolbar, "LB / RB   Filter items   ·   Right stick scrolls", 14, UI.MUTED).autowrap_mode = TextServer.AUTOWRAP_OFF
-	var capacity := UI.label(toolbar, "%d / %d stowed" % [profile.stored_count(), profile.storage_capacity()], 17, Color("ffd079"))
-	capacity.autowrap_mode = TextServer.AUTOWRAP_OFF
-	capacity.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	capacity.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	capacity.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	var filters := GridContainer.new()
-	filters.columns = 3
-	filters.add_theme_constant_override("h_separation", 5)
-	filters.add_theme_constant_override("v_separation", 4)
-	parent.add_child(filters)
+func build_storage_grid(parent: VBoxContainer, slot := "", quick_slots: Array[Button] = []) -> Button:
 	var category_tabs: Array[Button] = []
-	for category in STORAGE_FILTERS:
-		var tab := UI.button(filters, category, select_storage_filter.bind(category), false, 32)
-		tab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		tab.icon = EquipmentIcons.icon(STORAGE_FILTERS[category], STORAGE_FILTERS[category])
-		tab.expand_icon = true
-		tab.add_theme_constant_override("icon_max_width", 16)
-		category_tabs.append(tab)
-		if storage_filter == category:
-			tab.add_theme_color_override("font_color", UI.CYAN)
-			tab.grab_focus()
-	if Profile.GEAR_SLOTS.has(storage_filter):
-		UI.label(parent, "%s socket" % Profile.GEAR_SLOTS[storage_filter], 15, UI.CYAN)
+	var carried := slot.is_empty() and show_carried
+	if slot.is_empty():
+		var toolbar := HBoxContainer.new()
+		parent.add_child(toolbar)
+		var stored := UI.button(toolbar, "Stored", select_storage_pocket.bind(false), false, 31)
+		var inventory := UI.button(toolbar, "Carried Inventory", select_storage_pocket.bind(true), false, 31)
+		(inventory if carried else stored).add_theme_color_override("font_color", UI.CYAN)
+		var caption := "Select a stack to stow" if carried else "%d / %d gear stowed" % [profile.stored_count(), profile.storage_capacity()]
+		var capacity := UI.label(toolbar, caption, 17, Color("ffd079"))
+		capacity.autowrap_mode = TextServer.AUTOWRAP_OFF
+		capacity.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		capacity.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		capacity.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		var filters := HBoxContainer.new()
+		filters.add_theme_constant_override("separation", 5)
+		parent.add_child(filters)
+		for category in storage_categories():
+			var tab := UI.button(filters, category, select_storage_filter.bind(category), false, 32)
+			tab.icon = EquipmentIcons.icon(STORAGE_FILTERS[category], STORAGE_FILTERS[category])
+			tab.expand_icon = true
+			tab.add_theme_constant_override("icon_max_width", 13)
+			category_tabs.append(tab)
+			if storage_filter == category:
+				tab.add_theme_color_override("font_color", UI.CYAN)
+				tab.grab_focus()
+	else:
+		UI.label(parent, "%s socket" % Profile.GEAR_SLOTS[slot], 24, UI.CYAN)
 
 	var entries := scroll_entries(parent)
-	entries.get_parent().custom_minimum_size.y = UI.ITEM_SIZE + UI.ITEM_GAP
+	var scroll := entries.get_parent() as ScrollContainer
+	scroll.custom_minimum_size.y = UI.ITEM_SIZE + UI.ITEM_GAP
 	var grid := GridContainer.new()
 	grid.columns = 3
 	grid.add_theme_constant_override("h_separation", UI.ITEM_GAP)
@@ -1536,20 +1636,35 @@ func build_storage_grid(parent: VBoxContainer) -> Button:
 	entries.add_child(grid)
 	var detail_card := UI.equipment_card(UI.CYAN)
 	parent.add_child(detail_card)
+	if not slot.is_empty():
+		scroll.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+		var spacer := Control.new()
+		spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		parent.add_child(spacer)
 	var detail := UI.column(detail_card, 4)
 	var title := UI.label(detail, "Stored Items", 20, UI.CYAN)
 	var description := UI.label(detail, "Select an item or choose a socket to filter gear.", 16, UI.MUTED)
-	var action := UI.button(detail, "", func(): apply_storage_item(focused_item), false, 34)
+	var action := UI.button(detail, "", func():
+		if carried:
+			inventory_status = profile.stow_purchase(focused_item)
+			show_page("Storage")
+		else:
+			apply_storage_item(focused_item)
+	, false, 34)
+	action.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	action.hide()
-	var items := storage_items()
+	var items := storage_items(carried)
 	var reveal := func(id: String):
 		var item: Dictionary = items[id]
 		focused_item = id
 		title.text = "%s  ·  %s" % [item.name, Profile.RARITY_NAMES[item.rarity]]
 		title.add_theme_color_override("font_color", Profile.RARITY_COLORS[item.rarity])
 		description.text = item.detail
-		action.visible = item.kind == "Equipment"
-		if item.kind == "Equipment":
+		action.visible = carried or item.kind == "Equipment"
+		if carried:
+			action.text = "Stow Stack"
+		elif item.kind == "Equipment":
 			var current: String = profile.equipped_for(item.slot)
 			action.text = "Stow" if id == current else ("Equip" if current.is_empty() else "Replace " + String(Profile.GEAR[current].name))
 		elif item.kind == "Supplies":
@@ -1557,13 +1672,15 @@ func build_storage_grid(parent: VBoxContainer) -> Button:
 	var tiles := {}
 	for id in items:
 		var item: Dictionary = items[id]
-		if storage_filter not in ["All", item.kind, item.slot]:
+		if (slot.is_empty() and storage_filter not in ["All", item.kind]) or (not slot.is_empty() and item.slot != slot):
 			continue
 		var tile := UI.item_tile(grid, item.icon, Profile.RARITY_COLORS[item.rarity], item.rarity, item.badge, func():
 			reveal.call(id)
 			if item.kind == "Blueprints":
 				pending_blueprint = id.trim_prefix("blueprint/")
 				show_page("Blueprint Details")
+			elif item.kind == "Supplies" and not carried and not quick_slots.is_empty():
+				quick_slots[0].grab_focus()
 			elif action.visible:
 				action.grab_focus()
 		)
@@ -1572,44 +1689,54 @@ func build_storage_grid(parent: VBoxContainer) -> Button:
 		tiles[id] = tile
 	if tiles.is_empty():
 		focused_item = ""
-		UI.label(entries, "No items in this category.", 17, UI.MUTED)
+		detail_card.hide()
+		UI.label(entries, "No items in this category." if slot.is_empty() else "No compatible gear or installed augments for this socket.", 17, UI.MUTED)
 	else:
 		var id: String = focused_item if tiles.has(focused_item) else tiles.keys()[0]
 		reveal.call(id)
-		if not Profile.GEAR_SLOTS.has(storage_filter):
-			tiles[id].grab_focus()
+		tiles[id].grab_focus()
 		var first_item: Button = tiles.values()[0]
-		for tab in category_tabs.slice(3):
+		for tab in category_tabs:
 			tab.focus_neighbor_bottom = tab.get_path_to(first_item)
 		var fit := func():
-			var scroll := entries.get_parent() as ScrollContainer
-			var usable := scroll.size.x - scroll.get_v_scroll_bar().get_combined_minimum_size().x
-			grid.columns = clampi(floori((usable + UI.ITEM_GAP) / (UI.ITEM_SIZE + UI.ITEM_GAP)), 1, 9)
+			grid.columns = UI.item_grid_columns(scroll, 14)
+			if not slot.is_empty():
+				var rows := clampi(ceili(float(tiles.size()) / grid.columns), 1, 4)
+				scroll.custom_minimum_size.y = rows * (UI.ITEM_SIZE + UI.ITEM_GAP)
 			var ordered := tiles.values()
 			for index in ordered.size():
 				var tile: Button = ordered[index]
-				if index < grid.columns:
-					var category := 3 + mini(2, index * 3 / grid.columns)
+				if index < grid.columns and not category_tabs.is_empty():
+					var category := mini(category_tabs.size() - 1, index * category_tabs.size() / grid.columns)
 					tile.focus_neighbor_top = tile.get_path_to(category_tabs[category])
 				else:
 					tile.focus_neighbor_top = NodePath()
 		entries.get_parent().resized.connect(fit)
 		fit.call_deferred()
-	build_quick_assignments(parent)
-	return category_tabs[0]
+	if not category_tabs.is_empty():
+		return category_tabs[0]
+	return tiles.get(focused_item) as Button
 
 func select_storage_filter(category: String) -> void:
 	storage_filter = category
 	focused_item = ""
 	show_page("Storage")
 
+func storage_categories() -> Array:
+	return ["All", "Supplies", "Materials"] if show_carried else STORAGE_FILTERS.keys()
+
+func select_storage_pocket(carried: bool) -> void:
+	show_carried = carried
+	select_storage_filter("All")
+
 func apply_storage_item(id: String) -> void:
 	if profile.gear.has(id):
 		inventory_status = profile.move_gear(id)
 	show_page("Storage")
 
-func build_quick_assignments(parent: VBoxContainer) -> void:
+func build_quick_assignments(parent: VBoxContainer) -> Array[Button]:
 	var row := HBoxContainer.new()
+	var buttons: Array[Button] = []
 	row.add_theme_constant_override("separation", UI.ITEM_GAP)
 	parent.add_child(row)
 	for index in 4:
@@ -1619,14 +1746,18 @@ func build_quick_assignments(parent: VBoxContainer) -> void:
 		var direction: String = ["↑", "←", "→", "↓"][index]
 		var button := UI.item_tile(row, icon, UI.CYAN, 0, "%s  %d/%d" % [direction, stack.get("count", 0), Profile.QUICK_MAX], func():
 			if Profile.stock.has(focused_item) and not Profile.stock[focused_item].has("material"):
-				inventory_status = profile.assign_quick(index, focused_item)
+				inventory_status = profile.assign_quick(index, focused_item, &"inventory" if show_carried else &"storage")
 			else:
 				inventory_status = "Select a supply to assign."
 			show_page("Storage")
 		)
 		button.tooltip_text = "Assign supply to %s" % direction if id.is_empty() else "%s  ·  %s" % [direction, profile.stock[id].name]
+		buttons.append(button)
 	var clear := OptionButton.new()
+	clear.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	clear.custom_minimum_size.y = 31
 	row.add_child(clear)
+	UI.style_button(clear)
 	clear.add_item("Clear quick slot")
 	clear.set_item_disabled(0, true)
 	for index in 4:
@@ -1637,6 +1768,7 @@ func build_quick_assignments(parent: VBoxContainer) -> void:
 		inventory_status = profile.clear_quick(index - 1)
 		show_page("Storage")
 	)
+	return buttons
 
 func add_stat_group(parent: VBoxContainer, category: String, values: String) -> void:
 	var row := HBoxContainer.new()
@@ -1649,6 +1781,9 @@ func add_stat_group(parent: VBoxContainer, category: String, values: String) -> 
 	reading.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 
 func open_equipment_view(section: String) -> void:
+	if section != equipment_view:
+		focused_item = ""
+		equipment_slot = ""
 	equipment_view = section
 	show_page("Storage")
 
@@ -1801,12 +1936,13 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 		if page == "Storage":
 			get_viewport().set_input_as_handled()
-			if equipment_view == "Gear":
-				var filters := STORAGE_FILTERS.keys()
+			var focused := get_viewport().gui_get_focus_owner()
+			if equipment_view == "Storage" and (not focused or not focused.has_meta("equipment_tab")):
+				var filters := storage_categories()
 				var index := filters.find(storage_filter)
 				select_storage_filter(filters[posmod(index + step, filters.size())] if index >= 0 else filters[0 if step > 0 else filters.size() - 1])
 			else:
-				open_equipment_view("Gear")
+				open_equipment_view(EQUIPMENT_TABS[posmod(EQUIPMENT_TABS.find(equipment_view) + step, EQUIPMENT_TABS.size())])
 			return
 		if page == "Shop":
 			var categories := SHOP_FILTERS.keys()

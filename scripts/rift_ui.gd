@@ -7,8 +7,8 @@ const CYAN := Color("55e7ff")
 const MUTED := Color("9db4cc")
 const WHITE := Color("e7f2ff")
 const VIOLET := Color("bf82ff")
-const ITEM_SIZE := 58
-const ITEM_GAP := 6
+const ITEM_SIZE := 48
+const ITEM_GAP := 5
 static var button_texture: ImageTexture
 
 static func frame(fill: Color, edge: Color, accent := 2) -> StyleBoxFlat:
@@ -140,6 +140,8 @@ static func button(parent: Node, value: String, action: Callable, primary := fal
 	var item := Button.new()
 	item.text = value
 	item.custom_minimum_size.y = height
+	if parent is VBoxContainer and not value.is_empty():
+		item.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	if primary:
 		item.add_theme_color_override("font_color", WHITE)
 	if action.is_valid():
@@ -161,10 +163,10 @@ static func item_tile(parent: Container, icon: Texture2D, rarity: Color, rarity_
 	tile.expand_icon = true
 	tile.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	tile.vertical_icon_alignment = VERTICAL_ALIGNMENT_TOP
-	tile.add_theme_constant_override("icon_max_width", 29)
+	tile.add_theme_constant_override("icon_max_width", 26)
 	var variants := ["common", "rare", "epic", "legendary"]
 	var idle := tile_frame("item_slot_" + variants[rarity_index])
-	idle.content_margin_bottom = 19
+	idle.content_margin_bottom = 16
 	var active := idle.duplicate() as StyleBoxTexture
 	active.modulate_color = Color("f1f7ff")
 	var down := active.duplicate() as StyleBoxTexture
@@ -175,8 +177,9 @@ static func item_tile(parent: Container, icon: Texture2D, rarity: Color, rarity_
 	badge.autowrap_mode = TextServer.AUTOWRAP_OFF
 	badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	badge.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
-	badge.offset_top = -18
-	badge.offset_bottom = -3
+	badge.offset_top = -16
+	badge.offset_bottom = -2
+	badge.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	tile.draw.connect(func():
 		if not tile.has_focus():
 			return
@@ -198,6 +201,10 @@ static func item_tile(parent: Container, icon: Texture2D, rarity: Color, rarity_
 	tile.focus_entered.connect(tile.queue_redraw)
 	tile.focus_exited.connect(tile.queue_redraw)
 	return tile
+
+static func item_grid_columns(scroll: ScrollContainer, limit: int) -> int:
+	var inner_width := scroll.size.x - scroll.get_v_scroll_bar().get_combined_minimum_size().x
+	return clampi(floori((inner_width + ITEM_GAP) / (ITEM_SIZE + ITEM_GAP)), 1, limit)
 
 static func make_readable_scroll(scroll: ScrollContainer) -> void:
 	scroll.focus_mode = Control.FOCUS_ALL
