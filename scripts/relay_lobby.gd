@@ -13,6 +13,7 @@ signal invite_received(display_name: String, code: String)
 const Profile := preload("res://scripts/rogue_profile.gd")
 const Keys := preload("res://addons/GD-Sync/Scripts/KeyStore.gd")
 const Client := preload("res://addons/GD-Sync/MultiplayerClient.gd")
+const PartyVoice := preload("res://scripts/party_voice.gd")
 const RelayEnums := preload("res://addons/GD-Sync/Scripts/Enums/Enums.gd")
 const Codes := "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 const CodeLength := 10
@@ -45,8 +46,13 @@ var station_positions: Dictionary = {}
 var drop_serial := 0
 var relay: Node
 var request_timeout: Timer
+var voice: PartyVoice
 
 func _ready() -> void:
+	voice = PartyVoice.new()
+	voice.name = "PartyVoice"
+	voice.lobby = self
+	add_child(voice)
 	available = Keys.has_keys()
 	if not available:
 		status = RELAY_UNAVAILABLE
@@ -217,6 +223,7 @@ func _room_joined(lobby_name: String) -> void:
 	relay.expose_func(_receive_partner_position)
 	relay.expose_func(_receive_sector_records)
 	relay.expose_func(_receive_party_whisper)
+	relay.expose_func(voice.receive_voice)
 	relay.expose_func(_request_blueprint_drop)
 	relay.expose_func(_request_blueprint_pickup)
 	relay.expose_func(_receive_blueprint_drop, RelayEnums.EXPOSE_PERMISSION.HOST)
@@ -224,6 +231,7 @@ func _room_joined(lobby_name: String) -> void:
 	var joined_as_guest := pending == "join"
 	connected_room = room_code
 	pending = ""
+	voice.publish_preference()
 	relay.player_set_data("operator_name", local_name)
 	_publish_difficulty_unlocks()
 	if joined_as_guest:
@@ -409,6 +417,7 @@ func _finish_return() -> void:
 	mission_returned.emit()
 
 func _peer_left(client_id: int) -> void:
+	voice.remove_speaker(client_id)
 	station_positions.erase(client_id)
 	party_operators.erase(client_id)
 	last_party_whisper.erase(client_id)
@@ -422,6 +431,7 @@ func _peer_left(client_id: int) -> void:
 		_players_changed(client_id)
 
 func leave(message := "Create a room or enter a friend’s room code.") -> void:
+	voice.reset()
 	_clear_blueprint_drops()
 	var was_in_mission := mission_active
 	mission_active = false

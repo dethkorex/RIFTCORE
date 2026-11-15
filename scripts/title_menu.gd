@@ -449,12 +449,7 @@ func show_deploy_error() -> void:
 	show_page("Level select")
 
 func card(parent: Container, ratio := 1.0) -> VBoxContainer:
-	var panel := PanelContainer.new()
-	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	panel.size_flags_stretch_ratio = ratio
-	panel.add_theme_stylebox_override("panel", UI.texture_frame("panel_base_large", 40, Vector2(17, 13)))
-	parent.add_child(panel)
-	return UI.column(panel, 8)
+	return UI.card(parent, ratio)
 
 func portrait(parent: VBoxContainer) -> void:
 	var hero := TextureRect.new()
@@ -500,7 +495,8 @@ func build_start_screen() -> void:
 	brand.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	brand.custom_minimum_size.y = 72
 	stack.add_child(brand)
-	UI.label(stack, "ROGUE PROTOCOL", 17, UI.VIOLET)
+	var subtitle := UI.label(stack, "ROGUE PROTOCOL", 17, UI.VIOLET)
+	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	stack.add_child(HSeparator.new())
 	var buttons: Array[Button] = []
 	if active_slot > 0 or developer_session:
@@ -512,12 +508,14 @@ func build_start_screen() -> void:
 	buttons.append(UI.button(stack, "Quit Game", get_tree().quit))
 	for i in range(buttons.size()):
 		var button := buttons[i]
+		button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		button.alignment = HORIZONTAL_ALIGNMENT_CENTER
 		button.custom_minimum_size = Vector2(242, 43)
 		button.add_theme_font_size_override("font_size", 21)
 		button.focus_neighbor_top = button.get_path_to(buttons[posmod(i - 1, buttons.size())])
 		button.focus_neighbor_bottom = button.get_path_to(buttons[(i + 1) % buttons.size()])
-	UI.label(stack, "RX-07    //    SYSTEM READY", 13, UI.MUTED)
+	var status := UI.label(stack, "RX-07    //    SYSTEM READY", 13, UI.MUTED)
+	status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	buttons[0].grab_focus()
 
 func build_tutorials(columns: HBoxContainer) -> void:
@@ -1448,15 +1446,7 @@ func item_status(id: String, blueprints: bool) -> String:
 	return ""
 
 func scroll_entries(parent: VBoxContainer) -> VBoxContainer:
-	var scroll := ScrollContainer.new()
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
-	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	scroll.follow_focus = true
-	parent.add_child(scroll)
-	var entries := UI.column(scroll, 10)
-	entries.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	return entries
+	return UI.scroll_entries(parent)
 
 func item_card(parent: VBoxContainer, id: String) -> VBoxContainer:
 	var item: Dictionary = Profile.GEAR[id]

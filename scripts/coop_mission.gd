@@ -26,6 +26,8 @@ const PauseMenu := preload("res://scripts/coop_pause_menu.gd")
 const TICK := 0.05
 const INPUT_INTERVAL := 1.0 / 30.0
 const MAX_SNAPSHOT_LEAD := 0.10
+const INPUT_HISTORY_LIMIT := 48
+const MAX_CORRECTION_SPEED := 12.0
 # Terrain movement fields can see the guest prediction body. Combat and pickups use layer 1.
 const PREDICTION_LAYER := 1 << 6
 const DIFFICULTY_PER_GUEST := 0.25
@@ -99,6 +101,7 @@ var clock := 0.0
 var outcome := ""
 var team_xp := 0
 var sector_seconds := 0.0
+var chat_open := false
 var security_defeated := 0
 var lives_lost := 0
 var extracted_results: Dictionary = {}
@@ -115,7 +118,10 @@ var input_sequence := 0
 var state_sequence := 0
 var latest_state := -1
 var latest_operators := -1
+var presented_snapshot := -1
 var correction := Vector3.ZERO
+var input_positions: Dictionary[int, Vector3] = {}
+var acknowledged_input := -1
 var pressed: Dictionary = {}
 var released: Dictionary = {}
 var targets: Array = []
@@ -296,16 +302,19 @@ func load_stage() -> void:
 			operator.equip_sector_weapon(active_weapon_ids.back())
 		operator.gain_experience(roundi(team_xp * operator.xp_gain_multiplier), false)
 		if not previous.is_empty():
-			operator.health = clampf(previous[index][0], 1.0, operator.max_health)
 			operator.energy = minf(previous[index][1], operator.max_energy)
 			operator.lives = previous[index][2]
 			if operator.lives <= 0:
-				operator.lives = 1
+				operator.health = 0.0
+				operator.set_meta("coop_down", true)
+				operator.hide()
+			else:
+				operator.health = clampf(previous[index][0], 1.0, operator.max_health)
 			operator.equip_sector_weapon(previous[index][3])
 			operator.recovered_supplies = previous[index][4]
 			operator.salvage = previous[index][5]
 			operator.recovered_blueprints = previous[index][6]
-		operator.set_physics_process(host or index == local_index)
+		operator.set_physics_process(operator.health > 0.0 and (host or index == local_index))
 		if not host:
 			operator.set_process(false)
 			operator.local_prediction = index == local_index
@@ -313,18 +322,16 @@ func load_stage() -> void:
 			if index != local_index:
 				operator.collision_mask = 0
 		else:
-			operator.recovered_resources.connect(func(hp: float, eng: float):
-				peer.call_func(receive_restore_feedback, act, index, hp, eng)
+			if operator.health <= 0.0:
+				operator.collision_layer = 0
+			operator.recovered_resources.connect(func(hp: float, eng: float, display_amount: bool):
+				peer.call_func(receive_restore_feedback, act, index, hp, eng, display_amount)
 			)
-			operator.supply_found.connect(func(id: String):
-				if index == local_index:
-					announce_supply(id)
-				else:
-					peer.call_func_on(roster[index], receive_recovered, {}, "", id)
-			)
-			if index != local_index:
-				operator.salvage_collected.connect(func(drop: Dictionary): peer.call_func_on(roster[index], receive_recovered, drop, "", ""))
-				operator.blueprint_found.connect(func(id: String): peer.call_func_on(roster[index], receive_recovered, {}, id, ""))
+			operator.supply_found.connect(func(id: String): report_loot(index, {}, "", id))
+			operator.salvage_collected.connect(func(drop: Dictionary): report_loot(index, drop, "", ""))
+			operator.blueprint_found.connect(func(id: String): report_loot(index, {}, id, ""))
+			operator.bolts_picked_up.connect(func(amount: int): report_loot(index, {}, "", "", amount))
+			operator.life_picked_up.connect(func(): report_loot(index, {}, "", "", 0, true))
 			operator.fell_into_pit.connect(respawn_operator.bind(operator))
 			operator.died.connect(respawn_operator.bind(operator))
 			operator.projectile_deflected.connect(func(id: int): peer.call_func(receive_deflection, act, id))
@@ -334,7 +341,7 @@ func load_stage() -> void:
 		plate.position.y = 1.48
 		plate.font = UI.DISPLAY
 		plate.font_size = 30
-		plate.pixel_size = 0.0048
+		plate.pixel_size = 0.0048 * UI.COOP_NAME_SCALE
 		plate.outline_size = 10
 		plate.modulate = UI.CYAN if index == local_index else UI.VIOLET
 		plate.billboard = BaseMaterial3D.BILLBOARD_ENABLED
@@ -434,6 +441,7 @@ func load_stage() -> void:
 	repair_hall.authority = host
 	Details.new().install(stage, first, sector, act)
 	correction = Vector3.ZERO
+	input_positions.clear()
 	if stage_title:
 		update_hud_title()
 		update_personal_hud(operators[local_index])
@@ -460,6 +468,7 @@ func respawn_operator(operator: RiftPlayer) -> void:
 	operator.health = 0.0
 	operator.hide()
 	operator.cancel_charge()
+	operator.cancel_saber_charge()
 	operator.set_physics_process(false)
 	operator.set_deferred("collision_layer", 0)
 	if boss_started and not boss_defeated:
@@ -596,7 +605,6 @@ func on_boss_defeated() -> void:
 	RiftAudio.play_music(true, sector)
 	for operator in operators:
 		if operator.has_meta("coop_down"):
-			operator.lives = maxi(1, operator.lives)
 			restore_operator.call_deferred(operator, gate.global_position + Vector3(3.0, 1.0, 0.0))
 	award_team_experience((35 if act == 1 else 80) + sector * 8)
 	if act == 2:
@@ -646,7 +654,7 @@ func collect_personal_totals(settle_loot := false) -> void:
 		var ledger := personal_rewards[index]
 		ledger.bolts += operator.credits
 		operator.credits = 0
-		if not settle_loot:
+		if not settle_loot or operator.lives <= 0:
 			continue
 		for id in operator.recovered_blueprints:
 			if not ledger.blueprints.has(id):
@@ -776,15 +784,17 @@ func receive_cache_open() -> void:
 	elif is_instance_valid(boss_cache):
 		boss_cache.queue_free()
 
-func receive_restore_feedback(remote_act: int, index: int, hp: float, eng: float) -> void:
+func receive_restore_feedback(remote_act: int, index: int, hp: float, eng: float, display_amount := true) -> void:
 	if not host and remote_act == act and peer.get_sender_id() == peer.get_host() and index >= 0 and index < operators.size():
-		operators[index].play_restore_feedback.call_deferred(hp, eng)
+		operators[index].play_restore_feedback.call_deferred(hp, eng, display_amount)
 
-func announce_supply(id: String) -> void:
-	if is_instance_valid(personal_hud) and Profile.stock.has(id):
-		personal_hud.announce(Profile.stock[id].name + "  +1", Color("75ffd2"), 22)
+func report_loot(index: int, materials: Dictionary, blueprint: String, supply: String, bolts := 0, extra_life := false) -> void:
+	if index == local_index:
+		personal_hud.show_loot(materials, blueprint, supply, bolts, extra_life)
+	else:
+		peer.call_func_on(roster[index], receive_recovered, materials, blueprint, supply, bolts, extra_life)
 
-func receive_recovered(materials: Dictionary, blueprint: String, supply: String) -> void:
+func receive_recovered(materials: Dictionary, blueprint: String, supply: String, bolts := 0, extra_life := false) -> void:
 	if host or not outcome.is_empty() or peer.get_sender_id() != peer.get_host():
 		return
 	var operator := operators[local_index]
@@ -792,8 +802,7 @@ func receive_recovered(materials: Dictionary, blueprint: String, supply: String)
 		operator.collect_salvage(materials)
 	if Profile.GEAR.has(blueprint):
 		operator.recovered_blueprints[blueprint] = true
-	if Profile.stock.has(supply):
-		announce_supply(supply)
+	personal_hud.show_loot(materials, blueprint, supply, bolts, extra_life)
 
 func update_doors() -> void:
 	if boss_defeated:
@@ -803,11 +812,17 @@ func update_doors() -> void:
 			barrier.get_node("CollisionShape3D").set_deferred("disabled", true)
 
 func check_campaign_progress() -> void:
+	var remaining := operators.filter(func(operator): return operator.lives > 0)
+	if remaining.is_empty():
+		for index in range(1, roster.size()):
+			peer.call_func_on(roster[index], receive_outcome, false, 0, 0, [], sector_seconds, {"operator_wiped": true})
+		finish_mission(false, 0, 0, [], true)
+		return
 	var far_edge := exit_marker.global_position.x
 	if not boss_started:
-		if not entrance_open and operators.all(func(operator): return arena_door.near(operator)):
+		if not entrance_open and remaining.all(func(operator): return arena_door.near(operator)):
 			entrance_open = true
-		if entrance_open and arena_door.passable and operators.all(func(operator): return arena_door.inside(operator, far_edge)):
+		if entrance_open and arena_door.passable and remaining.all(func(operator): return arena_door.inside(operator, far_edge)):
 			boss_started = true
 			var track := RiftAudio.choose_boss_track()
 			peer.call_func(receive_boss_intro, act, track)
@@ -832,10 +847,13 @@ func check_campaign_progress() -> void:
 				for index in operators.size():
 					if index != local_index:
 						var ledger := personal_rewards[index]
-						peer.call_func_on(roster[index], receive_outcome, true, operators[index].experience, ledger.bolts, ledger.blueprints, sector_seconds, challenge_results(index))
-				extracted_results = challenge_results(local_index)
+						var wiped := operators[index].lives <= 0
+						var results := {"operator_wiped": true} if wiped else challenge_results(index)
+						peer.call_func_on(roster[index], receive_outcome, not wiped, operators[index].experience, ledger.bolts, ledger.blueprints, sector_seconds, results)
+				var wiped := operators[local_index].lives <= 0
+				extracted_results = challenge_results(local_index) if not wiped else {}
 				var ledger := personal_rewards[local_index]
-				finish_mission(true, operators[local_index].experience, ledger.bolts, ledger.blueprints)
+				finish_mission(true, operators[local_index].experience, ledger.bolts, ledger.blueprints, wiped)
 			return
 
 func receive_boss_intro(remote_act: int, track: int) -> void:
@@ -859,7 +877,7 @@ func play_boss_intro(track: int) -> void:
 	cinematic.queue_free()
 	boss_intro_active = false
 	for index in operators.size():
-		operators[index].set_physics_process(host or index == local_index)
+		operators[index].set_physics_process(operators[index].health > 0.0 and (host or index == local_index))
 	if host:
 		boss.target = nearest_operator(boss.global_position)
 		boss.active = true
@@ -882,9 +900,9 @@ func change_act(next: int) -> void:
 	load_stage()
 	loading.begin()
 	await get_tree().create_timer(0.5).timeout
-	loading.fade_out()
+	await loading.fade_out()
 	changing_act = false
-	if sector == 1 and act == 2:
+	if sector == 1 and act == 2 and operators[local_index].lives > 0:
 		await choose_module()
 	show_field_briefing()
 
@@ -972,8 +990,18 @@ func build_hud() -> void:
 func is_pause_open() -> bool:
 	return is_instance_valid(module_chooser) or (is_instance_valid(pause_menu) and pause_menu.is_open())
 
+func can_open_chat() -> bool:
+	return not is_pause_open() and outcome.is_empty() and not changing_act and not boss_intro_active and not suit_reveal_playing and not is_instance_valid(field_briefing)
+
+func set_chat_open(open: bool) -> void:
+	chat_open = open
+	set_local_controls_suspended(chat_open or is_pause_open() or suit_reveal_playing)
+
+func local_input_blocked() -> bool:
+	return chat_open or is_pause_open()
+
 func open_pause() -> void:
-	if is_pause_open() or not outcome.is_empty() or changing_act or boss_intro_active or suit_reveal_playing:
+	if local_input_blocked() or not outcome.is_empty() or changing_act or boss_intro_active or suit_reveal_playing:
 		return
 	pause_menu.open()
 	resume_controls_pending = false
@@ -994,6 +1022,8 @@ func update_personal_hud(operator: RiftPlayer) -> void:
 	personal_hud.lives = operator.lives
 	personal_hud.credits = int(personal_rewards[local_index].bolts) if host else personal_bolts
 	personal_hud.core_shards = local_profile.core_shards
+	personal_hud.set_run_time(sector_seconds)
+	personal_hud.set_status_effects(operator.supplies)
 	var suit := Catalog.weapon(operator.equipped_suit())
 	personal_hud.weapon = String(suit.get("reward_name", "STANDARD FRAME")).to_upper()
 	personal_hud.suit_tint = Color(suit.get("color", UI.CYAN))
@@ -1009,7 +1039,7 @@ func update_personal_hud(operator: RiftPlayer) -> void:
 		personal_hud.queue_redraw()
 
 func get_player_axis() -> Vector2:
-	if is_pause_open():
+	if local_input_blocked():
 		return Vector2.ZERO
 	return Vector2(Input.get_axis("move_left", "move_right"), Input.get_axis("climb_down", "climb_up"))
 
@@ -1028,18 +1058,19 @@ func _physics_process(delta: float) -> void:
 	if not host:
 		# Keep the guest responsive while the host remains authoritative.
 		var local := operators[local_index]
-		if local.health > 0.0 and correction.length_squared() > 0.0225:
-			var step := correction * (1.0 - exp(-9.0 * delta))
+		if local.health > 0.0 and correction.length_squared() > 0.0025:
+			var step := (correction * (1.0 - exp(-9.0 * delta))).limit_length(MAX_CORRECTION_SPEED * delta)
 			local.move_and_collide(step)
 			correction -= step
-		if not is_pause_open():
+		if not local_input_blocked():
 			for action in INPUTS:
 				if Input.is_action_just_pressed(action):
 					pressed[action] = true
 				if Input.is_action_just_released(action):
 					released[action] = true
 	else:
-		sector_seconds += delta
+		if not suit_reveal_playing and not is_instance_valid(module_chooser) and not is_instance_valid(field_briefing) and not resetting_arena:
+			sector_seconds += delta
 		tick_reboot(delta)
 		for index in range(1, operators.size()):
 			var remote: Dictionary = remote_players[roster[index]]
@@ -1073,7 +1104,7 @@ func _physics_process(delta: float) -> void:
 		send_input()
 
 func resume_controls() -> void:
-	if not is_pause_open():
+	if not local_input_blocked():
 		set_local_controls_suspended(false)
 
 func nearest_operator(at: Vector3) -> RiftPlayer:
@@ -1087,7 +1118,7 @@ func nearest_operator(at: Vector3) -> RiftPlayer:
 	return best
 
 func send_input(force_reliable := false) -> void:
-	var suspended := is_pause_open()
+	var suspended := local_input_blocked()
 	var current := INPUT_SUSPENDED if suspended else 0
 	var down := 0
 	var up := 0
@@ -1104,6 +1135,9 @@ func send_input(force_reliable := false) -> void:
 	var axis := get_player_axis()
 	last_sent_axis = axis
 	input_sequence += 1
+	input_positions[input_sequence] = operators[local_index].global_position
+	if input_positions.size() > INPUT_HISTORY_LIMIT:
+		input_positions.erase(input_positions.keys().front())
 	# Take the first arrival for action edges, with reliable delivery as a fallback.
 	peer.call_func_on_unreliable(peer.get_host(), receive_input, axis, current, down, up, input_sequence)
 	if force_reliable or down != 0 or up != 0:
@@ -1117,7 +1151,7 @@ func receive_input(axis: Vector2, current: int, down: int, up: int, sequence: in
 	var remote: Dictionary = remote_players[sender]
 	if sequence > remote.input:
 		remote.input = sequence
-		remote.timeout = 0.45
+		remote.timeout = 0.65
 		remote.suspended = (current & INPUT_SUSPENDED) != 0
 		operator.set_controls_suspended(remote.suspended)
 		operator.remote_axis = axis.clamp(Vector2(-1, -1), Vector2(1, 1))
@@ -1207,16 +1241,12 @@ func broadcast_state(reliable_operators := false) -> void:
 		for other in players.size():
 			if other != index:
 				snapshot[other] = players[other].slice(0, 11) + [players[other][16], players[other][17]]
-		var totals := [personal_rewards[index].bolts, operators[index].recovered_blueprints.size()]
+		var totals := [personal_rewards[index].bolts, operators[index].recovered_blueprints.size(), sector_seconds, remote_players[roster[index]].input]
 		if reliable_operators:
 			peer.call_func_on(roster[index], receive_operators, act, snapshot, state_sequence, totals)
 		else:
 			peer.call_func_on_unreliable(roster[index], receive_operators, act, snapshot, state_sequence, totals)
 	peer.call_func_unreliable(receive_state, act, security, boss_state, props_consumed, team_xp, state_sequence)
-	if (not boss_started and operators.any(func(operator): return operator.lives <= 0)) or (boss_started and operators.all(func(operator): return operator.health <= 0.0) and operators.any(func(operator): return operator.lives <= 0)):
-		for index in range(1, roster.size()):
-			peer.call_func_on(roster[index], receive_outcome, false, 0, 0, [], 0.0, {"operator_wiped": operators[index].lives <= 0})
-		finish_mission(false, 0, 0, [], operators[local_index].lives <= 0)
 
 func receive_state(remote_act: int, security: PackedFloat32Array, arena: Array, consumed: Array, xp: int, sequence: int) -> void:
 	if host or changing_act or remote_act != act or not outcome.is_empty() or peer.get_sender_id() != peer.get_host() or sequence <= latest_state or security.size() != enemies.size() * 6:
@@ -1307,68 +1337,93 @@ func receive_operators(remote_act: int, players: Array, sequence: int, rewards: 
 		return
 	personal_bolts = int(rewards[0])
 	blueprint_count = int(rewards[1])
+	if rewards.size() > 2 and is_finite(float(rewards[2])):
+		sector_seconds = maxf(sector_seconds, float(rewards[2]))
 	latest_operators = sequence
 	targets = players
 	snapshot_age = 0.0
 	var local := operators[local_index]
 	var local_data: Array = players[local_index]
-	local.supplies = local_data[15].duplicate()
-	var projected: Vector3 = local_data[0] + local_data[10] * TICK
-	correction = projected - local.global_position
-	if local_data[2] <= 0.0 or local.health <= 0.0 or correction.length() > 2.5:
+	var revived: bool = local.health <= 0.0 and float(local_data[2]) > 0.0
+	var life_changed := local.lives != int(local_data[7])
+	if local_data[2] <= 0.0 or revived or life_changed:
 		local.global_position = local_data[0]
 		local.velocity = local_data[10]
 		correction = Vector3.ZERO
+		input_positions.clear()
+	elif rewards.size() > 3:
+		var ack := int(rewards[3])
+		if ack > acknowledged_input and input_positions.has(ack):
+			# Compare positions for the same input. The current guest is already several frames ahead.
+			var offset: Vector3 = local_data[0] - input_positions[ack]
+			acknowledged_input = ack
+			if offset.length_squared() > 64.0:
+				local.global_position = local_data[0]
+				local.velocity = local_data[10]
+				correction = Vector3.ZERO
+				input_positions.clear()
+			else:
+				correction = offset.limit_length(3.0)
+	else:
+		var projected: Vector3 = local_data[0] + local_data[10] * TICK
+		correction = (projected - local.global_position).limit_length(2.5)
+	apply_operator_state(local, local_data, true)
+	local.supplies = local_data[15].duplicate()
+	local.fire_lock = local_data[11]
+	local.charge_held = local_data[12] and not local.controls_suspended
+	local.present_charge(float(local_data[16]) if local_data.size() > 16 and local.charge_held else 0.0, local.energy >= local.charged_shot_cost())
+	local.melee_lock = local_data[13]
+	local.reflect_saber_pose(local_data[4], float(local_data[17]) if local_data.size() > 17 else -1.0)
+	if local.melee_lock > 0.0:
+		local.play_character_animation(local_data[4])
+	if local_data[14].size() == 4 and int(local_data[18]) == quick_revision:
+		local.recovered_supplies.assign(local_data[19])
+		for slot in 4:
+			var actual: Dictionary = local_data[14][slot]
+			if local_profile.quick_slots[slot] != actual:
+				local_profile.quick_slots[slot] = actual.duplicate()
+				local_profile.quick_changed.emit()
+
+func apply_operator_state(operator: RiftPlayer, data: Array, is_local: bool) -> void:
+	operator.health = data[2]
+	operator.energy = data[3]
+	operator.max_health = data[8]
+	operator.max_energy = data[9]
+	operator.lives = data[7]
+	if not (is_local and suit_reveal_playing) and operator.equipped_suit() != data[6]:
+		if String(data[6]).is_empty():
+			operator.equip_sector_weapon("")
+		else:
+			operator.unlock_sector_weapon(data[6])
+	operator.visible = operator.health > 0.0
+	operator.experience = int(data[20]) if data.size() > 20 else team_xp
+	if is_local and not changing_act and not boss_intro_active:
+		operator.set_physics_process(operator.health > 0.0)
 
 func _process(delta: float) -> void:
 	if not host:
 		snapshot_age += delta
 		var blend := 1.0 - exp(-19.0 * delta)
+		var fresh := latest_operators > presented_snapshot
 		for index in operators.size():
 			var data: Array = targets[index]
-			if data.is_empty():
+			if index == local_index or data.is_empty():
 				continue
 			var operator := operators[index]
-			if index != local_index:
-				var projected: Vector3 = data[0]
-				if operator.health > 0 and data[2] > 0 and operator.lives == data[7] and operator.global_position.distance_squared_to(projected) < 6.25:
-					projected += data[10] * minf(snapshot_age + TICK * 0.5, MAX_SNAPSHOT_LEAD)
-					operator.global_position = operator.global_position.lerp(projected, blend)
-				else:
-					operator.global_position = projected
+			var projected: Vector3 = data[0]
+			if operator.health > 0 and data[2] > 0 and operator.lives == data[7] and operator.global_position.distance_squared_to(projected) < 6.25:
+				projected += data[10] * minf(snapshot_age + TICK * 0.5, MAX_SNAPSHOT_LEAD)
+				operator.global_position = operator.global_position.lerp(projected, blend)
+			else:
+				operator.global_position = projected
+			if fresh:
 				operator.model_root.rotation = data[1]
 				operator.reflect_saber_pose(data[4], float(data[12]) if data.size() > 12 else -1.0)
 				operator.play_character_animation(data[4])
 				operator.facing = data[5]
+				apply_operator_state(operator, data, false)
 				operator.present_charge(float(data[11]), data[3] >= operator.charged_shot_cost())
-			else:
-				operator.fire_lock = data[11]
-				operator.charge_held = data[12] and not operator.controls_suspended
-				operator.present_charge(float(data[16]) if data.size() > 16 and operator.charge_held else 0.0, data[3] >= operator.charged_shot_cost())
-				operator.melee_lock = data[13]
-				operator.reflect_saber_pose(data[4], float(data[17]) if data.size() > 17 else -1.0)
-				if operator.melee_lock > 0.0:
-					operator.play_character_animation(data[4])
-				if outcome.is_empty() and data[14].size() == 4 and int(data[18]) == quick_revision:
-					operator.recovered_supplies.assign(data[19])
-					for slot in 4:
-						var actual: Dictionary = data[14][slot]
-						var local: Dictionary = local_profile.quick_slots[slot]
-						if local != actual:
-							local_profile.quick_slots[slot] = actual.duplicate()
-							local_profile.quick_changed.emit()
-			operator.health = data[2]
-			operator.energy = data[3]
-			operator.max_health = data[8]
-			operator.max_energy = data[9]
-			operator.lives = data[7]
-			if not (index == local_index and suit_reveal_playing) and operator.equipped_suit() != data[6]:
-				if String(data[6]).is_empty():
-					operator.equip_sector_weapon("")
-				else:
-					operator.unlock_sector_weapon(data[6])
-			operator.visible = operator.health > 0
-			operator.experience = int(data[20]) if data.size() > 20 else team_xp
+		presented_snapshot = latest_operators
 		for index in enemy_targets.size():
 			var enemy := enemies[index]
 			enemy.visible = enemy_health[index] > 0.0
@@ -1379,6 +1434,12 @@ func _process(delta: float) -> void:
 					enemy.health = enemy_health[index]
 					enemy.health_changed.emit(enemy.health, enemy.max_health)
 	var local := operators[local_index]
+	if not boss_intro_active and not changing_act:
+		if local.health > 0.0 or local.lives > 0:
+			camera.target = local
+		elif not is_instance_valid(camera.target) or camera.target.health <= 0.0:
+			var survivor := nearest_operator(local.global_position)
+			camera.target = survivor if survivor else local
 	var teammates := PackedStringArray()
 	var view := camera.get_node("Camera3D") as Camera3D
 	for index in operators.size():
@@ -1395,14 +1456,16 @@ func _process(delta: float) -> void:
 			continue
 		var teammate := operators[index]
 		var offset := teammate.global_position.x - local.global_position.x
-		if teammate.health <= 0.0:
+		if teammate.lives <= 0:
+			teammates.append("%s is out of lives" % display_name)
+		elif teammate.health <= 0.0:
 			teammates.append("%s is down" % display_name)
 		elif get_viewport().get_visible_rect().has_point(view.unproject_position(teammate.global_position)):
 			teammates.append("%s is nearby" % display_name)
 		else:
 			teammates.append("%s  %s  %.0f m" % ["←" if offset < 0.0 else "→", display_name, absf(offset)])
 	if local.health <= 0.0:
-		var down := "Down / waiting for the team" if boss_started and not boss_defeated else ("Out of lives" if local.lives <= 0 else "Respawning at checkpoint")
+		var down := "Out of lives / spectating" if local.lives <= 0 else ("Down / waiting for the team" if boss_started and not boss_defeated else "Respawning at checkpoint")
 		teammates.insert(0, down)
 	elif reboot_from == local_index:
 		teammates.insert(0, "Rebooting ally · stay close")
@@ -1427,6 +1490,8 @@ func challenge_results(index := 0) -> Dictionary:
 	var health := 100.0
 	var energy := 100.0
 	for operator in operators:
+		if operator.lives <= 0:
+			continue
 		health = minf(health, 100.0 * operator.health / operator.max_health)
 		energy = minf(energy, 100.0 * operator.energy / operator.max_energy)
 	return {"act": 1, "clear": 1, "clean": int(lives_lost == 0), "kills": security_defeated,
@@ -1491,7 +1556,9 @@ func receive_outcome(success: bool, xp: int, bolts: int, blueprints: Array, dura
 func finish_mission(success: bool, xp: int, bolts: int, blueprints: Array, exhausted_lives := false) -> void:
 	if not outcome.is_empty():
 		return
-	var message := "Mission failed. An operator ran out of retries."
+	var party_extracted := success
+	success = success and not exhausted_lives
+	var message := "Mission failed. The party ran out of lives."
 	var new_hard_unlock: bool = success and mode == Difficulty.NORMAL and not local_profile.hard_unlocked(sector)
 	local_profile.finish_field_supplies(operators[local_index].recovered_supplies, false)
 	if not success and exhausted_lives:
@@ -1542,7 +1609,7 @@ func finish_mission(success: bool, xp: int, bolts: int, blueprints: Array, exhau
 	return_button.text = "Return Together" if host else "Leave Mission"
 	return_button.focus_mode = Control.FOCUS_ALL
 	return_button.grab_focus()
-	if success and host:
+	if party_extracted and host:
 		return_timer = Timer.new()
 		return_timer.one_shot = true
 		add_child(return_timer)
@@ -1564,10 +1631,10 @@ func play_extraction_dialogue(dialogue: CanvasLayer, lines: Array) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouse and not is_pause_open():
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	if event.is_action_pressed("pause") and not event is InputEventMouseButton and not is_pause_open():
+	if event.is_action_pressed("pause") and not event is InputEventMouseButton and not local_input_blocked():
 		get_viewport().set_input_as_handled()
 		open_pause()
-	elif event.is_action_pressed("field_interact") and not is_pause_open() and local_profile.rank(Profile.FIELD_REBOOT) > 0 and reboot_candidate(operators[local_index]) >= 0:
+	elif event.is_action_pressed("field_interact") and not local_input_blocked() and local_profile.rank(Profile.FIELD_REBOOT) > 0 and reboot_candidate(operators[local_index]) >= 0:
 		get_viewport().set_input_as_handled()
 		if host:
 			start_reboot(local_index)

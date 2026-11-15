@@ -1,10 +1,10 @@
-# RIFTCORE Alpha 6.2
+# RIFTCORE Alpha 6.2.1
 
-- Spend Core Shards in the Workshop’s new Core Ascension tree. Choose permanent talents in Survivability, Damage, and Scavenger, unlock stronger tiers, and rank up your favorites. NOVA explains the tree on your first visit.
-- Unlock Field Reboot to revive a downed teammate in co-op.
-- Boss suits have distinct attacks, effects, and transformation sequences, along with six new suit models.
-- Ember Foundry adds a choice of run modules between acts and a pressure relief valve in the Expert Forge Titan fight.
-- Seven campaign rooms now use alternating wall jumps. Harder difficulties sharpen enemy pressure and shorten boss openings.
-- Menu labels are centered on wider buttons, and Continue takes you back to your last operator.
+- Co-op gives each operator three lives. Players who run out can spectate while their teammates keep playing. Guest movement is smoother when network packets arrive late.
+- Party voice chat includes microphone and output selection, voice volume, and remappable push-to-talk. Both players can enable it in Settings → Audio. The default is V on keyboard or left-stick click on controller.
+- Press Enter to open whispers in the hub or on a mission. You can also open Settings while paused in co-op.
+- The HUD shows your speedrun time across both acts, excluding loading and shared cinematics. Active boosts are easier to read, combat-effect text is larger, and co-op nameplates are 15% larger.
+- RX-07 has a new wall-slide pose, and the title menu text and buttons are centered.
+- Pickup popups show the names of items and blueprints and the exact number of bolts received. Health, energy, and XP stay on their meters.
 
-Co-op players should update together. Windows and Linux players can update through the launcher or Settings → Update Game.
+Update together through Launcher 0.2 or Settings → Update Game before joining a co-op room.

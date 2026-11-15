@@ -7,6 +7,7 @@ const CYAN := Color("55e7ff")
 const MUTED := Color("9db4cc")
 const WHITE := Color("e7f2ff")
 const VIOLET := Color("bf82ff")
+const COOP_NAME_SCALE := 1.15
 const ITEM_SIZE := 48
 const ITEM_GAP := 5
 static var button_texture: ImageTexture
@@ -227,6 +228,24 @@ static func column(parent: Node, spacing := 12) -> VBoxContainer:
 	stack.add_theme_constant_override("separation", spacing)
 	parent.add_child(stack)
 	return stack
+
+static func card(parent: Container, ratio := 1.0) -> VBoxContainer:
+	var panel := PanelContainer.new()
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	panel.size_flags_stretch_ratio = ratio
+	panel.add_theme_stylebox_override("panel", texture_frame("panel_base_large", 40, Vector2(17, 13)))
+	parent.add_child(panel)
+	return column(panel, 8)
+
+static func scroll_entries(parent: VBoxContainer) -> VBoxContainer:
+	var scroll := ScrollContainer.new()
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.follow_focus = true
+	parent.add_child(scroll)
+	var entries := column(scroll, 10)
+	entries.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	return entries
 
 static func currency_row(parent: Control, title: String, shard := false) -> Label:
 	var row := HBoxContainer.new()

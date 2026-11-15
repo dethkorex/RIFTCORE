@@ -68,12 +68,14 @@ func _collect(body: Node3D) -> void:
 	match kind:
 		Kind.HEALTH:
 			var amount: float = (50.0 if large else 25.0) * player.healing_pickup_multiplier * player.recovery_item_multiplier
-			player.restore_health(player.max_health if full_heal else amount, true)
+			player.restore_health(player.max_health if full_heal else amount, true, false)
 		Kind.ENERGY:
-			player.restore_energy((60.0 if large else 30.0) * player.recovery_item_multiplier, true)
+			player.restore_energy((60.0 if large else 30.0) * player.recovery_item_multiplier, true, false)
 		Kind.CREDITS:
-			player.credits += roundi((30.0 if large else 10.0) * player.salvage_multiplier)
+			var amount := roundi((30.0 if large else 10.0) * player.salvage_multiplier)
+			player.credits += amount
 			player.credits_changed.emit(player.credits)
+			player.bolts_picked_up.emit(amount)
 		Kind.LIFE:
 			player.add_life()
 	queue_free()

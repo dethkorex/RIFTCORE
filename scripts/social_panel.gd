@@ -59,6 +59,19 @@ static func contact_button(row: VBoxContainer, contact: Dictionary, select: Call
 	button.add_theme_constant_override("icon_max_width", 22)
 	return button
 
+static func message_contacts() -> Array[Dictionary]:
+	var rows := contacts()
+	for id in RiftSocial.whispers:
+		if not id is int or rows.any(func(contact): return contact.chat == id):
+			continue
+		var name := str(id)
+		if RiftSocial.can_whisper(id):
+			var persona: String = RiftSocial.steam.getFriendPersonaName(id)
+			if not persona.is_empty() and persona != "[unknown]":
+				name = persona
+		rows.append({"key": "steam:" + str(id), "chat": id, "name": name, "status": "Steam conversation", "party": false, "playing": false, "recent": false})
+	return rows
+
 static func set_focus(left: Control, right: Control) -> void:
 	if is_instance_valid(left) and is_instance_valid(right):
 		left.focus_neighbor_right = left.get_path_to(right)
@@ -250,11 +263,11 @@ static func build_add(menu, columns: HBoxContainer) -> void:
 	UI.label(form, "Players you meet in co-op also appear under Recent.", 16, UI.MUTED)
 	account.grab_focus()
 
-static func build_messages(menu, columns: HBoxContainer) -> void:
-	var threads: VBoxContainer = menu.card(columns, 0.7)
+static func build_messages(menu, columns: HBoxContainer, focus_composer := false) -> void:
+	var threads := UI.card(columns, 0.7)
 	UI.label(threads, "CONVERSATIONS", 24, UI.CYAN)
-	var entries: VBoxContainer = menu.scroll_entries(threads)
-	var pane: VBoxContainer = menu.card(columns, 1.3)
+	var entries := UI.scroll_entries(threads)
+	var pane := UI.card(columns, 1.3)
 	var heading := UI.label(pane, "Choose a contact", 30, UI.CYAN)
 	var history := RichTextLabel.new()
 	history.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -309,35 +322,43 @@ static func build_messages(menu, columns: HBoxContainer) -> void:
 		refresh.call()
 		submit.disabled = not composer.editable
 	var first := {}
-	for contact in contacts():
+	var empty_hint := UI.label(entries, "Join a party or connect a Steam friend to send private messages.", 17, UI.MUTED)
+	var add_thread := func(contact: Dictionary) -> Button:
+		var button := contact_button(entries, contact, select)
+		listed[contact.chat] = button
+		button.focus_entered.connect(func(): set_focus(button, composer))
+		set_focus(button, composer)
+		empty_hint.hide()
+		return button
+	for contact in message_contacts():
 		var connected: bool = contact.party if contact.recent else RiftSocial.can_whisper(contact.chat)
 		if connected or RiftSocial.whispers.has(contact.chat):
-			var button := contact_button(entries, contact, select)
-			listed[contact.chat] = button
-			button.focus_entered.connect(func(): set_focus(button, composer))
+			add_thread.call(contact)
 			if first.is_empty():
 				first = contact
 			if contact.chat == menu.whisper_contact:
 				select.call(contact)
-			if not button.disabled:
-				set_focus(button, composer)
 	if current.contact.is_empty() and not first.is_empty():
 		select.call(first)
 	if not current.contact.is_empty():
-		listed[current.contact.chat].grab_focus()
+		if focus_composer and composer.editable:
+			composer.grab_focus()
+		else:
+			listed[current.contact.chat].grab_focus()
 	if first.is_empty():
-		UI.label(entries, "Join a party or connect a Steam friend to send private messages.", 17, UI.MUTED)
 		composer.editable = false
-		submit.disabled = true
+	submit.disabled = not composer.editable
 	watch(history, RiftSocial.whispers_changed, func(id):
 		if current.contact.get("chat") == id:
 			RiftSocial.unread_whispers.erase(id)
 			refresh.call()
-		if listed.has(id):
-			for contact in contacts():
-				if contact.chat == id:
+		for contact in message_contacts():
+			if contact.chat == id:
+				if listed.has(id):
 					listed[id].text = contact_title(contact)
-					break
+				else:
+					add_thread.call(contact)
+				break
 	)
 	watch(history, RiftRelay.changed, func():
 		refresh.call()

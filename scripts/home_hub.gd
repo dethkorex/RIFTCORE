@@ -67,6 +67,7 @@ func _ready() -> void:
 	prompt.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	prompt.no_depth_test = true
 	local_online_label = label_in_space(avatar, "", Vector3(0, 1.21, 0), 27, Color("91edff"))
+	local_online_label.pixel_size *= UI.COOP_NAME_SCALE
 	local_online_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	local_online_label.hide()
 	camera = Camera3D.new()
@@ -158,8 +159,15 @@ func play_station_story(lines: Array, finish_label := "Back to Station") -> void
 	story.queue_free()
 	update_station()
 
+var chat_open := false
+
+func set_chat_open(open: bool) -> void:
+	chat_open = open
+	velocity_x = 0.0
+	avatar.play_character_animation("idle")
+
 func _physics_process(delta: float) -> void:
-	if panel_open or reconstructing or has_dialogue():
+	if panel_open or chat_open or reconstructing or has_dialogue():
 		return
 	var input_axis := Input.get_axis("move_left", "move_right")
 	if absf(input_axis) < 0.15:
@@ -214,6 +222,7 @@ func update_partner(id: int, x: float, facing: float, animation: String, display
 		partner.collision_layer = 0
 		partner.collision_mask = 0
 		var partner_label := label_in_space(partner, "", Vector3(0, 1.54, 0), 29, Color("ca99ff"))
+		partner_label.pixel_size *= UI.COOP_NAME_SCALE
 		partner_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 		partners[id] = {"actor": partner, "label": partner_label}
 	var entry: Dictionary = partners[id]
@@ -267,7 +276,7 @@ func set_bank(amount: int, shards: int, level: int) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouse and not is_pause_open():
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	if panel_open or reconstructing or has_dialogue():
+	if panel_open or chat_open or reconstructing or has_dialogue():
 		return
 	if not RiftRelay.connected_room.is_empty() and (event.is_action_pressed("pause") or event.is_action_pressed("ui_cancel")):
 		get_viewport().set_input_as_handled()

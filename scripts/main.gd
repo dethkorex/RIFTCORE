@@ -1,7 +1,6 @@
 extends Node
 
 const PauseOperator := preload("res://scripts/pause_operator_panel.gd")
-const Materials := preload("res://scripts/fabrication_catalog.gd")
 const Story := preload("res://scripts/rift_story.gd")
 const StoryDialogue := preload("res://scripts/story_dialogue.gd")
 const UI := preload("res://scripts/rift_ui.gd")
@@ -17,6 +16,7 @@ const COMBAT_VFX := preload("res://scripts/combat_vfx.gd")
 const ManualSave := preload("res://scripts/manual_save_session.gd")
 const SuitReveal := preload("res://scripts/suit_reveal.gd")
 const CampaignDoor := preload("res://scripts/campaign_door.gd")
+const WhisperOverlay := preload("res://scripts/whisper_overlay.gd")
 const HOME_HUB := preload("res://scenes/home_hub.tscn")
 var sector_complete := false
 var deploying := false
@@ -67,6 +67,7 @@ var menu: Control
 var game_root: Node3D
 var pause_menu: Control
 var invite_overlay: CanvasLayer
+var chat: WhisperOverlay
 var editor_level: Node3D
 var coop_mission: Node3D
 var coop_join_loading: CanvasLayer
@@ -87,6 +88,10 @@ func _ready() -> void:
 			return
 		preload("res://scripts/steam_artwork.gd").apply.call_deferred(install_root)
 	add_build_version()
+	chat = WhisperOverlay.new()
+	chat.available = can_open_chat
+	chat.toggled.connect(set_chat_open)
+	add_child(chat)
 	Input.joy_connection_changed.connect(on_joy_connection_changed)
 	var pointer := preload("res://scripts/menu_pointer.gd").new()
 	pointer.name = "MenuPointer"
@@ -94,6 +99,7 @@ func _ready() -> void:
 		or is_instance_valid(pause_menu) and pause_menu.is_visible_in_tree()
 		or is_instance_valid(coop_mission) and coop_mission.is_pause_open()
 		or is_instance_valid(home_hub) and (home_hub.is_pause_open() or home_hub.has_dialogue())
+		or chat.is_open()
 		or get_tree().has_group(&"interactive_dialogue"))
 	add_child(pointer)
 	RiftRelay.invite_received.connect(show_friend_invite)
@@ -495,6 +501,7 @@ func configure_input() -> void:
 	add_key_action("restart", KEY_R)
 	add_key_action("pause", KEY_ESCAPE)
 	add_key_action("field_interact", KEY_F)
+	add_key_action("push_to_talk", KEY_V)
 	add_joy_action("move_left", JOY_AXIS_LEFT_X, -1.0)
 	add_joy_action("move_right", JOY_AXIS_LEFT_X, 1.0)
 	InputMap.action_set_deadzone("move_left", 0.18)
@@ -509,6 +516,7 @@ func configure_input() -> void:
 	InputMap.action_set_deadzone("crouch_stick", 0.65)
 	add_joy_button("pause", JOY_BUTTON_START)
 	add_joy_button("field_interact", JOY_BUTTON_RIGHT_STICK)
+	add_joy_button("push_to_talk", JOY_BUTTON_LEFT_STICK)
 	add_joy_button("ui_accept", JOY_BUTTON_A)
 	add_joy_button("ui_cancel", JOY_BUTTON_B)
 	add_joy_button("ui_up", JOY_BUTTON_DPAD_UP)
@@ -648,6 +656,8 @@ func close_coop_mission(message: String) -> void:
 	if not is_instance_valid(coop_mission):
 		return
 	profile.finish_field_supplies({}, false)
+	if coop_mission.outcome.is_empty() and coop_mission.operators[coop_mission.local_index].lives <= 0:
+		reset_defeated_run()
 	remove_child(coop_mission)
 	coop_mission.queue_free()
 	coop_mission = null
@@ -1000,6 +1010,7 @@ func load_game(show_deployment := true) -> void:
 			chest.queue_free()
 	mission_stats = {"seconds": 0.0, "kills": 0, "operator_xp": 0, "player_xp": 0, "shards": 0}
 	mission_stats.merge(save.get_value("checkpoint", "mission_stats", {}), true)
+	factory_hud.set_run_time(mission_stats.seconds)
 	player.credits_changed.emit(player.credits)
 	player.lives = saved_lives
 	player.lives_changed.emit(player.lives)
@@ -1323,20 +1334,11 @@ func build_hud() -> void:
 		factory_hud.credits = total
 		factory_hud.queue_redraw()
 	)
+	player.bolts_picked_up.connect(func(amount: int): factory_hud.show_loot({}, "", "", amount))
 	player.experience_changed.connect(factory_hud.set_experience)
-	player.blueprint_found.connect(func(id: String):
-		if not profile.blueprints.has(id) and profile.GEAR.has(id):
-			factory_hud.announce("BLUEPRINT RECOVERED  /  " + profile.GEAR[id].name, Color("ffda83"), 27)
-	)
-	player.supply_found.connect(func(id: String):
-		factory_hud.announce(profile.stock[id].name + "  +1", Color("75ffd2"), 22)
-	)
-	player.salvage_collected.connect(func(drop: Dictionary):
-		var recovered: Array[String] = []
-		for id in drop:
-			recovered.append("%s +%d" % [Materials.label(id), drop[id]])
-		factory_hud.announce("SALVAGE  /  " + "  ·  ".join(recovered), Color("ff8ada"), 27)
-	)
+	player.blueprint_found.connect(func(id: String): factory_hud.show_loot({}, id, ""))
+	player.supply_found.connect(func(id: String): factory_hud.show_loot({}, "", id))
+	player.salvage_collected.connect(func(drop: Dictionary): factory_hud.show_loot(drop, "", ""))
 	player.experience_earned.connect(func(amount: int):
 		mission_stats.operator_xp += amount
 		award_mission_xp(maxi(1, amount / 3))
@@ -1356,7 +1358,7 @@ func build_hud() -> void:
 	)
 	player.life_picked_up.connect(func():
 		life_taken = true
-		factory_hud.announce("EXTRA LIFE", Color("6dffdd"), 27)
+		factory_hud.show_loot({}, "", "", 0, true)
 		if checkpoint_reached:
 			save_checkpoint()
 	)
@@ -1592,6 +1594,8 @@ func _process(delta: float) -> void:
 	if deploying or advancing_act or arena_intro or suit_reveal_active or sector_complete or not is_instance_valid(player) or player.health <= 0.0:
 		return
 	mission_stats.seconds += delta
+	factory_hud.set_run_time(mission_stats.seconds)
+	factory_hud.set_status_effects(player.supplies)
 	var exit := game_root.get_node("MARKERS/RoomExit") as Marker3D
 	var at_exit := player.global_position.distance_to(exit.global_position) <= 1.45
 	if not at_exit:
@@ -1831,6 +1835,36 @@ func _input(event: InputEvent) -> void:
 		active_controller = event.device
 	elif (event is InputEventKey and event.pressed and not event.echo) or (event is InputEventMouseButton and event.pressed):
 		active_controller = -1
+	if chat.is_open():
+		if event.is_action_pressed("ui_cancel") or (not event is InputEventMouseButton and event.is_action_pressed("pause")):
+			get_viewport().set_input_as_handled()
+			chat.close()
+		return
+	if event is InputEventKey and event.pressed and not event.echo and can_open_chat() and (
+			event.keycode in [KEY_ENTER, KEY_KP_ENTER] or event.physical_keycode in [KEY_ENTER, KEY_KP_ENTER]):
+		get_viewport().set_input_as_handled()
+		chat.open()
+
+func can_open_chat() -> bool:
+	if get_tree().paused or get_tree().has_group(&"interactive_dialogue") or (is_instance_valid(menu) and menu.is_visible_in_tree()):
+		return false
+	if is_instance_valid(coop_mission):
+		return coop_mission.can_open_chat()
+	if is_instance_valid(home_hub):
+		return not home_hub.panel_open and not home_hub.reconstructing and not home_hub.has_dialogue()
+	return is_instance_valid(player) and player.visible and not deploying and not advancing_act and not arena_intro and not suit_reveal_active and not sector_complete and not respawning
+
+func set_chat_open(open: bool) -> void:
+	if not open:
+		for action in RiftSettings.ACTIONS.keys() + ["crouch_stick", "quick_0", "quick_1", "quick_2", "quick_3"]:
+			if action != "push_to_talk":
+				Input.action_release(action)
+	if is_instance_valid(coop_mission):
+		coop_mission.set_chat_open(open)
+	elif is_instance_valid(home_hub):
+		home_hub.set_chat_open(open)
+	elif is_instance_valid(player):
+		player.set_controls_suspended(open)
 
 func on_joy_connection_changed(device: int, connected: bool) -> void:
 	if connected or device != active_controller:

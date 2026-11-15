@@ -49,19 +49,21 @@ func air_dash(rig: Skeleton3D) -> void:
 	aim(rig, "RightFoot", "RightToeBase", Vector3(-.09, -.18, -.98))
 
 func wall_slide(rig: Skeleton3D) -> void:
-	aim(rig, "Spine", "Spine1", Vector3(-.06, .93, .30))
-	aim(rig, "Spine1", "Spine2", Vector3(0, .95, .31))
-	aim(rig, "Neck", "Head", Vector3(0, .99, .10))
-	aim(rig, "RightArm", "RightForeArm", Vector3(-.55, .53, -.64))
-	aim(rig, "RightForeArm", "RightHand", Vector3(-.18, .87, -.47))
-	aim(rig, "LeftArm", "LeftForeArm", Vector3(.38, -.57, .73))
-	aim(rig, "LeftForeArm", "LeftHand", Vector3(-.10, .57, .81))
-	aim(rig, "RightUpLeg", "RightLeg", Vector3(-.22, -.82, -.53))
-	aim(rig, "RightLeg", "RightFoot", Vector3(-.04, -.88, .47))
-	aim(rig, "RightFoot", "RightToeBase", Vector3(0, -.18, .98))
-	aim(rig, "LeftUpLeg", "LeftLeg", Vector3(.22, -.67, .71))
-	aim(rig, "LeftLeg", "LeftFoot", Vector3(.15, -.72, -.68))
-	aim(rig, "LeftFoot", "LeftToeBase", Vector3(.08, -.39, .91))
+	# RX-07 faces the exit lane. The free hand reaches back toward the wall.
+	aim(rig, "Spine", "Spine1", Vector3(0, .98, .17))
+	aim(rig, "Spine1", "Spine2", Vector3(.03, .98, .20))
+	aim(rig, "Neck", "Head", Vector3(0, .99, .13))
+	aim(rig, "LeftArm", "LeftForeArm", Vector3(.30, .80, -.49))
+	aim(rig, "LeftForeArm", "LeftHand", Vector3(-.13, .71, -.69))
+	aim(rig, "LeftHand", "LeftHandMiddle1", Vector3(0, .91, -.41))
+	aim(rig, "RightArm", "RightForeArm", Vector3(-.28, -.87, .39))
+	aim(rig, "RightForeArm", "RightHand", Vector3(-.07, .39, .92))
+	aim(rig, "RightUpLeg", "RightLeg", Vector3(-.16, -.96, -.24))
+	aim(rig, "RightLeg", "RightFoot", Vector3(-.07, -.98, .15))
+	aim(rig, "RightFoot", "RightToeBase", Vector3(0, .03, 1))
+	aim(rig, "LeftUpLeg", "LeftLeg", Vector3(.19, -.70, .62))
+	aim(rig, "LeftLeg", "LeftFoot", Vector3(.04, -.91, -.40))
+	aim(rig, "LeftFoot", "LeftToeBase", Vector3(.03, .13, .99))
 
 func saber_charge(rig: Skeleton3D) -> void:
 	# The left hand holds the blade. Leave the run and jump tracks on the legs.

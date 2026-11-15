@@ -7,12 +7,14 @@ func animate(amount: float, hurt_player: bool, burning := false, critical := fal
 	font_size = 80 if critical else 67
 	if hurt_player:
 		font_size = roundi((80 if critical else 76) * 1.15)
+	if burning or critical:
+		font_size = roundi(font_size * 1.2)
 	modulate = Color("ff7b85") if hurt_player else (Color("ff9a50") if burning or critical else Color("ffe6a9"))
 	rise_and_fade()
 
 func animate_restoration(amount: float, hp: bool, tint: Color) -> void:
 	text = "+%s %s" % [format_amount(amount), "HP" if hp else "ENG"]
-	font_size = 80
+	font_size = 96
 	modulate = tint
 	rise_and_fade()
 

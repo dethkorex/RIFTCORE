@@ -42,11 +42,12 @@ func _ready() -> void:
 	tabs.add_theme_stylebox_override("tab_hovered", UI.frame(Color("34244f"), UI.VIOLET))
 	tabs.add_theme_stylebox_override("tab_unselected", UI.frame(Color("12253d"), Color("3b6384")))
 	add_child(tabs)
-	var audio := settings_tab("Audio", "Volume")
+	var audio := settings_tab("Audio", "Volume", true)
 	for bus_name in RiftSettings.volumes:
 		var key: String = bus_name
 		add_slider(audio, key + " Volume", RiftSettings.volumes[key] * 100.0, 0, 100, 1,
 			func(value: float): RiftSettings.set_volume(key, value / 100.0))
+	build_voice_settings(audio)
 	var video := settings_tab("Video", "Display")
 	var mode := add_selector(video, "Resolution", RiftSettings.MODES.map(func(size): return "%d × %d" % [size.x, size.y]), RiftSettings.resolution_index)
 	var window_mode := add_selector(video, "Display Mode", RiftSettings.DISPLAY_MODES, RiftSettings.display_mode)
@@ -90,13 +91,44 @@ func _ready() -> void:
 				tabs.get_tab_bar().grab_focus()
 	)
 
-func settings_tab(title: String, heading: String) -> VBoxContainer:
+func settings_tab(title: String, heading: String, scrollable := false) -> VBoxContainer:
 	var panel := VBoxContainer.new()
-	panel.name = title
 	panel.add_theme_constant_override("separation", 8)
-	tabs.add_child(panel)
+	if scrollable:
+		var scroll := ScrollContainer.new()
+		scroll.name = title
+		scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		scroll.follow_focus = true
+		tabs.add_child(scroll)
+		panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		scroll.add_child(panel)
+	else:
+		panel.name = title
+		tabs.add_child(panel)
 	UI.label(panel, heading, 25, UI.CYAN)
 	return panel
+
+func build_voice_settings(panel: VBoxContainer) -> void:
+	panel.add_child(HSeparator.new())
+	UI.label(panel, "Party voice", 23, UI.CYAN)
+	add_toggle(panel, "Enable voice chat", RiftSettings.voice_enabled, func(enabled: bool):
+		RiftSettings.set_voice_mode(enabled, RiftSettings.voice_push_to_talk))
+	var transmission := add_selector(panel, "Transmit mode", ["Push-to-talk", "Open microphone"], int(not RiftSettings.voice_push_to_talk))
+	transmission.item_selected.connect(func(index: int): RiftSettings.set_voice_mode(RiftSettings.voice_enabled, index == 0))
+	add_audio_device(panel, "Microphone", true, RiftSettings.microphone_device)
+	add_audio_device(panel, "Game audio output", false, RiftSettings.speaker_device)
+	var binding := UI.label(panel, "", 15, UI.MUTED)
+	var refresh_hint := func():
+		binding.text = "Push-to-talk   %s / %s   ·   Change under Keyboard & Mouse or Controller" % [
+			RiftSettings.binding_label("push_to_talk", "key"), RiftSettings.binding_label("push_to_talk", "pad")]
+	refresh_hint.call()
+	tabs.tab_changed.connect(func(_tab: int): refresh_hint.call())
+
+func add_audio_device(panel: VBoxContainer, title: String, microphone: bool, selected: String) -> void:
+	var devices := RiftSettings.audio_devices(microphone)
+	var list := add_selector(panel, title, devices, maxi(0, devices.find(selected)))
+	list.fit_to_longest_item = false
+	list.item_selected.connect(func(index: int): RiftSettings.set_audio_device(microphone, devices[index]))
 
 func add_selector(panel: VBoxContainer, title: String, options: Array, index: int) -> OptionButton:
 	var row := HBoxContainer.new()

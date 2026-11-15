@@ -20,12 +20,13 @@ const PACK_VFX := preload("res://scripts/pack_combat_vfx.gd")
 
 signal energy_changed(current: float, maximum: float)
 signal credits_changed(total: int)
+signal bolts_picked_up(amount: int)
 signal experience_changed(total: int)
 signal experience_earned(amount: int)
 signal blueprint_found(id: String)
 signal salvage_collected(drop: Dictionary)
 signal supply_found(id: String)
-signal recovered_resources(hp: float, eng: float)
+signal recovered_resources(hp: float, eng: float, display_amount: bool)
 
 const START_HEALTH := 80.0
 const START_ENERGY := 75.0
@@ -220,6 +221,7 @@ func _ready() -> void:
 	if animation_player:
 		make_locomotion_in_place()
 		build_combat_clips()
+		build_wall_slide_clip()
 		for clip in [&"idle", &"walk", &"run", &"fall"]:
 			if animation_player.has_animation(clip):
 				animation_player.get_animation(clip).loop_mode = Animation.LOOP_LINEAR
@@ -931,33 +933,33 @@ func add_life() -> void:
 	lives_changed.emit(lives)
 	life_picked_up.emit()
 
-func restore_health(amount: float, feedback := false) -> void:
+func restore_health(amount: float, feedback := false, display_amount := true) -> void:
 	var previous := health
 	health = minf(max_health, health + amount)
 	health_changed.emit(health, max_health)
 	if feedback:
-		report_recovery(health - previous, 0.0)
+		report_recovery(health - previous, 0.0, display_amount)
 
-func restore_energy(amount: float, feedback := false) -> void:
+func restore_energy(amount: float, feedback := false, display_amount := true) -> void:
 	var previous := energy
 	energy = clampf(energy + amount, 0.0, max_energy)
 	energy_changed.emit(energy, max_energy)
 	if feedback:
-		report_recovery(0.0, energy - previous)
+		report_recovery(0.0, energy - previous, display_amount)
 
-func report_recovery(hp: float, eng: float) -> void:
+func report_recovery(hp: float, eng: float, display_amount := true) -> void:
 	if hp <= 0.0 and eng <= 0.0:
 		return
-	play_restore_feedback.call_deferred(hp, eng)
-	recovered_resources.emit(hp, eng)
+	play_restore_feedback.call_deferred(hp, eng, display_amount)
+	recovered_resources.emit(hp, eng, display_amount)
 
-func play_restore_feedback(hp: float, eng: float) -> void:
+func play_restore_feedback(hp: float, eng: float, display_amount := true) -> void:
 	var scene := get_tree().current_scene if is_inside_tree() else null
 	if not scene or health <= 0.0:
 		return
-	if hp > 0.0:
+	if display_amount and hp > 0.0:
 		show_restore_number(scene, hp, true, -.18 if eng > 0.0 else 0.0, HEAL_TINT)
-	if eng > 0.0:
+	if display_amount and eng > 0.0:
 		show_restore_number(scene, eng, false, .23 if hp > 0.0 else 0.0, ENERGY_TINT)
 	var tint := HEAL_TINT if hp > 0.0 else ENERGY_TINT
 	if hp > 0.0 and eng > 0.0:
@@ -1109,7 +1111,7 @@ func shoot(charged := false, pose_held := false) -> void:
 		restore_energy(-cost)
 	var aim := facing
 	if buster_pose:
-		buster_pose.ladder_direction = aim if is_instance_valid(ladder) else 0.0
+		buster_pose.ladder_direction = aim if is_instance_valid(ladder) or wall_sliding else 0.0
 		buster_pose.crouched = low_profile and is_zero_approx(buster_pose.ladder_direction)
 		buster_pose.influence = 1.0 if pose_held else 0.7
 	if health <= 0.0:
@@ -1313,6 +1315,14 @@ func build_combat_clips() -> void:
 		var slide := sample_combat_pose(crouch, [0.0, 0.16, 0.67, 1.0], [0.64, 0.82, 0.85, 0.80], 0.0, true)
 		slide.loop_mode = Animation.LOOP_LINEAR
 		library.add_animation(&"slide", slide)
+
+func build_wall_slide_clip() -> void:
+	var library := animation_player.get_animation_library(&"")
+	if library == null or library.has_animation(&"wall_slide") or not library.has_animation(&"idle"):
+		return
+	var brace := sample_combat_pose(library.get_animation(&"idle"), [0.0, 1.0], [0.0, 0.0], 0.0)
+	brace.loop_mode = Animation.LOOP_LINEAR
+	library.add_animation(&"wall_slide", brace)
 
 func sample_combat_pose(source: Animation, stops: Array, poses: Array, accent: float, slide := false) -> Animation:
 	var clip := source.duplicate() as Animation
@@ -1542,17 +1552,18 @@ func play_ground_locomotion(axis: float, speed: float, top_speed: float) -> void
 			animation_player.speed_scale = clampf(absf(speed) / (top_speed * 0.32), 0.45, 1.6)
 
 func update_character_visuals(axis: float) -> void:
+	var bracing := wall_sliding and not grounded() and dash_left <= 0.0 and melee_lock <= 0.0
 	if model_root:
 		var visual_facing := signf(velocity.x) if absf(velocity.x) > 0.65 and fire_lock <= 0.0 and melee_lock <= 0.0 else facing
-		if wall_sliding and dash_left <= 0.0 and fire_lock <= 0.0:
+		if bracing:
 			visual_facing = -wall_side
-		if is_instance_valid(charge_orb):
+		elif is_instance_valid(charge_orb):
 			visual_facing = facing
 		model_root.rotation.y = PI * 0.5 * (combo_facing if melee_lock > 0.0 else visual_facing)
 		model_root.rotation.x = lerpf(model_root.rotation.x, 0.0, 0.48)
 	var swinging := melee_lock > 0.0
 	if buster_pose:
-		buster_pose.ladder_direction = 0.0
+		buster_pose.ladder_direction = facing if bracing else 0.0
 		buster_pose.crouched = low_profile
 		var aiming := not swinging and displayed_saber_charge < 0.10 and not (ground_dash and dash_left > 0.0) and (charge_held or is_instance_valid(charge_orb) or fire_lock > 0.0)
 		buster_pose.influence = move_toward(buster_pose.influence, 1.0 if aiming else 0.0, 0.30)
@@ -1562,7 +1573,7 @@ func update_character_visuals(axis: float) -> void:
 		return
 	if dash_left > 0.0:
 		play_character_animation("slide" if ground_dash else "dash")
-	elif wall_sliding:
+	elif bracing:
 		play_character_animation("wall_slide")
 	elif not is_on_floor():
 		play_character_animation("fall" if velocity.y < -0.6 else "jump")
@@ -1574,8 +1585,7 @@ func update_character_visuals(axis: float) -> void:
 		play_ground_locomotion(axis, velocity.x, move_speed)
 
 func play_character_animation(animation_name: String, force := false) -> void:
-	var clip := "fall" if animation_name == "wall_slide" else animation_name
-	if not animation_player or not animation_player.has_animation(clip):
+	if not animation_player or not animation_player.has_animation(animation_name):
 		return
 	if not force and current_animation == animation_name:
 		return
@@ -1585,17 +1595,16 @@ func play_character_animation(animation_name: String, force := false) -> void:
 	current_animation = animation_name
 	animation_player.speed_scale = 1.0
 	var speed_scale := 1.0
-	var duration := animation_player.get_animation(clip).length
+	var duration := animation_player.get_animation(animation_name).length
 	match animation_name:
 		"jump": speed_scale = duration / (jump_velocity / gravity)
 		"land": speed_scale = duration / 0.21
 		"dash": speed_scale = duration / dash_duration
-		"wall_slide": speed_scale = 0.36
 		"shoot": speed_scale = duration / 0.15
 		"crouch_shoot": speed_scale = duration / 0.15
 		"saber_cut", "saber_return", "slash_finisher":
 			speed_scale = duration / SWING_DURATIONS[SWING_CLIPS.find(StringName(animation_name))]
-	animation_player.play(clip, 0.035 if force or animation_name in ["dash", "slide", "wall_slide"] else 0.10, speed_scale)
+	animation_player.play(animation_name, 0.035 if force or animation_name in ["dash", "slide", "wall_slide"] else 0.10, speed_scale)
 
 static func defense_for_experience(total: int) -> float:
 	return minf(0.25, (level_for_experience(total) - 1) * 0.02)

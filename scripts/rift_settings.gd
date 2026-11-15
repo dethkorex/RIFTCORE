@@ -5,12 +5,13 @@ const ACTIONS := {
 	"move_left": "Move left", "move_right": "Move right", "jump": "Jump",
 	"crouch": "Crouch", "climb_up": "Climb up", "climb_down": "Climb down",
 	"dash": "Dash", "shoot": "Buster", "melee": "Sword", "swap_weapon": "Next suit", "previous_suit": "Previous suit", "pause": "Pause",
-	"field_interact": "Field interact",
+	"field_interact": "Field interact", "push_to_talk": "Push-to-talk",
 }
 const QUICK_DEFAULTS := [JOY_BUTTON_DPAD_UP, JOY_BUTTON_DPAD_LEFT, JOY_BUTTON_DPAD_RIGHT, JOY_BUTTON_DPAD_DOWN]
 const AXES := ["move_left", "move_right", "climb_up", "climb_down", "crouch"]
 var path := "user://riftcore_settings.cfg"
 signal hud_scale_changed
+signal voice_settings_changed
 const DISPLAY_MODES := ["Windowed", "Borderless Fullscreen", "Exclusive Fullscreen"]
 const VSYNC_CHOICES := ["Off", "On", "Adaptive", "Mailbox"]
 const FRAME_LIMITS := [0, 30, 60, 90, 120, 144, 165, 240]
@@ -18,6 +19,10 @@ const CONTROLLER_STYLES := ["Xbox", "PlayStation"]
 const PAD_BUTTONS := [0, 1, 2, 3, 9, 10, 7, 8, 4, 6, 11, 12, 13, 14]
 const QUALITY_SCALES := [0.67, 0.85, 1.0]
 var volumes := {"Master": 1.0, "Music": 0.85, "SFX": 1.0, "Voice": 1.0}
+var voice_enabled := false
+var voice_push_to_talk := true
+var microphone_device := "Default"
+var speaker_device := "Default"
 var resolution_index := 2
 var display_mode := 1
 var vsync_mode := 1
@@ -46,6 +51,10 @@ func restore() -> void:
 	if data.load(path) == OK:
 		for bus_name in volumes:
 			volumes[bus_name] = clampf(float(data.get_value("audio", bus_name, volumes[bus_name])), 0.0, 1.0)
+		voice_enabled = bool(data.get_value("audio", "voice_enabled", false))
+		voice_push_to_talk = bool(data.get_value("audio", "voice_push_to_talk", true))
+		microphone_device = str(data.get_value("audio", "microphone", "Default"))
+		speaker_device = str(data.get_value("audio", "speakers", "Default"))
 		resolution_index = clampi(int(data.get_value("video", "resolution", resolution_index)), 0, MODES.size() - 1)
 		var previous_fullscreen := bool(data.get_value("video", "fullscreen", true))
 		display_mode = clampi(int(data.get_value("video", "window_mode", int(previous_fullscreen))), 0, DISPLAY_MODES.size() - 1)
@@ -65,6 +74,7 @@ func restore() -> void:
 			bindings = loaded
 	for bus_name in volumes:
 		apply_volume(bus_name)
+	apply_audio_devices()
 	if not defaults.is_empty():
 		apply_bindings()
 
@@ -72,6 +82,10 @@ func save() -> Error:
 	var data := ConfigFile.new()
 	for bus_name in volumes:
 		data.set_value("audio", bus_name, volumes[bus_name])
+	data.set_value("audio", "voice_enabled", voice_enabled)
+	data.set_value("audio", "voice_push_to_talk", voice_push_to_talk)
+	data.set_value("audio", "microphone", microphone_device)
+	data.set_value("audio", "speakers", speaker_device)
 	data.set_value("video", "resolution", resolution_index)
 	data.set_value("video", "fullscreen", display_mode != 0)
 	data.set_value("video", "window_mode", display_mode)
@@ -104,6 +118,34 @@ func apply_volume(bus_name: String) -> void:
 func set_volume(bus_name: String, value: float) -> void:
 	volumes[bus_name] = clampf(value, 0.0, 1.0)
 	apply_volume(bus_name)
+	save()
+
+func audio_devices(microphone: bool) -> Array:
+	var listed := AudioServer.get_input_device_list() if microphone else AudioServer.get_output_device_list()
+	var devices := ["Default"]
+	for device in listed:
+		if device not in devices:
+			devices.append(device)
+	return devices
+
+func apply_audio_devices() -> void:
+	AudioServer.input_device = microphone_device if microphone_device in audio_devices(true) else "Default"
+	AudioServer.output_device = speaker_device if speaker_device in audio_devices(false) else "Default"
+
+func set_audio_device(microphone: bool, device: String) -> void:
+	voice_settings_changed.emit()
+	if microphone:
+		microphone_device = device
+		AudioServer.input_device = device
+	else:
+		speaker_device = device
+		AudioServer.output_device = device
+	save()
+
+func set_voice_mode(enabled: bool, push_to_talk: bool) -> void:
+	voice_enabled = enabled
+	voice_push_to_talk = push_to_talk
+	voice_settings_changed.emit()
 	save()
 
 func set_display(index: int, mode: int) -> void:
@@ -205,6 +247,8 @@ func set_binding(action: String, event: InputEvent, device: String) -> String:
 	var data := to_data(event)
 	if data.is_empty():
 		return "Choose a key, mouse button, or controller input."
+	if data.type == "key" and int(data.code) in [KEY_ENTER, KEY_KP_ENTER]:
+		return "Enter opens whispers during gameplay."
 	for other in ACTIONS:
 		if other == action or (other in ["climb_down", "crouch"] and action in ["climb_down", "crouch"]):
 			continue

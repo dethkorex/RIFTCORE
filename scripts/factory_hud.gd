@@ -2,6 +2,8 @@ extends Control
 
 const UI := preload("res://scripts/rift_ui.gd")
 const EquipmentIcons := preload("res://scripts/equipment_icons.gd")
+const Materials := preload("res://scripts/fabrication_catalog.gd")
+const Profile := preload("res://scripts/rogue_profile.gd")
 const CURRENCY := preload("res://assets/ui/bolt.svg")
 const SHARD := preload("res://assets/ui/core-shard.svg")
 const PAUSE_PLATE := preload("res://assets/ui/riftcore_kit/panel_base_small.png")
@@ -10,6 +12,7 @@ const CYAN := Color("00caff")
 const WHITE := Color("f1f8ff")
 const INK := Color(0.018, 0.046, 0.13, 0.96)
 const HUD_SCALE := 0.75
+const BOOST_NAMES := {"attack": "ATK", "defense": "DEF", "speed": "SPD"}
 
 var health := 1.0
 var energy := 1.0
@@ -24,7 +27,10 @@ var animated_xp := 0.0
 var xp_tween: Tween
 var notice: Label
 var notice_tween: Tween
+var loot_popups: VBoxContainer
 var remaining := 0
+var run_tenths := 0
+var status_lines := PackedStringArray()
 var act := 1
 var coop := false
 var reserve_lives := 0
@@ -95,6 +101,14 @@ func _ready() -> void:
 	notice.add_theme_constant_override("outline_size", 8)
 	notice.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	notice.hide()
+	loot_popups = VBoxContainer.new()
+	loot_popups.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	loot_popups.add_theme_constant_override("separation", 3)
+	add_child(loot_popups)
+	loot_popups.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+	loot_popups.offset_left = -230
+	loot_popups.offset_right = 230
+	loot_popups.offset_top = 186
 
 func set_experience(total: int) -> void:
 	var old_level := RiftPlayer.level_for_experience(experience)
@@ -113,7 +127,7 @@ func set_experience(total: int) -> void:
 		announce("LEVEL UP!", Color("c9a0ff"))
 		RiftAudio.play_effect(&"voice_level_up")
 
-func announce(message: String, tint: Color, font_size := 30) -> void:
+func announce(message: String, tint: Color, font_size := 36) -> void:
 	if notice_tween and notice_tween.is_valid():
 		notice_tween.kill()
 	notice.text = message
@@ -129,6 +143,54 @@ func announce(message: String, tint: Color, font_size := 30) -> void:
 	notice_tween.tween_interval(1.2)
 	notice_tween.tween_property(notice, "modulate:a", 0.0, 0.32)
 	notice_tween.tween_callback(notice.hide)
+
+func set_run_time(seconds: float) -> void:
+	var next := floori(seconds * 10.0)
+	if next != run_tenths:
+		run_tenths = next
+		queue_redraw()
+
+func show_loot(materials: Dictionary, blueprint: String, supply: String, bolts := 0, extra_life := false) -> void:
+	if bolts > 0:
+		add_loot_popup("+%d Bolts" % bolts, Color("ffda83"))
+	if Profile.GEAR.has(blueprint):
+		add_loot_popup(Profile.GEAR[blueprint].name + " Blueprint", Color("ffda83"))
+	if Profile.stock.has(supply):
+		add_loot_popup("+1 " + Profile.stock[supply].name, Color("75ffd2"))
+	if extra_life:
+		add_loot_popup("+1 Life", Color("75ffd2"))
+	for id in materials:
+		add_loot_popup("+%d %s" % [materials[id], Materials.label(id)], Color("ff8ada"))
+
+func add_loot_popup(message: String, tint: Color) -> void:
+	if loot_popups.get_child_count() >= 5:
+		var oldest := loot_popups.get_child(0)
+		loot_popups.remove_child(oldest)
+		oldest.queue_free()
+	var popup := Label.new()
+	popup.text = message
+	popup.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	popup.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	popup.add_theme_font_override("font", UI.DISPLAY)
+	popup.add_theme_font_size_override("font_size", 24)
+	popup.add_theme_color_override("font_color", tint)
+	popup.add_theme_color_override("font_outline_color", Color("020817"))
+	popup.add_theme_constant_override("outline_size", 7)
+	loot_popups.add_child(popup)
+	var fade := popup.create_tween()
+	fade.tween_interval(1.6)
+	fade.tween_property(popup, "modulate:a", 0.0, 0.32)
+	fade.tween_callback(popup.queue_free)
+
+func set_status_effects(supplies: Dictionary) -> void:
+	var lines := PackedStringArray()
+	for stat in BOOST_NAMES:
+		var effect: Vector2 = supplies.get(stat, Vector2.ZERO)
+		if effect.y > 0.0:
+			lines.append("%s +%d%%   ·   %ds" % [BOOST_NAMES[stat], roundi(effect.x * 100.0), ceili(effect.y)])
+	if lines != status_lines:
+		status_lines = lines
+		queue_redraw()
 
 func plate(rect: Rect2, cut := 9.0, edge := CYAN) -> void:
 	var x := rect.position.x
@@ -222,6 +284,9 @@ func _draw() -> void:
 	if reserve_lives > 0:
 		life_text += "  +%d" % reserve_lives
 	caption(counters + Vector2(15, 94), life_text, 17)
+	plate(Rect2(counters + Vector2(0, 111), Vector2(222, 33)), 9)
+	var time_text := "%02d:%02d.%d" % [run_tenths / 600, run_tenths / 10 % 60, run_tenths % 10]
+	caption(counters + Vector2(15, 134), "TIME     " + time_text, 17)
 	if boss_visible:
 		var center := hud_size.x * 0.5
 		var values := "%d / %d" % [roundi(boss_health), roundi(boss_max_health)]
@@ -254,3 +319,8 @@ func _draw() -> void:
 	var previous := RiftSettings.binding_label("previous_suit", device)
 	var next := RiftSettings.binding_label("swap_weapon", device)
 	caption(Vector2(64, 199), "%s  ‹  PREV     NEXT  ›  %s" % [previous, next], 12, Color("a8c6db"))
+	var status_y := counters.y + 153.0 if coop else 218.0
+	for line in status_lines:
+		plate(Rect2(20, status_y, 222, 33), 9, UI.VIOLET)
+		caption(Vector2(35, status_y + 24), line, 22)
+		status_y += 39.0
