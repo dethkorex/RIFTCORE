@@ -71,6 +71,7 @@ func _ready() -> void:
 		arena_left = entry.global_position.x + 2.5
 		arena_right = exit.global_position.x - 2.3
 	armor.rotation.y = facing * 1.10
+	preload("res://scripts/boss_armor_kit.gd").mount(armor, 1, warden, ORANGE)
 	collision_mask = 1
 	for catwalk in get_tree().get_nodes_in_group(&"factory_one_way"):
 		if stage.is_ancestor_of(catwalk):
@@ -226,7 +227,7 @@ func update_rush(prior: float, delta: float) -> void:
 			var id: int = body.get_instance_id()
 			if not hit_players.has(id) and where.x > lo and where.x < hi and where.y < floor_height + 2.30:
 				hit_players[id] = true
-				body.take_damage(33.0 + 5.0 * phase_index(), global_position)
+				body.take_boss_hit(33.0 + 5.0 * phase_index(), global_position, 1, true)
 		if absf(rush_end - global_position.x) < .22 or speed > 0.5 and absf(global_position.x - start_x) < .025:
 			world_impact = true
 			VFX.throw_sparks(drill, HEAT_MARKER, 3.0)
@@ -258,6 +259,7 @@ func fire_at(prior: float, at: float, height: float, is_drill: bool) -> void:
 		return
 	var muzzle := Vector3(global_position.x + facing * 1.5, floor_height + height, 0.0)
 	var shot := RiftProjectile.new()
+	shot.boss_status_sector = 1
 	get_parent().add_child(shot)
 	shot.global_position = muzzle
 	shot.speed = 23.0 if is_drill else 12.5 + phase_index() * 1.0
@@ -298,7 +300,7 @@ func advance_flames(authority: bool) -> void:
 				var at: Vector3 = body.global_position - flame.global_position
 				if not struck.has(id) and absf(at.x) < flame.width * 0.49 + 0.32 and at.y > 0.0 and at.y < flame.height + 0.49:
 					struck[id] = true
-					body.take_damage((21.0 if warden else 29.0) + phase_index() * 3.0, flame.global_position)
+					body.take_boss_hit((21.0 if warden else 29.0) + phase_index() * 3.0, flame.global_position, 1, true)
 
 func show_rush_markers() -> void:
 	tracks = Node3D.new()

@@ -14,6 +14,8 @@ SetCompressor /SOLID lzma
 !define MUI_ICON "${BRAND_ICO}"
 !define MUI_UNICON "${BRAND_ICO}"
 !include "MUI2.nsh"
+!include "FileFunc.nsh"
+!include "LogicLib.nsh"
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
@@ -42,12 +44,18 @@ Section "RIFTCORE Playtest" Main
   FileWrite $0 "RIFTCORE playtest installation"
   FileClose $0
   WriteUninstaller "$INSTDIR\Uninstall.exe"
+  ${GetParameters} $0
+  ${GetOptions} $0 "/NO-REGISTER" $1
+  ${IfNot} ${Errors}
+    Goto install_finished
+  ${EndIf}
   CreateDirectory "$SMPROGRAMS\RIFTCORE"
   CreateShortcut "$SMPROGRAMS\RIFTCORE\RIFTCORE.lnk" "$INSTDIR\RIFTCORE.exe" "" "$INSTDIR\riftcore.ico"
   CreateShortcut "$SMPROGRAMS\RIFTCORE\Uninstall RIFTCORE.lnk" "$INSTDIR\Uninstall.exe"
   WriteRegStr HKCU "Software\RIFTCORE" "InstallDir" "$INSTDIR"
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\RIFTCORE" "DisplayName" "RIFTCORE Playtest"
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\RIFTCORE" "UninstallString" '"$INSTDIR\Uninstall.exe"'
+install_finished:
 SectionEnd
 
 Section "Uninstall"
@@ -55,9 +63,14 @@ Section "Uninstall"
   IfFileExists "$INSTDIR\riftcore.install" +2
   Abort "This folder is not a RIFTCORE install."
   Delete "$INSTDIR\riftcore.install"
-  Delete "$SMPROGRAMS\RIFTCORE\RIFTCORE.lnk"
-  Delete "$SMPROGRAMS\RIFTCORE\Uninstall RIFTCORE.lnk"
-  RMDir "$SMPROGRAMS\RIFTCORE"
+  ReadRegStr $0 HKCU "Software\RIFTCORE" "InstallDir"
+  ${If} $0 == $INSTDIR
+    Delete "$SMPROGRAMS\RIFTCORE\RIFTCORE.lnk"
+    Delete "$SMPROGRAMS\RIFTCORE\Uninstall RIFTCORE.lnk"
+    RMDir "$SMPROGRAMS\RIFTCORE"
+    DeleteRegKey HKCU "Software\RIFTCORE"
+    DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\RIFTCORE"
+  ${EndIf}
   Delete "$INSTDIR\RIFTCORE.exe"
   Delete "$INSTDIR\RIFTCORE.exe.previous"
   Delete "$INSTDIR\RIFTCORE.exe.upgrade"
@@ -68,6 +81,4 @@ Section "Uninstall"
   RMDir /r "$INSTDIR\versions"
   RMDir /r "$INSTDIR\downloads"
   RMDir "$INSTDIR"
-  DeleteRegKey HKCU "Software\RIFTCORE"
-  DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\RIFTCORE"
 SectionEnd

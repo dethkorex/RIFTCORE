@@ -3,6 +3,7 @@ extends Node3D
 
 const SURFACE := preload("res://assets/campaign/sector_surface.gdshader")
 const CHAMFER := preload("res://scripts/factory_chamfer.gd")
+const PANEL_TRIM := preload("res://scripts/sector_material_trim.gd")
 const PALETTES := [
 	["312d2c","a46643","ff8330"], ["34322a","687844","bece65"],
 	["274054","7aabc1","b4e6ff"], ["192e36","426e79","74eddd"],
@@ -16,11 +17,13 @@ const PALETTES := [
 @export var shaft := false
 static var kits: Dictionary = {}
 var meshes: Dictionary = {}
+var ice_coating := false
 
 func _ready() -> void:
 	if surface == null:
 		return
-	var key := Vector2i(sector, int(shaft))
+	ice_coating = get_parent().is_in_group(&"ice_deck")
+	var key := Vector3i(sector, int(shaft), int(ice_coating))
 	if not kits.has(key):
 		kits[key] = make_kit()
 	var geometry := MeshInstance3D.new()
@@ -42,10 +45,15 @@ func make_kit() -> ArrayMesh:
 	tread.set_shader_parameter("roughness", .68)
 	tread.set_shader_parameter("grain_mix", .46 if sector in [2, 3, 5, 10] else .56)
 	tread.set_shader_parameter("chassis_color", Color(colors[0]))
+	if ice_coating:
+		tread.set_shader_parameter("surface_tint", Color("9bd7ff"))
+		tread.set_shader_parameter("metal", .38)
+		tread.set_shader_parameter("roughness", .18)
+		tread.set_shader_parameter("brightness", 1.5)
 	if shaft:
 		build_shaft(tread, chassis, trim, lamp)
 	else:
-		build_deck(tread, chassis, trim, lamp)
+		build_deck(tread, chassis, trim, lamp, PANEL_TRIM.make(sector))
 	var assembled := ArrayMesh.new()
 	for material: Material in meshes:
 		var batch: SurfaceTool = meshes[material]
@@ -64,7 +72,7 @@ func build_shaft(surface_mat: Material, chassis: Material, trim: Material, lamp:
 			for index in [-1,1]:
 				box(Vector3(index*.071,y,z*1.044), Vector3(.036,.19,.04), lamp, .009, slope)
 
-func build_deck(tread: Material, chassis: Material, trim: Material, lamp: Material) -> void:
+func build_deck(tread: Material, chassis: Material, trim: Material, lamp: Material, fascia: Material) -> void:
 	box(Vector3(0,-0.49,0), Vector3(5.98,.60,4.78), chassis, .13)
 	box(Vector3(0,-0.741,0), Vector3(5.84,.188,4.60), trim, .069)
 	for i in 3:
@@ -72,7 +80,7 @@ func build_deck(tread: Material, chassis: Material, trim: Material, lamp: Materi
 		box(Vector3(x,-.097,0), Vector3(1.94,.194,4.72), tread, .064)
 		for face in [-1, 1]:
 			var z := float(face) * 2.372
-			box(Vector3(x,-.389,z), Vector3(1.76,.32,.116), chassis, .045)
+			box(Vector3(x,-.473,z), Vector3(1.76,.39,.116), fascia, .049)
 			add_fascia(x, z, face, trim, lamp)
 			for side in [-1,1]:
 				box(Vector3(x + side*.875,-.324,z*.999), Vector3(.14,.53,.142), trim, .040)
@@ -80,6 +88,12 @@ func build_deck(tread: Material, chassis: Material, trim: Material, lamp: Materi
 		box(Vector3(crossbeam,-.801,0), Vector3(.24,.069,4.51), chassis, .023)
 	for stringer in [-1.36,1.36]:
 		box(Vector3(0,-.799,stringer), Vector3(5.5,.075,.19), trim, .023)
+	for face in [-1, 1]:
+		for i in 6:
+			var x := (i - 2.5) * .97
+			var angle: float = [-.46, .31, -.22, .0, -.57, .46, .0, .26, -.62, .54][sector - 1] * (1 if i % 2 == 0 else -1)
+			var accent_width := .92 if sector in [1, 4, 5, 8] else .52
+			box(Vector3(x, -.686, face * 2.31), Vector3(accent_width,.11,.13), trim, .036, angle)
 
 func add_fascia(x: float, z: float, face: int, trim: Material, light: Material) -> void:
 	var at := Vector3(x,-.406,z + face * .05)

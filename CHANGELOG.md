@@ -1,10 +1,17 @@
-# RIFTCORE Alpha 6.2.1
+# RIFTCORE Alpha 6.3.5
 
-- Co-op gives each operator three lives. Players who run out can spectate while their teammates keep playing. Guest movement is smoother when network packets arrive late.
-- Party voice chat includes microphone and output selection, voice volume, and remappable push-to-talk. Both players can enable it in Settings → Audio. The default is V on keyboard or left-stick click on controller.
-- Press Enter to open whispers in the hub or on a mission. You can also open Settings while paused in co-op.
-- The HUD shows your speedrun time across both acts, excluding loading and shared cinematics. Active boosts are easier to read, combat-effect text is larger, and co-op nameplates are 15% larger.
-- RX-07 has a new wall-slide pose, and the title menu text and buttons are centered.
-- Pickup popups show the names of items and blueprints and the exact number of bolts received. Health, energy, and XP stay on their meters.
+- Level-ups restore 50% of maximum health and flash gold.
+- Restored the previous weapon, impact, enemy, and dash sounds.
+- The campaign adds 46 enemies with cleaner platform spacing and safer landings.
+- Ember Foundry has a bigger boulder encounter, breakable walls, and a pressure-plate shutter.
+- Platforms and boss armor have sector-specific finishes. Jungle vine platforms and slippery ice get distinct visuals.
+- Boss intros add power-up poses and larger, themed health displays.
+- Co-op shows teammate health, colored names, and live microphone indicators. Test your mic under Audio settings.
+- Co-op carries Operator XP and earned suits across deployments. A party wipe returns everyone to the same lobby at Operator Level 1.
+- The Profile bay shows career stats and Solo and Co-op records. Profile and Operator Select use animated models.
+- Operators use the permanent Player Profile name. Delete Profile resets local progress and the local RIFTCORE friends list.
+- Operator Level gates blueprints, equipment, and Shop stock. Profile Level unlocks Core Ascension ranks.
+- Challenges reset at local midnight and always show the time until the next reset.
+- Boss suits have a separate energy-powered weapon input. Standard Buster fire remains available in every suit.
 
 Update together through Launcher 0.2 or Settings → Update Game before joining a co-op room.

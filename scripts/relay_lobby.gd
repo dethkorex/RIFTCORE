@@ -9,6 +9,7 @@ signal guest_joined
 signal mission_returned
 signal mission_disconnected(message: String)
 signal invite_received(display_name: String, code: String)
+signal party_chat_changed
 
 const Profile := preload("res://scripts/rogue_profile.gd")
 const Keys := preload("res://addons/GD-Sync/Scripts/KeyStore.gd")
@@ -17,7 +18,7 @@ const PartyVoice := preload("res://scripts/party_voice.gd")
 const RelayEnums := preload("res://addons/GD-Sync/Scripts/Enums/Enums.gd")
 const Codes := "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 const CodeLength := 10
-const ROOM_PREFIX := "riftcore-coop-v14-"
+const ROOM_PREFIX := "riftcore-coop-v15-"
 const Difficulty := preload("res://scripts/mission_difficulty.gd")
 const MAX_PLAYERS := 4
 const RELAY_UNAVAILABLE := "Online rooms are unavailable. Solo play is available."
@@ -32,6 +33,9 @@ var pending_invite := 0
 var copy_on_join := false
 var party_operators: Dictionary[int, String] = {}
 var last_party_whisper: Dictionary[int, int] = {}
+var party_messages: Array[Dictionary] = []
+var last_party_chat: Dictionary[int, int] = {}
+var next_party_message_at := 0
 var mission_active := false
 var mission_roster: Array = []
 var mission_mode := 0
@@ -83,6 +87,7 @@ func _initialize_client() -> void:
 	)
 	relay.client_joined.connect(_players_changed)
 	relay.client_left.connect(_peer_left)
+	relay.host_changed.connect(_host_changed)
 	relay.player_data_changed.connect(_difficulty_data_changed)
 	relay.kicked.connect(func(_reason: String): leave("You were removed from the room."))
 
@@ -223,6 +228,7 @@ func _room_joined(lobby_name: String) -> void:
 	relay.expose_func(_receive_partner_position)
 	relay.expose_func(_receive_sector_records)
 	relay.expose_func(_receive_party_whisper)
+	relay.expose_func(_receive_party_message)
 	relay.expose_func(voice.receive_voice)
 	relay.expose_func(_request_blueprint_drop)
 	relay.expose_func(_request_blueprint_pickup)
@@ -310,6 +316,36 @@ func _receive_party_whisper(body: String) -> void:
 		return
 	last_party_whisper[sender] = now
 	RiftSocial.receive_whisper("rift:" + party_operators[sender], message)
+
+func send_party_message(raw: String) -> bool:
+	var body := RiftSocial.clean_whisper(raw)
+	var now := Time.get_ticks_msec()
+	if connected_room.is_empty() or room_size < 2 or not is_instance_valid(relay) or body.is_empty() or now < next_party_message_at:
+		return false
+	next_party_message_at = now + 450
+	relay.call_func(_receive_party_message, body)
+	append_party_message(local_name, body, true)
+	return true
+
+func _receive_party_message(raw: String) -> void:
+	var sender: int = relay.get_sender_id()
+	if connected_room.is_empty() or sender == relay.get_client_id() or not relay.lobby_get_all_clients().has(sender) or raw.length() > RiftSocial.WHISPER_LIMIT:
+		return
+	var now := Time.get_ticks_msec()
+	if now - last_party_chat.get(sender, -1000) < 270:
+		return
+	var body := RiftSocial.clean_whisper(raw)
+	if body.is_empty():
+		return
+	last_party_chat[sender] = now
+	var alias := Profile.clean_operator_name(str(relay.player_get_data(sender, "operator_name", "RX-07")))
+	append_party_message(alias, body, false)
+
+func append_party_message(alias: String, body: String, outgoing: bool) -> void:
+	party_messages.append({"name": alias, "body": body, "outgoing": outgoing})
+	if party_messages.size() > 60:
+		party_messages.pop_front()
+	party_chat_changed.emit()
 
 func can_deploy() -> bool:
 	return not mission_active and room_size >= 2 and is_instance_valid(relay) and relay.is_host()
@@ -421,14 +457,23 @@ func _peer_left(client_id: int) -> void:
 	station_positions.erase(client_id)
 	party_operators.erase(client_id)
 	last_party_whisper.erase(client_id)
+	last_party_chat.erase(client_id)
 	if relay.is_host() and not mission_active:
 		for key in blueprint_drops.keys():
 			if blueprint_drops[key].owner == client_id:
 				_publish_blueprint_drop(key, "", client_id, 0.0)
-	if mission_active:
-		leave("Your partner left the mission.")
-	else:
-		_players_changed(client_id)
+	if mission_active and mission_roster.has(client_id):
+		mission_active = false
+		mission_roster.clear()
+		if relay.is_host():
+			relay.lobby_open()
+		mission_disconnected.emit("An operator disconnected. Your party is back at the station.")
+	_players_changed(client_id)
+
+func _host_changed(is_host: bool, _host_id: int) -> void:
+	if is_host and not mission_active and not connected_room.is_empty():
+		relay.lobby_open()
+		changed.emit()
 
 func leave(message := "Create a room or enter a friend’s room code.") -> void:
 	voice.reset()
@@ -444,6 +489,10 @@ func leave(message := "Create a room or enter a friend’s room code.") -> void:
 	copy_on_join = false
 	party_operators.clear()
 	last_party_whisper.clear()
+	last_party_chat.clear()
+	next_party_message_at = 0
+	party_messages.clear()
+	party_chat_changed.emit()
 	room_code = ""
 	room_size = 0
 	request_timeout.stop()

@@ -4,8 +4,9 @@ const UI := preload("res://scripts/rift_ui.gd")
 const CombatVFX := preload("res://scripts/combat_vfx.gd")
 const Story := preload("res://scripts/rift_story.gd")
 const StoryDialogue := preload("res://scripts/story_dialogue.gd")
+const HUD := preload("res://scripts/factory_hud.gd")
 
-func play(rig: SideCameraRig, boss: Node3D, floor_y: float, title: String, tint: Color, sector: int, act: int, online := false) -> void:
+func play(rig: SideCameraRig, boss: Combatant, floor_y: float, title: String, tint: Color, sector: int, act: int, readout: HUD, online := false) -> void:
 	var camera := rig.get_node("Camera3D") as Camera3D
 	var gameplay_camera := camera.transform
 	var landing := boss.global_position
@@ -53,6 +54,18 @@ func play(rig: SideCameraRig, boss: Node3D, floor_y: float, title: String, tint:
 	shake.tween_property(camera, "global_position", impact_eye + Vector3.DOWN * 0.13, 0.05)
 	shake.tween_property(camera, "global_position", impact_eye, 0.16)
 	await shake.finished
+	var armor := boss.get_node_or_null("Armor") as Node3D
+	if armor == null:
+		armor = boss.get("armor")
+	if armor == null:
+		armor = boss
+	var neutral := armor.transform
+	var pose := create_tween().set_parallel().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	pose.tween_method(func(weight: float):
+		aim(camera, wide_focus, Vector3(lerpf(0.0, -wide_distance * 0.29, weight), 0.25 - 0.65 * weight, wide_distance * lerpf(1.0, 0.83, weight)))
+	, 0.0, 1.0, 0.55)
+	pose.tween_property(armor, "rotation", Vector3(-0.07, -0.32, -0.06 if act == 1 else 0.05), 0.55)
+	await pose.finished
 
 	var layer := CanvasLayer.new()
 	layer.layer = 32
@@ -77,8 +90,39 @@ func play(rig: SideCameraRig, boss: Node3D, floor_y: float, title: String, tint:
 		var dialogue := StoryDialogue.new()
 		dialogue.add_to_group(&"boss_dialogue")
 		add_child(dialogue)
-		await dialogue.play(Story.boss_exchange(sector, act), "Begin Fight", online, title, portrait, tint, online)
+		await dialogue.play(Story.boss_exchange(sector, act), "Continue", online, title, portrait, tint, online)
 		dialogue.queue_free()
+	readout.boss_name = title.to_upper()
+	readout.boss_tint = tint
+	readout.boss_sector = sector
+	readout.boss_act = act
+	readout.boss_max_health = boss.max_health
+	readout.boss_health = 0.0
+	readout.boss_visible = true
+	readout.queue_redraw()
+	RiftAudio.play_effect(&"titan_windup")
+	var power := OmniLight3D.new()
+	boss.add_child(power)
+	power.position.y = height * .23
+	power.light_color = tint
+	power.omni_range = height * 2.7
+	power.light_energy = 0.0
+	var pose_rotation := armor.rotation
+	var energize := create_tween()
+	energize.tween_method(func(weight: float):
+		var brace := sin(weight * PI)
+		armor.rotation = pose_rotation + Vector3(-.17 * brace, .14 * brace, sin(weight * TAU * 4.0) * .024 * brace)
+		armor.scale = neutral.basis.get_scale() * Vector3(1.0 + .05 * brace, 1.0 - .09 * brace, 1.0 + .05 * brace)
+		power.light_energy = weight * 3.4 + absf(sin(weight * TAU * 4.0)) * brace
+		readout.boss_health = lerpf(0.0, boss.health, weight)
+		readout.queue_redraw()
+	, 0.0, 1.0, 1.85)
+	await energize.finished
+	armor.transform = neutral
+	RiftAudio.stop_effect(&"titan_windup")
+	RiftAudio.play_effect(&"deploy_zap")
+	RiftProjectile.suit_flash(impact, boss.global_position, tint, true)
+	create_tween().tween_property(power, "light_energy", 0.0, .43)
 	var target := rig.target
 	var position := target.global_position if is_instance_valid(target) else landing
 	var facing := target.facing if is_instance_valid(target) else 1.0
@@ -90,6 +134,7 @@ func play(rig: SideCameraRig, boss: Node3D, floor_y: float, title: String, tint:
 	await pullback.finished
 	rig.global_position = view_at
 	camera.transform = gameplay_camera
+	power.queue_free()
 	rig.set_process(true)
 
 func aim(camera: Camera3D, target: Vector3, offset: Vector3) -> void:

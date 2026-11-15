@@ -305,6 +305,21 @@ func save_social() -> bool:
 	data.set_value("records", "pinned", pinned)
 	return data.save(storage_path) == OK
 
+func reset_profile() -> void:
+	followed.clear()
+	recent_players.clear()
+	rift_friends.clear()
+	pinned.clear()
+	best_times.clear()
+	whispers.clear()
+	unread_whispers.clear()
+	invites.clear()
+	operator_id = Crypto.new().generate_random_bytes(8).hex_encode()
+	refresh_season()
+	save_social()
+	records_changed.emit()
+	invites_changed.emit()
+
 func open_friends() -> void:
 	if OS.shell_open("steam://open/friends") != OK:
 		OS.shell_open("https://steamcommunity.com/my/friends/")

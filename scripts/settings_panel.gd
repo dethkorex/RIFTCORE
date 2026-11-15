@@ -117,12 +117,39 @@ func build_voice_settings(panel: VBoxContainer) -> void:
 	transmission.item_selected.connect(func(index: int): RiftSettings.set_voice_mode(RiftSettings.voice_enabled, index == 0))
 	add_audio_device(panel, "Microphone", true, RiftSettings.microphone_device)
 	add_audio_device(panel, "Game audio output", false, RiftSettings.speaker_device)
+	build_microphone_test(panel)
 	var binding := UI.label(panel, "", 15, UI.MUTED)
 	var refresh_hint := func():
 		binding.text = "Push-to-talk   %s / %s   ·   Change under Keyboard & Mouse or Controller" % [
 			RiftSettings.binding_label("push_to_talk", "key"), RiftSettings.binding_label("push_to_talk", "pad")]
 	refresh_hint.call()
 	tabs.tab_changed.connect(func(_tab: int): refresh_hint.call())
+
+func build_microphone_test(panel: VBoxContainer) -> void:
+	var voice := RiftRelay.voice
+	var controls := HBoxContainer.new()
+	controls.add_theme_constant_override("separation", 10)
+	panel.add_child(controls)
+	var test := UI.button(controls, "Test microphone", func():
+		if voice.is_testing_microphone():
+			voice.stop_microphone_test()
+		else:
+			voice.start_microphone_test(controls)
+	, false, 34)
+	var meter := ProgressBar.new()
+	meter.max_value = 1.0
+	meter.step = 0.0
+	meter.custom_minimum_size = Vector2(112, 9)
+	meter.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	meter.show_percentage = false
+	controls.add_child(meter)
+	var status := UI.label(panel, "Record 4 seconds and hear it back locally.", 16, UI.MUTED)
+	var refresh := func(message: String, level: float):
+		status.text = message
+		meter.set_value_no_signal(level)
+		test.text = "Stop test" if voice.is_testing_microphone() else "Test microphone"
+	voice.microphone_test_changed.connect(refresh)
+	controls.tree_exiting.connect(func(): voice.microphone_test_changed.disconnect(refresh), CONNECT_ONE_SHOT)
 
 func add_audio_device(panel: VBoxContainer, title: String, microphone: bool, selected: String) -> void:
 	var devices := RiftSettings.audio_devices(microphone)
@@ -246,8 +273,8 @@ func build_controller_bindings() -> void:
 	groups.add_theme_constant_override("separation", 18)
 	groups.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	panel.add_child(groups)
-	var movement := build_action_column(groups, "Movement", ["move_left", "move_right", "jump", "crouch", "climb_up", "climb_down"])
-	var combat := build_action_column(groups, "Combat and suits", ["dash", "shoot", "melee", "swap_weapon", "previous_suit", "pause"])
+	var movement := build_action_column(groups, "Movement and interaction", ["move_left", "move_right", "jump", "crouch", "climb_up", "climb_down", "field_interact"])
+	var combat := build_action_column(groups, "Combat and communication", ["dash", "shoot", "melee", "swap_weapon", "previous_suit", "pause", "push_to_talk"])
 	var shortcuts := build_controller_buttons(groups)
 
 	var footer := HBoxContainer.new()

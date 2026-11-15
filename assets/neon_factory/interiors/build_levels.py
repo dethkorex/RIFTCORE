@@ -7,6 +7,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "campaign"))
 from interior_rhythm import break_up_walk
 from folded_rooms import FOLDS, FOLD_TIMED_FIXTURE, folded_route
 from build_doorways import outfit
+from clear_traversal import clear_decks
+from encounter_spacing import update_encounters
 
 base=Path(__file__).resolve().parents[3] / "scenes/levels"
 kit="res://assets/neon_factory/foundry/"
@@ -21,6 +23,7 @@ def make(act):
         ("Lining",kit+"interior_bulkhead.tscn","PackedScene"),("Cave",kit+"cave_lining.tscn","PackedScene"),
         ("PressureBank",kit+"pressure_bank.glb","PackedScene"),
         ("Threshold",kit+"zone_threshold.glb","PackedScene"),
+        ("LowThreshold",kit+"zone_threshold_low.tscn","PackedScene"),
         ("FactorySky","res://scripts/jungle_backdrop.gd","Script"),
         ("FactoryPanorama","res://assets/neon_factory/foundry/foundry_panorama.jpg","Texture2D"),
         ("Bridge",kit+"powered_bridge.tscn","PackedScene"),("ArenaLift",kit+"warden_lift.tscn","PackedScene"),("Shutter","res://assets/neon_factory/interiors/service_shutter.tscn","PackedScene"),("Relay","res://assets/neon_factory/foundry/power_coupler.tscn","PackedScene"),
@@ -121,6 +124,10 @@ height = 0.44
             for n in range(a+5,b,15):
                 asset(f"IndustrialButtress{i}_{n}","DECOR","Wall",n,y-5.2,-3.25,scale=(2.75,1.4,.79))
         for i,(mouth,_,floor) in enumerate(descent):
+            if act == 1 and i == 2:
+                # Set the lintel below the upper Bedrock walk and use its existing rock wall.
+                asset("CaveThreshold2","TERRAIN","LowThreshold",mouth+1.35,-2.0,-.48)
+                continue
             asset(f"CaveThreshold{i}","DECOR","Threshold",mouth+1.35,floor,-.48)
             asset(f"CaveReturnWall{i}","DECOR","Cave",mouth+3.3,floor-2.15,-2.57)
         for index,x in enumerate(range(-9,end+6,6)):
@@ -173,30 +180,22 @@ height = 0.44
         node(name,"TERRAIN","CharacterBody3D",(x,y,0),script=e("Supply"),
              group=["factory_supply_carrier"],supplies_only="true",reward=e(reward))
 
-    def relay(trigger,platform,x,y,mx,my,dy,lift=False,art="Bridge",operation=None,dx=0,projectile_only=True,delay=None):
+    def relay(trigger,platform,x,y,mx,my,dy,lift=False,art="Bridge",operation=None,dx=0,projectile_only=True,delay=None,pressure_plate=False):
         if delay is None: delay = 1.15 if lift else 0.0
         asset(platform,"TERRAIN",art,mx,my)
         node(trigger,"TERRAIN","StaticBody3D",(x,y,0),group=["factory_shot_relay"],script=e("RelayCode"),
-            **({"collision_layer": 2, "collision_mask": 0} if projectile_only else {}),
+            collision_layer=0 if pressure_plate else 2 if projectile_only else 1, collision_mask=0,
             **({"departure_delay": delay} if delay else {}),
-            floating="true",platform_path=f'NodePath("../{platform}")',travel=v((dx,dy,0)),operation=f'"{operation or ("FREIGHT LIFT" if lift else "DROP BRIDGE")}"',lift=str(lift).lower())
+            floating=str(not pressure_plate).lower(),pressure_plate=str(pressure_plate).lower(),
+            platform_path=f'NodePath("../{platform}")',travel=v((dx,dy,0)),operation=f'"{operation or ("FREIGHT LIFT" if lift else "DROP BRIDGE")}"',lift=str(lift).lower())
         path="TERRAIN/"+trigger
-        asset("Art",path,"Relay",0,0,0)
-        node("Collider",path,"CollisionShape3D",shape=s("RelayShape"))
-        node("Lamp",path,"MeshInstance3D",(0,0,0),mesh=s("LampMesh"))
-    def switchback(prefix,x,y,index):
-        # From the main route, ascend left to a wall-kick shaft, then cross right to the cache.
-        decks(prefix+"Approach",x-3,x+2,y+1.85)
-        decks(prefix+"Turn",x-10,x-4.6,y+3.65)
-        wall(prefix+"WestShaft",x-16,y+2.2,5.5)
-        wall(prefix+"EastShaft",x-12.2,y+2.2,3.65)
-        deck(prefix+"ShaftEntry",x-15.6,x-12.6,y+2.9)
-        deck(prefix+"ShaftTop",x-12,x-6.2,y+6.55)
-        deck(prefix+"Midspan",x-2.2,x+1.9,y+7.05)
-        decks(prefix+"Vault",x+6,x+15,y+7.35)
-        chest(prefix+"Chest",x+12.7,y+7.35,index)
-        deck(prefix+"Return",x+16,x+20,y+4.9)
-        deck(prefix+"LowerReturn",x+20,x+25,y+2.5)
+        if pressure_plate:
+            asset("Art",path,"Relay",0,-.08,0,scale=(2,.25,2))
+            node("Lamp",path,"MeshInstance3D",(0,-.08,0),mesh=s("LampMesh"),scale=v((2,.30,2)))
+        else:
+            asset("Art",path,"Relay",0,0,0)
+            node("Collider",path,"CollisionShape3D",shape=s("RelayShape"))
+            node("Lamp",path,"MeshInstance3D",(0,0,0),mesh=s("LampMesh"))
     def lower_loop(prefix,x,index):
         ramp(prefix+"Down",x,x+8,0,-1.85)
         decks(prefix+"Tunnel",x+8,x+32,-1.85)
@@ -332,8 +331,7 @@ height = 0.44
 
     def basement(prefix, western_end, entry, gate_x, join, cache_index, gap):
         floor, return_y = -8.5, -2.6
-        # From the east drop, cross the sump to the west. The relay opens the
-        # shutter upstairs. Climb out at the west end and retrace the route one tier up.
+        # Act I's sump uses a floor interlock. Act II's upper lock is a fractured wall.
         decks(prefix+"WestSump",western_end,western_end+gap[0],floor)
         if act == 1:
             decks(prefix+"EastSump",western_end+gap[1],entry+4,floor)
@@ -352,9 +350,12 @@ height = 0.44
         ramp(prefix+"ShutterRamp",gate_x-5,gate_x-1,return_y,-.4-return_y)
         decks(prefix+"Rejoin",gate_x-1,join,-.4)
         ramp(prefix+"RejoinLip",join,join+4,-.4,.4)
-        wall(prefix+"RelaySightBaffle",western_end+15,floor-.45,1.95)
-        relay(prefix+"LockRelay",prefix+"Lock",western_end+9,floor+1,gate_x,5.7,10.0,
-              art="Shutter",operation="RETURN SHUTTER")
+        if act==1:
+            relay(prefix+"LockRelay",prefix+"Lock",western_end+2.25,floor+.15,gate_x,5.7,10.0,
+                  art="Shutter",operation="RETURN SHUTTER",pressure_plate=True)
+        else:
+            node(prefix+"FracturedBulkhead","TERRAIN","StaticBody3D",(gate_x,-.39,0),
+                 script=e("Barricade"),scale=v((1,4.18,1)),accent="Color(1, 0.47, 0.17, 1)")
         wall(prefix+"GateSill",gate_x,-12.85,12.47)
         wall(prefix+"GateHeader",gate_x,8.3,12.0)
         for index in range(0, int(entry+11-western_end), 6):
@@ -447,7 +448,11 @@ height = 0.44
         deck("OutboundCatwalkA",392.2,397.6,0)
         spikes("ForgeApronSpikes",383,392.2,-4.3)
         deck("CatwalkDippedLanding",399.4,403,-1.1)
-        deck("ForgeApproachRamp",403,409,-1.1,1.2)
+        ramp("ForgeApproachRamp",403,409,-1.1,2.3)
+        node("ForgeFracturedBulkhead","TERRAIN","StaticBody3D",(410.4,1.2,0),
+             script=e("Barricade"),scale=v((1,2.2,1)),accent="Color(1, 0.47, 0.17, 1)")
+        deck("ForgeBulkheadLintel",409.7,411.1,6.53)
+        wall("ForgeBulkheadCrown",410.4,6.52,12.7)
         deck("ForgeApproachLanding",409,412,1.2)
         sealed_cache("ForgeService",371.5,0,13)
         for i,(x,y,kind) in enumerate([(28,0,0),(69.5,-2.05,1),(149,6.15,2),(197,-8.5,0),(253,-1.35,1),(295.0,0,2),(344,6.15,1)]):
@@ -473,7 +478,6 @@ height = 0.44
         # different jump from the bridge approach in Act I.
         ramp("KilnDuctDescent",83,89,0,-1.85)
         deck("KilnDuctFloor",89,92.1,-1.85)
-        deck("KilnIntakeLintel",87.8,89.7,1.34)
         spikes("KilnDrainSpikes",92.1,96.25,-5.2)
         deck("KilnDuctLanding",96.25,98.35,-.90)
         ramp("KilnDuctRim",98.35,101,-.90,.90)
@@ -493,14 +497,19 @@ height = 0.44
         decks("FuelRiserLanding",293,297,0)
         riser("Riser",297,344,11)
         refinery_high_route()
-        deck("RightStairA",344,348,4.45)
-        deck("RightStairB",348,353,2.65)
-        ramp("SlagRamp",353,362,2.65,-2.65)
+        deck("RightStairA",345.1,349,4.45)
+        ramp("SlagRamp",352,362,2.9,-2.9)
         fork("Refinery",362,405,5,True)
         decks("SmelterExit",405,418,0)
-        node("SlagBoulder","TERRAIN","AnimatableBody3D",(416.7,.82,0),
-             script=e("Boulder"),group=["foundry_boulder"],runway_length=11.0)
-        hazard("SlagFerryReliefVent",449.9,.6,1,1.35,purge="SlagFerryRelay")
+        # The etched chute is its own encounter. The inlet stays open for retreat.
+        deck("BoulderChuteCanopy",406,418,4.08)
+        asset("BoulderStartCollar","DECOR","Threshold",416.1,0,-.2,scale=(1.1,1.12,1.2))
+        for x in (406,410,414):
+            asset("BoulderBaffle"+str(x),"DECOR","PressureBank",x,1.2,-2.54,scale=(.85,1.15,.9))
+            node("BoulderLamp"+str(x),"DECOR","OmniLight3D",(x,2.86,-1.43),light_color="Color(1, 0.19, 0.052, 1)",light_energy="1.65",omni_range="4.8")
+        node("SlagBoulder","TERRAIN","AnimatableBody3D",(416.4,1.4,0),
+             script=e("Boulder"),group=["foundry_boulder"],runway_length=10.6)
+        hazard("SlagFerryReliefVent",450.85,.6,1,1.35,purge="SlagFerryRelay")
         deck("SlagBridgeLanding",427.4,431.4,0)
         ramp("SlagBridgeRiser",431.4,435.2,0,.92)
         ramp("SlagBridgeReturn",435.2,441,.92,-.92)
@@ -512,7 +521,6 @@ height = 0.44
         deck("SlagVaultWestboundLedge",441.8,444.25,8.32,drop=True)
         deck("SlagVaultTurn",429.1,435.87,9.25,drop=True)
         chest("SlagFerryCache",431.7,9.25,3)
-        sealed_cache("RefineryService",405.3,0,14)
         for i,(x,y,k) in enumerate([(37,-.94,2),(57,-1.35,1),(99.45,-.52,0),(135,6.15,2),(177,-8.5,1),(223,-2.6,2),(333,6.15,0),(391.0,-1.35,1),(401,-.6,2)]):
             hazard("FoundryFlare"+str(i+1),x,y,k,i*.42)
         for name,x,y,reward in [
@@ -522,5 +530,5 @@ height = 0.44
         enemies([(29,.18,0),(46,-1.35,2),(76,2.7,4),(87.2,-1.25,1),(144,6.15,0),(161,5.4,4),(202,-8.5,3),(224,5,2),(231,-2.1,3),(260,-1.87,2),(286,5.24,1),(322,6.15,2),(374,-1.35,0),(466.1,.6,4)],gate)
     wall("AirlockEnd",-13,0,14)
     arena(hall,gate,exit,0)
-    file.write_text(outfit("neon_factory", '\n'.join(header)+'\n\n'+'\n\n'.join(nodes)+'\n'),encoding="utf8")
+    file.write_text(update_encounters(clear_decks(outfit("neon_factory", '\n'.join(header)+'\n\n'+'\n\n'.join(nodes)+'\n'))),encoding="utf8")
 for act in [1,2]: make(act)

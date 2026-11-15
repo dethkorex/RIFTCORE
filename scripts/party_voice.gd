@@ -1,23 +1,36 @@
 extends Node
 
+signal microphone_test_changed(message: String, level: float)
+
+const MIC_ICON := preload("res://assets/ui/party-microphone.svg")
 const SAMPLE_RATE := 12000
 const PACKET_MS := 40
 const SAMPLES := SAMPLE_RATE * PACKET_MS / 1000
 const IDLE_MS := 280
 const BUFFER_PACKETS := 3
 const VOICE_READY := "rift_voice_v1"
+const SPEECH_GATE := 0.006
+const MIC_TEST_SECONDS := 4.0
 
 var lobby: Node
 var capturing := false
 var retry_at := 0
 var sequence := 0
 var streams: Dictionary = {}
+var last_transmit := -IDLE_MS
+var test_owner: WeakRef
+var test_frames := PackedVector2Array()
+var test_deadline := 0
+var test_peak := 0.0
+var test_mix_rate := 0
+var test_player: AudioStreamPlayer
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	RiftSettings.voice_settings_changed.connect(settings_changed)
 
 func settings_changed() -> void:
+	stop_microphone_test("Microphone settings changed.")
 	reset()
 	publish_preference()
 
@@ -28,6 +41,90 @@ func publish_preference() -> void:
 func available() -> bool:
 	return RiftSettings.voice_enabled and not lobby.connected_room.is_empty() and lobby.room_size > 1 and is_instance_valid(lobby.relay)
 
+func indicator_visible(id: int) -> bool:
+	return available() and (id == lobby.relay.get_client_id() or lobby.relay.player_get_data(id, VOICE_READY, false) == true)
+
+func indicator_tint(id: int) -> Color:
+	var last := last_transmit if id == lobby.relay.get_client_id() else int(streams.get(id, {}).get("last_at", -IDLE_MS))
+	var elapsed := Time.get_ticks_msec() - last
+	if elapsed >= IDLE_MS:
+		return Color("8397ac")
+	return Color("61ffcf").lerp(Color("d8fffa"), (sin(float(Time.get_ticks_msec()) * 0.021) + 1.0) * 0.5)
+
+func start_microphone_test(owner: Control) -> void:
+	stop_microphone_test()
+	reset()
+	if DisplayServer.get_name() == "headless" or AudioServer.set_input_device_active(true) != OK:
+		microphone_test_changed.emit("Could not open the selected microphone.", 0.0)
+		return
+	test_mix_rate = AudioServer.get_input_mix_rate()
+	if test_mix_rate <= 0:
+		AudioServer.set_input_device_active(false)
+		microphone_test_changed.emit("The selected microphone is unavailable.", 0.0)
+		return
+	test_owner = weakref(owner)
+	AudioServer.get_input_frames(AudioServer.get_input_frames_available())
+	test_deadline = Time.get_ticks_msec() + int(MIC_TEST_SECONDS * 1000.0)
+	microphone_test_changed.emit("Recording… speak into your microphone.", 0.0)
+
+func is_testing_microphone() -> bool:
+	return test_owner != null
+
+func stop_microphone_test(message := "Microphone test stopped.") -> void:
+	if test_owner == null:
+		return
+	if test_deadline > 0:
+		AudioServer.set_input_device_active(false)
+	test_deadline = 0
+	test_owner = null
+	test_frames.clear()
+	test_peak = 0.0
+	if is_instance_valid(test_player):
+		test_player.stop()
+		test_player.queue_free()
+		test_player = null
+	microphone_test_changed.emit(message, 0.0)
+
+func update_microphone_test() -> void:
+	var owner := test_owner.get_ref() as Control
+	if owner == null or not owner.is_visible_in_tree():
+		stop_microphone_test()
+		return
+	if test_deadline == 0:
+		return
+	var available_frames := AudioServer.get_input_frames_available()
+	var chunk := AudioServer.get_input_frames(available_frames) if available_frames > 0 else PackedVector2Array()
+	var peak := 0.0
+	for sample in chunk:
+		peak = maxf(peak, maxf(absf(sample.x), absf(sample.y)))
+	test_frames.append_array(chunk)
+	test_peak = maxf(test_peak, peak)
+	var remaining := float(test_deadline - Time.get_ticks_msec()) / 1000.0
+	if remaining > 0.0:
+		microphone_test_changed.emit("Recording… %d s" % ceili(remaining), clampf(sqrt(peak), 0.0, 1.0))
+		return
+	AudioServer.set_input_device_active(false)
+	test_deadline = 0
+	if test_frames.is_empty() or test_peak < SPEECH_GATE:
+		stop_microphone_test("No signal detected. Check the microphone and try again.")
+		return
+	var recording := AudioStreamWAV.new()
+	recording.format = AudioStreamWAV.FORMAT_16_BITS
+	recording.mix_rate = test_mix_rate
+	var pcm := PackedByteArray()
+	pcm.resize(test_frames.size() * 2)
+	for index in test_frames.size():
+		var sample := test_frames[index]
+		pcm.encode_s16(index * 2, roundi(clampf((sample.x + sample.y) * 0.5, -1.0, 1.0) * 32767.0))
+	recording.data = pcm
+	test_player = AudioStreamPlayer.new()
+	test_player.stream = recording
+	test_player.bus = &"Voice"
+	add_child(test_player)
+	test_player.finished.connect(func(): stop_microphone_test("Test complete. Playback uses Voice Volume."))
+	test_player.play()
+	microphone_test_changed.emit("Playing your recording…", 0.0)
+
 func wants_microphone() -> bool:
 	if DisplayServer.get_name() == "headless" or not get_window().has_focus():
 		return false
@@ -37,6 +134,9 @@ func wants_microphone() -> bool:
 	return Input.is_action_pressed(&"push_to_talk") and not (focused is LineEdit or focused is TextEdit)
 
 func _process(_delta: float) -> void:
+	if is_testing_microphone():
+		update_microphone_test()
+		return
 	if not available():
 		if capturing or not streams.is_empty():
 			reset()
@@ -83,13 +183,14 @@ func send_capture(recipients: Array) -> void:
 		var value := clampf(total / (end - start), -1.0, 1.0)
 		peak = maxf(peak, absf(value))
 		packet[sample] = 128 + roundi(signf(value) * sqrt(absf(value)) * 127.0)
-	if peak >= 0.006:
+	if peak >= SPEECH_GATE:
+		last_transmit = Time.get_ticks_msec()
 		sequence += 1
 		for id in recipients:
 			lobby.relay.call_func_on_unreliable(id, receive_voice, sequence, packet)
 
 func receive_voice(serial: int, packet: PackedByteArray) -> void:
-	if not available() or packet.size() != SAMPLES or serial <= 0:
+	if not available() or is_testing_microphone() or packet.size() != SAMPLES or serial <= 0:
 		return
 	var sender: int = lobby.relay.get_sender_id()
 	if sender == lobby.relay.get_client_id() or not lobby.relay.lobby_get_all_clients().has(sender):
@@ -154,5 +255,6 @@ func remove_speaker(id: int) -> void:
 
 func reset() -> void:
 	stop_capture()
+	last_transmit = -IDLE_MS
 	for id in streams.keys():
 		remove_speaker(id)

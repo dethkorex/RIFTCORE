@@ -44,6 +44,7 @@ func _ready() -> void:
 	if gate and exit:
 		arena_left = gate.global_position.x + 2.4
 		arena_right = exit.global_position.x - 3.9
+	preload("res://scripts/boss_armor_kit.gd").mount(armor, 2, false, THORN)
 	died.connect(_break_apart)
 	reactor_light = OmniLight3D.new()
 	reactor_light.position = Vector3(0, 0.45, 0.5)
@@ -106,7 +107,7 @@ func _physics_process(delta: float) -> void:
 			hazards.erase(h)
 		elif h["tick"] <= 0.0 and absf(target.global_position.x - effect.global_position.x) < float(h.get("radius", 1.65)) and target.global_position.y < body_floor + 2.05:
 			h["tick"] = 0.64
-			target.take_damage(10.0, effect.global_position)
+			target.take_boss_hit(10.0, effect.global_position, 2, true)
 	if absf(dx) < 1.44 and absf(target.global_position.y - global_position.y) < 1.42:
 		target.take_damage(21.0, global_position)
 	if phase_time > 0.0:
@@ -154,6 +155,7 @@ func _release() -> void:
 		var count := (5 if health / max_health < 0.5 else 3) + difficulty_mode
 		for i in range(count):
 			var shot := RiftProjectile.new()
+			shot.boss_status_sector = 2
 			shot.collision_layer = 0
 			shot.collision_mask = 1
 			shot.speed = 12.0 + i * 2.5

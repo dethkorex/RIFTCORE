@@ -6,6 +6,7 @@ import re
 from pathlib import Path
 
 from branch_junctions import JUNCTIONS, ROUTE_BEATS
+from encounter_spacing import update_encounters
 from exterior_routes import EXTERIORS
 from interior_rhythm import break_up_walk
 from folded_rooms import FOLDS, FOLD_TIMED_FIXTURE, folded_route
@@ -1222,7 +1223,11 @@ size = Vector3(1.52, 1.25, 1.5)"""
         header = pieces[0] + "".join(piece for piece in pieces[1:]
                                     if re.search(r'id="([^"]+)"',piece)[1] in keep)
         header = re.sub(r"\n{3,}", "\n\n", header.strip())
-        return outfit(self.sector, "\n\n".join([header,*self.shapes,*result,*self.nodes]) + "\n")
+        from clear_traversal import clear_decks, frost_decks
+        scene = clear_decks(outfit(self.sector, "\n\n".join([header,*self.shapes,*result,*self.nodes]) + "\n"))
+        if self.sector == "frozen_reactor":
+            scene = frost_decks(scene)
+        return update_encounters(scene)
 
 
 def main():

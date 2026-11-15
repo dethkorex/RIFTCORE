@@ -64,6 +64,7 @@ func play(lines: Array, finish_label: String, automatic := false, boss_name := "
 		speaker.add_theme_color_override("font_color", accent.lightened(0.2))
 		frame.add_theme_stylebox_override("panel", UI.frame(Color("081222"), accent, 3))
 		image.texture = boss_portrait if boss else NOVA if guide else operator_image
+		reader.voice_pitch = 0.77 if boss else 1.32 if guide else 1.0
 		reader.next.text = finish_label if index == lines.size() - 1 else "Next"
 		await reader.show_line(line[1], automatic)
 		if reader.skipped:

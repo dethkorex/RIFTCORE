@@ -127,12 +127,32 @@ func build_section(left: float, right: float, back: float, front: float) -> void
 	panel(body, Vector3(0, -0.035, 0), size - Vector3(0.008, 0.07, 0.008), frame_material)
 	panel(body, Vector3(0, size.y * 0.5 - 0.045, 0),
 		Vector3(size.x - 0.026, 0.09, size.z - 0.025), deck_material)
+	if vines and size.z > 2.0:
+		add_leaf_geometry(body, size)
 	if front >= deck_depth * 0.5 - 0.01:
 		var strips := maxi(1, roundi(size.x / 1.15))
 		for index in strips:
 			var x := ((index + 0.5) / strips - 0.5) * size.x
 			panel(body, Vector3(x, 0.03, size.z * 0.5 + 0.008),
 				Vector3(size.x / strips * 0.70, 0.045, 0.020), accent_material)
+
+func add_leaf_geometry(body: Node3D, size: Vector3) -> void:
+	var leaf := SphereMesh.new()
+	leaf.radius = 0.5
+	leaf.height = 1.0
+	leaf.radial_segments = 24
+	leaf.rings = 9
+	for side in [-1, 1]:
+		var lobe := MeshInstance3D.new()
+		lobe.mesh = leaf
+		lobe.material_override = deck_material
+		lobe.position = Vector3(0, -0.065, side * size.z * 0.24)
+		lobe.scale = Vector3(size.x * 0.91, .4, size.z * .49)
+		body.add_child(lobe)
+	for index in 5:
+		var at_x := (index - 2) * size.x * .16
+		panel(body, Vector3(at_x, size.y * 0.5 + .003, 0),
+			Vector3(size.x * .046, .014, size.z * (0.54 - 0.08 * absi(index - 2))), accent_material)
 
 func panel(parent: Node3D, at: Vector3, size: Vector3, material: Material) -> void:
 	var mesh := BoxMesh.new()

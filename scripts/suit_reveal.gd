@@ -45,9 +45,8 @@ func play(actor: RiftPlayer, rig: SideCameraRig, hud: CanvasLayer, reward: Dicti
 	var light_out := create_tween()
 	light_out.tween_property(aura, "light_energy", 1.45, 0.43).from(5.0)
 	var plate := ability_card(hud, reward, tint)
-	await get_tree().create_timer(0.55, false).timeout
-	actor.play_character_animation("idle", true)
-	await get_tree().create_timer(1.95, false).timeout
+	await get_tree().create_timer(0.50, false).timeout
+	await demonstrate(actor, rig, plate)
 	var resume := create_tween().set_parallel().set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_CUBIC)
 	resume.tween_property(lens, "position:z", zoom, 0.4)
 	resume.tween_property(rig, "global_position", landing + Vector3(rig.look_ahead * actor.facing, 0.35, 0), 0.4)
@@ -56,6 +55,31 @@ func play(actor: RiftPlayer, rig: SideCameraRig, hud: CanvasLayer, reward: Dicti
 	await resume.finished
 	plate.queue_free()
 	actor.model_root.rotation.y = PI * 0.5 * actor.facing
+
+func demonstrate(actor: RiftPlayer, rig: SideCameraRig, plate: PanelContainer) -> void:
+	var camera := rig.get_node("Camera3D") as Camera3D
+	var pull_back := create_tween().set_parallel()
+	pull_back.tween_property(camera, "position:z", camera.position.z * 1.27, 0.45)
+	pull_back.tween_property(rig, "global_position:x", actor.global_position.x + 2.15, 0.45)
+	await pull_back.finished
+	actor.facing = 1.0
+	actor.model_root.rotation.y = PI * 0.5
+	actor.showcase_projectiles = self
+	actor.play_character_animation("idle", true)
+	var demo := plate.get_node("AbilityCopy/Demonstration") as Label
+	for i in 3:
+		demo.text = "STANDARD VOLLEY   %d / 3" % (i + 1)
+		await actor.shoot(false)
+		await get_tree().create_timer(0.29, false).timeout
+	for i in 3:
+		demo.text = "SUIT WEAPON   %d / 3" % (i + 1)
+		await actor.shoot(false, false, true)
+		await get_tree().create_timer(0.37, false).timeout
+	actor.showcase_projectiles = null
+	actor.fire_lock = 0.0
+	if actor.buster_pose:
+		actor.buster_pose.influence = 0.0
+	demo.text = "L / RT  Suit weapon"
 
 func build_floor_light(tint: Color) -> OmniLight3D:
 	var light := OmniLight3D.new()
@@ -86,11 +110,12 @@ func ability_card(hud: CanvasLayer, reward: Dictionary, tint: Color) -> PanelCon
 	plate.anchor_right = 0.95
 	plate.anchor_top = 0.40
 	var stack := UI.column(plate, 7)
+	stack.name = "AbilityCopy"
 	UI.label(stack, "SUIT ACQUIRED", 15, tint)
 	UI.label(stack, String(reward.reward_name).to_upper(), 28)
 	var details := UI.label(stack, Catalog.WEAPON_EFFECTS[reward.reward], 17, UI.MUTED)
 	details.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	UI.label(stack, "LB / RB  Cycle suits", 14, tint)
+	UI.label(stack, "LB / RB  Cycle suits", 14, tint).name = "Demonstration"
 	plate.modulate.a = 0.0
 	create_tween().tween_property(plate, "modulate:a", 1.0, 0.22)
 	return plate

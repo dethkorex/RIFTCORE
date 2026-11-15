@@ -54,6 +54,7 @@ func _ready() -> void:
 	var level := get_parent().get_parent()
 	left = level.get_node("Gate").global_position.x + 2.3
 	right = level.get_node("ExitBarrier").global_position.x - 2.7
+	preload("res://scripts/boss_armor_kit.gd").mount(armor, sector_number, false, accent)
 	for limb in ["ArmLeft", "ArmRight", "LegLeft", "LegRight", "Rotor"]:
 		var part := armor.find_child(limb, true, false) as Node3D
 		if part:
@@ -234,6 +235,7 @@ func execute(move: String) -> void:
 
 func fire(at: Vector3, aim: Vector3, power: float, speed: float, heavy := false) -> void:
 	var shot := RiftProjectile.new()
+	shot.boss_status_sector = sector_number
 	shot.collision_layer = 0
 	shot.collision_mask = 1 | 128
 	shot.damage = power
@@ -278,7 +280,7 @@ func update_fields(delta: float) -> void:
 		if data.pull != 0.0:
 			target.velocity.x += signf(diff.x) * float(data.pull) * 25.0 * delta
 		if data.tick <= 0.0 and (not data.crouchable or not target.low_profile):
-			target.take_projectile_damage(data.damage)
+			target.take_boss_hit(data.damage, fx.global_position, sector_number)
 			data.tick = 0.66
 
 func ice_wall(x: float) -> void:

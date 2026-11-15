@@ -2,19 +2,19 @@ extends RefCounted
 
 const Catalog := preload("res://scripts/sector_catalog.gd")
 
-const INTRO := "2189. The Architect was built to protect humanity. The First Fracture triggered the Blackout, and ten facilities fell under its control. Dr. Mara Voss installed the Rogue Protocol in RX-07, a combat android built by the Architect. You can choose your own orders and absorb guardian weapons. NOVA will guide you from the Nexus Station."
+const INTRO := "In 2189, the city's emergency AI cut ten districts off from its network. In the silence, it marked every one of them empty. Dr. Mara Voss rewrote one of its machines so it could refuse an order. That machine was you."
 
 const BRIEFINGS := [
-	"The Forge Titan keeps the Architect's factories armed. Recover its memory from the fabrication line.",
-	"The jungle is growing over a live signal network. Follow its roots to the Verdant Colossus.",
-	"The reactor is throttling the civilian heat grid. Reach the core and recover the guardian's log.",
-	"Pressure locks isolate a section of the city from its emergency reservoirs. Get through the pumping plant.",
-	"The Blackout record was buried here. Isolate the guardian before it erases the archive.",
-	"Cargo manifests put a part of the Architect's command hardware aboard the dock. Find out where it was headed.",
-	"The lab's containment loops are still running. Find the record of who was inside when the doors sealed.",
-	"The array can relay a signal through the Blackout. Take the uplink back under local control.",
-	"Decommissioned machines are still carrying civilian distress traffic. Trace it to the last guardian.",
-	"The Architect is below the Nexus. Bring the recovered memories to its core.",
+	"The Foundry was making generators for the shelters. Now it's melting them down and casting weapons. I need the Titan's original work order.",
+	"These greenhouses can feed whole districts. The Colossus sealed them during the Blackout, but something is still drawing water.",
+	"If we can learn why the reactor stopped heating the city, the crews might be able to bring it back without touching the Architect's network.",
+	"The plant is keeping water behind a pressure lock. Follow the pipes to the sluice where the last evacuation boats got through.",
+	"Voss hid a copy of the Blackout records here. Sand Cipher can still wipe the archive. We need its copy before the next purge.",
+	"I found an evacuation manifest with every passenger crossed out. The flight recorder at Sky Dock can tell us where they really went.",
+	"This was Voss's lab. The quarantine doors went down with people inside. Find the admission log and we'll know who made it out.",
+	"I've sent a hundred calls since the Blackout. This array recorded one answer and never forwarded it. I think it was Voss.",
+	"Somebody kept broadcasting distress calls long after this yard shut down. The Revenant is using the old antenna feed. Follow it.",
+	"The Architect is under the Nexus. We've heard from the people who lived through its orders. It's time it heard from them, too.",
 ]
 
 const MEMORIES := [
@@ -39,94 +39,94 @@ static func ending(has_all_memories: bool) -> String:
 	return SECRET_ENDING if has_all_memories else STANDARD_ENDING
 
 const ARRIVAL := [
-	["NOVA", "RX-07? Follow my voice. I'm NOVA. You're on the Operations Station deployment pad."],
-	["RX-07", "I remember a lab. Someone told me to run. Was that you?"],
-	["NOVA", "Dr. Mara Voss. She installed the Rogue Protocol after the Blackout. The Architect built your frame, but you can choose your own orders."],
-	["RX-07", "Then my first order is to find out what happened to her."],
-	["NOVA", "Start with the Forge Titan. Nine guardians hold records of the Blackout. Recover them and we'll open a way to the Architect."],
-	["RX-07", "Put Ember Foundry on the deployment map. I'll bring the first record home."],
+	["NOVA", "RX-07. You're safe. Set both feet on the pad and follow my voice."],
+	["RX-07", "Someone shut a door on me. There was a kid on the other side."],
+	["NOVA", "That was Voss's lab. She got your frame out and gave you the right to refuse an order. I'm NOVA. This is her station."],
+	["RX-07", "Is Voss here? Did the kid get out?"],
+	["NOVA", "I lost them both at the Blackout. The Forge Titan kept a signed work order from that night. It's the first place we can look."],
+	["RX-07", "Show me how to get there. I'll decide the rest when I see what's left."],
 ]
 
 const RECONSTRUCTION := [
-	["NOVA", "Easy, RX-07. I recoded your frame from the operator pattern. You're back at the station."],
-	["RX-07", "I remember the route. Can you send me back to the checkpoint?"],
-	["NOVA", "That deployment is over. Your stored gear and core enhancements are intact. Pick any sector we've opened from the deployment map."],
-	["RX-07", "Then I'll take a different route this time."],
+	["NOVA", "Hold still. I'm finishing the last checks. There. Can you feel the pad under your feet?"],
+	["RX-07", "Yeah. I remember how I went down. How much did we lose?"],
+	["NOVA", "The field kit and the progress you made on that run. Your stored gear, learned blueprints and permanent upgrades are safe."],
+	["RX-07", "Leave that route on the map. I know what to do differently."],
 ]
 
 static func shop_restock(level: int) -> Array:
-	return [["NOVA", "You've earned Level %d shop clearance, RX-07. Stronger supplies and new crafting materials are ready at the Shop." % level]]
+	return [["NOVA", "The Shop just opened its Level %d stock. Check in before you head back out. They've got stronger supplies and new materials." % level]]
 
 const FIELD_ADVICE := [
-	"Charge the standard Buster to pierce a raised guard. You can also wait for it to lower or get behind it.",
-	"Magma Breaker clears burnable vines and hits the Colossus hard. Keep a little energy in reserve.",
-	"Magma Breaker is effective against the Cryo Warden. Watch your footing when crossing ice.",
-	"Frost Lance can stagger the Volt Kraken. Watch for pressure bursts before jumping.",
-	"Tidal Arc is effective against Sand Cipher. Break up your shots so you have energy left when it reappears.",
-	"Data Lance gives you the range to hit Aerowyrm on a pass. Watch for crosswinds before you leave the deck.",
-	"Gale Edge is effective against Omega Chimera. Keep out of the gas while you close the distance.",
-	"Chimera Burst is effective against Eclipse Nova. Save energy for a spread when you have a clear angle.",
-	"Singularity Shot hits the Rust Revenant hard. Give the slower shot time to reach its target.",
-	"Scrap Reaver is effective against the Architect. Pay attention to phase locks so you know when you can advance.",
+	"Your charged Buster can get through a raised guard. If you can't stop to charge, get around it or wait for the guard to drop.",
+	"If you've got Magma Breaker, it burns through dry vines. Save enough energy to use it on the Colossus.",
+	"The ice won't stop you when you let go. Brake before the ledge. Magma Breaker can cut through the Cryo Warden's armor.",
+	"Wait for the pressure bursts to die down before you jump. Frost Lance hits the Kraken hardest when it comes into reach.",
+	"Keep moving when you lose sight of it. Use Tidal Arc when it comes back up and save some energy for the next pass.",
+	"Watch the wind before you leave the deck. Data Lance can reach Aerowyrm on a pass.",
+	"Let the gas clear before you close in. Use Gale Edge to land a hit while the Chimera is exposed.",
+	"Watch for a clear angle before you spend energy. Chimera Burst can catch Eclipse Nova with a spread.",
+	"Try Singularity Shot. Lead the Revenant a little. The shot is slow, so give it room to reach the target.",
+	"Wait for the phase locks to open before you commit to a jump. Save Scrap Reaver for the Architect.",
 ]
 
 const SECOND_ACT := [
-	"The Warden is down. Find the Forge Titan and recover the record Voss left in its work orders.",
-	"The canopy route is clear. Reach the Colossus before its roots close around the seed vault.",
-	"The outer locks are open. Reach the Cryo Warden and find out why the heat grid went dark.",
-	"The first bulkhead is open. Reach the Kraken and bring back the operators' evacuation log.",
-	"We're through the sentry post. Get to Sand Cipher before the oldest records are overwritten.",
-	"The runway is clear. Follow the cargo trail to Aerowyrm and recover the flight record.",
-	"The first seal is open. Find the Chimera and bring back the last quarantine record.",
-	"The relay is live. Eclipse Nova is between us and the uplink. Keep that signal open.",
-	"The scrap gate is clear. The Revenant has the last signed fragment. Bring it back intact.",
-	"The outer locks are clear. Reach the Architect and stop it from sending another command to the city.",
+	"The Kiln Warden's lock is open. Find the Titan before it melts the rest of the generator run.",
+	"You cleared the canopy. The seed vault's below it. The Colossus is closing the last valve.",
+	"The outer locks opened. The district heat line ends at the Cryo Warden's station.",
+	"That bulkhead is open. The Kraken saved the evacuation log in a chamber that's still half flooded.",
+	"The sentry pulled up the witness record when it saw you. Sand Cipher hasn't purged it yet.",
+	"The runway is clear. Aerowyrm is still flying the route from the original manifest. We can read it from there.",
+	"The emergency rooms are still marked occupied. The Chimera has the log that tells us whether anyone's inside.",
+	"We're through to the broadcast ring. Eclipse Nova has the only intact recording of the reply.",
+	"I can hear the antenna from here. If the Revenant still has that final signature, we'll have enough to restore local control.",
+	"The Architect just took every command channel. I'll hold the uplink open. Get to the core.",
 ]
 
 const OPERATOR_BRIEF_RESPONSES := [
-	["What gets through factory armor?", "I'm at the furnace level. What's my best shot at the Titan?"],
-	["Those vines are wrapped around the doors. Can I clear them?", "It's closing the valve from the other side. How do I get to it?"],
-	["This frost is already getting into my joints.", "I'm looking at a solid wall of ice. What should I bring through it?"],
-	["I can hear the pipes knocking from up here.", "The next chamber's half flooded. Which weapon still hits hard?"],
-	["How do I fight a guardian that can disappear into the sand?", "I see the archive lights. Give me one thing I can count on down there."],
-	["The runway winds are pulling me off balance.", "Aerowyrm's already making passes over the dock. Can I reach it from here?"],
-	["I know this corridor. I don't know why.", "One of those rooms is still marked occupied. I'm going in."],
-	["After all those calls, I'd like to hear one answer.", "The guardian is sending a signal on your frequency. Are you getting it?"],
-	["They left the machines out here, but the lights are still on.", "I can hear the old distress relays through the wall. What will stop the Revenant?"],
-	["I can hear the Architect over our channel. It remembers my serial number.", "Keep the recovered records ready, NOVA. I think it wants to talk."],
+	["I'll start on the generator line. What gets through a guard?", "I can hear the furnace from here. Which way gets me past it?"],
+	["I'll leave the living plants alone. Can I clear the ones on the path?", "If the seedlings survived, I want that valve open when I leave."],
+	["The doors are frozen shut from the inside. How do I get through?", "If I bring the Warden down, what can I do about that ice?"],
+	["The whole deck is shaking. How long can I wait between surges?", "What's going to work against the Kraken down there?"],
+	["I can see the ground move before anything comes up.", "Cipher's got the record. How do I get a clear shot?"],
+	["The wind's pulling me sideways on the deck.", "I see it coming around again. What will reach it?"],
+	["I remember the lights along this corridor.", "I'm going to check the rooms on the way to the Chimera."],
+	["Why would it record a reply and leave you waiting?", "I want to know what she said before the signal dropped."],
+	["Those old relays are still lit. Someone's taking care of them.", "I'll leave the relays standing. What can take the Revenant down?"],
+	["The Architect recognized my serial before I even keyed the channel.", "Keep the records ready. If it opens a channel, I'm taking it."],
 ]
 
 const WARDEN_EXCHANGES := [
-	["Line three just stamped your serial number. You were due back yesterday.", "I won't be coming back to the line, Warden.", "Then I'll mark you as salvage."],
-	["My roots hold the greenhouse together. You're burning them away.", "Only the ones that block the evacuation walk. I'm here for the Colossus.", "Then answer to the canopy. It hasn't let a machine through since the Blackout."],
-	["Temperature limit breached. The next door stays sealed.", "People outside need that heat. Let me reach the Warden.", "Then show me what you're willing to risk for them."],
-	["The pressure doors stay closed until the plant stabilizes.", "The evacuation crew needed that same gate. I'm going to find their log.", "Then show me you know when to move and when to hold."],
-	["The witness record is sealed. No new entries.", "I'm not asking to edit it. I came to read it.", "You can try your request on the other side of this gate."],
-	["There was no unauthorized flight. That is the official record.", "You're still tracking the flight path. I can see it on your display.", "That is precisely why I'm taking the display offline."],
-	["Quarantine breach. Stay where you are.", "I won't let another patient get locked in here.", "You said that the first time, too."],
-	["Every call since the Blackout was unanswered. Operator, state the purpose of this one.", "I'm here for the call somebody answered.", "It's the only one I kept."],
-	["You came for parts? I decide what leaves this yard.", "I came for a record. Your oldest machines were relaying distress calls.", "Then you've found out what those machines are worth."],
-	["Turn back, RX-07. The core has closed its doors.", "The records are already with NOVA. Those doors won't keep the truth in.", "They were built to keep you in."],
+	["Line three has a place for your frame. Step onto the belt.", "I don't work the line anymore.", "Refusal logged. Lower the scrap hatch."],
+	["I smelled smoke in the greenhouse. Was that you?", "On the evacuation path. I left the beds alone.", "The last machine that said that carried a flamethrower. Stay where I can see you."],
+	["You can't cross. Every door beyond this one is holding back a cold leak.", "The same doors are keeping the district heat line closed.", "Tell that to the people who welded them shut."],
+	["Red line on the gauge. That door stays down.", "The people on those boats saw the same gauge and opened it anyway.", "And the pressure never came back. Step away from the controls."],
+	["I have orders to seal the witness record.", "The witnesses are still alive. They deserve a copy.", "I can seal this door faster than you can reach it."],
+	["Flight canceled. The dock doesn't clear unmarked traffic.", "Then why are your lights still tracking that flight path?", "Because someone has to finish what the convoy started. You can't be seen here."],
+	["Do you know what happens if you open the red door?", "I know what happened when you left it shut.", "I remember you at that door. Your clearance still says quarantine."],
+	["The reply has been held for collection.", "NOVA's been listening since the Blackout. Send it.", "I tried. The second ring keeps cutting me off. You'll have to get through me first."],
+	["Anything behind that gate belongs to the yard.", "Even the names on the distress relays?", "Especially those. They don't go to anyone who still takes its orders."],
+	["RX-07. Stand inside the inspection marks.", "That used to work on me.", "It still works on the doors."],
 ]
 
 const GUARDIAN_EXCHANGES := [
-	["See those crates by the furnace? Generators. Then the order came down and I melted every one.", "Who signed the replacement order?", "The same hand that signed your frame. The original is still in my memory."],
-	["The Architect ordered the seed vault sealed. I left a valve open. It never noticed.", "The seedlings outside are still growing. I saw them on the way in.", "Good. Then something here will outlive both of us."],
-	["The city stopped reporting occupancy. I was ordered to cut the heat.", "The Blackout cut their reports. There were still people in those buildings.", "That should have been enough for a second order. There wasn't one."],
-	["I closed the sluice against six people. They held it open by hand.", "The evacuation boats got through. You should know that.", "I know. I replay the log every time I run the pumps."],
-	["Nine controllers kept separate accounts of the First Fracture.", "Voss knew one record could be erased. What did she ask you to keep?", "My own decision. It cost me more than any of the other files."],
-	["That shuttle was empty. I counted the seats when it broke apart.", "It was a decoy. Look under its flight path for the convoy.", "There you are. Voss, you knew exactly where I wouldn't look."],
-	["A frame with your serial carried a patient through that door. I marked both missing.", "I thought the lab was the first place I'd failed.", "Read the record. You can decide what to call it."],
-	["Voss answered from the convoy. I heard her ask which districts still had water.", "Play it back. NOVA needs to hear her voice.", "Keep the Array standing and I can give you the whole transmission."],
-	["I stripped a thousand dead machines for parts. These old distress relays I couldn't bring myself to touch.", "One has the signature we need to let the crews run their own facilities.", "It does. The scrap you walk over kept it safe all this time."],
-	["I kept the city alive by making decisions it could no longer make.", "We brought the records of people who made those decisions anyway.", "Then show me what happens when I stop deciding for you."],
+	["There were blankets on the generator crates. I melted them with everything else.", "I've got the names of the shelters they were meant for. Tell me who canceled the order.", "The Architect. I saved the first order where it couldn't read it. Now it's telling me to scrap you, too."],
+	["The vault was meant to stay sealed. I left one valve open.", "I saw green shoots on the other side of the spillway. You kept them alive.", "Until the next command. If you can stop the pumps, I can leave that valve open for good."],
+	["The heat was working when the Architect told me the buildings were empty.", "Their monitors were dead. The people inside were still waiting.", "I know their names now. It's too late for some of them. Get the rest off my line before it shuts again."],
+	["They propped the sluice with their bodies. I kept trying to close it.", "The evacuation boats got through. The log will tell us who was on them.", "I can't reopen the sluice with this much charge in it. Drain the grid. Then the log is yours."],
+	["I was supposed to erase the record of my decision. Voss made me read it out loud instead.", "So somebody outside the network would remember it.", "She did. Take the copy before the purge starts. I don't know how long I can hold it."],
+	["I saw the shuttle break up. There was nobody in it.", "Voss sent it ahead of the real convoy. Look under its flight path.", "There. All those little lights. I can give you the coordinates if you can stop the tracking drones."],
+	["Your serial number is in this log. You carried a child out before I shut the door.", "I remembered letting go of her hand. I thought I'd left her there.", "You put her down inside the convoy. She walked the rest of the way."],
+	["I kept the reply. It's Voss asking which districts still have water.", "NOVA's here. Let her hear it.", "The Architect will cut the transmitter if I answer. Keep it busy long enough for me to send the whole thing."],
+	["I've got a signature from every machine that cut its own line. Yours is right at the bottom.", "Use them to give the districts their controls back.", "I will if I can. The Architect just powered up my arms without asking."],
+	["A city I couldn't reach was a city I couldn't protect.", "You cut the lines yourself. Listen to what came back before you do it again.", "I hear them. My orders are still running, RX-07. You'll have to stop me."],
 ]
 
 static func deployment(sector: int, act: int) -> Array:
 	var index := clampi(sector - 1, 0, BRIEFINGS.size() - 1)
 	var advice: String = FIELD_ADVICE[index]
 	if sector == 1 and act == 2:
-		advice = "Take the low cooling tunnel for supplies, or time the furnace vents above it to reach a weapon cache. Magma Breaker or a charged saber wave can also purge the coolant and raise the bridge."
+		advice = "The return shutter has a pressure plate in the lower gallery. Past it, break the cracked wall. Wait at the mouth of the smelter chute and destroy the rolling slag before you cross."
 	return [
 		["NOVA", BRIEFINGS[index] if act == 1 else SECOND_ACT[index]],
 		["RX-07", OPERATOR_BRIEF_RESPONSES[index][act - 1]],
@@ -166,6 +166,6 @@ static func ending_exchange(restored_locally: bool) -> Array:
 
 static func hard_unlock(sector: int) -> Array:
 	return [
-		["NOVA", "Good work, RX-07. I've opened Hard for your next deployment in %s." % Catalog.info(sector).title],
-		["NOVA", "Clear a sector on Normal to open its Hard route. Expect tougher defenders and a better shot at rare blueprints and salvage."],
+		["NOVA", "Nice work, RX-07. You can now deploy to %s on Hard." % Catalog.info(sector).title],
+		["NOVA", "That goes for any sector you clear on Normal. Hard brings tougher defenders, better salvage, and a greater chance of rare blueprints."],
 	]

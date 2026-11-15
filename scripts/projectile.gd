@@ -30,6 +30,7 @@ var struck: Dictionary = {}
 var source_operator := 0
 var splits_on_impact := false
 var core_rebated := false
+var boss_status_sector := 0
 signal reward_hit(at: Vector3, links: PackedVector3Array)
 signal reward_spent(at: Vector3)
 
@@ -129,7 +130,9 @@ func _on_body_entered(body: Node) -> void:
 		if struck.has(body.get_instance_id()):
 			return
 		struck[body.get_instance_id()] = true
-		if body.has_method("take_projectile_damage"):
+		if body is RiftPlayer and boss_status_sector > 0:
+			body.take_boss_hit(damage, global_position, boss_status_sector)
+		elif body.has_method("take_projectile_damage"):
 			body.take_projectile_damage(damage)
 		else:
 			var prior: float = body.health if "health" in body else 0.0
@@ -425,8 +428,8 @@ static func cached_mesh(key: String) -> Mesh:
 				var orb := SphereMesh.new()
 				orb.radius = 1.0
 				orb.height = 2.0
-				orb.radial_segments = 12
-				orb.rings = 5
+				orb.radial_segments = 24
+				orb.rings = 12
 				mesh_cache[key] = orb
 			"Prism":
 				mesh_cache[key] = PrismMesh.new()
@@ -434,8 +437,8 @@ static func cached_mesh(key: String) -> Mesh:
 				var ring := TorusMesh.new()
 				ring.inner_radius = 0.46
 				ring.outer_radius = 0.53
-				ring.rings = 14
-				ring.ring_segments = 5
+				ring.rings = 24
+				ring.ring_segments = 8
 				mesh_cache[key] = ring
 			_:
 				var cone := CylinderMesh.new()

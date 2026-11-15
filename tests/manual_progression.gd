@@ -57,6 +57,24 @@ func run() -> void:
 	check(session.profile.craft(id) == "Blueprint undiscovered.", "Undiscovered recipes cannot be crafted")
 	session.profile.blueprints[id] = true
 	check(session.profile.craft(id).contains("sent to Storage"), "Fabrication spends materials and puts gear in storage")
+	var crafter = manual_save.new(2).profile
+	crafter.award_player_xp(100000000)
+	crafter.blueprints["vital_weave"] = true
+	crafter.gear["impact_liner"] = "equipped"
+	crafter.materials.merge(crafter.recipe_materials("vital_weave"), true)
+	check(crafter.craft("vital_weave", true).contains("equipped")
+		and crafter.equipped_for("frame") == "vital_weave" and crafter.gear.get("impact_liner") == "stored",
+		"Craft and equip swaps the current gear into Storage")
+	check(crafter.craft("vital_weave", true) == "Blueprint already fabricated.", "Craft and equip cannot spend the same recipe twice")
+	crafter.blueprints["pulse_lens"] = true
+	crafter.materials.merge(crafter.recipe_materials("pulse_lens"), true)
+	for gear_id in crafter.GEAR:
+		if crafter.stored_count() >= crafter.storage_capacity():
+			break
+		if not crafter.gear.has(gear_id) and gear_id != "pulse_lens":
+			crafter.gear[gear_id] = "stored"
+	check(crafter.craft("pulse_lens") == "Storage is full." and crafter.craft("pulse_lens", true).contains("equipped"),
+		"An empty socket can accept new gear when Storage is full")
 	session.profile.unlock_sector(catalog.SECTORS.size())
 	session.profile.quick_slots[0] = {"id": "patch_kit", "count": 2}
 	session.profile.stored_supplies["patch_kit"] = 4
@@ -79,26 +97,33 @@ func run() -> void:
 		var item: Dictionary = shopper.stock[stock_id]
 		var required: int = item.shop_level
 		shopper.credits = item.price
+		if item.get("material", "") in ["core", "legendary"]:
+			shopper.player_xp = player_script.experience_threshold(50)
+			check(shopper.buy_supply(stock_id) == "Item unavailable." and shopper.credits == item.price,
+				"%s can no longer be purchased" % item.name)
+			continue
 		if required > 1:
-			shopper.player_xp = player_script.experience_threshold(required - 1)
+			shopper.player_xp = player_script.experience_threshold(50)
+			shopper.operator_level = required - 1
 			var locked: String = shopper.buy_supply(stock_id)
-			if locked != "Unlocks at Player Lv. %d." % required or shopper.credits != item.price or shopper.supply_owned(stock_id) != 0:
+			if locked != "Unlocks at Operator Lv. %d." % required or shopper.credits != item.price or shopper.supply_owned(stock_id) != 0:
 				check(false, "%s rejects a purchase before its milestone" % stock_id)
-		shopper.player_xp = player_script.experience_threshold(required)
+		shopper.player_xp = 0
+		shopper.operator_level = required
 		var result: String = shopper.buy_supply(stock_id)
 		if not result.begins_with("Purchased ") or shopper.credits != 0 or shopper.supply_owned(stock_id) != item.get("quantity", 1):
 			check(false, "%s can be purchased at its milestone" % stock_id)
 		milestones[required] = true
 	var levels := milestones.keys()
 	levels.sort()
-	check(levels == [1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50], "Shop stock unlocks every five Player Levels")
+	check(levels == [1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50], "Shop stock unlocks every five Operator Levels")
 	var old_shop_save := ConfigFile.new()
-	old_shop_save.set_value("profile", "player_xp", player_script.experience_threshold(10))
+	old_shop_save.set_value("checkpoint", "experience", player_script.experience_threshold(10))
 	var shopper = manual_save.new(2).profile
 	shopper.decode_from(old_shop_save)
 	check(shopper.shop_announced_through == 10, "Older saves only get announcements for future milestones")
-	shopper.award_player_xp(player_script.experience_threshold(20) - shopper.player_xp)
 	var shop_save := ConfigFile.new()
+	shop_save.set_value("checkpoint", "experience", player_script.experience_threshold(20))
 	shopper.encode_into(shop_save)
 	shopper.decode_from(shop_save)
 	check(shopper.shop_milestone() == 20 and shopper.shop_announced_through == 10, "Saving after earning XP keeps the new shop announcement pending")

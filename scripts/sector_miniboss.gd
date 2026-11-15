@@ -99,6 +99,7 @@ func _ready() -> void:
 	var center := mesh_bounds.get_center()
 	skin.position = Vector3(-center.x * fit, -chassis_height - mesh_bounds.position.y * fit, -center.z * fit)
 	armor.rotation.y = facing * 0.90
+	preload("res://scripts/boss_armor_kit.gd").mount(armor, sector, true, accent)
 	core = RiftProjectile.part(armor, RiftProjectile.cached_mesh("Orb"), RiftProjectile.light_paint(accent, 2.2), Vector3(0, 0.65, 0.65), Vector3(0.24, 0.24, 0.17))
 	for side in [-1.0, 1.0]:
 		var band := RiftProjectile.part(armor, BoxMesh.new(), RiftProjectile.light_paint(accent, 1.6), Vector3(side * 0.55, 0.65, 0.44), Vector3(0.12, 0.47, 0.12))
@@ -270,13 +271,14 @@ func pulse(zone: Vector3, power: float, delay: float) -> void:
 			return
 		impact.show()
 		if absf(target.global_position.x - zone.x) < zone.y and target.global_position.y < floor_y + zone.z + 0.26:
-			target.take_damage(power, Vector3(zone.x, floor_y, 0))
+			target.take_boss_hit(power, Vector3(zone.x, floor_y, 0), sector, true)
 	)
 	tween.tween_property(impact, "transparency", 1.0, 0.32)
 	tween.tween_callback(impact.queue_free)
 
 func fire(at: Vector3, direction: Vector3, power: float, speed: float, drill := false) -> void:
 	var shot := RiftProjectile.new()
+	shot.boss_status_sector = sector
 	shot.collision_layer = 0
 	shot.collision_mask = 1 | 128
 	shot.damage = power

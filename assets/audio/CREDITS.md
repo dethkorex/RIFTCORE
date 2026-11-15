@@ -8,6 +8,10 @@
 - Charge buildup, charged shot, and enemy break — `forceField_002`, `laserLarge_004`, and `explosionCrunch_001` from the same Kenney pack.
 - Pickup, level-up, and checkpoint — `select_005`, `confirmation_004`, and `confirmation_003` from Kenney's Interface Sounds pack.
 
+## Dialogue (CC0)
+
+- rubberduck — [50 CC0 Sci-Fi SFX](https://opengameart.org/content/50-cc0-sci-fi-sfx). The dialogue chirp uses an edited `beep_01`.
+
 ## Boss music (CC0)
 
 - Zane Little Music — [Achilles](https://opengameart.org/content/achilles)

@@ -7,10 +7,19 @@ const CYAN := Color("55e7ff")
 const MUTED := Color("9db4cc")
 const WHITE := Color("e7f2ff")
 const VIOLET := Color("bf82ff")
-const COOP_NAME_SCALE := 1.15
+const COOP_NAME_SCALE := 1.3225
+const PARTY_COLORS := [CYAN, Color("ffd072"), Color("e0a0ff"), Color("7cfac0")]
 const ITEM_SIZE := 48
 const ITEM_GAP := 5
 static var button_texture: ImageTexture
+
+static func operator_tint(id: int, host: int, members: Array) -> Color:
+	if id == host:
+		return PARTY_COLORS[0]
+	var guests := members.duplicate()
+	guests.erase(host)
+	guests.sort()
+	return PARTY_COLORS[1 + posmod(guests.find(id), PARTY_COLORS.size() - 1)]
 
 static func frame(fill: Color, edge: Color, accent := 2) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()

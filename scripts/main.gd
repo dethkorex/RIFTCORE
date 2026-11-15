@@ -17,6 +17,7 @@ const ManualSave := preload("res://scripts/manual_save_session.gd")
 const SuitReveal := preload("res://scripts/suit_reveal.gd")
 const CampaignDoor := preload("res://scripts/campaign_door.gd")
 const WhisperOverlay := preload("res://scripts/whisper_overlay.gd")
+const PlayerAccount := preload("res://scripts/player_account.gd")
 const HOME_HUB := preload("res://scenes/home_hub.tscn")
 var sector_complete := false
 var deploying := false
@@ -68,6 +69,7 @@ var game_root: Node3D
 var pause_menu: Control
 var invite_overlay: CanvasLayer
 var chat: WhisperOverlay
+var account: PlayerAccount
 var editor_level: Node3D
 var coop_mission: Node3D
 var coop_join_loading: CanvasLayer
@@ -128,6 +130,9 @@ func _ready() -> void:
 		profile.restore()
 	else:
 		profile.manual_only = true
+	account = PlayerAccount.new()
+	account.restore()
+	profile.player_xp = account.experience
 	if get_tree().has_meta(&"restart_factory"):
 		get_tree().remove_meta(&"restart_factory")
 		start_game.call_deferred()
@@ -216,6 +221,9 @@ func verify_social() -> void:
 	get_tree().quit(0 if valid else 1)
 
 func verify_live_relay(arguments: PackedStringArray) -> void:
+	var wipe_test := arguments.has("wipe")
+	if wipe_test:
+		arguments = arguments.slice(0, arguments.size() - 1)
 	var mission_test := arguments.has("mission")
 	var smoke_sector := 2 if arguments.has("jungle") else 1
 	if smoke_sector == 2:
@@ -253,7 +261,8 @@ func verify_live_relay(arguments: PackedStringArray) -> void:
 		return
 
 	if mission_test:
-		await verify_coop_mission(host, smoke_sector)
+		checkpoint_path = "user://relay-check-%d.cfg" % OS.get_process_id()
+		await verify_coop_mission(host, smoke_sector, wipe_test)
 		return
 
 	# Exchange lobby data to verify both clients share more than a room name.
@@ -276,7 +285,7 @@ func verify_live_relay(arguments: PackedStringArray) -> void:
 		peer.lobby_set_data("rift_check_guest", platform)
 		finish_relay_check(await wait_for_relay(func(): return peer.lobby_get_data("rift_check_ack", false), 15.0))
 
-func verify_coop_mission(host: bool, smoke_sector: int) -> void:
+func verify_coop_mission(host: bool, smoke_sector: int, wipe_test := false) -> void:
 	profile.unlocked_sector = smoke_sector
 	RiftRelay.unlocked_sector = smoke_sector
 	if host:
@@ -285,6 +294,14 @@ func verify_coop_mission(host: bool, smoke_sector: int) -> void:
 		await get_tree().create_timer(0.8).timeout
 	var previous_credits: int = profile.credits
 	var previous_xp: int = profile.player_xp
+	var starting_operator_xp := 120 if host else 260
+	var run := ConfigFile.new()
+	run.set_value("checkpoint", "sector", smoke_sector)
+	run.set_value("checkpoint", "experience", starting_operator_xp)
+	if smoke_sector > 1 and not host:
+		run.set_value("checkpoint", "weapons", [Catalog.info(smoke_sector - 1).reward])
+		run.set_value("checkpoint", "equipped", Catalog.info(smoke_sector - 1).reward)
+	write_checkpoint(run)
 	var reward_blueprint := "bp_%02d_%02d" % [smoke_sector, int(not host)]
 	profile.gear["impact_liner" if host else "pulse_lens"] = "stored"
 	var saved_gear: Dictionary = profile.gear.duplicate(true)
@@ -301,6 +318,7 @@ func verify_coop_mission(host: bool, smoke_sector: int) -> void:
 	else:
 		var together := await wait_for_relay(func(): return home_hub.partners.values().any(func(entry): return entry.actor.position.x > 2.0) and RiftRelay.relay.lobby_get_data("coop_guest_in_hub", false), 8.0)
 		if not together:
+			print("Campaign check failed to see the guest move in the hub")
 			finish_relay_check(false)
 			return
 		home_hub.avatar.position.x = home_hub.partners.values()[0].x
@@ -313,11 +331,16 @@ func verify_coop_mission(host: bool, smoke_sector: int) -> void:
 			return
 		RiftRelay.deploy(smoke_sector)
 	if not await wait_for_relay(func(): return is_instance_valid(coop_mission), 15.0):
+		print("Campaign check failed to deploy")
 		finish_relay_check(false)
 		return
 	var mission = coop_mission
 	var local_index := 0 if host else 1
 	var local_operator: RiftPlayer = mission.operators[local_index]
+	if not await wait_for_relay(func(): return is_instance_valid(coop_mission) and coop_mission.operators[local_index].experience >= starting_operator_xp, 5.0):
+		print("Campaign check failed to carry Operator XP into deployment")
+		finish_relay_check(false)
+		return
 	var spawn_x := local_operator.position.x
 	if mission.camera.target != local_operator or not is_equal_approx(local_operator.damage_taken_scale, mission.difficulty) or not mission.personal_hud.coop or not mission.personal_hud.is_visible_in_tree():
 		print("Campaign check failed local camera or HUD")
@@ -338,6 +361,9 @@ func verify_coop_mission(host: bool, smoke_sector: int) -> void:
 	if smoke_sector == 2 and not await verify_jungle_coop_crossing(local_operator, mission, "NurseryThorns"):
 		print("Campaign check failed at the Nursery Thorns")
 		finish_relay_check(false)
+		return
+	if wipe_test:
+		await verify_coop_wipe(host, mission)
 		return
 	if not host:
 		RiftRelay.relay.lobby_set_data("coop_guest_moved", true)
@@ -372,16 +398,64 @@ func verify_coop_mission(host: bool, smoke_sector: int) -> void:
 		if not await clear_coop_test_boss(mission):
 			finish_relay_check(false)
 			return
-	var returned := await wait_for_relay(func(): return is_instance_valid(home_hub) and not RiftRelay.mission_active, 24.0)
+	# The guest begins waiting before the host plays the guardian entrance,
+	# suit reveal and extraction debrief. Each is part of the normal test path.
+	var returned := await wait_for_relay(func(): return is_instance_valid(home_hub) and not RiftRelay.mission_active, 50.0)
+	var continuation := read_checkpoint()
+	var progressed: bool = (continuation != null
+		and int(continuation.get_value("checkpoint", "sector", 0)) == smoke_sector + 1
+		and int(continuation.get_value("checkpoint", "experience", 0)) > starting_operator_xp
+		and Catalog.info(smoke_sector).reward in continuation.get_value("checkpoint", "weapons", []))
 	var rewards := (profile.player_xp > previous_xp and profile.credits > previous_credits
 		and profile.blueprint_items.has(reward_blueprint) and profile.gear == saved_gear
-		and profile.unlocked_sector >= smoke_sector + 1)
+		and profile.unlocked_sector >= smoke_sector + 1 and progressed)
+	if not returned or not rewards:
+		print("Campaign check failed at extraction: hub=", returned, " XP=", profile.player_xp > previous_xp,
+			" bolts=", profile.credits > previous_credits, " blueprint=", profile.blueprint_items.has(reward_blueprint),
+			" gear=", profile.gear == saved_gear, " sector=", profile.unlocked_sector, " continuation=", progressed)
 	if not host and returned and rewards:
 		RiftRelay.relay.lobby_set_data("coop_guest_returned", true)
 		await get_tree().create_timer(1.5).timeout
 	if host and returned and rewards:
 		returned = await wait_for_relay(func(): return RiftRelay.relay.lobby_get_data("coop_guest_returned", false), 8.0)
 	finish_relay_check(returned and rewards)
+
+func verify_coop_wipe(host: bool, mission: Node) -> void:
+	var room := RiftRelay.connected_room
+	var previous_xp: int = profile.player_xp
+	profile.gear["pulse_lens"] = "equipped"
+	profile.gear["impact_liner"] = "stored"
+	profile.core_shards = 17
+	profile.credits = 113
+	profile.operator_level = 4
+	var checkpoint := ConfigFile.new()
+	checkpoint.set_value("checkpoint", "experience", 650)
+	write_checkpoint(checkpoint)
+	if host:
+		if not await wait_for_relay(func(): return RiftRelay.relay.lobby_get_data("coop_wipe_ready", false), 10.0):
+			finish_relay_check(false)
+			return
+		for operator in mission.operators:
+			operator.gain_experience(650, false)
+			operator.lives = 1
+			mission.respawn_operator(operator)
+	else:
+		RiftRelay.relay.lobby_set_data("coop_wipe_ready", true)
+	var returned := await wait_for_relay(func(): return is_instance_valid(home_hub) and not RiftRelay.mission_active, 15.0)
+	var reset := returned and RiftRelay.connected_room == room and RiftRelay.room_size == 2
+	reset = reset and profile.operator_level == 1 and read_checkpoint() == null
+	reset = reset and not profile.gear.has("pulse_lens") and profile.gear.get("impact_liner", "") == "stored"
+	reset = reset and profile.core_shards == 17 and profile.credits == 113 and profile.player_xp == previous_xp
+	if not host and reset:
+		RiftRelay.relay.lobby_set_data("coop_wipe_returned", true)
+		await wait_for_relay(func(): return RiftRelay.relay.lobby_get_data("coop_wipe_confirmed", false), 8.0)
+	elif host and reset:
+		reset = await wait_for_relay(func(): return RiftRelay.relay.lobby_get_data("coop_wipe_returned", false), 8.0)
+		if reset:
+			RiftRelay.relay.lobby_set_data("coop_wipe_confirmed", true)
+			await get_tree().create_timer(1.3).timeout
+	print("LIVE PARTY WIPE ", reset, " / same room, Lv. 1 and permanent progress")
+	finish_relay_check(reset)
 
 func verify_jungle_coop_crossing(operator: RiftPlayer, mission: Node, pit_name: String) -> bool:
 	var pit := mission.stage.find_child(pit_name, true, false) as Area3D
@@ -401,6 +475,7 @@ func verify_jungle_coop_crossing(operator: RiftPlayer, mission: Node, pit_name: 
 			player.invulnerable_time = 8.0
 			player.global_position = Vector3(edge - 2.8, height + 0.93, 0)
 			player.velocity = Vector3.ZERO
+			mission.mark_position_reset(player)
 		mission.broadcast_state(true)
 	else:
 		RiftRelay.relay.lobby_set_data("coop_approach_ready", pit_name)
@@ -439,20 +514,25 @@ func clear_coop_test_boss(mission: Node) -> bool:
 	mission.operators[1].global_position = gate_position + Vector3(-10.0, 1.0, 0.0)
 	mission.check_campaign_progress()
 	if mission.entrance_open or mission.boss_started:
+		print("Campaign check failed: arena door opened on a staggered arrival, act ", mission.act)
 		return false
 	mission.operators[1].global_position = gate_position + Vector3(-1.0, 1.0, 0.0)
 	mission.check_campaign_progress()
 	if not mission.entrance_open or mission.boss_started:
+		print("Campaign check failed: arena door did not open for both operators, act ", mission.act)
 		return false
 	if not await wait_for_relay(func(): return mission.arena_door.passable, 2.0):
+		print("Campaign check failed: open arena door retains collision, act ", mission.act)
 		return false
 	mission.operators[0].global_position = gate_position + Vector3(3.0, 1.0, 0.0)
 	mission.check_campaign_progress()
 	if mission.boss_started:
+		print("Campaign check failed: arena sealed while an operator was outside, act ", mission.act)
 		return false
 	mission.operators[1].global_position = gate_position + Vector3(4.0, 1.0, 0.0)
 	mission.check_campaign_progress()
 	if not mission.boss_started or not await wait_for_relay(func(): return not mission.boss_intro_active, 17.0):
+		print("Campaign check failed: boss intro did not complete, act ", mission.act)
 		return false
 	mission.boss.take_damage(100000.0)
 	mission.operators[0].global_position = mission.exit_marker.global_position
@@ -475,6 +555,8 @@ func finish_relay_check(passed: bool) -> void:
 	else:
 		print("RELAY CHECK FAIL. ", RiftRelay.status)
 	RiftRelay.leave()
+	if checkpoint_path.begins_with("user://relay-check-") and FileAccess.file_exists(checkpoint_path):
+		DirAccess.remove_absolute(checkpoint_path)
 	get_tree().quit(0 if passed else 1)
 
 func configure_input() -> void:
@@ -495,6 +577,7 @@ func configure_input() -> void:
 	add_key_action("jump", KEY_SPACE)
 	add_key_action("dash", KEY_SHIFT)
 	add_key_action("shoot", KEY_J)
+	add_key_action("suit_fire", KEY_L)
 	add_key_action("swap_weapon", KEY_Q)
 	add_key_action("previous_suit", KEY_E)
 	add_key_action("melee", KEY_K)
@@ -509,6 +592,8 @@ func configure_input() -> void:
 	add_joy_button("jump", JOY_BUTTON_A)
 	add_joy_button("dash", JOY_BUTTON_B)
 	add_joy_button("shoot", JOY_BUTTON_X)
+	add_joy_action("suit_fire", JOY_AXIS_TRIGGER_RIGHT, 1.0)
+	InputMap.action_set_deadzone("suit_fire", 0.55)
 	add_joy_button("swap_weapon", JOY_BUTTON_RIGHT_SHOULDER)
 	add_joy_button("previous_suit", JOY_BUTTON_LEFT_SHOULDER)
 	add_joy_button("melee", JOY_BUTTON_Y)
@@ -558,6 +643,7 @@ func show_main_menu() -> void:
 		RiftRelay.mission_returned.connect(close_coop_mission.bind("Back at Operations Station."))
 	RiftAudio.play_music(false)
 	menu = RiftTitleMenu.new()
+	menu.account = account
 	refresh_menu_save()
 	add_child(menu)
 	menu.start_requested.connect(start_game)
@@ -569,6 +655,9 @@ func show_main_menu() -> void:
 	menu.slot_requested.connect(select_save_slot)
 	menu.operator_deleted.connect(clear_deleted_operator)
 	menu.save_requested.connect(save_at_station)
+	menu.profile_deletion_requested.connect(delete_player_profile)
+	if account and account.display_name.is_empty():
+		menu.show_page("Set up Player Profile")
 	if get_tree().has_meta(&"open_command_deck"):
 		get_tree().remove_meta(&"open_command_deck")
 		open_home_hub()
@@ -610,6 +699,13 @@ func start_coop_mission(is_host: bool, number: int) -> void:
 	coop_mission.relay_owner = RiftRelay
 	coop_mission.roster = RiftRelay.mission_roster.duplicate()
 	coop_mission.mode = RiftRelay.mission_mode
+	var save := read_checkpoint()
+	if save:
+		coop_mission.starting_xp = clampi(int(save.get_value("checkpoint", "experience", 0)), 0, 1000000)
+		var saved_weapons: Variant = save.get_value("checkpoint", "weapons", [])
+		if saved_weapons is Array:
+			coop_mission.starting_weapons = saved_weapons
+		coop_mission.starting_suit = String(save.get_value("checkpoint", "equipped", ""))
 	coop_mission.rewards_earned.connect(bank_coop_rewards)
 	coop_mission.operator_wiped.connect(reset_defeated_run)
 	coop_mission.exit_requested.connect(func():
@@ -631,7 +727,7 @@ func bank_coop_rewards(xp: int, bolts: int, blueprints: Array, number: int) -> v
 	var supplies: Dictionary = results.get("supplies", {}).duplicate()
 	var packs := int(profile.apply_resupply_contract(supplies))
 	profile.deposit_supplies(supplies)
-	profile.award_player_xp(xp)
+	coop_mission.profile_xp_progress = award_profile_clear(number, RiftRelay.mission_mode, coop_mission.sector_seconds, int(results.get("kills", 0)), true)
 	profile.credits += bolts
 	var shards := int(profile.talent_bonus("shard_reclaimer"))
 	profile.core_shards += shards
@@ -646,17 +742,40 @@ func bank_coop_rewards(xp: int, bolts: int, blueprints: Array, number: int) -> v
 			profile.endings.append(ending)
 	for id in blueprints:
 		profile.collect_blueprint(id)
-	var operator_level := RiftPlayer.level_for_experience(coop_mission.operators[coop_mission.local_index].experience)
+	var operator_level := RiftPlayer.level_for_experience(xp)
 	var hunt: String = profile.advance_blueprint_hunt(number, RiftRelay.mission_mode, operator_level)
 	if not hunt.is_empty():
 		coop_mission.extracted_results["hunt_award"] = profile.GEAR[hunt].name
 	coop_mission.extracted_results["talent_blueprints"] = profile.award_archive_mastery(number, RiftRelay.mission_mode, operator_level)
+	profile.operator_level = operator_level
+	var save := read_checkpoint()
+	if save == null:
+		save = ConfigFile.new()
+	var old_sector := int(save.get_value("checkpoint", "sector", 1))
+	var cleared := maxi(number, int(save.get_value("checkpoint", "run_cleared_through", old_sector - 1)))
+	if old_sector <= number:
+		var module_id: String = save.get_value("checkpoint", "module", "")
+		save = ConfigFile.new()
+		save.set_value("checkpoint", "sector", mini(cleared + 1, Catalog.SECTORS.size()))
+		save.set_value("checkpoint", "act", 2 if cleared >= Catalog.SECTORS.size() else 1)
+		save.set_value("checkpoint", "difficulty", RiftRelay.mission_mode)
+		save.set_value("checkpoint", "module", module_id)
+		save.set_value("checkpoint", "at_start", true)
+		save.set_value("checkpoint", "lives", 3)
+	save.set_value("checkpoint", "run_cleared_through", cleared)
+	save.set_value("checkpoint", "experience", xp)
+	save.set_value("checkpoint", "weapons", results.get("weapons", []))
+	save.set_value("checkpoint", "equipped", results.get("equipped", ""))
+	var error := write_checkpoint(save)
+	if error != OK:
+		push_warning("Could not save the next co-op deployment: %s" % error_string(error))
 
 func close_coop_mission(message: String) -> void:
 	if not is_instance_valid(coop_mission):
 		return
 	profile.finish_field_supplies({}, false)
 	if coop_mission.outcome.is_empty() and coop_mission.operators[coop_mission.local_index].lives <= 0:
+		coop_mission.keep_recovered_blueprints(coop_mission.recovered_blueprint_ids(coop_mission.local_index))
 		reset_defeated_run()
 	remove_child(coop_mission)
 	coop_mission.queue_free()
@@ -692,6 +811,7 @@ func refresh_menu_save() -> void:
 		menu.saved_level = RiftPlayer.level_for_experience(menu.saved_experience)
 		menu.at_sector_start = bool(save.get_value("checkpoint", "at_start", false))
 		menu.run_unlocks = save.get_value("checkpoint", "weapons", [])
+	profile.operator_level = menu.saved_level
 
 func select_save_slot(number: int, fresh: bool, operator_name := "") -> void:
 	var selected := ManualSave.new(number)
@@ -700,7 +820,11 @@ func select_save_slot(number: int, fresh: bool, operator_name := "") -> void:
 		return
 	save_session = selected
 	profile = selected.profile
-	if fresh:
+	if account:
+		profile.player_xp = account.experience
+	if account and not account.display_name.is_empty():
+		profile.operator_name = account.display_name
+	elif fresh:
 		profile.operator_name = profile.clean_operator_name(operator_name)
 	RiftSettings.remember_operator_name(profile.operator_name)
 	get_tree().set_meta(&"riftcore_save_session", selected)
@@ -708,11 +832,34 @@ func select_save_slot(number: int, fresh: bool, operator_name := "") -> void:
 	if fresh:
 		home_hub.materialize_operator("arrival")
 
+func delete_player_profile() -> void:
+	if not account or account.display_name.is_empty() or is_instance_valid(coop_mission):
+		return
+	var error := account.remove_local_progress([SAVE_PATH, profile.path, RiftSocial.storage_path])
+	if error != OK:
+		menu.show_save_result("Could not delete the profile. " + error_string(error))
+		return
+	RiftRelay.leave()
+	RiftSocial.reset_profile()
+	RiftSettings.remember_operator_name("")
+	get_tree().remove_meta(&"riftcore_save_session")
+	remove_home_hub()
+	save_session = null
+	profile = ManualSave.Profile.new()
+	profile.manual_only = true
+	account = PlayerAccount.new()
+	menu.account = account
+	menu.station_panel = false
+	refresh_menu_save()
+	menu.show_page("Set up Player Profile")
+
 func clear_deleted_operator(slot: int) -> void:
 	if save_session and save_session.slot == slot:
 		save_session = null
 		profile = ManualSave.Profile.new()
 		profile.manual_only = true
+		if account:
+			profile.player_xp = account.experience
 		get_tree().remove_meta(&"riftcore_save_session")
 		refresh_menu_save()
 
@@ -768,7 +915,7 @@ func open_home_hub() -> void:
 	if checkpoint and checkpoint.has_section_key("checkpoint", "recovered_supplies"):
 		var supplies: Dictionary = profile.finish_field_supplies(checkpoint.get_value("checkpoint", "recovered_supplies").duplicate(), true)
 		checkpoint.set_value("checkpoint", "recovered_supplies", supplies)
-	RiftRelay.local_name = profile.operator_name
+	RiftRelay.local_name = account.display_name if account and not account.display_name.is_empty() else profile.operator_name
 	RiftRelay.unlocked_sector = profile.unlocked_sector
 	RiftRelay.set_difficulty_unlocks(profile.normal_clears.keys(), profile.nightmare_unlocked())
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
@@ -1234,7 +1381,6 @@ func bind_boss_signals() -> void:
 		boss_defeated = true
 		RiftAudio.play_music(true, sector)
 		var defeat_xp := (35 if act == 1 else 80) + sector * 8
-		award_mission_xp(defeat_xp)
 		player.gain_experience(roundi(defeat_xp * player.xp_gain_multiplier))
 		var shards := 1 + sector + (3 if act == 2 else 0)
 		profile.core_shards += shards
@@ -1341,7 +1487,6 @@ func build_hud() -> void:
 	player.salvage_collected.connect(func(drop: Dictionary): factory_hud.show_loot(drop, "", ""))
 	player.experience_earned.connect(func(amount: int):
 		mission_stats.operator_xp += amount
-		award_mission_xp(maxi(1, amount / 3))
 		factory_hud.queue_redraw()
 	)
 	player.weapon_changed.connect(func(weapon: String):
@@ -1409,10 +1554,17 @@ func save_checkpoint(manual_combat_snapshot := false) -> void:
 	if error != OK:
 		push_warning("Could not save Riftcore checkpoint: %s" % error_string(error))
 
-func award_mission_xp(amount: int) -> void:
+func award_profile_clear(number: int, difficulty: int, seconds := 0.0, kills := 0, online := false) -> Dictionary:
+	profile.survival_seconds += maxf(0.0, seconds)
+	if account:
+		var progress := account.award_clear(number, difficulty, {
+			"seconds": seconds, "kills": kills, "online": online,
+			"operator": profile.operator_name, "survival": profile.survival_seconds})
+		profile.player_xp = account.experience
+		return progress
 	var before: int = profile.player_xp
-	profile.award_player_xp(amount)
-	mission_stats.player_xp += profile.player_xp - before
+	profile.award_player_xp(PlayerAccount.clear_reward(number, difficulty))
+	return {"before": before, "after": profile.player_xp}
 
 func _enemy_defeated() -> void:
 	mission_stats.kills += 1
@@ -1467,6 +1619,7 @@ func _on_pit_fall() -> void:
 	if blade:
 		blade.hide()
 	player.health = player.max_health
+	player.clear_boss_debuff()
 	player.restore_energy(player.max_energy)
 	player.health_changed.emit(player.health, player.max_health)
 	player.invulnerable_time = 1.5
@@ -1501,6 +1654,12 @@ func expire_run_on_death() -> void:
 	reset_defeated_run()
 
 func reset_defeated_run() -> void:
+	var elapsed: float = coop_mission.sector_seconds if is_instance_valid(coop_mission) else float(mission_stats.seconds)
+	if account and account.track_survival(profile.survival_seconds + elapsed, profile.operator_name):
+		if account.save() != OK:
+			push_warning("Could not save the Operator survival record.")
+	profile.survival_seconds = 0.0
+	profile.operator_level = 1
 	clear_checkpoint()
 	if save_session:
 		var error := save_session.invalidate_defeated_run()
@@ -1595,7 +1754,7 @@ func _process(delta: float) -> void:
 		return
 	mission_stats.seconds += delta
 	factory_hud.set_run_time(mission_stats.seconds)
-	factory_hud.set_status_effects(player.supplies)
+	factory_hud.set_status_effects(player.supplies, player.boss_debuff, player.debuff_left)
 	var exit := game_root.get_node("MARKERS/RoomExit") as Marker3D
 	var at_exit := player.global_position.distance_to(exit.global_position) <= 1.45
 	if not at_exit:
@@ -1613,7 +1772,9 @@ func _process(delta: float) -> void:
 		return
 	sector_complete = true
 	RiftSocial.record_clear(sector, mission_stats.seconds)
-	award_mission_xp(65 + sector * 12)
+	var profile_progress := award_profile_clear(sector, mission_difficulty, mission_stats.seconds, mission_stats.kills)
+	mission_stats.player_xp = int(profile_progress.after) - int(profile_progress.before)
+	mission_stats.profile_progress = profile_progress
 	var replay := sector <= run_cleared_through
 	run_cleared_through = maxi(run_cleared_through, sector)
 	var bonus := 160 + 25 * (sector - 1)
@@ -1796,6 +1957,8 @@ func seal_arena() -> void:
 
 func play_arena_intro() -> void:
 	RiftAudio.play_boss_music()
+	var intro_boss := boss
+	var intro_player := player
 	player.cancel_charge()
 	player.velocity = Vector3.ZERO
 	player.facing = 1.0
@@ -1807,10 +1970,12 @@ func play_arena_intro() -> void:
 	destination.y = gate.global_position.y + player.standing_capsule.height * 0.5 + 0.02
 	player.play_character_animation("walk", true)
 	await player.create_tween().tween_property(player, "global_position", destination, 0.46).finished
+	if player != intro_player or boss != intro_boss:
+		return
 	player.play_character_animation("idle", true)
 	var cinematic := preload("res://scripts/boss_intro.gd").new()
-	game_root.add_child(cinematic)
-	await cinematic.play(camera_rig, boss, gate.global_position.y, factory_hud.boss_name, Color(Catalog.info(sector).color), sector, act)
+	intro_boss.add_child(cinematic)
+	await cinematic.play(camera_rig, boss, gate.global_position.y, factory_hud.boss_name, Color(Catalog.info(sector).color), sector, act, factory_hud)
 	cinematic.queue_free()
 	player.invulnerable_time = 0.35
 	player.set_physics_process(true)

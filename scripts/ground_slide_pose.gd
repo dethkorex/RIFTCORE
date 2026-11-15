@@ -49,21 +49,21 @@ func air_dash(rig: Skeleton3D) -> void:
 	aim(rig, "RightFoot", "RightToeBase", Vector3(-.09, -.18, -.98))
 
 func wall_slide(rig: Skeleton3D) -> void:
-	# RX-07 faces the exit lane. The free hand reaches back toward the wall.
-	aim(rig, "Spine", "Spine1", Vector3(0, .98, .17))
-	aim(rig, "Spine1", "Spine2", Vector3(.03, .98, .20))
-	aim(rig, "Neck", "Head", Vector3(0, .99, .13))
-	aim(rig, "LeftArm", "LeftForeArm", Vector3(.30, .80, -.49))
-	aim(rig, "LeftForeArm", "LeftHand", Vector3(-.13, .71, -.69))
-	aim(rig, "LeftHand", "LeftHandMiddle1", Vector3(0, .91, -.41))
-	aim(rig, "RightArm", "RightForeArm", Vector3(-.28, -.87, .39))
-	aim(rig, "RightForeArm", "RightHand", Vector3(-.07, .39, .92))
-	aim(rig, "RightUpLeg", "RightLeg", Vector3(-.16, -.96, -.24))
-	aim(rig, "RightLeg", "RightFoot", Vector3(-.07, -.98, .15))
-	aim(rig, "RightFoot", "RightToeBase", Vector3(0, .03, 1))
-	aim(rig, "LeftUpLeg", "LeftLeg", Vector3(.19, -.70, .62))
-	aim(rig, "LeftLeg", "LeftFoot", Vector3(.04, -.91, -.40))
-	aim(rig, "LeftFoot", "LeftToeBase", Vector3(.03, .13, .99))
+	aim(rig, "Spine", "Spine1", Vector3(0, .93, .36))
+	aim(rig, "Spine1", "Spine2", Vector3(0, .94, .34))
+	aim(rig, "Neck", "Head", Vector3(0, .99, .10))
+	# The free hand stays high against the wall. The cannon is folded in front.
+	aim(rig, "LeftArm", "LeftForeArm", Vector3(.31, .88, -.32))
+	aim(rig, "LeftForeArm", "LeftHand", Vector3(-.07, .97, -.24))
+	aim(rig, "LeftHand", "LeftHandMiddle1", Vector3(0, .99, -.12))
+	aim(rig, "RightArm", "RightForeArm", Vector3(-.34, -.73, .57))
+	aim(rig, "RightForeArm", "RightHand", Vector3(.07, .80, .60))
+	aim(rig, "RightUpLeg", "RightLeg", Vector3(-.16, -.94, -.31))
+	aim(rig, "RightLeg", "RightFoot", Vector3(-.05, -.91, -.41))
+	aim(rig, "RightFoot", "RightToeBase", Vector3(0, -.68, .73))
+	aim(rig, "LeftUpLeg", "LeftLeg", Vector3(.20, -.95, .24))
+	aim(rig, "LeftLeg", "LeftFoot", Vector3(.08, -.84, -.54))
+	aim(rig, "LeftFoot", "LeftToeBase", Vector3(.04, -.57, .82))
 
 func saber_charge(rig: Skeleton3D) -> void:
 	# The left hand holds the blade. Leave the run and jump tracks on the legs.

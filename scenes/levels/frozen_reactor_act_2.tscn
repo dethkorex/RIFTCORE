@@ -756,6 +756,8 @@ size = Vector3(0.79, 5.913, 4)
 
 [node name="CryoWardenSector" type="Node3D"]
 metadata/interior_layout = true
+metadata/encounter_spacing = 1
+metadata/clearance_pass = 1
 metadata/pit_floor_y = -22.0
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
@@ -960,6 +962,18 @@ position = Vector3(489.5, 3.91, 0)
 patrol_right_limit = 564.837
 detachment_sector = 3
 patrol_model = 0
+
+[node name="Reinforcement01" parent="Actors" groups=["level_enemies"] instance=ExtResource("scout")]
+position = Vector3(547.34, 2.3, 0)
+patrol_right_limit = 564.837
+detachment_sector = 3
+patrol_model = 0
+
+[node name="Reinforcement02" parent="Actors" groups=["level_enemies"] instance=ExtResource("heavy")]
+position = Vector3(374.12, -2.54, 0)
+patrol_right_limit = 564.837
+detachment_sector = 3
+patrol_model = 2
 
 [node name="CameraRig" type="Node3D" parent="."]
 position = Vector3(0, 1.35, 0)
@@ -2436,7 +2450,7 @@ scale = Vector3(0.38478, 1, 1)
 position = Vector3(0, -0.42, 0)
 shape = SubResource("BoxShape3D_0383")
 
-[node name="LeftApron00" type="StaticBody3D" parent="TERRAIN/Room04_Lift"]
+[node name="LeftApron00" type="StaticBody3D" parent="TERRAIN/Room04_Lift" groups=["ice_deck"]]
 position = Vector3(196.18, 1.25, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
@@ -2541,18 +2555,6 @@ scale = Vector3(1.0467, 0.54762, 1)
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room04_Lift/HighLanding"]
 position = Vector3(0, -0.23, 0)
 shape = SubResource("BoxShape3D_0408")
-
-[node name="HighReturn" type="StaticBody3D" parent="TERRAIN/Room04_Lift" groups=["factory_drop_through"]]
-position = Vector3(221.68, 3.55, 0)
-rotation = Vector3(0, 0, 0)
-collision_layer = 1
-
-[node name="Art" parent="TERRAIN/Room04_Lift/HighReturn" instance=ExtResource("RCDeck")]
-scale = Vector3(0.86667, 0.54762, 1)
-
-[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room04_Lift/HighReturn"]
-position = Vector3(0, -0.23, 0)
-shape = SubResource("BoxShape3D_0411")
 
 [node name="InteriorCache05" type="Area3D" parent="TERRAIN" groups=["factory_salvage_chest"]]
 position = Vector3(215.28, 5.55, 0)
@@ -4378,12 +4380,12 @@ position = Vector3(0, -0.42, 0)
 shape = SubResource("BoxShape3D_0910")
 
 [node name="AlcoveHatch" parent="TERRAIN/Room08_Hall" instance=ExtResource("RCHatch")]
-position = Vector3(562.14, 4.5, 0)
+position = Vector3(562.14, 4.33, 0)
 deck_width = 4.2
-climb_height = 3.15
+climb_height = 2.98
 
 [node name="MaintenanceAlcove" type="StaticBody3D" parent="TERRAIN/Room08_Hall" groups=["factory_drop_through"]]
-position = Vector3(565.99, 4.5, 0)
+position = Vector3(565.99, 4.33, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
@@ -4394,20 +4396,8 @@ scale = Vector3(0.58333, 0.54762, 1)
 position = Vector3(0, -0.23, 0)
 shape = SubResource("BoxShape3D_0914")
 
-[node name="AlcoveCeiling" type="StaticBody3D" parent="TERRAIN/Room08_Hall" groups=["factory_drop_through"]]
-position = Vector3(565.99, 6.85, 0)
-rotation = Vector3(0, 0, 0)
-collision_layer = 1
-
-[node name="Art" parent="TERRAIN/Room08_Hall/AlcoveCeiling" instance=ExtResource("RCDeck")]
-scale = Vector3(0.58333, 0.54762, 1)
-
-[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room08_Hall/AlcoveCeiling"]
-position = Vector3(0, -0.23, 0)
-shape = SubResource("BoxShape3D_0917")
-
 [node name="AlcoveEnd" type="StaticBody3D" parent="TERRAIN/Room08_Hall"]
-position = Vector3(567.59, 5.55, 0)
+position = Vector3(567.59, 5.38, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
@@ -4419,12 +4409,12 @@ position = Vector3(0, 0, 0)
 shape = SubResource("BoxShape3D_0920")
 
 [node name="FracturedBarricade" type="StaticBody3D" parent="TERRAIN/Room08_Hall"]
-position = Vector3(564.74, 4.5, 0)
+position = Vector3(564.74, 4.33, 0)
 script = ExtResource("RCBarricade")
 accent = Color(0.3412, 0.8078, 1.0, 1)
 
 [node name="InteriorCache09" type="Area3D" parent="TERRAIN" groups=["factory_salvage_chest"]]
-position = Vector3(566.49, 4.5, 0)
+position = Vector3(566.49, 4.33, 0)
 script = ExtResource("RCCacheScript")
 sector = 3
 materials = 5

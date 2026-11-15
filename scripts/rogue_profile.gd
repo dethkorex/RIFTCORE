@@ -9,7 +9,7 @@ const CHALLENGES := [
 	{"name": "Sector Clear", "objective": "Defeat the Act 2 boss and reach extraction.", "credits": 240, "step": 25},
 	{"name": "Clean Run", "objective": "Clear both acts in the same run without losing a life.", "credits": 420, "step": 35},
 ]
-const CHALLENGE_COOLDOWN := 86400
+const SECONDS_PER_DAY := 86400
 const CHALLENGE_SETS := [
 	[["Gatebreaker", "Enter Act II", "act", 1], ["Sector Clear", "Extract from the sector", "clear", 1], ["Clean Run", "Extract without losing a life", "clean", 1], ["Security Sweep", "Defeat 10 security units before extraction", "kills", 10], ["Salvage Run", "Extract with 5 recovered materials", "materials", 5]],
 	[["First Breach", "Enter Act II", "act", 1], ["Extraction Ready", "Extract from the sector", "clear", 1], ["Health Reserve", "Extract with at least 60% HP", "health", 60], ["Credit Runner", "Collect 50 bolts before extraction", "bolts", 50], ["Quick Response", "Extract within 15 minutes", "time", 900]],
@@ -163,6 +163,7 @@ var materials: Dictionary = {}
 var core_shards := 0
 const COSMETICS := {"Standard": Color("55e7ff"), "Magenta": Color("ff67ce"), "Gold": Color("ffd069")}
 var operator_name := "RX-07"
+var survival_seconds := 0.0
 var player_xp := 0
 var cosmetic := "Standard"
 var credits := 0
@@ -176,6 +177,7 @@ var hard_clears: Dictionary = {}
 var reserve_lives := 0
 var gear := {}
 var manual_only := false
+var operator_level := 1
 
 static func clean_operator_name(value: String) -> String:
 	var cleaned := ""
@@ -203,11 +205,10 @@ func player_level() -> int:
 	return mini(PLAYER_LEVEL_CAP, RiftPlayer.level_for_experience(player_xp))
 
 func shop_milestone() -> int:
-	var level := player_level()
 	var milestone := 1
 	for item in stock.values():
 		var required: int = item.shop_level
-		if required <= level:
+		if required <= operator_level:
 			milestone = maxi(milestone, required)
 	return milestone
 
@@ -218,13 +219,14 @@ func cosmetic_level(id: String) -> int:
 	return {"Standard": 1, "Magenta": 8, "Gold": 25}.get(id, PLAYER_LEVEL_CAP + 1)
 
 func storage_capacity() -> int:
-	return 12 + floori(player_level() / 5.0) + rank("storage") * 7
+	return 12 + floori(operator_level / 5.0) + rank("storage") * 7
 
 func decode_from(data: ConfigFile) -> void:
 	reconstruction_seen = bool(data.get_value("story", "reconstruction_seen", false))
 	var saved_briefings: Variant = data.get_value("story", "briefed_acts", PackedInt32Array())
 	briefed_acts = saved_briefings if saved_briefings is PackedInt32Array else PackedInt32Array()
 	operator_name = clean_operator_name(str(data.get_value("profile", "operator_name", "RX-07")))
+	survival_seconds = maxf(0.0, float(data.get_value("profile", "survival_seconds", 0.0)))
 	materials.clear()
 	blueprints.clear()
 	blueprint_hunts.clear()
@@ -307,10 +309,11 @@ func decode_from(data: ConfigFile) -> void:
 		materials["scrap"] = legacy_bolts / 50
 	player_xp = 0
 	award_player_xp(int(data.get_value("profile", "player_xp", 0)))
+	operator_level = RiftPlayer.level_for_experience(int(data.get_value("checkpoint", "experience", 0)))
 	var shop_level := shop_milestone()
 	shop_announced_through = clampi(int(data.get_value("story", "shop_announced_through", shop_level)), 1, shop_level)
 	var skin := String(data.get_value("profile", "cosmetic", "Standard"))
-	cosmetic = skin if player_level() >= cosmetic_level(skin) else "Standard"
+	cosmetic = skin if operator_level >= cosmetic_level(skin) else "Standard"
 	credits = maxi(0, int(data.get_value("profile", "credits", 0)))
 	unlocked_sector = clampi(int(data.get_value("profile", "unlocked_sector", 1)), 1, Catalog.SECTORS.size())
 	reserve_lives = maxi(0, int(data.get_value("profile", "reserve_lives", 0)))
@@ -382,6 +385,7 @@ func encode_into(data: ConfigFile) -> void:
 	data.set_value("profile", "credits", credits)
 	data.set_value("profile", "player_xp", player_xp)
 	data.set_value("profile", "operator_name", operator_name)
+	data.set_value("profile", "survival_seconds", survival_seconds)
 	data.set_value("profile", "cosmetic", cosmetic)
 	data.set_value("profile", "materials", materials)
 	data.set_value("profile", "core_shards", core_shards)
@@ -430,36 +434,46 @@ func recipe_materials(id: String) -> Dictionary:
 func stored_count() -> int:
 	return gear.values().count("stored")
 
-func craft_limit(id: String) -> String:
+func craft_limit(id: String, equip_now := false) -> String:
+	if not GEAR.has(id):
+		return "Unknown blueprint."
 	if not blueprints.has(id):
 		return "Blueprint undiscovered."
 	if gear.has(id):
 		return "Blueprint already fabricated."
-	if player_level() < crafting_level(id):
-		return "Requires Player Level %d." % crafting_level(id)
+	var level := recipe_level(id) if equip_now else crafting_level(id)
+	if operator_level < level:
+		return "Requires Operator Level %d." % level
 	if stored_count() >= storage_capacity():
-		return "Storage is full."
+		if not equip_now:
+			return "Storage is full."
+		if not equipped_for(GEAR[id].slot).is_empty():
+			return "Free a Storage slot for your current gear."
 	var bill := recipe_materials(id)
 	for material in bill:
 		if int(materials.get(material, 0)) < int(bill[material]):
 			return "Missing fabrication materials."
 	return ""
 
-func craft(id: String) -> String:
-	if not GEAR.has(id):
-		return "Unknown blueprint."
-	var restriction := craft_limit(id)
+func craft(id: String, equip_now := false) -> String:
+	var restriction := craft_limit(id, equip_now)
 	if not restriction.is_empty():
 		return restriction
 	var previous := materials.duplicate()
+	var previous_gear := gear.duplicate()
 	var bill := recipe_materials(id)
 	for material in bill:
 		materials[material] -= bill[material]
-	gear[id] = "stored"
+	var replaced := equipped_for(GEAR[id].slot) if equip_now else ""
+	if not replaced.is_empty():
+		gear[replaced] = "stored"
+	gear[id] = "equipped" if equip_now else "stored"
 	if save() != OK:
 		materials = previous
-		gear.erase(id)
+		gear = previous_gear
 		return "Could not fabricate item."
+	if equip_now:
+		return "%s equipped. %s sent to Storage." % [GEAR[id].name, GEAR[replaced].name] if not replaced.is_empty() else "%s equipped." % GEAR[id].name
 	return "%s fabricated and sent to Storage." % GEAR[id].name
 
 func deposit_materials(recovered: Dictionary) -> void:
@@ -476,6 +490,8 @@ func move_gear(id: String) -> String:
 			return "Storage is full."
 		gear[id] = "stored"
 	else:
+		if operator_level < recipe_level(id):
+			return "Requires Operator Level %d." % recipe_level(id)
 		var old := equipped_for(item.slot)
 		if not old.is_empty():
 			if gear[id] == "carried" and stored_count() >= storage_capacity():
@@ -535,27 +551,33 @@ func hard_clear_count() -> int:
 func nightmare_unlocked() -> bool:
 	return hard_clear_count() == Catalog.SECTORS.size()
 
-func challenge_cycle(sector: int) -> Dictionary:
+func challenge_cycle(sector: int, clock := Time.get_datetime_dict_from_system()) -> Dictionary:
 	var cycle: Dictionary = challenge_cycles.get(sector, {})
-	var now := int(Time.get_unix_time_from_system())
-	var deadline := int(cycle.get("reset_at", 0))
-	if cycle.is_empty() or (deadline > 0 and now >= deadline):
-		var picker := RandomNumberGenerator.new()
-		picker.seed = hash([deadline, sector, operator_name])
-		var next := 0 if cycle.is_empty() else posmod(int(cycle.set) + picker.randi_range(1, CHALLENGE_SETS.size() - 1), CHALLENGE_SETS.size())
+	var today := challenge_day(clock)
+	if cycle.is_empty():
 		var done: Array = []
-		if cycle.is_empty():
-			for tier in CHALLENGES.size():
-				if completed_challenges.has(challenge_key(sector, tier)):
-					done.append(tier)
-		cycle = {"set": next, "done": done, "reset_at": 0}
+		for tier in CHALLENGES.size():
+			if completed_challenges.has(challenge_key(sector, tier)):
+				done.append(tier)
+		cycle = {"set": 0, "done": done, "day": today}
 		challenge_cycles[sector] = cycle
-	if cycle.done.size() == 5 and int(cycle.reset_at) <= 0:
-		cycle.reset_at = now + CHALLENGE_COOLDOWN
+	elif not cycle.has("day"):
+		# Keep an existing save's progress until its first midnight on this version.
+		cycle["day"] = today
+		cycle.erase("reset_at")
+	elif today > int(cycle.day):
+		var picker := RandomNumberGenerator.new()
+		picker.seed = hash([today, sector, operator_name])
+		var next := posmod(int(cycle.set) + picker.randi_range(1, CHALLENGE_SETS.size() - 1), CHALLENGE_SETS.size())
+		cycle = {"set": next, "done": [], "day": today}
+		challenge_cycles[sector] = cycle
 	return cycle
 
-static func challenge_seconds_left(cycle: Dictionary) -> int:
-	return maxi(0, int(cycle.get("reset_at", 0)) - int(Time.get_unix_time_from_system()))
+static func challenge_day(clock := Time.get_datetime_dict_from_system()) -> int:
+	return clock.year * 10000 + clock.month * 100 + clock.day
+
+static func challenge_seconds_left(clock := Time.get_datetime_dict_from_system()) -> int:
+	return SECONDS_PER_DAY - clock.hour * 3600 - clock.minute * 60 - clock.second
 
 static func challenge_shards(sector: int, tier: int) -> int:
 	return 4 + sector * 2 + tier * 2
@@ -587,7 +609,6 @@ func record_challenges(sector: int, results: Dictionary) -> Dictionary:
 	if earned == 0:
 		return {}
 	if cycle.done.size() == 5:
-		cycle.reset_at = int(Time.get_unix_time_from_system()) + CHALLENGE_COOLDOWN
 		shards += challenge_set_shards(sector)
 	credits += payment
 	reserve_lives += earned
@@ -758,6 +779,8 @@ func learn_blueprint(id: String) -> String:
 		return "Blueprint unavailable."
 	if blueprints.has(id):
 		return "Recipe already unlocked."
+	if operator_level < crafting_level(id):
+		return "Requires Operator Level %d." % crafting_level(id)
 	blueprint_items.erase(id)
 	blueprints[id] = true
 	if save() != OK:
@@ -771,18 +794,23 @@ func supply_owned(id: String) -> int:
 	return int(carried_materials.get(item.material, 0)) if item.has("material") else int(inventory.get(id, 0))
 
 func supply_purchase_limit(id: String) -> int:
+	if not sold_at_shop(id):
+		return 0
 	var item: Dictionary = stock[id]
 	return clampi(floori(float(STACK_MAX - supply_owned(id)) / int(item.get("quantity", 1))), 0, STACK_MAX)
 
 func supply_price(id: String) -> int:
 	return maxi(1, ceili(stock[id].price * (1.0 - talent_bonus("vendor_license") / 100.0)))
 
+static func sold_at_shop(id: String) -> bool:
+	return stock.has(id) and stock[id].get("material", "") not in ["core", "legendary"]
+
 func buy_supply(id: String, bundles := 1) -> String:
-	if not stock.has(id) or bundles < 1:
+	if not sold_at_shop(id) or bundles < 1:
 		return "Item unavailable."
 	var item: Dictionary = stock[id]
-	if player_level() < int(item.shop_level):
-		return "Unlocks at Player Lv. %d." % item.shop_level
+	if operator_level < int(item.shop_level):
+		return "Unlocks at Operator Lv. %d." % item.shop_level
 	if bundles > supply_purchase_limit(id):
 		return "Stack full."
 	var cost := supply_price(id) * bundles

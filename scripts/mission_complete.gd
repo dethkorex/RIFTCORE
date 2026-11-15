@@ -32,7 +32,7 @@ static func build(stack: VBoxContainer, sector_name: String, stats: Dictionary, 
 	for entry in [
 		["Time", "%02d:%02d" % [time / 60, time % 60]], ["Enemies defeated", str(stats.kills)],
 		["Boss defeated", "Yes"], ["Lives lost", str(deaths)],
-		["Operator XP gained", "+%d" % stats.operator_xp], ["Player XP gained", "+%d" % stats.player_xp],
+		["Operator XP gained", "+%d" % stats.operator_xp], ["Profile XP gained", "+%d" % stats.player_xp],
 		["Materials recovered", str(material_count)], ["Core Shards earned", "+%d" % stats.shards],
 		["Blueprints recovered", str(blueprints.size())], ["Bolts banked", "+%d" % bolts],
 	]:
@@ -40,6 +40,8 @@ static func build(stack: VBoxContainer, sector_name: String, stats: Dictionary, 
 		caption.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		caption.autowrap_mode = TextServer.AUTOWRAP_OFF
 		UI.label(rows, entry[1], 16, UI.CYAN).autowrap_mode = TextServer.AUTOWRAP_OFF
+	if stats.has("profile_progress"):
+		profile_progress(results, stats.profile_progress)
 	UI.label(results, "EXTRACTION REWARDS", 24, UI.CYAN)
 	var scroll := ScrollContainer.new()
 	scroll.custom_minimum_size.y = 117
@@ -64,6 +66,29 @@ static func build(stack: VBoxContainer, sector_name: String, stats: Dictionary, 
 	if not ending.is_empty():
 		UI.label(stack, ending, 15, UI.MUTED)
 	UI.button(stack, "Return to Station", exit, true).grab_focus()
+
+static func profile_progress(parent: Control, progress: Dictionary) -> void:
+	var start := int(progress.before)
+	var total := int(progress.after)
+	var level := mini(Profile.PLAYER_LEVEL_CAP, RiftPlayer.level_for_experience(total))
+	var floor_xp := RiftPlayer.experience_threshold(level)
+	var span := RiftPlayer.experience_threshold(level + 1) - floor_xp
+	var full := level >= Profile.PLAYER_LEVEL_CAP
+	var end := span if full else total - floor_xp
+	var caption := "PROFILE LV. %d  /  %s" % [level, "MAX" if full else "%d / %d XP" % [end, span]]
+	if total > start:
+		caption += "   ·   +%d XP" % (total - start)
+	UI.label(parent, caption, 18, UI.VIOLET)
+	var meter := ProgressBar.new()
+	meter.show_percentage = false
+	meter.max_value = span
+	meter.custom_minimum_size.y = 10
+	meter.add_theme_stylebox_override("background", UI.frame(Color("162640"), Color("405a77"), 1))
+	meter.add_theme_stylebox_override("fill", UI.frame(UI.VIOLET, Color("edd5ff"), 1))
+	parent.add_child(meter)
+	meter.value = end if total == start or full else maxi(0, start - floor_xp)
+	if total > start and not full:
+		meter.create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS).tween_property(meter, "value", end, 0.8).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 
 static func reward(parent: HBoxContainer, caption: String, text: String, tint: Color) -> void:
 	var tile := UI.equipment_card(tint)

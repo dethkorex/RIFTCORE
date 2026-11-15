@@ -61,7 +61,7 @@ static func projectile_hit(parent: Node3D, direction: Vector3, tint: Color, char
 		sparks.autoplay = false
 		sparks.size = 0.78 if charged else 0.51
 		sparks.spark_count = 16 if charged else 9
-		sparks.debris_count = 3
+		sparks.debris_count = 0
 		sparks.dust_count = 0
 		parent.add_child(sparks)
 		sparks.burst(parent.global_position, (-direction + Vector3.BACK * 0.5).normalized(), &"metal")

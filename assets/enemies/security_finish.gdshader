@@ -5,9 +5,17 @@ uniform vec4 chassis_coat : source_color = vec4(1.);
 uniform float alloy = .26;
 uniform float roughness_bias = .53;
 uniform float relief : hint_range(0.0, 0.08) = 0.014;
+uniform sampler2D sector_trim : source_color, filter_linear_mipmap_anisotropic, repeat_disable;
+uniform vec2 sector_strip = vec2(0.0, 0.0);
+uniform float sector_mix = 0.0;
 void fragment() {
 	vec3 coating = texture(armor_albedo, UV).rgb;
 	float height = texture(trim_height, UV).r;
+	if (sector_mix > 0.0) {
+		vec2 trim_uv = vec2(mix(.004, .496, UV.x), mix(sector_strip.x, sector_strip.y, UV.y));
+		coating = mix(coating, texture(sector_trim, trim_uv).rgb, sector_mix);
+		height = mix(height, texture(sector_trim, trim_uv + vec2(.5, 0.0)).r, sector_mix);
+	}
 	vec3 n = normalize(NORMAL);
 	vec3 dx = dFdx(VERTEX);
 	vec3 dy = dFdy(VERTEX);

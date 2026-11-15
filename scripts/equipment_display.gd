@@ -4,11 +4,12 @@ const PlayerScene := preload("res://scenes/actors/riftcore_player.tscn")
 const Pad := preload("res://assets/hub/deploy_pad.tscn")
 
 var actor: RiftPlayer
+var compact := false
 
 func _ready() -> void:
 	stretch = true
-	custom_minimum_size = Vector2(225, 270)
-	size_flags_vertical = Control.SIZE_EXPAND_FILL
+	custom_minimum_size = Vector2(115, 128) if compact else Vector2(225, 270)
+	size_flags_vertical = Control.SIZE_FILL if compact else Control.SIZE_EXPAND_FILL
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var view := SubViewport.new()
 	view.own_world_3d = true
@@ -29,7 +30,7 @@ func _ready() -> void:
 	var camera := Camera3D.new()
 	camera.projection = Camera3D.PROJECTION_ORTHOGONAL
 	camera.size = 2.45
-	camera.keep_aspect = Camera3D.KEEP_WIDTH
+	camera.keep_aspect = Camera3D.KEEP_HEIGHT
 	view.add_child(camera)
 	camera.position = Vector3(0, 1.37, 4.2)
 	camera.look_at(Vector3(0, 1.12, 0))

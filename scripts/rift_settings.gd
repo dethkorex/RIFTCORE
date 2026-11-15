@@ -4,7 +4,7 @@ const MODES := [Vector2i(1280, 720), Vector2i(1600, 900), Vector2i(1920, 1080), 
 const ACTIONS := {
 	"move_left": "Move left", "move_right": "Move right", "jump": "Jump",
 	"crouch": "Crouch", "climb_up": "Climb up", "climb_down": "Climb down",
-	"dash": "Dash", "shoot": "Buster", "melee": "Sword", "swap_weapon": "Next suit", "previous_suit": "Previous suit", "pause": "Pause",
+	"dash": "Dash", "shoot": "Buster", "suit_fire": "Suit Weapon", "melee": "Sword", "swap_weapon": "Next suit", "previous_suit": "Previous suit", "pause": "Pause",
 	"field_interact": "Field interact", "push_to_talk": "Push-to-talk",
 }
 const QUICK_DEFAULTS := [JOY_BUTTON_DPAD_UP, JOY_BUTTON_DPAD_LEFT, JOY_BUTTON_DPAD_RIGHT, JOY_BUTTON_DPAD_DOWN]
@@ -133,13 +133,14 @@ func apply_audio_devices() -> void:
 	AudioServer.output_device = speaker_device if speaker_device in audio_devices(false) else "Default"
 
 func set_audio_device(microphone: bool, device: String) -> void:
+	var selected := device if device in audio_devices(microphone) else "Default"
 	voice_settings_changed.emit()
 	if microphone:
-		microphone_device = device
-		AudioServer.input_device = device
+		microphone_device = selected
+		AudioServer.input_device = selected
 	else:
-		speaker_device = device
-		AudioServer.output_device = device
+		speaker_device = selected
+		AudioServer.output_device = selected
 	save()
 
 func set_voice_mode(enabled: bool, push_to_talk: bool) -> void:
@@ -248,7 +249,7 @@ func set_binding(action: String, event: InputEvent, device: String) -> String:
 	if data.is_empty():
 		return "Choose a key, mouse button, or controller input."
 	if data.type == "key" and int(data.code) in [KEY_ENTER, KEY_KP_ENTER]:
-		return "Enter opens whispers during gameplay."
+		return "Enter opens chat during gameplay."
 	for other in ACTIONS:
 		if other == action or (other in ["climb_down", "crouch"] and action in ["climb_down", "crouch"]):
 			continue
@@ -294,7 +295,7 @@ func apply_bindings() -> void:
 			if not data is Dictionary:
 				continue
 			var event := from_data(data)
-			if not event or (event is InputEventJoypadButton and event.button_index in QUICK_DEFAULTS):
+			if not event or (event is InputEventJoypadButton and event.button_index in QUICK_DEFAULTS) or (event is InputEventKey and event.physical_keycode in [KEY_ENTER, KEY_KP_ENTER]):
 				continue
 			for old in InputMap.action_get_events(action):
 				if device_of(old) == device:

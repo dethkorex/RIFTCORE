@@ -9,6 +9,7 @@ const AVATAR := preload("res://scenes/actors/riftcore_player.tscn")
 const WINDOW := preload("res://assets/hub/orbital_view.png")
 const STATIONS := [
 	{"x": -18.0, "name": "System", "page": "Save Game", "color": Color("9cbbff"), "prop": "settings_terminal"},
+	{"x": -13.5, "name": "Profile", "page": "Player Profile", "color": Color("f196ff"), "prop": "save_terminal"},
 	{"x": -9.0, "name": "Crafting", "page": "Fabrication", "color": Color("ffc465"), "prop": "forge_bay"},
 	{"x": -4.5, "name": "Shop", "page": "Shop", "color": Color("ffd076"), "prop": "storage_bay"},
 	{"x": 0.0, "name": "Deploy", "page": "Sector select", "color": Color("52edff"), "prop": "deploy_pad"},
@@ -184,11 +185,16 @@ func _physics_process(delta: float) -> void:
 	update_station()
 
 func _process(delta: float) -> void:
-	for entry in partners.values():
+	for id: int in partners:
+		var entry: Dictionary = partners[id]
 		var partner: RiftPlayer = entry.actor
 		partner.position.x = lerpf(partner.position.x, entry.x, 1.0 - exp(-16.0 * delta))
 		partner.position.y = 1.11 if absf(partner.position.x) < 1.25 else 0.89
 		partner.model_root.rotation.y = entry.facing
+		var microphone := entry.microphone as Sprite3D
+		microphone.visible = RiftRelay.voice.indicator_visible(id)
+		if microphone.visible:
+			microphone.modulate = RiftRelay.voice.indicator_tint(id)
 	station_sync += delta
 	if station_sync >= 0.05:
 		station_sync = 0.0
@@ -224,9 +230,17 @@ func update_partner(id: int, x: float, facing: float, animation: String, display
 		var partner_label := label_in_space(partner, "", Vector3(0, 1.54, 0), 29, Color("ca99ff"))
 		partner_label.pixel_size *= UI.COOP_NAME_SCALE
 		partner_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-		partners[id] = {"actor": partner, "label": partner_label}
+		var microphone := Sprite3D.new()
+		microphone.texture = RiftRelay.voice.MIC_ICON
+		microphone.position = Vector3(0, 1.84, 0)
+		microphone.pixel_size = 0.0085
+		microphone.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		microphone.hide()
+		partner.add_child(microphone)
+		partners[id] = {"actor": partner, "label": partner_label, "microphone": microphone}
 	var entry: Dictionary = partners[id]
 	entry.label.text = display_name
+	entry.label.modulate = UI.operator_tint(id, RiftRelay.relay.get_host(), RiftRelay.relay.lobby_get_all_clients())
 	entry.x = x
 	entry.facing = facing
 	entry.actor.play_character_animation(animation)
@@ -237,6 +251,9 @@ func refresh_partner_room() -> void:
 	local_online_label.text = RiftRelay.local_name
 	local_online_label.visible = not RiftRelay.connected_room.is_empty()
 	var members: Array = [] if RiftRelay.connected_room.is_empty() else RiftRelay.relay.lobby_get_all_clients()
+	if not members.is_empty():
+		var host: int = RiftRelay.relay.get_host()
+		local_online_label.modulate = UI.operator_tint(RiftRelay.relay.get_client_id(), host, members)
 	for id in partners.keys():
 		if not members.has(id):
 			partners[id].actor.queue_free()
@@ -406,8 +423,8 @@ func build_pad(station: Dictionary) -> void:
 	elif station.name == "Shop":
 		terminal.set("caption", "SHOP / SUPPLIES")
 		terminal.set("accent", station.color)
-	elif station.name == "Social":
-		terminal.set("caption", "SOCIAL")
+	elif station.name in ["Social", "Profile"]:
+		terminal.set("caption", station.name.to_upper())
 		terminal.set("icon", "icon_person")
 		terminal.set("accent", station.color)
 	var tint: Color = station.color

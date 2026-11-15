@@ -1,0 +1,24 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://assets/neon_factory/foundry/zone_threshold.glb" id="1"]
+
+[sub_resource type="BoxShape3D" id="Lintel"]
+size = Vector3(1.88, 1.0074, 5.27)
+
+[sub_resource type="BoxShape3D" id="RearJamb"]
+size = Vector3(1.81, 4.0572, 1.04)
+
+[node name="LowZoneThreshold" type="StaticBody3D"]
+collision_layer = 1
+collision_mask = 0
+
+[node name="Art" parent="." instance=ExtResource("1")]
+scale = Vector3(1, 0.69, 1)
+
+[node name="Lintel" type="CollisionShape3D" parent="."]
+position = Vector3(0, 3.8985, 0)
+shape = SubResource("Lintel")
+
+[node name="RearJamb" type="CollisionShape3D" parent="."]
+position = Vector3(0, 1.9803, -1.69)
+shape = SubResource("RearJamb")

@@ -27,9 +27,14 @@ signal blueprint_found(id: String)
 signal salvage_collected(drop: Dictionary)
 signal supply_found(id: String)
 signal recovered_resources(hp: float, eng: float, display_amount: bool)
+signal hurt
 
 const START_HEALTH := 80.0
 const START_ENERGY := 75.0
+const HEALTH_GAIN_PER_LEVEL := 8.0
+const LEVEL_HEAL_FRACTION := 0.50
+const LEVEL_UP_TINT := Color("ffcb48")
+const BOSS_DEBUFFS := ["", "BURN", "VENOM", "FROST", "SHOCK", "SIGNAL JAM", "TURBULENCE", "CORROSION", "GRAVITY LOCK", "MAGNETIZED", "RIFT SILENCE"]
 const Catalog := preload("res://scripts/sector_catalog.gd")
 signal fell_into_pit
 signal shot_fired(projectile: RiftProjectile)
@@ -172,6 +177,11 @@ var climb_pose: SkeletonModifier3D
 var slide_pose: SkeletonModifier3D
 var standing_capsule := CapsuleShape3D.new()
 var charge_held := false
+var queued_suit_shot := false
+var boss_debuff := 0
+var debuff_left := 0.0
+var debuff_tick := 0.0
+var shock_stun := 0.0
 var charge_elapsed := 0.0
 const ChargingOrb := preload("res://scripts/buster_charge_orb.gd")
 const CHARGE_SHELL := preload("res://assets/vfx/buster_charge_shell.gdshader")
@@ -183,6 +193,7 @@ var restore_aura: Node3D
 const HEAL_TINT := Color("6fff94")
 const ENERGY_TINT := Color("69c7ff")
 var full_charge_visual := false
+var showcase_projectiles: Node3D
 var muzzle_skeleton: Skeleton3D
 var muzzle_bone := -1
 var muzzle_offset := Vector3.ZERO
@@ -410,6 +421,7 @@ func action_released(action: StringName) -> bool:
 	return remote_released.has(action) if remote_input else Input.is_action_just_released(action)
 
 func _physics_process(delta: float) -> void:
+	update_boss_debuff(delta)
 	if not local_prediction and quick_profile != null and health > 0.0:
 		for index in 4:
 			if action_pressed(StringName("quick_%d" % index)):
@@ -432,15 +444,21 @@ func simulate_movement(delta: float) -> void:
 		cancel_saber_charge()
 		return
 	var terrain := environment_control()
+	if boss_debuff == 8:
+		terrain.y *= 1.30
 	landing_left = maxf(0.0, landing_left - delta)
 	fire_lock = maxf(0.0, fire_lock - delta)
 	dash_lock = maxf(0.0, dash_lock - delta)
 	var axis := movement_axis("move_left", "move_right")
+	if shock_stun > 0.0:
+		axis = 0.0
+	elif boss_debuff == 6 and not grounded():
+		axis *= .53
 	ladder_lock = maxf(0.0, ladder_lock - delta)
 	update_wall_contact(delta, axis)
 	var stick_crouch := action_held("crouch_stick") and absf(axis) < 0.35
 	var wants_crouch := action_held("crouch") or stick_crouch
-	var drop_command := grounded() and wants_crouch and action_pressed("dash") and not is_instance_valid(ladder)
+	var drop_command := shock_stun <= 0.0 and grounded() and wants_crouch and action_pressed("dash") and not is_instance_valid(ladder)
 	var dropping := drop_command and start_platform_drop()
 	if not dropping and update_ladder(delta, axis):
 		cancel_saber_charge()
@@ -460,11 +478,13 @@ func simulate_movement(delta: float) -> void:
 		air_dash_available = true
 	else:
 		coyote = maxf(0.0, coyote - delta)
-	if action_pressed("jump"):
+	if shock_stun > 0.0:
+		jump_buffer = 0.0
+	elif action_pressed("jump"):
 		jump_buffer = jump_buffer_duration
 	else:
 		jump_buffer = maxf(0.0, jump_buffer - delta)
-	if not drop_command and resume_input_guard <= 0.0 and contact_recoil <= 0.0 and action_pressed("dash") and dash_lock <= 0.0 and (grounded() or air_dash_available):
+	if not dropping and shock_stun <= 0.0 and boss_debuff != 9 and resume_input_guard <= 0.0 and contact_recoil <= 0.0 and action_pressed("dash") and dash_lock <= 0.0 and (grounded() or air_dash_available):
 		dash_left = dash_duration
 		dash_elapsed = 0.0
 		dash_facing = facing
@@ -496,7 +516,8 @@ func simulate_movement(delta: float) -> void:
 		elif not grounded() and absf(axis) < 0.08:
 			accel = air_braking
 		if contact_recoil <= 0.0 and wall_launch_lock <= 0.0:
-			velocity.x = move_toward(velocity.x, 0.0 if crouching else locomotion_speed(axis, move_speed * (1.0 + supply_bonus("speed"))), accel * delta)
+			var speed_scale := .66 if boss_debuff == 3 else 1.0
+			velocity.x = move_toward(velocity.x, 0.0 if crouching else locomotion_speed(axis, move_speed * speed_scale * (1.0 + supply_bonus("speed"))), accel * delta)
 		if not grounded():
 			var gravity_scale := fall_gravity_multiplier if velocity.y < 0.0 else 1.0
 			velocity.y = maxf(-max_fall_speed * clampf(terrain.y * 1.4, 0.36, 1.0), velocity.y - gravity * gravity_scale * terrain.y * delta)
@@ -544,6 +565,7 @@ func die_in_pit() -> void:
 	if health <= 0.0:
 		return
 	health = 0.0
+	clear_boss_debuff()
 	cancel_charge()
 	health_changed.emit(health, max_health)
 	set_physics_process(false)
@@ -596,11 +618,18 @@ func has_dash_floor(delta: float) -> bool:
 func environment_control() -> Vector4:
 	# Ground grip, gravity, lateral flow, and buoyant jump.
 	var result := Vector4(1, 1, 0, 0)
+	if is_on_floor():
+		for index in get_slide_collision_count():
+			var contact := get_slide_collision(index)
+			var surface := contact.get_collider() as Node
+			if surface and contact.get_normal().y > 0.55 and surface.is_in_group(&"ice_deck"):
+				result.x = 0.19
+				break
 	for zone in get_tree().get_nodes_in_group("terrain_modifier"):
 		if not zone.get_overlapping_bodies().has(self):
 			continue
 		match int(zone.kind):
-			0: result.x = 0.24 / zone.terrain_strength
+			0: result.x = minf(result.x, 0.24 / zone.terrain_strength)
 			1:
 				result.y = 0.46
 				result.w = 1.0
@@ -785,6 +814,11 @@ func climb_rise(climb: Node3D) -> float:
 	return (climb.global_basis.y * float(climb.rise)).y
 
 func update_ladder(delta: float, axis: float) -> bool:
+	if shock_stun > 0.0 and is_instance_valid(ladder):
+		velocity = Vector3.ZERO
+		return true
+	if shock_stun > 0.0:
+		return false
 	var vertical := movement_axis("climb_down", "climb_up")
 	if not is_instance_valid(ladder):
 		var dash_grab := dash_left > 0.0
@@ -912,9 +946,14 @@ func gain_experience(amount: int, earned := true) -> void:
 	experience += amount
 	var gained_levels := level_for_experience(experience) - previous_level
 	if gained_levels > 0:
-		max_health += gained_levels * 8.0
+		var previous_max := max_health
+		max_health += gained_levels * HEALTH_GAIN_PER_LEVEL
 		max_energy += gained_levels * 6.0
-		health = minf(max_health, health + gained_levels * 20.0)
+		if earned and health > 0.0:
+			# Each level heals half of the maximum HP at that level.
+			var average_max := previous_max + HEALTH_GAIN_PER_LEVEL * (gained_levels + 1) * 0.5
+			health = minf(max_health, health + average_max * gained_levels * LEVEL_HEAL_FRACTION)
+			play_level_up_feedback.call_deferred()
 		health_changed.emit(health, max_health)
 		energy_changed.emit(energy, max_energy)
 	experience_changed.emit(experience)
@@ -964,20 +1003,27 @@ func play_restore_feedback(hp: float, eng: float, display_amount := true) -> voi
 	var tint := HEAL_TINT if hp > 0.0 else ENERGY_TINT
 	if hp > 0.0 and eng > 0.0:
 		tint = HEAL_TINT.lerp(ENERGY_TINT, .5)
+	play_recovery_glow(tint)
+
+func play_level_up_feedback() -> void:
+	if is_inside_tree() and visible and health > 0.0:
+		play_recovery_glow(LEVEL_UP_TINT, true)
+
+func play_recovery_glow(tint: Color, level_up := false) -> void:
 	if restore_glow and restore_glow.is_valid():
 		restore_glow.kill()
 	if not restore_shell:
 		restore_shell = ShaderMaterial.new()
 		restore_shell.shader = CHARGE_SHELL
 	restore_shell.set_shader_parameter("charge_color", tint)
-	restore_shell.set_shader_parameter("intensity", 1.6)
+	restore_shell.set_shader_parameter("intensity", 3.2 if level_up else 1.6)
 	refresh_suit_overlay()
 	if is_instance_valid(restore_aura):
 		restore_aura.queue_free()
-	restore_aura = preload("res://scripts/combat_vfx.gd").recovery(self, tint)
+	restore_aura = preload("res://scripts/combat_vfx.gd").recovery(self, tint, level_up)
 	restore_glow = create_tween()
-	restore_glow.tween_interval(.36)
-	restore_glow.tween_property(restore_shell, "shader_parameter/intensity", 0.0, .87)
+	restore_glow.tween_interval(.52 if level_up else .36)
+	restore_glow.tween_property(restore_shell, "shader_parameter/intensity", 0.0, 1.10 if level_up else .87)
 	restore_glow.tween_callback(func():
 		restore_shell = null
 		refresh_suit_overlay()
@@ -989,8 +1035,10 @@ func show_restore_number(scene: Node, amount: float, hp: bool, offset: float, ti
 	counter.global_position = global_position + Vector3(offset, 1.22 + (0.22 if not hp and offset != 0.0 else 0.0), .32)
 	counter.animate_restoration(amount, hp, tint)
 
+var hurt_shell: ShaderMaterial
+var hurt_flash: Tween
 func refresh_suit_overlay() -> void:
-	var material := restore_shell if restore_shell else (charge_shell if full_charge_visual else reward_coating)
+	var material := hurt_shell if hurt_shell else (restore_shell if restore_shell else (charge_shell if full_charge_visual else reward_coating))
 	for mesh in base_suit_meshes:
 		mesh.material_overlay = material
 	for mesh in reward_suit_meshes.values():
@@ -1032,26 +1080,38 @@ func update_charge(delta: float) -> void:
 		shot_buffer_left = maxf(0.0, shot_buffer_left - delta)
 		if fire_lock <= 0.0 and melee_lock <= 0.0:
 			shot_buffer_left = 0.0
-			shoot(queued_charged, queued_pose)
+			shoot(queued_charged, queued_pose, queued_suit_shot)
+	if not equipped_suit().is_empty():
+		cancel_charge()
+		if action_pressed("suit_fire"):
+			queue_buster_shot(false, false, energy >= suit_shot_cost())
+		elif action_pressed("shoot"):
+			queue_buster_shot(false, false)
+		return
 	if action_pressed("shoot"):
 		charge_held = true
 		charge_elapsed = 0.0
 	if not charge_held:
 		return
 	if not action_held("shoot"):
-		var full := charge_elapsed >= charge_time * charge_time_scale and energy >= charged_shot_cost()
+		var full := boss_debuff != 5 and charge_elapsed >= charge_time * charge_time_scale and energy >= charged_shot_cost()
 		var pose_held := is_instance_valid(charge_orb)
 		cancel_charge()
-		if melee_lock <= 0.0:
-			if fire_lock <= 0.0:
-				shoot(full, pose_held)
-			else:
-				shot_buffer_left = 0.12
-				queued_charged = full
-				queued_pose = pose_held
+		queue_buster_shot(full, pose_held)
 		return
 	charge_elapsed += delta
-	present_charge(charge_elapsed, energy >= charged_shot_cost())
+	present_charge(charge_elapsed, boss_debuff != 5 and energy >= charged_shot_cost())
+
+func queue_buster_shot(charged: bool, pose_held: bool, suit_shot := false) -> void:
+	if melee_lock > 0.0:
+		return
+	if fire_lock <= 0.0:
+		shoot(charged, pose_held, suit_shot)
+	else:
+		shot_buffer_left = 0.12
+		queued_charged = charged
+		queued_pose = pose_held
+		queued_suit_shot = suit_shot
 
 func present_charge(held_time: float, has_energy: bool) -> void:
 	var required_time := charge_time * charge_time_scale
@@ -1096,19 +1156,22 @@ func buster_power() -> float:
 	return base_buster_damage * level_damage_scale() * buster_damage_multiplier * (1.0 + supply_bonus("attack"))
 
 func charged_shot_cost() -> float:
-	var base := 36.0 if magma_active else (30.0 if thorn_active or not special_weapon.is_empty() else 0.0)
-	return base * charge_cost_multiplier * (0.75 if run_module == "conduit" else 1.0)
+	return 0.0
 
-func shoot(charged := false, pose_held := false) -> void:
-	var magma := magma_active
-	var thorn := thorn_active
-	var special := special_weapon
-	var cost := charged_shot_cost() if charged else (8.0 if magma else (7.0 if thorn or not special.is_empty() else 0.0))
-	if energy < cost:
-		return
+func suit_shot_cost() -> float:
+	return (8.0 if magma_active else 7.0) * charge_cost_multiplier * (0.75 if run_module == "conduit" else 1.0)
+
+func shoot(charged := false, pose_held := false, suit_shot := false) -> void:
+	var showcase := is_instance_valid(showcase_projectiles)
+	var suit := equipped_suit()
+	var uses_suit := suit_shot and not suit.is_empty() and (showcase or (boss_debuff != 10 and energy >= suit_shot_cost()))
+	var magma := uses_suit and magma_active
+	var thorn := uses_suit and thorn_active
+	var special := special_weapon if uses_suit else ""
+	charged = charged and suit.is_empty()
 	fire_lock = fire_interval
-	if cost > 0.0:
-		restore_energy(-cost)
+	if uses_suit and not showcase:
+		restore_energy(-suit_shot_cost())
 	var aim := facing
 	if buster_pose:
 		buster_pose.ladder_direction = aim if is_instance_valid(ladder) or wall_sliding else 0.0
@@ -1125,19 +1188,13 @@ func shoot(charged := false, pose_held := false) -> void:
 	if not special.is_empty():
 		launch_reward_weapon(muzzle, aim, charged, special)
 	elif thorn:
-		var count := 1 if charged else 2
-		for i in range(count):
-			var angle := (i - (count - 1) * 0.5) * (0.18 if charged else 0.14)
-			launch_buster(muzzle, Vector3(aim * cos(angle), sin(angle), 0), charged, false, (92.0 if charged else 16.0) * level_damage_scale(), Color("a8ff64"), "thorn_swarm")
-	elif magma and charged:
-		for spread in [-0.51, 0.0, 0.51]:
-			var direction := Vector3(aim * cos(spread), sin(spread), 0.0)
-			launch_buster(muzzle, direction, true, true, (62.0 if is_zero_approx(spread) else 45.0) * level_damage_scale(), Color.TRANSPARENT, "magma_breaker")
+		for angle in [-.09, .09]:
+			launch_buster(muzzle, Vector3(aim * cos(angle), sin(angle), 0), false, false, 16.0 * level_damage_scale(), Color("a8ff64"), "thorn_swarm")
 	else:
 		var power := (34.0 * level_damage_scale()) if magma else (buster_power() * (4.0 if charged else 1.0))
 		launch_buster(muzzle, Vector3(aim, 0, 0), charged, magma, power, Color.TRANSPARENT, "magma_breaker" if magma else "")
-	if not equipped_suit().is_empty():
-		RiftProjectile.suit_flash(get_parent(), muzzle, Color(Catalog.weapon(equipped_suit()).color), charged)
+	if uses_suit:
+		RiftProjectile.suit_flash(showcase_projectiles if showcase else get_parent(), muzzle, Color(Catalog.weapon(suit).color), charged)
 	RiftAudio.play_effect(&"buster_charged" if charged else &"buster")
 
 func buster_range(muzzle: Vector3, direction: Vector3) -> float:
@@ -1159,7 +1216,14 @@ func buster_range(muzzle: Vector3, direction: Vector3) -> float:
 func launch_buster(muzzle: Vector3, direction: Vector3, charged: bool, magma: bool, power: float, tint := Color.TRANSPARENT, weapon_id := "", echo := false) -> void:
 	var projectile := RiftProjectile.new()
 	projectile.collision_mask = 3 | 16 | (8 if magma else 0)
-	get_parent().add_child(projectile)
+	var showcase := is_instance_valid(showcase_projectiles)
+	if showcase:
+		projectile.collision_layer = 0
+		projectile.collision_mask = 0
+		projectile.monitoring = false
+		projectile.monitorable = false
+	var container := showcase_projectiles if showcase else get_parent()
+	container.add_child(projectile)
 	projectile.global_position = muzzle
 	projectile.damage = power * (buster_damage_multiplier * (1.0 + supply_bonus("attack")) if magma or not weapon_id.is_empty() else 1.0)
 	projectile.source_operator = get_instance_id()
@@ -1197,6 +1261,12 @@ func launch_buster(muzzle: Vector3, direction: Vector3, charged: bool, magma: bo
 	if tint.a > 0.0:
 		shot_color = tint
 	projectile.setup(direction, faction, shot_color, false, charged, magma)
+	if showcase:
+		projectile.remove_from_group(&"rift_projectile")
+		projectile.speed *= 0.57
+		projectile.lifetime = 0.65
+		projectile.range_remaining = 9.0
+		return
 	shot_fired.emit(projectile)
 	if charged and not echo and echo_power > 0.0:
 		await get_tree().create_timer(0.11, false).timeout
@@ -1249,7 +1319,8 @@ func unlock_sector_weapon(id: String, equip := true) -> void:
 		magma_unlocked = true
 	elif id == "thorn_swarm":
 		thorn_unlocked = true
-	equip_sector_weapon(id)
+	if equip:
+		equip_sector_weapon(id)
 
 func equip_sector_weapon(id: String) -> void:
 	if not id.is_empty() and id not in run_weapon_ids:
@@ -1370,7 +1441,11 @@ func update_melee(delta: float) -> void:
 	if not can_use_saber:
 		cancel_saber_charge()
 	elif action_pressed("melee"):
-		saber_hold = 0.0
+		if equipped_suit().is_empty():
+			saber_hold = 0.0
+		else:
+			cancel_saber_charge()
+			released_tap = true
 	if saber_hold >= 0.0:
 		if action_held("melee") and not action_released("melee"):
 			saber_hold += delta
@@ -1630,6 +1705,49 @@ func take_damage(amount: float, source_position := Vector3.ZERO) -> void:
 func take_projectile_damage(amount: float) -> void:
 	receive_hit(amount, Vector3.ZERO)
 
+func take_boss_hit(amount: float, source: Vector3, sector: int, recoil := false) -> void:
+	var previous := health
+	if recoil:
+		take_damage(amount, source)
+	else:
+		take_projectile_damage(amount)
+	if health <= 0.0 or health >= previous or sector < 1 or sector >= BOSS_DEBUFFS.size():
+		return
+	if boss_debuff != sector:
+		debuff_tick = 2.0 if sector == 4 else 1.0
+	boss_debuff = sector
+	debuff_left = 6.0 if sector == 4 else (4.0 if sector in [2, 7] else 3.0)
+
+func clear_boss_debuff() -> void:
+	boss_debuff = 0
+	debuff_left = 0.0
+	debuff_tick = 0.0
+	shock_stun = 0.0
+
+func update_boss_debuff(delta: float) -> void:
+	shock_stun = maxf(0.0, shock_stun - delta)
+	if boss_debuff == 0 or health <= 0.0:
+		return
+	debuff_left -= delta
+	debuff_tick -= delta
+	if debuff_tick <= .001 and boss_debuff in [1, 2, 4, 7]:
+		var shock := boss_debuff == 4
+		debuff_tick += 2.0 if shock else 1.0
+		if shock:
+			shock_stun = .26
+			dash_left = 0.0
+		if not local_prediction:
+			var damage := max_health * (.022 if shock else .033)
+			health = maxf(0.0, health - damage)
+			show_damage.call_deferred(damage, boss_debuff == 1)
+			health_changed.emit(health, max_health)
+			if health <= 0.0:
+				clear_boss_debuff()
+				died.emit()
+	if debuff_left <= .001:
+		boss_debuff = 0
+		debuff_left = 0.0
+
 func receive_hit(amount: float, source_position: Vector3) -> bool:
 	if dash_left > 0.0 and dash_elapsed < dash_guard_time:
 		return false
@@ -1646,12 +1764,32 @@ func receive_hit(amount: float, source_position: Vector3) -> bool:
 func react_to_hit(previous_health: float) -> bool:
 	if health >= previous_health:
 		return false
-	RiftAudio.play_effect(&"armor_hit")
-	if not remote_input:
-		RiftSettings.rumble()
+	play_hurt_feedback(not remote_input)
+	hurt.emit()
 	if health <= 0.0:
 		return false
 	invulnerable_time = 0.65 + extra_hit_immunity
 	if impact_energy > 0.0:
 		restore_energy(impact_energy, true)
 	return true
+
+func play_hurt_feedback(local_feedback: bool) -> void:
+	if local_feedback:
+		RiftAudio.play_effect(&"armor_hit")
+		RiftSettings.rumble()
+	if not visible or health <= 0.0:
+		return
+	if hurt_flash and hurt_flash.is_valid():
+		hurt_flash.kill()
+	if not hurt_shell:
+		hurt_shell = ShaderMaterial.new()
+		hurt_shell.shader = CHARGE_SHELL
+		hurt_shell.set_shader_parameter("charge_color", Color("ff445c"))
+	hurt_shell.set_shader_parameter("intensity", 1.9)
+	refresh_suit_overlay()
+	hurt_flash = create_tween()
+	hurt_flash.tween_property(hurt_shell, "shader_parameter/intensity", 0.0, 0.28)
+	hurt_flash.tween_callback(func():
+		hurt_shell = null
+		refresh_suit_overlay()
+	)

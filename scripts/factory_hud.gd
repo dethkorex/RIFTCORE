@@ -33,6 +33,8 @@ var run_tenths := 0
 var status_lines := PackedStringArray()
 var act := 1
 var coop := false
+var coop_objective: Control
+var coop_party: Control
 var reserve_lives := 0
 var reached_exit := false
 var weapon := "STANDARD FRAME"
@@ -44,6 +46,9 @@ var boss_health := 0.0
 var boss_max_health := 1.0
 var boss_name := "FORGE TITAN"
 var boss_tint := Color("ff8c36")
+var boss_sector := 1
+var boss_act := 2
+const BOSS_SIGILS := ["◆", "✿", "❄", "◈", "⌘", "≋", "⬢", "⊙", "▦", "✧"]
 var exit_task := "REACH THE FACTORY EXIT"
 
 func show_quick_slots(profile) -> void:
@@ -109,6 +114,40 @@ func _ready() -> void:
 	loot_popups.offset_left = -230
 	loot_popups.offset_right = 230
 	loot_popups.offset_top = 186
+
+func place_party() -> void:
+	var factor := HUD_SCALE * RiftSettings.hud_scale
+	coop_party.position = Vector2(18, 218) * factor
+	coop_party.scale = Vector2.ONE * factor
+	queue_redraw()
+
+func draw_boss_readout(hud_size: Vector2) -> void:
+	var width := clampf(hud_size.x - 560.0, 294.0, 590.0)
+	var top := 12.0 if hud_size.x >= 1120.0 else 132.0
+	var at := Vector2((hud_size.x - width) * .5, top)
+	var values := "%d / %d" % [roundi(boss_health), roundi(boss_max_health)]
+	var tint := boss_tint.lightened(.19) if boss_act == 1 else boss_tint
+	plate(Rect2(at, Vector2(width, 87)), 15 if boss_act == 2 else 9, tint)
+	plate(Rect2(at + Vector2(12, 11), Vector2(48, 43)), 11, tint)
+	caption(at + Vector2(22, 43), BOSS_SIGILS[clampi(boss_sector - 1, 0, BOSS_SIGILS.size() - 1)], 27, tint)
+	var value_font := 20
+	var value_width := UI.DISPLAY.get_string_size(values, HORIZONTAL_ALIGNMENT_LEFT, -1, value_font).x
+	caption(at + Vector2(width - value_width - 17, 43), values, value_font)
+	caption(at + Vector2(72, 25), "SECTOR %02d   /   %s" % [boss_sector, "MINIBOSS" if boss_act == 1 else "GUARDIAN"], 13, tint)
+	var name_font := 27
+	var available := width - value_width - 93.0
+	while name_font > 13 and UI.DISPLAY.get_string_size(boss_name, HORIZONTAL_ALIGNMENT_LEFT, -1, name_font).x > available:
+		name_font -= 1
+	caption(at + Vector2(72, 47), boss_name, name_font)
+	var fill := clampf(boss_health / maxf(1.0, boss_max_health), 0.0, 1.0)
+	var meter := Rect2(at + Vector2(14, 60), Vector2(width - 28, 17))
+	draw_rect(meter, tint.darkened(.82))
+	var segments := 12 if boss_act == 2 else 8
+	for index in segments:
+		var span := meter.size.x / segments
+		var part := clampf(fill * segments - index, 0.0, 1.0)
+		var segment := Rect2(meter.position + Vector2(span * index, 0), Vector2((span - 2.0) * part, meter.size.y))
+		draw_rect(segment, tint.lerp(Color.WHITE, .14 + (index % 2) * .14))
 
 func set_experience(total: int) -> void:
 	var old_level := RiftPlayer.level_for_experience(experience)
@@ -182,8 +221,10 @@ func add_loot_popup(message: String, tint: Color) -> void:
 	fade.tween_property(popup, "modulate:a", 0.0, 0.32)
 	fade.tween_callback(popup.queue_free)
 
-func set_status_effects(supplies: Dictionary) -> void:
+func set_status_effects(supplies: Dictionary, debuff := 0, remaining := 0.0) -> void:
 	var lines := PackedStringArray()
+	if debuff > 0 and debuff < RiftPlayer.BOSS_DEBUFFS.size() and remaining > 0.0:
+		lines.append("!  %s   ·   %ds" % [RiftPlayer.BOSS_DEBUFFS[debuff], ceili(remaining)])
 	for stat in BOOST_NAMES:
 		var effect: Vector2 = supplies.get(stat, Vector2.ZERO)
 		if effect.y > 0.0:
@@ -272,7 +313,9 @@ func _draw() -> void:
 		draw_line(Vector2(x + 12, 55), Vector2(right - 12, 55), CYAN, 1.0)
 		task(Vector2(x + 20, 80), exit_task, reached_exit)
 		task(Vector2(x + 20, 106), "OPTIONAL: SECURITY   %d LEFT" % remaining, remaining == 0)
-	var counters := Vector2(20, 218) if coop else Vector2(right - 222, 139)
+	var counters := Vector2(right - 222, 139)
+	if coop and is_instance_valid(coop_objective):
+		counters.y = maxf(counters.y, coop_objective.get_rect().end.y / hud_scale + 12.0)
 	plate(Rect2(counters, Vector2(222, 65)), 11)
 	draw_texture_rect(CURRENCY, Rect2(counters + Vector2(13, 5), Vector2(24, 24)), false)
 	caption(counters + Vector2(47, 25), "BOLTS  %04d" % credits, 19)
@@ -288,23 +331,7 @@ func _draw() -> void:
 	var time_text := "%02d:%02d.%d" % [run_tenths / 600, run_tenths / 10 % 60, run_tenths % 10]
 	caption(counters + Vector2(15, 134), "TIME     " + time_text, 17)
 	if boss_visible:
-		var center := hud_size.x * 0.5
-		var values := "%d / %d" % [roundi(boss_health), roundi(boss_max_health)]
-		var scale_factor := 1.2
-		var value_font := roundi(17 * scale_factor)
-		var title_font := roundi(18 * scale_factor)
-		var value_width := UI.DISPLAY.get_string_size(values, HORIZONTAL_ALIGNMENT_LEFT, -1, value_font).x
-		var title_width := UI.DISPLAY.get_string_size(boss_name, HORIZONTAL_ALIGNMENT_LEFT, -1, title_font).x
-		var half_width := maxf(180.0 * scale_factor, (title_width + value_width + 50.0 * scale_factor) * 0.5)
-		var bar_left := center - half_width + 17 * scale_factor
-		var bar_right := center + half_width - 17 * scale_factor
-		plate(Rect2(center - half_width, 14, half_width * 2.0, 47 * scale_factor), 11 * scale_factor, boss_tint)
-		caption(Vector2(bar_left, 14 + 22 * scale_factor), boss_name, title_font)
-		caption(Vector2(bar_right - value_width, 14 + 22 * scale_factor), values, value_font)
-		var meter := Rect2(bar_left, 14 + 30 * scale_factor, bar_right - bar_left, 7 * scale_factor)
-		draw_rect(meter, Color("482738"))
-		meter.size.x *= clampf(boss_health / boss_max_health, 0.0, 1.0)
-		draw_rect(meter, boss_tint)
+		draw_boss_readout(hud_size)
 	if failed:
 		plate(Rect2(hud_size.x * 0.5 - 168, hud_size.y * 0.72, 336, 44), 10, Color("ff536c"))
 		caption(Vector2(hud_size.x * 0.5 - 151, hud_size.y * 0.72 + 28), "RUN OVER   /   BANKING CREDITS" if lives <= 0 else "SYSTEM FAILURE   /   RESPAWNING", 17)
@@ -319,7 +346,9 @@ func _draw() -> void:
 	var previous := RiftSettings.binding_label("previous_suit", device)
 	var next := RiftSettings.binding_label("swap_weapon", device)
 	caption(Vector2(64, 199), "%s  ‹  PREV     NEXT  ›  %s" % [previous, next], 12, Color("a8c6db"))
-	var status_y := counters.y + 153.0 if coop else 218.0
+	var status_y := 218.0
+	if coop and is_instance_valid(coop_party):
+		status_y += coop_party.size.y + 12.0
 	for line in status_lines:
 		plate(Rect2(20, status_y, 222, 33), 9, UI.VIOLET)
 		caption(Vector2(35, status_y + 24), line, 22)

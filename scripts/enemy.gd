@@ -166,6 +166,8 @@ func install_model() -> void:
 	collider.shape = hitbox
 
 func finish_armor() -> void:
+	const SECTOR_TRIM := preload("res://assets/enemies/sector_armor_trim.png")
+	const TRIM_ROWS := [0, 102, 196, 295, 390, 475, 558, 636, 718, 802, 887]
 	var kit := detachment_sector if patrol_model < 0 else 0
 	var tone := Color(CERAMIC_TONES[kit - 1]) if kit > 0 else Color("8798ad")
 	var atlas := ALBEDO_ATLAS
@@ -189,6 +191,11 @@ func finish_armor() -> void:
 				finish.set_shader_parameter("chassis_coat", coating)
 				finish.set_shader_parameter("alloy", .46 if slot.contains("Ceramic") else .62)
 				finish.set_shader_parameter("roughness_bias", .43)
+				if kit > 0:
+					var strip := Vector2(TRIM_ROWS[kit - 1] + 3, TRIM_ROWS[kit] - 3) / 887.0
+					finish.set_shader_parameter("sector_trim", SECTOR_TRIM)
+					finish.set_shader_parameter("sector_strip", strip)
+					finish.set_shader_parameter("sector_mix", .37)
 				armor_finishes[key] = finish
 			piece.set_surface_override_material(surface, armor_finishes[key])
 
