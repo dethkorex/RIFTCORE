@@ -1716,8 +1716,6 @@ func finish_mission(success: bool, xp: int, bolts: int, blueprints: Array, exhau
 		message = "Mission failed. Returning the party to Operations Station." if party_wiped else "Out of lives. Returning to Operations Station with a fresh run."
 		rewards_status.text = "Fresh run at Level 1. Blueprints sent to Storage: %d." % kept
 	if success:
-		if not OS.get_cmdline_user_args().has("--verify-relay") and is_finite(sector_seconds):
-			RiftSocial.record_clear(sector, sector_seconds)
 		var unlocked: Array[String] = []
 		for id in blueprints:
 			if id is String and Profile.GEAR.has(id) and not unlocked.has(id):

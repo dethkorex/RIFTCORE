@@ -126,11 +126,11 @@ static func build_friends(menu, columns: HBoxContainer) -> void:
 	var tools := HBoxContainer.new()
 	tools.add_theme_constant_override("separation", 8)
 	directory.add_child(tools)
-	UI.button(tools, "Find Friends", menu.show_page.bind("Add Contact"), true, 34)
+	UI.button(tools, "Find Friends", open_find_friends.bind(menu), true, 34)
 	var online_setup := UI.button(tools, "Connect Online", menu.show_page.bind("Directory Account"), false, 34)
 	online_setup.visible = not RiftRelay.directory.online()
 	UI.button(tools, "Setup Guide", menu.show_page.bind("Co-op Setup Guide"), false, 34)
-	var name := UI.label(details, "Choose an operator", 32, UI.CYAN)
+	var name := UI.label(details, "Choose a friend", 32, UI.CYAN)
 	var status := UI.label(details, "", 16, UI.MUTED)
 	details.add_child(HSeparator.new())
 	var actions := UI.column(details, 8)
@@ -145,8 +145,8 @@ static func build_friends(menu, columns: HBoxContainer) -> void:
 		selected.key = contact.get("key", "")
 		menu.social_contact = selected.key
 		selected.action = null
-		name.text = contact.get("name", "Choose an operator")
-		status.text = contact.get("status", "Find friends by their account username.")
+		name.text = contact.get("name", "Choose a friend")
+		status.text = contact.get("status", "Use Find Friends to add someone by username.")
 		if contact.get("directory", false) and contact.get("saved", false):
 			status.text = "●  " + String(contact.status)
 			status.add_theme_color_override("font_color", Color("62ea98") if contact.playing else Color("ff687e"))
@@ -210,9 +210,6 @@ static func build_friends(menu, columns: HBoxContainer) -> void:
 					DisplayServer.clipboard_set(contact.id)
 					note.text = "Steam ID copied."
 				, false, 33)
-			else:
-				var record: Dictionary = RiftSocial.recent_players[contact.id]
-				UI.label(actions, "%d sectors timed this season" % record.get("times", {}).size(), 15, UI.MUTED)
 		var code := UI.button(actions, "Copy Room Code", RiftRelay.copy_invite_code, false, 34)
 		code.visible = not RiftRelay.connected_room.is_empty()
 		code.disabled = not code.visible or not RiftRelay.can_copy_invite_code()
@@ -439,6 +436,11 @@ static func show_account_created(menu, form: Control, email: String) -> void:
 	dialog.popup_centered(Vector2i(470, 0))
 
 static func finish_directory_form(menu) -> void:
+	if menu.directory_return_page == "Account Settings":
+		menu.directory_return_page = ""
+		RiftSettings.confirm_startup_choice("online")
+		menu.show_page("Account Settings")
+		return
 	if menu.station_panel:
 		RiftSettings.confirm_startup_choice("online")
 		menu.show_page("Social")
@@ -456,7 +458,10 @@ static func build_account_settings(menu, columns: HBoxContainer) -> void:
 	form.add_child(remember)
 	if not directory.online():
 		UI.label(form, "Sign in to change your account name or password.", 18, UI.MUTED)
-		UI.button(form, "Sign In", menu.show_page.bind("Directory Account"), true).grab_focus()
+		UI.button(form, "Sign In", func():
+			menu.directory_return_page = "Account Settings"
+			menu.show_page("Directory Account")
+		, true).grab_focus()
 		return
 	var username := directory_field(form, "Username", 20)
 	username.text = directory.username
@@ -509,14 +514,53 @@ static func directory_field(parent: Container, hint: String, limit := 254) -> Li
 	parent.add_child(field)
 	return field
 
-static func build_directory_search(menu, columns: HBoxContainer) -> void:
+static func open_find_friends(menu) -> void:
+	var previous_focus: Control = menu.get_viewport().gui_get_focus_owner()
+	var popup := ColorRect.new()
+	popup.name = "FindFriendsPopup"
+	popup.color = Color(0.02, 0.04, 0.08, 0.60)
+	menu.add_child(popup)
+	popup.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	var center := CenterContainer.new()
+	popup.add_child(center)
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	var panel := PanelContainer.new()
+	panel.name = "Dialog"
+	panel.add_theme_stylebox_override("panel", UI.frame(Color("11223b"), UI.CYAN))
+	var viewport_size: Vector2 = menu.get_viewport_rect().size
+	panel.custom_minimum_size = Vector2(minf(810, viewport_size.x - 48), minf(440, viewport_size.y - 48))
+	center.add_child(panel)
+	var content := UI.column(panel, 12)
+	var header := HBoxContainer.new()
+	content.add_child(header)
+	var title := UI.label(header, "Find Friends", 30, UI.CYAN)
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var close := UI.button(header, "Close", popup.hide, false, 34)
+	var columns := HBoxContainer.new()
+	columns.add_theme_constant_override("separation", 10)
+	columns.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	content.add_child(columns)
+	popup.visibility_changed.connect(func():
+		if not popup.visible:
+			popup.queue_free()
+			if is_instance_valid(previous_focus) and previous_focus.is_visible_in_tree():
+				previous_focus.grab_focus()
+	)
+	var initial := build_player_directory(menu, columns)
+	var first: Control = initial if initial else close
+	first.grab_focus()
+	watch(popup, popup.get_viewport().gui_focus_changed, func(control: Control):
+		if popup.visible and control and not popup.is_ancestor_of(control):
+			first.grab_focus.call_deferred()
+	)
+
+static func build_directory_search(menu, columns: HBoxContainer) -> Control:
 	var form: VBoxContainer = menu.card(columns, 1.22)
 	var directory = RiftRelay.directory
-	UI.label(form, "FIND RIFTCORE FRIENDS", 26, UI.CYAN)
+	UI.label(form, "Search by username", 24, UI.CYAN)
 	if not directory.online():
 		UI.label(form, "Connect your profile to search live.", 17, UI.MUTED)
-		UI.button(form, "Connect Online", menu.show_page.bind("Directory Account"), true, 36).grab_focus()
-		return
+		return UI.button(form, "Connect Online", menu.show_page.bind("Directory Account"), true, 36)
 	var query := directory_field(form, "Exact RIFTCORE account username", 20)
 	var message := UI.label(form, "", 17, UI.MUTED)
 	var actions := HBoxContainer.new()
@@ -560,20 +604,20 @@ static func build_directory_search(menu, columns: HBoxContainer) -> void:
 				directory_action(actions, "Send Friend Request", name, "request", message).grab_focus()
 	UI.button(form, "Search", find, true, 36)
 	query.text_submitted.connect(func(_value): find.call())
-	query.grab_focus()
+	return query
 
-static func build_player_directory(menu, columns: HBoxContainer) -> void:
-	build_directory_search(menu, columns)
-	var form: VBoxContainer = menu.card(columns)
-	UI.label(form, "ALL PLAYERS", 26, UI.CYAN)
+static func build_player_directory(menu, columns: HBoxContainer) -> Control:
+	var initial := build_directory_search(menu, columns)
 	var directory = RiftRelay.directory
 	if not directory.online():
-		UI.label(form, "Sign in to browse RIFTCORE usernames.", 17, UI.MUTED)
-		return
+		return initial
+	var form: VBoxContainer = menu.card(columns)
+	UI.label(form, "ALL PLAYERS", 26, UI.CYAN)
 	var caption := UI.label(form, "Browse discoverable RIFTCORE accounts.", 16, UI.MUTED)
 	var rows: VBoxContainer = menu.scroll_entries(form)
 	var navigation := HBoxContainer.new()
 	form.add_child(navigation)
+	navigation.hide()
 	var state := {"page": 1, "last": 1, "busy": false}
 	var redraw := func(direction: int):
 		if state.busy:
@@ -593,6 +637,7 @@ static func build_player_directory(menu, columns: HBoxContainer) -> void:
 			return
 		state.page = page
 		state.last = maxi(page, int(reply.get("FinalPage", page)))
+		navigation.visible = state.last > 1
 		caption.text = "Page %d / %d" % [page, state.last]
 		for entry in reply.Result:
 			var username := String(entry.get("Username", "")) if entry is Dictionary else ""
@@ -607,13 +652,18 @@ static func build_player_directory(menu, columns: HBoxContainer) -> void:
 	UI.button(navigation, "Previous", redraw.bind(-1), false, 34)
 	UI.button(navigation, "Next", redraw.bind(1), false, 34)
 	redraw.call(0)
+	return initial
+
+static func build_notifications(menu, columns: HBoxContainer) -> void:
+	build_friend_requests(menu, columns)
+	build_invites(menu, columns)
 
 static func build_friend_requests(menu, columns: HBoxContainer) -> void:
 	var form: VBoxContainer = menu.card(columns)
 	UI.label(form, "FRIEND REQUESTS", 28, UI.CYAN)
 	var directory = RiftRelay.directory
-	var message := UI.label(form, "", 16, UI.MUTED)
 	var rows: VBoxContainer = menu.scroll_entries(form)
+	var message := UI.label(form, "", 16, UI.MUTED)
 	var redraw := func():
 		for child in rows.get_children():
 			rows.remove_child(child)
@@ -622,10 +672,13 @@ static func build_friend_requests(menu, columns: HBoxContainer) -> void:
 			UI.label(rows, "Sign in to see incoming friend requests.", 17, UI.MUTED)
 			return
 		if directory.incoming_names.is_empty():
-			UI.label(rows, "You're caught up. No incoming requests.", 17, UI.MUTED)
+			UI.label(rows, "No pending friend requests.", 17, UI.MUTED)
 		for sender in directory.incoming_names:
+			var request := UI.equipment_card(UI.CYAN)
+			rows.add_child(request)
 			var actions := HBoxContainer.new()
-			rows.add_child(actions)
+			actions.add_theme_constant_override("separation", 9)
+			request.add_child(actions)
 			UI.label(actions, sender, 19).size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			directory_action(actions, "Accept", sender, "accept", message)
 			directory_action(actions, "Decline", sender, "remove", message)
@@ -776,7 +829,7 @@ static func build_invites(menu, columns: HBoxContainer) -> void:
 	code_button.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	var redraw := func():
 		var focus := pane.get_viewport().gui_get_focus_owner()
-		var restore_focus := focus == null or rows.is_ancestor_of(focus)
+		var restore_focus := focus != null and rows.is_ancestor_of(focus)
 		var first_action: Button
 		for child in rows.get_children():
 			rows.remove_child(child)

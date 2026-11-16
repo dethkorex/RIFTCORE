@@ -214,7 +214,7 @@ func show_friend_invite(display_name: String, code: String) -> void:
 			layer.queue_free()
 		, false, 35).focus_mode = Control.FOCUS_NONE
 	else:
-		UI.label(content, "Open Social → Invites to join", 16, UI.MUTED)
+		UI.label(content, "Open Social → Notifications to join", 16, UI.MUTED)
 	RiftAudio.play_effect(&"menu_confirm")
 	get_tree().create_timer(7.0).timeout.connect(func():
 		if is_instance_valid(layer):
@@ -1177,7 +1177,7 @@ func close_station_panel() -> void:
 		RiftRelay.publish_armor_finish(current_armor_finish())
 	menu.process_mode = Node.PROCESS_MODE_DISABLED
 	if is_instance_valid(home_hub):
-		if save_session and save_session.owns_slot and menu.page in ["Shop", "Storage", "Fabrication", "Upgrades", "Craft Item", "Learn Blueprint", "Blueprint Details"]:
+		if save_session and save_session.owns_slot and menu.page in ["Shop", "Gear", "Storage", "Fabrication", "Upgrades", "Craft Item", "Learn Blueprint", "Blueprint Details"]:
 			if persist_operator_save() != OK:
 				push_warning("Could not save the station inventory change.")
 		home_hub.set_bank(profile.credits, profile.core_shards, profile.player_level())
@@ -1987,7 +1987,6 @@ func _process(delta: float) -> void:
 			advance_to_act_two.call_deferred()
 		return
 	sector_complete = true
-	RiftSocial.record_clear(sector, mission_stats.seconds)
 	var profile_progress := award_profile_clear(sector, mission_difficulty, mission_stats.seconds, mission_stats.kills)
 	mission_stats.player_xp = int(profile_progress.after) - int(profile_progress.before)
 	mission_stats.profile_progress = profile_progress

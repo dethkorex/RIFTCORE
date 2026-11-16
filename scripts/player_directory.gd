@@ -205,6 +205,16 @@ func save_link() -> Error:
 	saved.set_value("profile", "remember", remember_sign_in)
 	return saved.save(LINK_PATH)
 
+func reset_local_link() -> Error:
+	for path in [LINK_PATH, "user://GD-Sync/DataController.conf"]:
+		if FileAccess.file_exists(path):
+			var error := DirAccess.remove_absolute(path)
+			if error != OK:
+				return error
+	linked = false
+	saved_account_name = ""
+	return OK
+
 func set_remember_sign_in(enabled: bool) -> void:
 	remember_sign_in = enabled
 	save_link()

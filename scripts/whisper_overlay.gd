@@ -82,8 +82,11 @@ func open() -> void:
 	var header := HBoxContainer.new()
 	content.add_child(header)
 	var title := UI.label(header, "COMMS", 19, UI.CYAN)
+	title.autowrap_mode = TextServer.AUTOWRAP_OFF
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	UI.label(header, "Enter  Send   /   Esc  Close", 13, UI.MUTED)
+	var shortcuts := UI.label(header, "Enter to send  ·  Esc to close", 13, UI.MUTED)
+	shortcuts.autowrap_mode = TextServer.AUTOWRAP_OFF
+	shortcuts.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	selector = OptionButton.new()
 	UI.style_button(selector)
 	selector.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -91,6 +94,7 @@ func open() -> void:
 	selector.item_selected.connect(select_channel)
 	content.add_child(selector)
 	history = RichTextLabel.new()
+	history.custom_minimum_size.y = 54
 	history.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	history.scroll_following = true
 	history.add_theme_font_size_override("normal_font_size", 16)
@@ -101,6 +105,7 @@ func open() -> void:
 	row.add_theme_constant_override("separation", 6)
 	content.add_child(row)
 	composer = LineEdit.new()
+	composer.custom_minimum_size.y = 31
 	composer.max_length = RiftSocial.WHISPER_LIMIT
 	composer.text = draft
 	composer.size_flags_horizontal = Control.SIZE_EXPAND_FILL

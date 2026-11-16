@@ -1,7 +1,6 @@
 extends Node
 
 const FRIEND := 4
-signal records_changed
 signal whispers_changed(contact: Variant)
 signal invites_changed
 
@@ -13,7 +12,6 @@ var pinned: Dictionary = {}
 var invites: Dictionary = {}
 var next_whisper_at := 0
 
-const SEASON_SECONDS := 30 * 24 * 60 * 60
 const STEAM_MIN := 76561197960265728
 var steam: Object
 var ready_to_query := false
@@ -24,8 +22,6 @@ var followed: Dictionary = {}
 var operator_id := ""
 var recent_players: Dictionary = {}
 var rift_friends: Dictionary = {}
-var best_times: Dictionary = {}
-var active_season := -1
 
 func _ready() -> void:
 	process_mode = PROCESS_MODE_ALWAYS
@@ -36,52 +32,22 @@ func _ready() -> void:
 				followed[id] = String(data.get_value("followed", id, ""))
 
 		operator_id = String(data.get_value("records", "operator_id", ""))
-		active_season = int(data.get_value("records", "season", -1))
-		best_times = data.get_value("records", "times", {})
 		recent_players = data.get_value("records", "recent", {})
 		rift_friends = data.get_value("records", "friends", {})
 		pinned = data.get_value("records", "pinned", {})
+		for contact in recent_players.values():
+			contact.erase("times")
 	if operator_id.is_empty():
 		operator_id = Crypto.new().generate_random_bytes(8).hex_encode()
-	refresh_season()
 	save_social()
 
-func refresh_season() -> void:
-	var current := floori(Time.get_unix_time_from_system() / SEASON_SECONDS)
-	if current != active_season:
-		active_season = current
-		best_times.clear()
-		for id in recent_players:
-			recent_players[id].times = {}
-
-func season_days_left() -> int:
-	refresh_season()
-	return ceili(((active_season + 1) * SEASON_SECONDS - Time.get_unix_time_from_system()) / 86400.0)
-
-func record_clear(sector: int, seconds: float) -> void:
-	refresh_season()
-	var time := roundi(seconds * 1000.0)
-	if sector >= 1 and sector <= 10 and time > 0 and time < int(best_times.get(sector, 86400000)):
-		best_times[sector] = time
-		save_social()
-		records_changed.emit()
-
 func get_records() -> Dictionary:
-	refresh_season()
-	return {"id": operator_id, "season": active_season, "times": best_times.duplicate()}
+	return {"id": operator_id}
 
 func receive_records(payload: Dictionary, alias: String) -> void:
-	refresh_season()
 	var id := String(payload.get("id", ""))
 	if id.length() != 16 or not id.is_valid_hex_number() or id == operator_id:
 		return
-	var times: Dictionary = recent_players.get(id, {}).get("times", {})
-	var supplied: Variant = payload.get("times")
-	if int(payload.get("season", -1)) == active_season and supplied is Dictionary:
-		for number in range(1, 11):
-			var time := int(supplied.get(number, 0))
-			if time > 0 and time < int(times.get(number, 86400000)):
-				times[number] = time
 	if recent_players.size() >= 50 and not recent_players.has(id):
 		for old_id in recent_players.keys():
 			if not rift_friends.has(old_id):
@@ -89,11 +55,10 @@ func receive_records(payload: Dictionary, alias: String) -> void:
 				break
 		if recent_players.size() >= 50:
 			return
-	var record := {"name": alias.left(20), "times": times}
+	var record := {"name": alias.left(20)}
 	if recent_players.get(id) != record:
 		recent_players[id] = record
 		save_social()
-		records_changed.emit()
 
 func toggle_rift_friend(id: String) -> void:
 	if rift_friends.has(id):
@@ -128,19 +93,6 @@ func record_invite(display_name: String, code: String) -> void:
 func remove_invite(code: String) -> void:
 	if invites.erase(code):
 		invites_changed.emit()
-
-func leaderboard(sector: int, operator_name: String) -> Array[Dictionary]:
-	refresh_season()
-	var rows: Array[Dictionary] = []
-	if best_times.has(sector):
-		rows.append({"name": operator_name + " (You)", "time": best_times[sector]})
-	for id in rift_friends:
-		var info: Dictionary = recent_players.get(id, {})
-		var times: Dictionary = info.get("times", {})
-		if times.has(sector):
-			rows.append({"name": String(info.name), "time": int(times[sector])})
-	rows.sort_custom(func(a, b): return a.time < b.time)
-	return rows
 
 func connect_steam() -> void:
 	if not Engine.has_singleton("Steam"):
@@ -303,27 +255,22 @@ func save_social() -> bool:
 	for key in followed:
 		data.set_value("followed", key, followed[key])
 	data.set_value("records", "operator_id", operator_id)
-	data.set_value("records", "season", active_season)
-	data.set_value("records", "times", best_times)
 	data.set_value("records", "recent", recent_players)
 	data.set_value("records", "friends", rift_friends)
 	data.set_value("records", "pinned", pinned)
 	return data.save(storage_path) == OK
 
-func reset_profile() -> void:
+func reset_social_data() -> bool:
 	followed.clear()
 	recent_players.clear()
 	rift_friends.clear()
 	pinned.clear()
-	best_times.clear()
 	whispers.clear()
 	unread_whispers.clear()
 	invites.clear()
 	operator_id = Crypto.new().generate_random_bytes(8).hex_encode()
-	refresh_season()
-	save_social()
-	records_changed.emit()
 	invites_changed.emit()
+	return save_social()
 
 func open_friends() -> void:
 	if OS.shell_open("steam://open/friends") != OK:
