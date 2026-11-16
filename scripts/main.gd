@@ -137,8 +137,6 @@ func _ready() -> void:
 	account = PlayerAccount.new()
 	account.restore()
 	progress_reset_error = PlaytestReset.migrate_local(account)
-	if RiftSettings.startup_mode == "online":
-		RiftRelay.directory.configure.call_deferred(account.display_name)
 	profile.player_xp = account.experience
 	if get_tree().has_meta(&"restart_factory"):
 		get_tree().remove_meta(&"restart_factory")
@@ -740,7 +738,7 @@ func show_main_menu() -> void:
 	if progress_reset_error != OK:
 		menu.show_page("Save Reset Error")
 		return
-	if account and (account.display_name.is_empty() or RiftSettings.startup_mode.is_empty()):
+	if account and not get_tree().has_meta(&"startup_choice_confirmed") and checkpoint_path == SAVE_PATH:
 		menu.show_page("Set up Player Profile")
 	if get_tree().has_meta(&"open_command_deck"):
 		get_tree().remove_meta(&"open_command_deck")
@@ -905,6 +903,7 @@ func complete_online_setup() -> void:
 		menu.show_page("Set up Player Profile")
 		return
 	RiftSettings.confirm_startup_choice("online")
+	get_tree().set_meta(&"startup_choice_confirmed", true)
 	var cloud = RiftRelay.directory.progress
 	await cloud.sync()
 	if not is_instance_valid(menu):
@@ -918,10 +917,7 @@ func complete_online_setup() -> void:
 	elif cloud.conflict:
 		menu.show_page("Saves")
 		return
-	if newly_signed_in and not cloud.checked_release:
-		menu.show_page("Saves")
-		return
-	menu.open_slot_picker("Load Game")
+	menu.open_after_startup()
 
 func purchase_finish(id: String) -> void:
 	var catalog := preload("res://scripts/operator_skins.gd")

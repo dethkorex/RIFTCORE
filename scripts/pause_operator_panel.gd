@@ -15,6 +15,8 @@ var buster: Label
 var quick_labels: Array[Label] = []
 var quick_icons: Array[TextureRect] = []
 var quick_edited: Callable
+var quick_origin := ""
+var quick_cancel: Button
 var inventory_grid: GridContainer
 var inventory_tiles: Dictionary = {}
 var inventory_snapshot: Dictionary = {}
@@ -141,6 +143,8 @@ func build_inventory() -> void:
 		equip_buttons.append(button)
 	return_stack = UI.button(panel, "Unequip Selected Slot", clear_slot, false, 30)
 	return_stack.focus_neighbor_top = return_stack.get_path_to(equip_buttons[0])
+	quick_cancel = UI.button(panel, "Cancel Assignment", cancel_quick_assignment, false, 30)
+	quick_cancel.hide()
 
 func select_inventory_item(key: String, equip := false) -> void:
 	var item: Dictionary = inventory_snapshot[key]
@@ -150,7 +154,9 @@ func select_inventory_item(key: String, equip := false) -> void:
 		selected_supply = String(item.get("supply", ""))
 		supply_source = item.get("source", &"inventory")
 	if equip and not selected_supply.is_empty():
-		item_feedback.text = "Choose a D-pad slot for %s." % item.name
+		quick_origin = key
+		quick_cancel.show()
+		item_feedback.text = "Assign Quick Slot  ·  %s" % item.name
 		equip_buttons[selected_slot].grab_focus()
 
 func edit_slot(index: int) -> void:
@@ -163,10 +169,27 @@ func edit_slot(index: int) -> void:
 	var player := operator.call() as RiftPlayer
 	item_feedback.text = profile.assign_quick(index, selected_supply, supply_source, player.recovered_supplies)
 	if previous != profile.quick_slots[index]:
-		selected_supply = ""
 		if quick_edited.is_valid():
 			quick_edited.call()
+		cancel_quick_assignment(false)
 	refresh()
+
+func cancel_quick_assignment(clear_message := true) -> bool:
+	if selected_supply.is_empty():
+		return false
+	var origin: Button = inventory_tiles.get(quick_origin)
+	selected_supply = ""
+	quick_origin = ""
+	quick_cancel.hide()
+	if clear_message:
+		item_feedback.text = ""
+	if is_instance_valid(origin):
+		origin.grab_focus()
+	return true
+
+func _input(event: InputEvent) -> void:
+	if is_visible_in_tree() and event.is_action_pressed("ui_cancel") and cancel_quick_assignment():
+		get_viewport().set_input_as_handled()
 
 func clear_slot() -> void:
 	var previous: Dictionary = profile.quick_slots[selected_slot].duplicate()

@@ -184,7 +184,7 @@ func sync(prefer_local := false) -> void:
 		conflict = true
 		last_checked_hash = fingerprint(current)
 		busy = false
-		update("A different cloud save is available. Choose which copy to keep in Saves.")
+		update("A different cloud save is available. Choose which copy to keep before playing.")
 		return
 	if not valid_snapshot(current):
 		busy = false

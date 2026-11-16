@@ -88,7 +88,7 @@ static func message_contacts() -> Array[Dictionary]:
 			var persona: String = RiftSocial.steam.getFriendPersonaName(id)
 			if not persona.is_empty() and persona != "[unknown]":
 				name = persona
-		rows.append({"key": "steam:" + str(id), "chat": id, "name": name, "status": "Steam conversation", "party": false, "playing": false, "recent": false})
+		rows.append({"key": "steam:" + str(id), "chat": id, "id": str(id), "name": name, "status": "Steam conversation", "party": false, "playing": false, "recent": false, "saved": false})
 	return rows
 
 static func can_message(id: Variant) -> bool:
@@ -136,6 +136,7 @@ static func build_friends(menu, columns: HBoxContainer) -> void:
 	var actions := UI.column(details, 8)
 	var note := UI.label(details, "", 16, UI.CYAN)
 	var relay_status := UI.label(details, "Invite Friend opens a private party." if RiftRelay.connected_room.is_empty() else RiftRelay.status, 15, UI.MUTED)
+	var conversation := build_conversation(details)
 
 	var selected := {"key": menu.social_contact, "button": null, "action": null}
 	var show_contact := func(contact: Dictionary):
@@ -145,6 +146,10 @@ static func build_friends(menu, columns: HBoxContainer) -> void:
 		selected.key = contact.get("key", "")
 		menu.social_contact = selected.key
 		selected.action = null
+		conversation.select.call(contact)
+		var primary := HBoxContainer.new()
+		primary.add_theme_constant_override("separation", 8)
+		actions.add_child(primary)
 		name.text = contact.get("name", "Choose a friend")
 		status.text = contact.get("status", "Use Find Friends to add someone by username.")
 		if contact.get("directory", false) and contact.get("saved", false):
@@ -155,13 +160,10 @@ static func build_friends(menu, columns: HBoxContainer) -> void:
 		if contact.get("directory", false):
 			var relation: int = contact.relation
 			if relation == Codes.FRIEND_STATUS.FRIEND:
-				var invite := UI.button(actions, "Invite Friend", RiftRelay.invite_directory_friend.bind(contact.id), true, 42)
+				var invite := UI.button(primary, "Invite Friend", RiftRelay.invite_directory_friend.bind(contact.id), true, 42)
 				invite.disabled = not contact.playing or not RiftRelay.can_invite_directory_friend()
 				invite.tooltip_text = "Opens a private group if needed and sends a RIFTCORE invite."
-				var message := UI.button(actions, "Message Friend", func():
-					menu.whisper_contact = contact.chat
-					menu.show_page("Whispers")
-				, false, 36)
+				var message := UI.button(primary, "Message", conversation.focus, false, 36)
 				selected.action = invite if not invite.disabled else message
 			var management := HBoxContainer.new()
 			management.add_theme_constant_override("separation", 8)
@@ -173,17 +175,14 @@ static func build_friends(menu, columns: HBoxContainer) -> void:
 				selected.action = remove
 		elif not contact.is_empty():
 			var joined: bool = contact.party
-			var chat_allowed: bool = joined or (not contact.recent and RiftSocial.can_whisper(contact.chat))
-			var invite := UI.button(actions, "Invite Friend", RiftRelay.invite_friend.bind(contact.chat), true, 42) if not contact.recent and contact.playing else null
+			var chat_allowed := can_message(contact.chat)
+			var invite := UI.button(primary, "Invite Friend", RiftRelay.invite_friend.bind(contact.chat), true, 42) if not contact.recent and contact.playing else null
 			if invite:
 				invite.disabled = joined or not contact.playing or not RiftRelay.can_invite_friend()
 				invite.tooltip_text = "Available for Steam friends playing RIFTCORE."
 			var whisper: Button
 			if chat_allowed or RiftSocial.whispers.has(contact.chat):
-				whisper = UI.button(actions, "Open Conversation", func():
-					menu.whisper_contact = contact.chat
-					menu.show_page("Whispers")
-				, false, 36)
+				whisper = UI.button(primary, "Message", conversation.focus, false, 36)
 			selected.action = invite if invite and not invite.disabled else whisper
 			var management := HBoxContainer.new()
 			management.add_theme_constant_override("separation", 9)
@@ -228,7 +227,7 @@ static func build_friends(menu, columns: HBoxContainer) -> void:
 		var query := search.text.strip_edges().to_lower()
 		var chosen := {}
 		var first := {}
-		for contact in contacts(true):
+		for contact in message_contacts():
 			var selected_filter := filter.selected
 			if ((selected_filter == 1 and not contact.saved) or (selected_filter == 2 and not contact.party)
 				or (selected_filter == 3 and not contact.playing) or (selected_filter == 4 and not contact.recent)):
@@ -239,6 +238,9 @@ static func build_friends(menu, columns: HBoxContainer) -> void:
 				selected.button = rows.get_viewport().gui_get_focus_owner()
 				if not is_instance_valid(selected.button) or selected.button.get_parent() != rows:
 					selected.button = rows.get_node_or_null("Contact_" + entry.key.replace(":", "_"))
+				RiftSocial.unread_whispers.erase(entry.chat)
+				if is_instance_valid(selected.button):
+					selected.button.text = contact_title(entry)
 				show_contact.call(entry)
 				if is_instance_valid(selected.action):
 					selected.action.grab_focus()
@@ -280,7 +282,16 @@ static func build_friends(menu, columns: HBoxContainer) -> void:
 		relay_status.text = RiftRelay.status
 		rebuild.call()
 	)
-	watch(directory, RiftSocial.whispers_changed, func(_id): rebuild.call())
+	watch(directory, RiftSocial.whispers_changed, func(id):
+		for contact in message_contacts():
+			if is_same(contact.chat, id):
+				var item := rows.get_node_or_null("Contact_" + String(contact.key).replace(":", "_")) as Button
+				if item:
+					item.text = contact_title(contact)
+				else:
+					rebuild.call()
+				break
+	)
 	rebuild.call()
 	if rows.get_viewport().gui_get_focus_owner() == null:
 		search.grab_focus()
@@ -304,18 +315,18 @@ static func build_startup_choices(menu, columns: HBoxContainer) -> void:
 	UI.label(form, "WELCOME TO RIFTCORE", 38, UI.CYAN)
 	UI.label(form, "An online account lets you use cloud saves and find friends. You can play solo with a local profile.", 19, UI.MUTED)
 	form.add_child(HSeparator.new())
-	var create := UI.button(form, "Create Account", menu.show_page.bind("Create Account"), true)
-	UI.button(form, "Sign In", menu.show_page.bind("Sign In"))
+	var sign_in := UI.button(form, "Sign In", menu.show_page.bind("Sign In"), true)
+	UI.button(form, "Create Account", menu.show_page.bind("Create Account"))
 	UI.button(form, "Continue Offline", func():
 		if menu.account.display_name.is_empty():
 			menu.show_page("Offline Setup")
 		else:
 			RiftSettings.confirm_startup_choice("offline")
-			menu.open_slot_picker("Load Game")
+			menu.open_after_startup()
 	)
 	UI.button(form, "Quit Game", RiftRelay.quit_game)
 	menu.portrait(menu.card(columns))
-	create.grab_focus()
+	sign_in.grab_focus()
 
 static func build_directory_account(menu, columns: HBoxContainer, create := false) -> void:
 	var form: VBoxContainer = menu.card(columns)
@@ -356,6 +367,20 @@ static func build_directory_account(menu, columns: HBoxContainer, create := fals
 	resend.disabled = false
 	resend.focus_mode = Control.FOCUS_ALL
 	var message := UI.label(form, "", 16, UI.MUTED)
+	if not create and directory.linked and directory.remember_sign_in:
+		var use_saved := UI.button(form, "Sign In as " + directory.saved_account_name, func():
+			if directory.busy:
+				return
+			message.text = "Restoring sign-in…"
+			await directory.configure()
+			if not is_instance_valid(form):
+				return
+			if directory.online():
+				finish_directory_form(menu)
+			else:
+				message.text = directory.status
+		, false, 34)
+		use_saved.tooltip_text = "Use the saved sign-in on this device."
 	var submit := func():
 		if directory.busy or primary.disabled:
 			return
@@ -721,105 +746,63 @@ static func build_add(menu, columns: HBoxContainer) -> void:
 	alias.text_submitted.connect(func(_value): submit.call())
 	UI.label(form, "Players you meet in co-op also appear under Recent.", 16, UI.MUTED)
 
-static func build_messages(menu, columns: HBoxContainer, focus_composer := false) -> void:
-	var threads := UI.card(columns, 0.7)
-	UI.label(threads, "CONVERSATIONS", 24, UI.CYAN)
-	var entries := UI.scroll_entries(threads)
-	var pane := UI.card(columns, 1.3)
-	var heading := UI.label(pane, "Choose a contact", 30, UI.CYAN)
+static func build_conversation(parent: VBoxContainer) -> Dictionary:
+	var pane := UI.column(parent, 5)
+	pane.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	var history := RichTextLabel.new()
 	history.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	history.bbcode_enabled = false
 	history.scroll_following = true
 	pane.add_child(history)
+	var row := HBoxContainer.new()
+	pane.add_child(row)
 	var composer := LineEdit.new()
 	composer.placeholder_text = "Write a whisper"
 	composer.max_length = RiftSocial.WHISPER_LIMIT
-	pane.add_child(composer)
-	var status := UI.label(pane, "", 16, UI.MUTED)
-	var current: Dictionary = {"contact": {}, "button": null}
-	var listed := {}
-	var refresh := func():
-		var contact: Dictionary = current.contact
-		var key: Variant = contact.get("chat", 0)
-		var active := can_message(key)
-		composer.editable = active
-		history.clear()
-		heading.text = contact.get("name", "Choose a contact")
-		status.text = "" if active or contact.is_empty() else "This contact is unavailable. Sign in or join their party to send a message."
-		for line in RiftSocial.whispers.get(key, []):
-			history.add_text("%s  %s\n%s\n\n" % [line.get("at", ""), "You" if line.outgoing else heading.text, line.body])
-		if active and history.get_paragraph_count() == 1:
-			history.add_text("Send a private message to start the conversation.")
+	composer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(composer)
+	var status := UI.label(pane, "", 15, UI.MUTED)
+	var current := {"chat": null, "name": ""}
 	var send := func():
-		if current.contact.is_empty() or not RiftSocial.send_whisper(current.contact.chat, composer.text):
-			if not composer.text.strip_edges().is_empty():
-				status.text = "Message unavailable. Check that your friend is connected and try again."
-			return
-		composer.clear()
-	var controls := HBoxContainer.new()
-	controls.add_theme_constant_override("separation", 8)
-	pane.add_child(controls)
-	var submit := UI.button(controls, "Send", send, false, 35)
+		if RiftSocial.send_whisper(current.chat, composer.text):
+			composer.clear()
+		elif not composer.text.strip_edges().is_empty():
+			status.text = "Message unavailable. Try again when your friend is connected."
+	var submit := UI.button(row, "Send", send, false, 35)
 	composer.text_submitted.connect(func(_value): send.call())
-	for phrase in ["Ready to deploy", "Meet at the hub", "One minute"]:
-		UI.button(controls, phrase, func():
-			if composer.editable:
-				composer.text = phrase
-				composer.grab_focus()
-				composer.caret_column = composer.text.length()
-		, false, 35)
+	var refresh := func():
+		var key: Variant = current.chat
+		var active := can_message(key)
+		var messages: Array = RiftSocial.whispers.get(key, [])
+		pane.visible = active or not messages.is_empty()
+		composer.editable = active
+		submit.disabled = not active
+		history.clear()
+		status.text = "" if active else "This conversation is read-only while the contact is unavailable."
+		for line in messages:
+			history.add_text("%s  %s
+%s
+
+" % [line.get("at", ""), "You" if line.outgoing else current.name, line.body])
+		if active and messages.is_empty():
+			history.add_text("Send a private message to start the conversation.")
 	var select := func(contact: Dictionary):
-		current.contact = contact
-		menu.whisper_contact = contact.chat
-		RiftSocial.unread_whispers.erase(contact.chat)
-		if listed.has(contact.chat):
-			listed[contact.chat].text = contact_title(contact)
+		var key: Variant = contact.get("chat")
+		if not is_same(current.chat, key):
+			composer.clear()
+		current.chat = key
+		current.name = contact.get("name", "")
 		refresh.call()
-		submit.disabled = not composer.editable
-	var first := {}
-	var empty_hint := UI.label(entries, "Add a RIFTCORE friend or join a party to send private messages.", 17, UI.MUTED)
-	var add_thread := func(contact: Dictionary) -> Button:
-		var button := contact_button(entries, contact, select)
-		listed[contact.chat] = button
-		button.focus_entered.connect(func(): set_focus(button, composer))
-		set_focus(button, composer)
-		empty_hint.hide()
-		return button
-	for contact in message_contacts():
-		var connected := can_message(contact.chat)
-		if connected or RiftSocial.whispers.has(contact.chat):
-			add_thread.call(contact)
-			if first.is_empty():
-				first = contact
-			if contact.chat == menu.whisper_contact:
-				select.call(contact)
-	if current.contact.is_empty() and not first.is_empty():
-		select.call(first)
-	if not current.contact.is_empty():
-		if focus_composer and composer.editable:
-			composer.grab_focus()
-		else:
-			listed[current.contact.chat].grab_focus()
-	if first.is_empty():
-		composer.editable = false
-	submit.disabled = not composer.editable
 	watch(history, RiftSocial.whispers_changed, func(id):
-		if current.contact.get("chat") == id:
-			RiftSocial.unread_whispers.erase(id)
+		if is_same(current.chat, id):
+			if composer.has_focus():
+				RiftSocial.unread_whispers.erase(id)
 			refresh.call()
-		for contact in message_contacts():
-			if contact.chat == id:
-				if listed.has(id):
-					listed[id].text = contact_title(contact)
-				else:
-					add_thread.call(contact)
-				break
 	)
-	watch(history, RiftRelay.changed, func():
-		refresh.call()
-		submit.disabled = not composer.editable
-	)
+	return {"select": select, "focus": func():
+		if composer.is_visible_in_tree() and composer.editable:
+			RiftSocial.unread_whispers.erase(current.chat)
+			composer.grab_focus()
+	}
 
 static func build_invites(menu, columns: HBoxContainer) -> void:
 	var pane: VBoxContainer = menu.card(columns)
