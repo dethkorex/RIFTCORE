@@ -108,7 +108,8 @@ func prepare_release() -> int:
 	var code := int(check.get("Code", 1))
 	if code != 0 and code != Codes.ACCOUNT_GET_DOCUMENT_RESPONSE_CODE.DOESNT_EXIST:
 		return code
-	var stored := String(check.get("Result", {}).get("release", "")) if code == 0 else ""
+	var remote_epoch: Variant = check.get("Result")
+	var stored := String(remote_epoch.get("release", "")) if code == 0 and remote_epoch is Dictionary else ""
 	if stored.naturalnocasecmp_to(target) > 0:
 		return ERR_UNAVAILABLE
 	if stored != target:

@@ -255,8 +255,8 @@ func decode_from(data: ConfigFile) -> void:
 	var pouch: Variant = data.get_value("inventory", "blueprint_pouch", [])
 	if pouch is Array:
 		for id in pouch:
-			if id is String and can_collect_blueprint(id) and blueprint_pouch.size() < BLUEPRINT_POUCH_SIZE:
-				blueprint_pouch.append(id)
+			if id is String and can_collect_blueprint(id):
+				blueprint_items[id] = true
 	var items: Variant = data.get_value("inventory", "stock", {})
 	var separated := data.has_section_key("inventory", "stored_supplies")
 	if items is Dictionary:
@@ -826,7 +826,7 @@ func buy_supply(id: String, bundles := 1) -> String:
 		credits += cost
 		target[key] = before
 		return "Could not save the purchase."
-	return "Purchased %s ×%d. Added to carried inventory." % [item.name, quantity]
+	return "Purchased %s ×%d. Added to Inventory." % [item.name, quantity]
 
 func collect_field_supply(id: String, recovered: Dictionary) -> bool:
 	if not stock.has(id) or stock[id].has("material"):

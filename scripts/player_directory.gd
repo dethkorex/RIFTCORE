@@ -79,39 +79,62 @@ func has_connection() -> bool:
 func online() -> bool:
 	return has_connection() and not username.is_empty() and lobby.relay.account_is_logged_in()
 
-func sign_in(email: String, password: String, create: bool, verification_code := "", registration_name := "") -> String:
+func register_account(email: String, password: String, raw_name: String) -> Dictionary:
+	if busy or online():
+		return {"created": false, "message": "Finish the current account session first."}
+	var name := raw_name.strip_edges()
+	if name.length() < 3 or name.length() > 20:
+		return {"created": false, "message": "Enter a username of 3 to 20 characters."}
+	if not valid_credentials(email, password):
+		return {"created": false, "message": "Enter your email and a password of 3 to 20 characters."}
+	busy = true
+	var code := Codes.ACCOUNT_CREATION_RESPONSE_CODE.NO_RESPONSE_FROM_SERVER
+	if await connect_service():
+		code = await lobby.relay.account_create(email, name, password)
+	busy = false
+	var message: String
+	match code:
+		Codes.ACCOUNT_CREATION_RESPONSE_CODE.SUCCESS:
+			return {"created": true}
+		Codes.ACCOUNT_CREATION_RESPONSE_CODE.USERNAME_ALREADY_EXISTS:
+			message = "That username is already taken. Choose another or sign in."
+		Codes.ACCOUNT_CREATION_RESPONSE_CODE.EMAIL_ALREADY_EXISTS:
+			message = "That email already has an account. Sign in to continue."
+		Codes.ACCOUNT_CREATION_RESPONSE_CODE.INVALID_EMAIL:
+			message = "Enter a valid email address."
+		Codes.ACCOUNT_CREATION_RESPONSE_CODE.INVALID_USERNAME:
+			message = "Choose a username that uses letters and numbers."
+		Codes.ACCOUNT_CREATION_RESPONSE_CODE.STORAGE_FULL:
+			message = "Account storage is full. Contact RIFTCORE support."
+		_:
+			message = response_message("Could not create your account", code)
+	return {"created": false, "message": message}
+
+func valid_credentials(email: String, password: String) -> bool:
+	return email.contains("@") and password.length() >= 3 and password.length() <= 20
+
+func sign_in(email: String, password: String, verification_code := "") -> String:
 	if busy or online():
 		return status
-	var name := registration_name.strip_edges()
-	if create and (name.length() < 3 or name.length() > 20):
-		return "Enter a username of 3 to 20 characters to create an account."
-	if not email.contains("@") or password.length() < 3 or password.length() > 20:
+	if not valid_credentials(email, password):
 		return "Enter your email and a password of 3 to 20 characters."
 	busy = true
 	var result := "Could not reach the directory. Try again."
 	if await connect_service():
-		result = await authenticate(email, password, create, verification_code, name)
+		result = await authenticate(email, password, verification_code)
 	busy = false
 	status = result
 	changed.emit()
 	return result
 
-func authenticate(email: String, password: String, create: bool, verification_code: String, registration_name := "") -> String:
-	if create:
-		var code: int = await lobby.relay.account_create(email, registration_name, password)
-		match code:
-			Codes.ACCOUNT_CREATION_RESPONSE_CODE.SUCCESS:
-				pass
-			Codes.ACCOUNT_CREATION_RESPONSE_CODE.USERNAME_ALREADY_EXISTS:
-				return "That profile name is already registered. Sign in if it belongs to you."
-			Codes.ACCOUNT_CREATION_RESPONSE_CODE.EMAIL_ALREADY_EXISTS:
-				return "That email is already registered. Choose Sign In."
-			Codes.ACCOUNT_CREATION_RESPONSE_CODE.INVALID_USERNAME:
-				return "GD Sync rejected this profile name. The local profile can still play offline."
-			_:
-				return response_message("Could not register this profile", code)
-	if not create and not verification_code.is_empty():
+func authenticate(email: String, password: String, verification_code: String) -> String:
+	needs_verification = false
+	if not verification_code.is_empty():
 		var code: int = await lobby.relay.account_verify(email, verification_code.strip_edges(), SESSION_TIME)
+		needs_verification = true
+		if code == Codes.ACCOUNT_VERIFICATION_RESPONSE_CODE.SUCCESS and lobby.relay.account_is_logged_in():
+			await finish_sign_in()
+			return status
 		if code == Codes.ACCOUNT_VERIFICATION_RESPONSE_CODE.INCORRECT_CODE:
 			return "That code did not match. Paste the latest code from your email."
 		if code == Codes.ACCOUNT_VERIFICATION_RESPONSE_CODE.CODE_EXPIRED:
@@ -125,7 +148,7 @@ func authenticate(email: String, password: String, create: bool, verification_co
 			return status
 		Codes.ACCOUNT_LOGIN_RESPONSE_CODE.NOT_VERIFIED:
 			needs_verification = true
-			return "Enter the verification code sent to your email."
+			return "This account still needs verification. Enter the latest code or request a new one."
 		Codes.ACCOUNT_LOGIN_RESPONSE_CODE.EMAIL_OR_PASSWORD_INCORRECT:
 			return "Check your email and password."
 	return response_message("Could not sign in", int(login.get("Code", 1)))
@@ -143,13 +166,17 @@ func resend_code(email: String, password: String) -> String:
 	busy = false
 	match code:
 		Codes.ACCOUNT_RESEND_VERIFICATION_RESPONSE_CODE.SUCCESS:
-			return "GD Sync accepted the resend. Check your inbox and spam folder."
+			needs_verification = true
+			return "Verification email requested. Check your inbox and spam folder."
 		Codes.ACCOUNT_RESEND_VERIFICATION_RESPONSE_CODE.ON_COOLDOWN:
-			return "Wait a moment before requesting another code."
+			needs_verification = true
+			return "The last code is still valid. Try again after the 10-minute limit."
 		Codes.ACCOUNT_RESEND_VERIFICATION_RESPONSE_CODE.EMAIL_OR_PASSWORD_INCORRECT:
 			return "Check your email and password. If the unverified account expired, register again."
 		Codes.ACCOUNT_RESEND_VERIFICATION_RESPONSE_CODE.ALREADY_VERIFIED:
 			return "This email is already verified. Select Sign In."
+		Codes.ACCOUNT_RESEND_VERIFICATION_RESPONSE_CODE.VERIFICATION_DISABLED:
+			return "Email verification is disabled for this server. Select Sign In."
 	return response_message("Could not resend the code", code)
 
 func finish_sign_in() -> void:

@@ -137,7 +137,8 @@ func _ready() -> void:
 	account = PlayerAccount.new()
 	account.restore()
 	progress_reset_error = PlaytestReset.migrate_local(account)
-	RiftRelay.directory.configure.call_deferred(account.display_name)
+	if RiftSettings.startup_mode == "online":
+		RiftRelay.directory.configure.call_deferred(account.display_name)
 	profile.player_xp = account.experience
 	if get_tree().has_meta(&"restart_factory"):
 		get_tree().remove_meta(&"restart_factory")
@@ -739,7 +740,7 @@ func show_main_menu() -> void:
 	if progress_reset_error != OK:
 		menu.show_page("Save Reset Error")
 		return
-	if account and account.display_name.is_empty():
+	if account and (account.display_name.is_empty() or RiftSettings.startup_mode.is_empty()):
 		menu.show_page("Set up Player Profile")
 	if get_tree().has_meta(&"open_command_deck"):
 		get_tree().remove_meta(&"open_command_deck")
@@ -903,6 +904,7 @@ func complete_online_setup() -> void:
 	if newly_signed_in and account.create(RiftRelay.directory.username) != OK:
 		menu.show_page("Set up Player Profile")
 		return
+	RiftSettings.confirm_startup_choice("online")
 	var cloud = RiftRelay.directory.progress
 	await cloud.sync()
 	if not is_instance_valid(menu):
@@ -1113,7 +1115,8 @@ func open_home_hub() -> void:
 		checkpoint.set_value("checkpoint", "recovered_supplies", supplies)
 	RiftRelay.local_name = RiftRelay.directory.username if RiftRelay.directory.online() else profile.operator_name
 	if account:
-		RiftRelay.directory.configure.call_deferred(account.display_name)
+		if RiftSettings.startup_mode == "online":
+			RiftRelay.directory.configure.call_deferred(account.display_name)
 	RiftRelay.publish_armor_finish(current_armor_finish())
 	RiftRelay.unlocked_sector = profile.unlocked_sector
 	RiftRelay.set_difficulty_unlocks(profile.normal_clears.keys(), profile.nightmare_unlocked())

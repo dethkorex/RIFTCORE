@@ -34,6 +34,7 @@ var vibration := true
 var show_hub_tips := true
 var seen_hub_tips := PackedStringArray()
 var last_operator_name := ""
+var startup_mode := ""
 var defaults: Dictionary = {}
 var bindings: Dictionary = {}
 
@@ -48,6 +49,7 @@ func _ready() -> void:
 func restore() -> void:
 	var data := ConfigFile.new()
 	last_operator_name = ""
+	startup_mode = ""
 	if data.load(path) == OK:
 		for bus_name in volumes:
 			volumes[bus_name] = clampf(float(data.get_value("audio", bus_name, volumes[bus_name])), 0.0, 1.0)
@@ -65,6 +67,7 @@ func restore() -> void:
 		hud_scale = clampf(float(data.get_value("gameplay", "hud_scale", 1.0)), 0.80, 1.15)
 		vibration = bool(data.get_value("controller", "vibration", true))
 		last_operator_name = str(data.get_value("player", "last_operator_name", "")).left(20)
+		startup_mode = String(data.get_value("player", "startup_mode", ""))
 		show_hub_tips = bool(data.get_value("tutorial", "enabled", true))
 		var seen: Variant = data.get_value("tutorial", "seen_stations", PackedStringArray())
 		if seen is PackedStringArray:
@@ -99,7 +102,13 @@ func save() -> Error:
 	data.set_value("tutorial", "enabled", show_hub_tips)
 	data.set_value("tutorial", "seen_stations", seen_hub_tips)
 	data.set_value("player", "last_operator_name", last_operator_name)
+	data.set_value("player", "startup_mode", startup_mode)
 	return data.save(path)
+
+func confirm_startup_choice(mode: String) -> void:
+	if startup_mode != mode:
+		startup_mode = mode
+		save()
 
 func remember_operator_name(operator_name: String) -> void:
 	if last_operator_name != operator_name:

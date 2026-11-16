@@ -46,7 +46,7 @@ func setup() -> void:
 	var relay = directory.lobby.relay
 	var private: Dictionary = await relay.account_get_document(PRIVATE_KEY)
 	if owner == directory.username and directory.online():
-		var pem: String = private.get("Result", {}).get("pem", "")
+		var pem := String(document(private).get("pem", ""))
 		var candidate: CryptoKey
 		if int(private.get("Code", 1)) == 0 and pem.length() <= 8192:
 			candidate = CryptoKey.new()
@@ -60,12 +60,16 @@ func setup() -> void:
 			var public_pem := candidate.save_to_string(true)
 			var published: Dictionary = await relay.account_get_document(PUBLIC_KEY)
 			if owner == directory.username and directory.online():
-				var ready: bool = published.get("Result", {}).get("pem", "") == public_pem
+				var ready: bool = document(published).get("pem", "") == public_pem
 				if not ready:
 					ready = await relay.account_document_set(PUBLIC_KEY, {"pem": public_pem}, true) == 0
 				if ready and owner == directory.username:
 					key = candidate
 	preparing = false
+
+func document(response: Dictionary) -> Dictionary:
+	var result: Variant = response.get("Result")
+	return result if result is Dictionary else {}
 
 func address(name: String) -> String:
 	return "riftcore_whisper_v1_" + name.to_lower().sha256_text().left(32)
@@ -91,12 +95,13 @@ func send(name: String, body: String) -> void:
 	var public: Dictionary = await relay.account_get_external_document(name, PUBLIC_KEY)
 	if int(public.get("Code", 1)) == 0 and owner == directory.username and can_send(name):
 		var recipient := CryptoKey.new()
-		var pem: String = public.get("Result", {}).get("pem", "")
+		var pem := String(document(public).get("pem", ""))
 		if pem.length() <= 1024 and recipient.load_from_string(pem, true) == OK:
 			var chunks := encode(recipient, body)
 			if not chunks.is_empty():
 				var previous: Dictionary = await relay.account_get_document(address_path)
-				var entries: Array = previous.get("Result", {}).get("messages", [])
+				var saved: Variant = document(previous).get("messages")
+				var entries: Array = saved if saved is Array else []
 				var now := int(Time.get_unix_time_from_system())
 				entries = entries.filter(func(row): return row is Dictionary and int(row.get("at", 0)) >= now - TTL)
 				var random_id := crypto.generate_random_bytes(12).hex_encode()
@@ -146,7 +151,7 @@ func read_next() -> void:
 	reading = true
 	var reply: Dictionary = await directory.lobby.relay.account_get_external_document(sender, address(owner))
 	if directory.online() and owner == directory.username and key and can_send(sender) and int(reply.get("Code", 1)) == 0:
-		var entries: Variant = reply.get("Result", {}).get("messages", [])
+		var entries: Variant = document(reply).get("messages")
 		if entries is Array and entries.size() <= MAX_MESSAGES:
 			var now := int(Time.get_unix_time_from_system())
 			for entry in entries:

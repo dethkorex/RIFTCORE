@@ -302,24 +302,40 @@ static func directory_action(parent: Container, caption: String, name: String, a
 	holder.button = button
 	return button
 
-static func build_directory_account(menu, columns: HBoxContainer, first_launch := false) -> void:
+static func build_startup_choices(menu, columns: HBoxContainer) -> void:
+	var form: VBoxContainer = menu.card(columns, 1.15)
+	UI.label(form, "WELCOME TO RIFTCORE", 38, UI.CYAN)
+	UI.label(form, "An online account lets you use cloud saves and find friends. You can play solo with a local profile.", 19, UI.MUTED)
+	form.add_child(HSeparator.new())
+	var create := UI.button(form, "Create Account", menu.show_page.bind("Create Account"), true)
+	UI.button(form, "Sign In", menu.show_page.bind("Sign In"))
+	UI.button(form, "Continue Offline", func():
+		if menu.account.display_name.is_empty():
+			menu.show_page("Offline Setup")
+		else:
+			RiftSettings.confirm_startup_choice("offline")
+			menu.open_slot_picker("Load Game")
+	)
+	UI.button(form, "Quit Game", RiftRelay.quit_game)
+	menu.portrait(menu.card(columns))
+	create.grab_focus()
+
+static func build_directory_account(menu, columns: HBoxContainer, create := false) -> void:
 	var form: VBoxContainer = menu.card(columns)
 	var directory = RiftRelay.directory
-	directory.configure(menu.account.display_name)
-	UI.label(form, "WELCOME TO RIFTCORE" if first_launch else "RIFTCORE ONLINE", 30, UI.CYAN)
-	if not menu.account.display_name.is_empty():
-		UI.label(form, menu.account.display_name, 24)
-	UI.label(form, "Verify your email once to use live friend search and invites. Solo play is available offline.", 17, UI.MUTED)
+	var heading := "Create a RIFTCORE Account" if create else "Sign In to RIFTCORE"
+	UI.label(form, heading, 31, UI.CYAN)
 	if directory.online():
 		UI.label(form, directory.status, 18, UI.CYAN)
-		UI.button(form, "Continue", func():
-			if menu.station_panel: menu.show_page("Social")
-			else: menu.online_setup_finished.emit()
-		, true).grab_focus()
+		UI.button(form, "Continue", func(): finish_directory_form(menu), true).grab_focus()
 		return
-	UI.label(form, "Friends find you by your account username.", 15, UI.MUTED)
-	var registration := directory_field(form, "Account username (new accounts)", 20)
+	var registration: LineEdit
+	if create:
+		registration = directory_field(form, "Account username", 20)
 	var email := directory_field(form, "Email")
+	if not create:
+		email.text = menu.sign_in_email_hint
+		menu.sign_in_email_hint = ""
 	var password := directory_field(form, "Password", 20)
 	password.secret = true
 	var code_row := HBoxContainer.new()
@@ -331,39 +347,103 @@ static func build_directory_account(menu, columns: HBoxContainer, first_launch :
 		code.grab_focus()
 		code.caret_column = code.text.length()
 	, false, 36)
-	code_row.visible = directory.needs_verification
-	var message := UI.label(form, directory.status, 16, UI.MUTED)
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 8)
-	form.add_child(row)
-	var submit := func(create: bool):
-		if directory.busy:
+	code_row.hide()
+	var actions := HBoxContainer.new()
+	actions.add_theme_constant_override("separation", 8)
+	form.add_child(actions)
+	var primary := UI.button(actions, "Create Account" if create else "Sign In", Callable(), true, 36)
+	primary.disabled = false
+	primary.focus_mode = Control.FOCUS_ALL
+	var resend := UI.button(actions, "Resend Code", Callable(), false, 36)
+	resend.hide()
+	resend.disabled = false
+	resend.focus_mode = Control.FOCUS_ALL
+	var message := UI.label(form, "", 16, UI.MUTED)
+	var submit := func():
+		if directory.busy or primary.disabled:
 			return
+		var verify := code_row.visible
+		var token := clean_verification_code(code.text) if verify else ""
+		if verify and token.is_empty():
+			message.text = "Enter the verification code from your email."
+			code.grab_focus()
+			return
+		var email_address := email.text.strip_edges()
+		var passphrase := password.text
 		message.text = "Connecting…"
-		var result: String = await directory.sign_in(email.text.strip_edges(), password.text, create, clean_verification_code(code.text), registration.text if registration else "")
+		primary.disabled = true
+		resend.disabled = true
+		if create:
+			var registration_result: Dictionary = await directory.register_account(email_address, passphrase, registration.text)
+			if not is_instance_valid(form):
+				return
+			if registration_result.created:
+				password.clear()
+				show_account_created(menu, form, email_address)
+				return
+			message.text = registration_result.message
+			primary.disabled = false
+			return
+		var result: String = await directory.sign_in(email_address, passphrase, token)
 		if not is_instance_valid(form):
 			return
 		message.text = result
+		primary.disabled = false
+		resend.disabled = false
 		if directory.online():
 			password.clear()
-			if menu.station_panel: menu.show_page("Social")
-			else: menu.online_setup_finished.emit()
+			finish_directory_form(menu)
 		elif directory.needs_verification:
+			if registration:
+				registration.hide()
 			code_row.show()
+			resend.show()
+			primary.text = "Verify Email"
 			code.grab_focus()
-	UI.button(row, "Sign In", submit.bind(false), true, 36)
-	UI.button(row, "Create Account", submit.bind(true), false, 36)
-	UI.button(row, "Resend Code", func():
-		var result: String = await directory.resend_code(email.text.strip_edges(), password.text)
+	primary.pressed.connect(submit)
+	resend.pressed.connect(func():
+		if directory.busy:
+			return
+		var email_address := email.text.strip_edges()
+		var passphrase := password.text
+		message.text = "Requesting a new code…"
+		resend.disabled = true
+		var result: String = await directory.resend_code(email_address, passphrase)
 		if is_instance_valid(message):
 			message.text = result
-	, false, 36)
-	if first_launch:
-		UI.button(form, "Continue Offline", func():
-			if not directory.busy: menu.show_page("Offline Setup")
-		, false, 38)
-	code.text_submitted.connect(func(_value): submit.call(false))
-	email.grab_focus()
+			resend.disabled = false
+	)
+	code.text_submitted.connect(func(_value): submit.call())
+	password.text_submitted.connect(func(_value): submit.call())
+	if menu.page == "Directory Account":
+		var new_page := "Directory Registration"
+		UI.button(form, "Create Account", menu.show_page.bind(new_page), false, 34)
+	elif menu.page == "Directory Registration":
+		UI.button(form, "Sign In", menu.show_page.bind("Directory Account"), false, 34)
+	(registration if registration else email).grab_focus()
+
+static func show_account_created(menu, form: Control, email: String) -> void:
+	var dialog := AcceptDialog.new()
+	dialog.title = "Account Created"
+	dialog.dialog_text = "Congratulations! Your RIFTCORE account has been created. Sign in with your email and password to continue."
+	dialog.ok_button_text = "Continue to Sign In"
+	dialog.transient = true
+	dialog.exclusive = true
+	dialog.unresizable = true
+	form.add_child(dialog)
+	var sign_in := func():
+		menu.sign_in_email_hint = email
+		menu.show_page("Directory Account" if menu.station_panel or menu.page == "Directory Registration" else "Sign In")
+	dialog.confirmed.connect(sign_in)
+	dialog.canceled.connect(sign_in)
+	dialog.popup_centered(Vector2i(470, 0))
+
+static func finish_directory_form(menu) -> void:
+	if menu.station_panel:
+		RiftSettings.confirm_startup_choice("online")
+		menu.show_page("Social")
+	else:
+		menu.online_setup_finished.emit()
 
 static func build_account_settings(menu, columns: HBoxContainer) -> void:
 	var form: VBoxContainer = menu.card(columns)
