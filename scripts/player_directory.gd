@@ -6,7 +6,8 @@ signal friend_request_received(username: String)
 const CloudProgress := preload("res://scripts/cloud_progress.gd")
 const Codes := preload("res://addons/GD-Sync/Scripts/Enums/Enums.gd")
 const LINK_PATH := "user://riftcore_directory.cfg"
-const DIRECTORY_BOARD := "RIFTCORE Players"
+# GD-Sync returns and expects the dashboard's URL-encoded leaderboard name.
+const DIRECTORY_BOARD := "Global%20Leaderboard"
 const PRESENCE_PATH := "riftcore_presence"
 const SESSION_TIME := 604800.0
 const PRESENCE_INTERVAL := 38.0
