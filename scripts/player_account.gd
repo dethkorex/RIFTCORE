@@ -2,8 +2,13 @@ extends RefCounted
 
 const ManualSave := preload("res://scripts/manual_save_session.gd")
 const Profile := ManualSave.Profile
+const SkinKit := preload("res://scripts/operator_skins.gd")
+const Difficulty := preload("res://scripts/mission_difficulty.gd")
 
-var path := "user://riftcore_player_profile.cfg"
+const PATH := "user://riftcore_player_profile.cfg"
+
+var path := PATH
+var last_operator := 0
 var display_name := ""
 var experience := 0
 var records: Dictionary = {}
@@ -11,17 +16,22 @@ var total_clears := 0
 var total_kills := 0
 var longest_run := 0.0
 var longest_operator := ""
+var unlocked_skins: Array = []
+var operator_skins: Dictionary = {}
 
 func restore() -> void:
 	var data := ConfigFile.new()
 	if data.load(path) == OK:
 		display_name = Profile.clean_operator_name(str(data.get_value("player", "name", "RX-07")))
+		last_operator = clampi(int(data.get_value("player", "last_operator", 0)), 0, ManualSave.SLOT_COUNT)
 		experience = clampi(int(data.get_value("player", "xp", 0)), 0, RiftPlayer.experience_threshold(Profile.PLAYER_LEVEL_CAP))
 		records = data.get_value("records", "sector_times", {})
 		total_clears = int(data.get_value("records", "clears", 0))
 		total_kills = int(data.get_value("records", "kills", 0))
 		longest_run = float(data.get_value("records", "longest_run", 0.0))
 		longest_operator = str(data.get_value("records", "longest_operator", ""))
+		unlocked_skins = data.get_value("wardrobe", "unlocked", [])
+		operator_skins = data.get_value("wardrobe", "selections", {})
 		return
 	var previous_name := RiftSettings.last_operator_name
 	for index in range(1, ManualSave.SLOT_COUNT + 1):
@@ -43,15 +53,29 @@ func create(raw_name: String) -> Error:
 		display_name = ""
 	return error
 
+func clear_progress() -> void:
+	last_operator = 0
+	experience = 0
+	records.clear()
+	total_clears = 0
+	total_kills = 0
+	longest_run = 0.0
+	longest_operator = ""
+	operator_skins.clear()
+	unlocked_skins.clear()
+
 func save() -> Error:
 	var data := ConfigFile.new()
 	data.set_value("player", "name", display_name)
 	data.set_value("player", "xp", experience)
+	data.set_value("player", "last_operator", last_operator)
 	data.set_value("records", "sector_times", records)
 	data.set_value("records", "clears", total_clears)
 	data.set_value("records", "kills", total_kills)
 	data.set_value("records", "longest_run", longest_run)
 	data.set_value("records", "longest_operator", longest_operator)
+	data.set_value("wardrobe", "unlocked", unlocked_skins)
+	data.set_value("wardrobe", "selections", operator_skins)
 	var target := ProjectSettings.globalize_path(path)
 	var temporary := target + ".tmp"
 	var error := data.save(temporary)
@@ -99,7 +123,17 @@ func award_clear(sector: int, difficulty: int, result := {}) -> Dictionary:
 		if seconds < float(records.get(key, INF)):
 			records[key] = seconds
 		track_survival(float(result.get("survival", seconds)), str(result.get("operator", "RX-07")))
+	var before_skins := unlocked_skins.duplicate()
+	if sector >= 1 and sector <= SkinKit.Catalog.SECTORS.size() and difficulty >= Difficulty.HARD:
+		var reward: String = SkinKit.Catalog.SECTORS[sector - 1].reward
+		if not unlocked_skins.has(reward):
+			unlocked_skins.append(reward)
+		if difficulty == Difficulty.NIGHTMARE:
+			var variant := "variant:%d" % sector
+			if not unlocked_skins.has(variant):
+				unlocked_skins.append(variant)
 	if save() != OK:
+		unlocked_skins = before_skins
 		experience = previous
 		records = previous_records
 		longest_run = previous_run
@@ -115,3 +149,17 @@ func track_survival(seconds: float, operator: String) -> bool:
 	longest_run = seconds
 	longest_operator = operator
 	return true
+
+func display_skin(slot: int) -> String:
+	var choice := String(operator_skins.get(slot, ""))
+	return choice if unlocked_skins.has(choice) else ""
+
+func select_skin(slot: int, choice: String) -> Error:
+	if slot < 1 or slot > ManualSave.SLOT_COUNT or (not choice.is_empty() and not unlocked_skins.has(choice)):
+		return ERR_INVALID_PARAMETER
+	var previous := display_skin(slot)
+	operator_skins[slot] = choice
+	var error := save()
+	if error != OK:
+		operator_skins[slot] = previous
+	return error

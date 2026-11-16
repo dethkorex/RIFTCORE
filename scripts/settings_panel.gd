@@ -143,7 +143,7 @@ func build_microphone_test(panel: VBoxContainer) -> void:
 	meter.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	meter.show_percentage = false
 	controls.add_child(meter)
-	var status := UI.label(panel, "Record 4 seconds and hear it back locally.", 16, UI.MUTED)
+	var status := UI.label(panel, "Hear your microphone live through your selected output.", 16, UI.MUTED)
 	var refresh := func(message: String, level: float):
 		status.text = message
 		meter.set_value_no_signal(level)
@@ -475,7 +475,7 @@ func install_update() -> void:
 	var error: String = await updater.install(manifest)
 	if error.is_empty():
 		if updater.start_version(manifest.tag):
-			get_tree().quit()
+			RiftRelay.quit_game()
 			return
 		error = "The update was installed, but it could not restart. Reopen RIFTCORE."
 	installing = false

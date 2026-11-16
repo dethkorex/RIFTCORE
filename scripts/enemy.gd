@@ -38,6 +38,7 @@ var maneuver_time := 0.0
 var attacks_launched := 0
 var has_defense := false
 @export var model_override: PackedScene
+@export var patrol_left_limit := -100000.0
 @export var patrol_right_limit := 100000.0
 @export var planted_override := false
 var mission_enemy := false
@@ -260,7 +261,7 @@ func _physics_process(delta: float) -> void:
 	elif not is_on_floor():
 		velocity.y -= 28.0 * delta
 	velocity.z = -global_position.z * 12.0
-	velocity.x = minf(velocity.x, (patrol_right_limit - global_position.x) / delta)
+	velocity.x = clampf(velocity.x, (patrol_left_limit - global_position.x) / delta, (patrol_right_limit - global_position.x) / delta)
 	move_and_slide()
 	if robot and not is_zero_approx(direction):
 		refresh_defense()

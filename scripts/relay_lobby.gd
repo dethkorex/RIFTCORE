@@ -14,6 +14,7 @@ signal party_chat_changed
 const Profile := preload("res://scripts/rogue_profile.gd")
 const Keys := preload("res://addons/GD-Sync/Scripts/KeyStore.gd")
 const Client := preload("res://addons/GD-Sync/MultiplayerClient.gd")
+const PlayerDirectory := preload("res://scripts/player_directory.gd")
 const PartyVoice := preload("res://scripts/party_voice.gd")
 const RelayEnums := preload("res://addons/GD-Sync/Scripts/Enums/Enums.gd")
 const Codes := "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
@@ -30,6 +31,9 @@ var room_code := ""
 var room_size := 0
 var available := false
 var pending_invite := 0
+var directory_invite := ""
+var relay_starting := false
+var relay_ready := false
 var copy_on_join := false
 var party_operators: Dictionary[int, String] = {}
 var last_party_whisper: Dictionary[int, int] = {}
@@ -51,12 +55,16 @@ var drop_serial := 0
 var relay: Node
 var request_timeout: Timer
 var voice: PartyVoice
+var directory: PlayerDirectory
 
 func _ready() -> void:
 	voice = PartyVoice.new()
 	voice.name = "PartyVoice"
 	voice.lobby = self
 	add_child(voice)
+	directory = PlayerDirectory.new()
+	directory.lobby = self
+	add_child(directory)
 	available = Keys.has_keys()
 	if not available:
 		status = RELAY_UNAVAILABLE
@@ -74,7 +82,11 @@ func _initialize_client() -> void:
 		relay = Client.new()
 		relay.name = "GDSync"
 		get_tree().root.add_child(relay)
-	relay.connected.connect(_request_room)
+	relay.connected.connect(func():
+		relay_ready = true
+		relay_starting = false
+		_request_room()
+	)
 	relay.connection_failed.connect(_connection_failed)
 	relay.disconnected.connect(_disconnected)
 	relay.lobby_created.connect(_join_created_room)
@@ -90,6 +102,22 @@ func _initialize_client() -> void:
 	relay.host_changed.connect(_host_changed)
 	relay.player_data_changed.connect(_difficulty_data_changed)
 	relay.kicked.connect(func(_reason: String): leave("You were removed from the room."))
+
+func ensure_relay() -> void:
+	if not available:
+		return
+	_initialize_client()
+	if not relay_ready and not relay_starting and not relay.is_active():
+		relay_starting = true
+		relay.start_multiplayer()
+
+func quit_game() -> void:
+	if is_instance_valid(relay) and relay.account_is_logged_in():
+		if directory.online():
+			await directory.progress.sync()
+		relay.quit()
+	else:
+		get_tree().quit()
 
 func host_room() -> void:
 	if not pending.is_empty() or not connected_room.is_empty():
@@ -113,7 +141,30 @@ func can_copy_invite_code() -> bool:
 	return available and pending.is_empty() and not mission_active and room_size < MAX_PLAYERS and (connected_room.is_empty() or relay.is_host())
 
 func can_invite_friend() -> bool:
-	return can_copy_invite_code() and pending_invite == 0 and RiftSocial.ready_to_query
+	return can_copy_invite_code() and pending_invite == 0 and directory_invite.is_empty() and RiftSocial.ready_to_query
+
+func can_invite_directory_friend() -> bool:
+	return directory.online() and can_copy_invite_code() and directory_invite.is_empty() and pending_invite == 0
+
+func invite_directory_friend(name: String) -> void:
+	if not can_invite_directory_friend():
+		return
+	directory_invite = name
+	if connected_room.is_empty():
+		host_room()
+	else:
+		_send_directory_invite.call_deferred()
+
+func _send_directory_invite() -> void:
+	var friend := directory_invite
+	var room := connected_room
+	if friend.is_empty() or room.is_empty():
+		return
+	var result: int = await relay.account_invite_friend_to_lobby(friend)
+	if directory_invite != friend or connected_room != room:
+		return
+	directory_invite = ""
+	_update("Invite sent to %s." % friend if result == 0 else directory.response_message("Could not send the invite", result))
 
 func join_room(entered_code: String) -> void:
 	if not pending.is_empty() or not connected_room.is_empty():
@@ -203,10 +254,16 @@ func _open(operation: String, code: String) -> void:
 	pending = operation
 	_update("Connecting to the online relay…")
 	request_timeout.start()
-	relay.start_multiplayer()
+	if relay_ready:
+		_request_room()
+	else:
+		ensure_relay()
 
 func _request_room() -> void:
-	relay.player_set_username("RX-%s" % Crypto.new().generate_random_bytes(6).hex_encode())
+	if pending.is_empty():
+		return
+	if not relay.account_is_logged_in():
+		relay.player_set_username("RX-%s" % Crypto.new().generate_random_bytes(6).hex_encode())
 	match pending:
 		"host":
 			_update("Creating your room…")
@@ -248,6 +305,8 @@ func _room_joined(lobby_name: String) -> void:
 		copy_invite_code()
 	if pending_invite != 0:
 		_send_pending_invite.call_deferred()
+	if not directory_invite.is_empty():
+		_send_directory_invite.call_deferred()
 
 func _room_failed(lobby_name: String, error: int) -> void:
 	if pending.is_empty() or lobby_name != _room_name():
@@ -256,6 +315,8 @@ func _room_failed(lobby_name: String, error: int) -> void:
 	leave("%s (GD Sync code %d)" % [message, error])
 
 func _connection_failed(error: int) -> void:
+	relay_starting = false
+	relay_ready = false
 	if pending.is_empty():
 		return
 	if error == RelayEnums.CONNECTION_FAILED.INVALID_PUBLIC_KEY:
@@ -264,6 +325,8 @@ func _connection_failed(error: int) -> void:
 		leave("Could not reach the online relay. Try again.")
 
 func _disconnected() -> void:
+	relay_starting = false
+	relay_ready = false
 	if not pending.is_empty() or not connected_room.is_empty():
 		leave("Lost the connection to the online relay.")
 
@@ -486,6 +549,7 @@ func leave(message := "Create a room or enter a friend’s room code.") -> void:
 	pending = ""
 	connected_room = ""
 	pending_invite = 0
+	directory_invite = ""
 	copy_on_join = false
 	party_operators.clear()
 	last_party_whisper.clear()
@@ -499,7 +563,10 @@ func leave(message := "Create a room or enter a friend’s room code.") -> void:
 	if disconnect and is_instance_valid(relay):
 		if was_joined and relay.is_active():
 			relay.lobby_leave()
-		relay.stop_multiplayer()
+		if not directory.online() or not was_joined:
+			relay.stop_multiplayer()
+			relay_starting = false
+			relay_ready = false
 	_update(message if available else RELAY_UNAVAILABLE)
 	if was_in_mission:
 		mission_disconnected.emit(message)

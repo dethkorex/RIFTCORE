@@ -1,17 +1,14 @@
-# RIFTCORE Alpha 6.3.5
+# RIFTCORE Alpha 6.3.6
 
-- Level-ups restore 50% of maximum health and flash gold.
-- Restored the previous weapon, impact, enemy, and dash sounds.
-- The campaign adds 46 enemies with cleaner platform spacing and safer landings.
-- Ember Foundry has a bigger boulder encounter, breakable walls, and a pressure-plate shutter.
-- Platforms and boss armor have sector-specific finishes. Jungle vine platforms and slippery ice get distinct visuals.
-- Boss intros add power-up poses and larger, themed health displays.
-- Co-op shows teammate health, colored names, and live microphone indicators. Test your mic under Audio settings.
-- Co-op carries Operator XP and earned suits across deployments. A party wipe returns everyone to the same lobby at Operator Level 1.
-- The Profile bay shows career stats and Solo and Co-op records. Profile and Operator Select use animated models.
-- Operators use the permanent Player Profile name. Delete Profile resets local progress and the local RIFTCORE friends list.
-- Operator Level gates blueprints, equipment, and Shop stock. Profile Level unlocks Core Ascension ranks.
-- Challenges reset at local midnight and always show the time until the next reset.
-- Boss suits have a separate energy-powered weapon input. Standard Buster fire remains available in every suit.
+- Sign in, create a RIFTCORE account, or play offline. Each profile has three operators. Online accounts back up progress to the cloud.
+- Find RIFTCORE friends, see who's online, whisper, and invite them to a party without Steam.
+- Press Enter to open chat, then Enter to send. Use /p for party chat, /w to whisper, or /r to reply.
+- Account Settings can update your username, password, and remembered sign-in.
+- Operator Level is back on the HUD and Equipment screen. Quick slots have smaller square frames and larger icons.
+- Operator cards use animated previews. Hard clears unlock boss suit displays; Expert clears unlock ten exclusive RX-07 finishes.
+- Restored crouch + B to drop through supported decks and fixed the wall-slide pose in both directions.
+- The microphone test plays directly through your headset. It does not make a recording.
 
-Update together through Launcher 0.2 or Settings → Update Game before joining a co-op room.
+This playtest resets previous progress and operator saves. RIFTCORE accounts and friends are kept. Existing cloud progress resets when the account signs in to this build.
+
+Update together through Launcher 0.2 or Settings → Update Game before joining a party.

@@ -6,7 +6,6 @@ const Materials := preload("res://scripts/fabrication_catalog.gd")
 const Profile := preload("res://scripts/rogue_profile.gd")
 const CURRENCY := preload("res://assets/ui/bolt.svg")
 const SHARD := preload("res://assets/ui/core-shard.svg")
-const PAUSE_PLATE := preload("res://assets/ui/riftcore_kit/panel_base_small.png")
 const PORTRAIT := preload("res://assets/ui/rx07_menu.png")
 const CYAN := Color("00caff")
 const WHITE := Color("f1f8ff")
@@ -57,38 +56,59 @@ func show_quick_slots(profile) -> void:
 	row.add_theme_constant_override("separation", 5)
 	add_child(row)
 	row.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
-	row.offset_left = -110
-	row.offset_right = 110
-	row.offset_top = -86
-	row.offset_bottom = -18
+	row.offset_left = -103
+	row.offset_right = 103
+	row.offset_top = -64
+	row.offset_bottom = -16
 	for index in 4:
-		var panel := PanelContainer.new()
-		panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		panel.custom_minimum_size = Vector2(51, 56)
-		panel.add_theme_stylebox_override("panel", UI.frame(Color("0b1b32"), UI.CYAN, 1))
-		row.add_child(panel)
-		var stack := UI.column(panel, 0)
-		var key: String = ["↑", "←", "→", "↓"][index] if not Input.get_connected_joypads().is_empty() else str(index + 1)
-		var count := UI.label(stack, key, 14, UI.CYAN)
-		count.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		var tile := Control.new()
+		tile.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		tile.custom_minimum_size = Vector2(48, 48)
+		row.add_child(tile)
+		tile.draw.connect(func():
+			tile.draw_style_box(UI.frame(Color("08142af2"), UI.CYAN, 2), Rect2(Vector2.ZERO, tile.size))
+			tile.draw_line(Vector2(4, 4), Vector2(20, 4), UI.CYAN.lightened(.3), 2.0))
+		var key := Label.new()
+		key.text = ["↑", "←", "→", "↓"][index]
+		key.add_theme_font_override("font", UI.DISPLAY)
+		key.add_theme_color_override("font_color", CYAN)
+		key.add_theme_font_size_override("font_size", 21)
+		key.position = Vector2(5, 1)
+		key.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		tile.add_child(key)
 		var icon := TextureRect.new()
-		icon.custom_minimum_size = Vector2(23, 23)
+		icon.position = Vector2(14, 11)
+		icon.size = Vector2(29, 28)
 		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		stack.add_child(icon)
-		var quantity := UI.label(stack, "", 14, UI.WHITE)
-		quantity.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		tile.add_child(icon)
+		var quantity := Label.new()
+		quantity.theme = UI.theme()
+		quantity.add_theme_font_size_override("font_size", 13)
+		quantity.position = Vector2(20, 31)
+		quantity.size = Vector2(24, 16)
+		quantity.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		quantity.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		tile.add_child(quantity)
 		var refresh := func():
 			if is_instance_valid(icon):
 				var current: Dictionary = profile.quick_slots[index]
 				var remaining := int(current.get("count", 0))
 				var item: Dictionary = profile.stock.get(current.get("id", ""), {})
 				icon.texture = EquipmentIcons.supply_icon(item) if remaining > 0 and not item.is_empty() else null
-				quantity.text = "×%d" % remaining if remaining > 0 else "—"
+				quantity.text = "×%d" % remaining if remaining > 0 else "–"
+		var refresh_key := func():
+			key.text = ["↑", "←", "→", "↓"][index] if not Input.get_connected_joypads().is_empty() else str(index + 1)
 		refresh.call()
+		refresh_key.call()
 		profile.quick_changed.connect(refresh)
-		icon.tree_exiting.connect(func(): profile.quick_changed.disconnect(refresh), CONNECT_ONE_SHOT)
+		var update_device := func(_device: int, _connected: bool): refresh_key.call()
+		Input.joy_connection_changed.connect(update_device)
+		tile.tree_exiting.connect(func():
+			profile.quick_changed.disconnect(refresh)
+			Input.joy_connection_changed.disconnect(update_device)
+		, CONNECT_ONE_SHOT)
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -254,28 +274,20 @@ func caption(at: Vector2, value: String, font_size := 18, color := WHITE) -> voi
 	draw_string(face, at + Vector2(1, 2), value, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, Color("020817"))
 	draw_string(face, at, value, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, color)
 
-func gauge(y: float, label: String, ratio: float, tint: Color, width: float, values := "") -> void:
-	plate(Rect2(129, y, 78, 25), 6, WHITE)
-	caption(Vector2(137, y + 18), label, 14)
-	plate(Rect2(214, y, width, 25), 7, WHITE)
-	var segments := maxi(1, roundi((width - 19.0) / 23.5))
-	var step := (width - 19.0) / segments
-	for i in range(segments):
-		var x := 220.0 + i * step
-		var amount := clampf(ratio * segments - i, 0.0, 1.0)
-		var slant := Vector2(8, -17)
-		var start := Vector2(x, y + 21)
-		var segment_width := Vector2(step - 2.5, 0)
-		draw_colored_polygon(PackedVector2Array([start, start + segment_width, start + segment_width + slant, start + slant]), Color("172d4b"))
-		if amount > 0.0:
-			draw_colored_polygon(PackedVector2Array([start, start + segment_width * amount, start + segment_width * amount + slant, start + slant]), tint)
+func gauge(y: float, label: String, ratio: float, tint: Color, values := "") -> void:
+	caption(Vector2(117, y + 13), label, 15, WHITE)
 	if not values.is_empty():
-		const FONT_SIZE := 17
-		var face := UI.DISPLAY
-		var text_width := face.get_string_size(values, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE).x
-		var at := Vector2(214.0 + (width - text_width) * 0.5, y + 18)
-		draw_string_outline(face, at, values, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE, 5, Color("020817"))
-		draw_string(face, at, values, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE, WHITE)
+		var width := UI.DISPLAY.get_string_size(values, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x
+		caption(Vector2(361 - width, y + 13), values, 16, WHITE)
+	for i in 10:
+		var amount := clampf(ratio * 10.0 - i, 0.0, 1.0)
+		var start := Vector2(116 + i * 24.4, y + 25)
+		var slant := Vector2(4, -7)
+		var span := Vector2(21.8, 0)
+		draw_colored_polygon(PackedVector2Array([start, start + span, start + span + slant, start + slant]), Color("1e3354"))
+		if amount > 0.0:
+			span *= amount
+			draw_colored_polygon(PackedVector2Array([start, start + span, start + span + slant, start + slant]), tint)
 
 func task(at: Vector2, value: String, done: bool) -> void:
 	var color := CYAN if done else WHITE
@@ -288,21 +300,20 @@ func _draw() -> void:
 	var hud_scale := HUD_SCALE * RiftSettings.hud_scale
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE * hud_scale)
 	var hud_size := size / hud_scale
-	var health_width := clampf(150.0 + (displayed_health_capacity - 80.0) * 1.4, 150.0, 245.0)
-	var energy_width := clampf(150.0 + (displayed_energy_capacity - 75.0) * 1.8, 150.0, 245.0)
-	draw_texture_rect(PAUSE_PLATE, Rect2(102, 67, 132 + maxf(health_width, energy_width), 111), false)
-	plate(Rect2(20, 26, 103, 118), 15)
+	plate(Rect2(20, 22, 355, 142), 12)
 	var source_size := PORTRAIT.get_size()
-	draw_texture_rect_region(PORTRAIT, Rect2(26, 33, 91, 103),
+	draw_texture_rect_region(PORTRAIT, Rect2(28, 31, 77, 104),
 		Rect2(source_size * Vector2(0.415, 0.008), source_size * Vector2(0.17, 0.27)))
-	plate(Rect2(130, 39, 96, 26), 8)
-	caption(Vector2(145, 58), "RX-07", 18)
-	gauge(77, "HEALTH", health, Color("62f10b"), health_width, "%d / %d" % [roundi(health * health_capacity), roundi(health_capacity)])
-	gauge(108, "ENERGY", energy, Color("04dafa"), energy_width, "%d / %d" % [roundi(energy * energy_capacity), roundi(energy_capacity)])
+	caption(Vector2(117, 48), "RX-07", 21)
+	var current_level := RiftPlayer.level_for_experience(experience)
+	caption(Vector2(218, 48), "OPERATOR LV. %02d" % current_level, 17, CYAN)
+	draw_line(Vector2(117, 54), Vector2(361, 54), Color("315979"))
+	gauge(57, "HEALTH", health, Color("6df536"), "%d / %d" % [roundi(health * health_capacity), roundi(health_capacity)])
+	gauge(89, "ENERGY", energy, Color("04dafa"), "%d / %d" % [roundi(energy * energy_capacity), roundi(energy_capacity)])
 	var shown_level := RiftPlayer.level_for_experience(animated_xp)
 	var threshold := RiftPlayer.experience_threshold(shown_level)
 	var next_threshold := RiftPlayer.experience_threshold(shown_level + 1)
-	gauge(139, "XP", (animated_xp - threshold) / (next_threshold - threshold), Color("ab72ff"), 150.0)
+	gauge(121, "OPERATOR XP", (animated_xp - threshold) / (next_threshold - threshold), Color("ab72ff"))
 	var right := hud_size.x - 20.0
 	if not coop:
 		var x := right - 348.0

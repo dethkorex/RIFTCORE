@@ -200,6 +200,11 @@ func send_whisper(id: Variant, raw: String) -> bool:
 	var now := Time.get_ticks_msec()
 	if body.is_empty() or now < next_whisper_at:
 		return false
+	if id is String and id.begins_with("account:"):
+		var queued: bool = RiftRelay.directory.whispers.queue(id.trim_prefix("account:"), body)
+		if queued:
+			next_whisper_at = now + 500
+		return queued
 	if id is String:
 		if not RiftRelay.whisper_to_operator(id.trim_prefix("rift:"), body):
 			return false

@@ -39,7 +39,7 @@ func _ready():
 	logger = GDSync._logger
 
 func perform_https_request(endpoint : String, message : Dictionary) -> Dictionary:
-	logger.write_log("Making HTTP request. <"+endpoint+"><"+str(message)+">", "[HTTP]")
+	logger.write_log("Making HTTP request. <"+endpoint+">", "[HTTP]")
 	
 	if !GDSync.is_active():
 		logger.write_error("Failed HTTP request as the plugin is not active. <"+endpoint+">", "[HTTP]")
@@ -56,22 +56,25 @@ func perform_https_request(endpoint : String, message : Dictionary) -> Dictionar
 	
 	message["PublicKey"] = connection_controller._PUBLIC_KEY
 	
-	request.request(
+	var error := request.request(
 		active_lb+"/"+endpoint,
 		["Content-Type: text/plain"],
 		HTTPClient.METHOD_POST,
 		var_to_str(message)
 	)
 	
+	if error != OK:
+		request.queue_free()
+		return {"Code" : 1}
 	var result = await request.request_completed
-	
+	request.queue_free()
+
 	logger.write_log("Completed HTTP request. <"+endpoint+"><"+str(result[1])+">", "[HTTP]")
 	
 	if result[1] == 200:
-		var text : String = result[3].get_string_from_ascii()
-		var received_message : Dictionary = str_to_var(text)
-		logger.write_log("Successful HTTP request. <"+endpoint+"><"+text+">", "[HTTP]")
-		return received_message
+		var text : String = result[3].get_string_from_utf8()
+		var received_message: Variant = str_to_var(text)
+		return received_message if received_message is Dictionary else {"Code" : 1}
 	else:
 		logger.write_error("Failed HTTP request. <"+endpoint+"><"+str(result[1])+">", "[HTTP]")
 		return {"Code" : 1 if result[1] != 503 else 3}

@@ -17,6 +17,7 @@ const ManualSave := preload("res://scripts/manual_save_session.gd")
 const SuitReveal := preload("res://scripts/suit_reveal.gd")
 const CampaignDoor := preload("res://scripts/campaign_door.gd")
 const WhisperOverlay := preload("res://scripts/whisper_overlay.gd")
+const PlaytestReset := preload("res://scripts/playtest_reset.gd")
 const PlayerAccount := preload("res://scripts/player_account.gd")
 const HOME_HUB := preload("res://scenes/home_hub.tscn")
 var sector_complete := false
@@ -70,6 +71,7 @@ var pause_menu: Control
 var invite_overlay: CanvasLayer
 var chat: WhisperOverlay
 var account: PlayerAccount
+var progress_reset_error := OK
 var editor_level: Node3D
 var coop_mission: Node3D
 var coop_join_loading: CanvasLayer
@@ -102,6 +104,7 @@ func _ready() -> void:
 		or is_instance_valid(coop_mission) and coop_mission.is_pause_open()
 		or is_instance_valid(home_hub) and (home_hub.is_pause_open() or home_hub.has_dialogue())
 		or chat.is_open()
+		or is_instance_valid(invite_overlay)
 		or get_tree().has_group(&"interactive_dialogue"))
 	add_child(pointer)
 	RiftRelay.invite_received.connect(show_friend_invite)
@@ -132,6 +135,8 @@ func _ready() -> void:
 		profile.manual_only = true
 	account = PlayerAccount.new()
 	account.restore()
+	progress_reset_error = PlaytestReset.migrate_local(account)
+	RiftRelay.directory.configure.call_deferred(account.display_name)
 	profile.player_xp = account.experience
 	if get_tree().has_meta(&"restart_factory"):
 		get_tree().remove_meta(&"restart_factory")
@@ -161,7 +166,27 @@ func show_friend_invite(display_name: String, code: String) -> void:
 	var content := UI.column(panel, 3)
 	content.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	UI.label(content, "%s invited you to a game" % display_name, 20, UI.CYAN)
-	UI.label(content, "Open Social → Invites to join", 16, UI.MUTED)
+	var can_enter_station: bool = is_instance_valid(menu) and not is_instance_valid(player) and menu.preferred_operator() > 0
+	if RiftRelay.can_receive_invite() and (is_instance_valid(home_hub) or can_enter_station):
+		var buttons := HBoxContainer.new()
+		buttons.add_theme_constant_override("separation", 8)
+		content.add_child(buttons)
+		UI.button(buttons, "Join Game", func():
+			if RiftRelay.can_receive_invite():
+				if not is_instance_valid(home_hub) and can_enter_station:
+					menu.play_local_save()
+				if not is_instance_valid(home_hub):
+					return
+				RiftSocial.remove_invite(code)
+				RiftRelay.join_room(code)
+				layer.queue_free()
+		, true, 35).focus_mode = Control.FOCUS_NONE
+		UI.button(buttons, "Dismiss", func():
+			RiftSocial.remove_invite(code)
+			layer.queue_free()
+		, false, 35).focus_mode = Control.FOCUS_NONE
+	else:
+		UI.label(content, "Open Social → Invites to join", 16, UI.MUTED)
 	RiftAudio.play_effect(&"menu_confirm")
 	get_tree().create_timer(7.0).timeout.connect(func():
 		if is_instance_valid(layer):
@@ -226,14 +251,17 @@ func verify_live_relay(arguments: PackedStringArray) -> void:
 		arguments = arguments.slice(0, arguments.size() - 1)
 	var mission_test := arguments.has("mission")
 	var smoke_sector := 2 if arguments.has("jungle") else 1
-	if smoke_sector == 2:
+	if not arguments.is_empty() and arguments[-1].begins_with("sector="):
+		smoke_sector = int(arguments[-1].trim_prefix("sector="))
+		arguments = arguments.slice(0, arguments.size() - 1)
+	elif smoke_sector == 2:
 		arguments = arguments.slice(0, arguments.size() - 1)
 	if mission_test:
 		arguments = arguments.slice(0, arguments.size() - 1)
 	var host := arguments == PackedStringArray(["host"])
 	var guest := arguments.size() == 2 and arguments[0] == "join" and RiftRelay.valid_code(arguments[1])
-	if not host and not guest:
-		print("RELAY CHECK FAIL. Use host or join ROOM_CODE.")
+	if (not host and not guest) or smoke_sector < 1 or smoke_sector > Catalog.SECTORS.size():
+		print("RELAY CHECK FAIL. Use host or join ROOM_CODE, with optional mission sector=N.")
 		get_tree().quit(1)
 		return
 	if not RiftRelay.available:
@@ -358,6 +386,10 @@ func verify_coop_mission(host: bool, smoke_sector: int, wipe_test := false) -> v
 		print("Campaign check failed to move operator ", local_index)
 		finish_relay_check(false)
 		return
+	if smoke_sector == 1 and not await verify_foundry_landing(local_operator):
+		print("Campaign check failed at the Foundry intake landing")
+		finish_relay_check(false)
+		return
 	if smoke_sector == 2 and not await verify_jungle_coop_crossing(local_operator, mission, "NurseryThorns"):
 		print("Campaign check failed at the Nursery Thorns")
 		finish_relay_check(false)
@@ -402,13 +434,14 @@ func verify_coop_mission(host: bool, smoke_sector: int, wipe_test := false) -> v
 	# suit reveal and extraction debrief. Each is part of the normal test path.
 	var returned := await wait_for_relay(func(): return is_instance_valid(home_hub) and not RiftRelay.mission_active, 50.0)
 	var continuation := read_checkpoint()
+	var next_sector := mini(smoke_sector + 1, Catalog.SECTORS.size())
 	var progressed: bool = (continuation != null
-		and int(continuation.get_value("checkpoint", "sector", 0)) == smoke_sector + 1
+		and int(continuation.get_value("checkpoint", "sector", 0)) == next_sector
 		and int(continuation.get_value("checkpoint", "experience", 0)) > starting_operator_xp
 		and Catalog.info(smoke_sector).reward in continuation.get_value("checkpoint", "weapons", []))
 	var rewards := (profile.player_xp > previous_xp and profile.credits > previous_credits
 		and profile.blueprint_items.has(reward_blueprint) and profile.gear == saved_gear
-		and profile.unlocked_sector >= smoke_sector + 1 and progressed)
+		and profile.unlocked_sector >= next_sector and progressed)
 	if not returned or not rewards:
 		print("Campaign check failed at extraction: hub=", returned, " XP=", profile.player_xp > previous_xp,
 			" bolts=", profile.credits > previous_credits, " blueprint=", profile.blueprint_items.has(reward_blueprint),
@@ -456,6 +489,22 @@ func verify_coop_wipe(host: bool, mission: Node) -> void:
 			await get_tree().create_timer(1.3).timeout
 	print("LIVE PARTY WIPE ", reset, " / same room, Lv. 1 and permanent progress")
 	finish_relay_check(reset)
+
+func verify_foundry_landing(operator: RiftPlayer) -> bool:
+	var start_health := operator.health
+	Input.action_press("move_right")
+	var takeoff := await wait_for_jump_lip(operator, 14.0)
+	var crossed := false
+	if takeoff:
+		Input.action_press("jump")
+		for frame in 17:
+			await get_tree().physics_frame
+		Input.action_press("dash")
+		crossed = await wait_for_relay(func(): return is_instance_valid(operator) and operator.global_position.x >= 22.25 and operator.is_on_floor(), 3.0)
+	Input.action_release("move_right")
+	Input.action_release("jump")
+	Input.action_release("dash")
+	return crossed and is_equal_approx(operator.health, start_health)
 
 func verify_jungle_coop_crossing(operator: RiftPlayer, mission: Node, pit_name: String) -> bool:
 	var pit := mission.stage.find_child(pit_name, true, false) as Area3D
@@ -656,6 +705,12 @@ func show_main_menu() -> void:
 	menu.operator_deleted.connect(clear_deleted_operator)
 	menu.save_requested.connect(save_at_station)
 	menu.profile_deletion_requested.connect(delete_player_profile)
+	menu.cloud_save_requested.connect(restore_cloud_and_play)
+	menu.online_setup_finished.connect(complete_online_setup)
+	menu.username_changed.connect(persist_username)
+	if progress_reset_error != OK:
+		menu.show_page("Save Reset Error")
+		return
 	if account and account.display_name.is_empty():
 		menu.show_page("Set up Player Profile")
 	if get_tree().has_meta(&"open_command_deck"):
@@ -769,6 +824,8 @@ func bank_coop_rewards(xp: int, bolts: int, blueprints: Array, number: int) -> v
 	var error := write_checkpoint(save)
 	if error != OK:
 		push_warning("Could not save the next co-op deployment: %s" % error_string(error))
+	elif save_session and persist_operator_save() != OK:
+		push_warning("Could not save the co-op extraction rewards to disk.")
 
 func close_coop_mission(message: String) -> void:
 	if not is_instance_valid(coop_mission):
@@ -813,11 +870,72 @@ func refresh_menu_save() -> void:
 		menu.run_unlocks = save.get_value("checkpoint", "weapons", [])
 	profile.operator_level = menu.saved_level
 
+func complete_online_setup() -> void:
+	var newly_signed_in := account.display_name.is_empty()
+	if newly_signed_in and account.create(RiftRelay.directory.username) != OK:
+		menu.show_page("Set up Player Profile")
+		return
+	var cloud = RiftRelay.directory.progress
+	await cloud.sync()
+	if not is_instance_valid(menu):
+		return
+	if newly_signed_in and not cloud.remote.is_empty() and cloud.conflict:
+		var result: Dictionary = await cloud.restore_cloud()
+		if result.get("error") != OK:
+			menu.show_page("Saves")
+			return
+		account.restore()
+	elif cloud.conflict:
+		menu.show_page("Saves")
+		return
+	if newly_signed_in and not cloud.checked_release:
+		menu.show_page("Saves")
+		return
+	menu.open_slot_picker("Load Game")
+
+func persist_username() -> void:
+	if account.display_name != RiftRelay.directory.username:
+		account.display_name = RiftRelay.directory.username
+	if account.save() == OK:
+		profile.operator_name = account.display_name
+		RiftRelay.local_name = account.display_name
+		RiftSettings.remember_operator_name(account.display_name)
+
+func restore_cloud_and_play() -> void:
+	if is_instance_valid(home_hub) or is_instance_valid(coop_mission):
+		return
+	var result: Dictionary = await RiftRelay.directory.progress.restore_cloud()
+	if result.get("error") != OK:
+		return
+	get_tree().remove_meta(&"riftcore_save_session")
+	save_session = null
+	account = PlayerAccount.new()
+	account.restore()
+	menu.account = account
+	var number: int = menu.preferred_operator()
+	if number > 0:
+		select_save_slot(number, false)
+	else:
+		refresh_menu_save()
+		menu.open_slot_picker("Load Game")
+
 func select_save_slot(number: int, fresh: bool, operator_name := "") -> void:
 	var selected := ManualSave.new(number)
+	if progress_reset_error != OK:
+		return
 	if not fresh and not selected.load_slot():
 		menu.show_slot_error()
 		return
+	if is_instance_valid(home_hub):
+		if save_session and save_session.slot == number and not fresh:
+			menu.hide()
+			close_station_panel()
+			return
+		if save_session and write_manual_save() != OK:
+			menu.slot_error = "Could not save your active operator before switching."
+			menu.show_page("Operators")
+			return
+		remove_home_hub()
 	save_session = selected
 	profile = selected.profile
 	if account:
@@ -828,19 +946,32 @@ func select_save_slot(number: int, fresh: bool, operator_name := "") -> void:
 		profile.operator_name = profile.clean_operator_name(operator_name)
 	RiftSettings.remember_operator_name(profile.operator_name)
 	get_tree().set_meta(&"riftcore_save_session", selected)
+	var saved_exists := ManualSave.read_slot(number) != null
+	if (not fresh or (not saved_exists and selected.save_slot() == OK)) and account:
+		account.last_operator = number
+		account.save()
 	open_home_hub()
 	if fresh:
 		home_hub.materialize_operator("arrival")
 
-func delete_player_profile() -> void:
+func delete_player_profile(email: String, password: String) -> void:
 	if not account or account.display_name.is_empty() or is_instance_valid(coop_mission):
 		return
+	if RiftRelay.directory.linked:
+		if email.is_empty() or password.is_empty():
+			menu.show_save_result("Enter your online email and password to delete this profile.")
+			return
+		var result: String = await RiftRelay.directory.delete_linked_account(email, password)
+		if not result.is_empty():
+			menu.show_save_result(result)
+			return
 	var error := account.remove_local_progress([SAVE_PATH, profile.path, RiftSocial.storage_path])
 	if error != OK:
 		menu.show_save_result("Could not delete the profile. " + error_string(error))
 		return
 	RiftRelay.leave()
 	RiftSocial.reset_profile()
+	RiftRelay.directory.reset_link()
 	RiftSettings.remember_operator_name("")
 	get_tree().remove_meta(&"riftcore_save_session")
 	remove_home_hub()
@@ -883,11 +1014,21 @@ func write_manual_save() -> Error:
 		if respawning or player.health <= 0.0:
 			return ERR_BUSY
 		save_checkpoint(true)
-	return save_session.save_slot()
+	return persist_operator_save()
+
+func persist_operator_save() -> Error:
+	if not save_session:
+		return ERR_UNCONFIGURED
+	var error := save_session.save_slot()
+	if error == OK and account and account.last_operator != save_session.slot:
+		account.last_operator = save_session.slot
+		account.save()
+	return error
 
 func manual_save_status(error: Error) -> String:
 	if error == OK:
-		return "Operator %02d saved." % save_session.slot
+		var location := "Saved locally. Cloud backup queued." if RiftRelay.directory.online() else "Saved on this device."
+		return "Operator %02d · %s" % [save_session.slot, location]
 	if error == ERR_UNCONFIGURED:
 		return "Select a save slot from the title screen first."
 	if error == ERR_BUSY:
@@ -916,6 +1057,8 @@ func open_home_hub() -> void:
 		var supplies: Dictionary = profile.finish_field_supplies(checkpoint.get_value("checkpoint", "recovered_supplies").duplicate(), true)
 		checkpoint.set_value("checkpoint", "recovered_supplies", supplies)
 	RiftRelay.local_name = account.display_name if account and not account.display_name.is_empty() else profile.operator_name
+	if account:
+		RiftRelay.directory.configure.call_deferred(account.display_name)
 	RiftRelay.unlocked_sector = profile.unlocked_sector
 	RiftRelay.set_difficulty_unlocks(profile.normal_clears.keys(), profile.nightmare_unlocked())
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
@@ -938,6 +1081,12 @@ func open_home_hub() -> void:
 	home_hub.title_requested.connect(func():
 		if not RiftRelay.connected_room.is_empty() or not RiftRelay.pending.is_empty():
 			RiftRelay.leave()
+		if save_session and persist_operator_save() != OK:
+			home_hub.set_panel_open(true)
+			menu.process_mode = Node.PROCESS_MODE_INHERIT
+			menu.open_station("Save Game")
+			menu.show_save_result("Could not save your operator before returning to the title.")
+			return
 		remove_home_hub()
 		menu.process_mode = Node.PROCESS_MODE_INHERIT
 		menu.show()
@@ -965,6 +1114,9 @@ func persist_blueprint_trade() -> Error:
 func close_station_panel() -> void:
 	menu.process_mode = Node.PROCESS_MODE_DISABLED
 	if is_instance_valid(home_hub):
+		if save_session and save_session.owns_slot and menu.page in ["Shop", "Storage", "Fabrication", "Upgrades", "Craft Item", "Learn Blueprint", "Blueprint Details"]:
+			if persist_operator_save() != OK:
+				push_warning("Could not save the station inventory change.")
 		home_hub.set_bank(profile.credits, profile.core_shards, profile.player_level())
 		home_hub.set_panel_open(false)
 
@@ -1838,6 +1990,8 @@ func _process(delta: float) -> void:
 			profile.save()
 		ending = Story.ending(recovered_all)
 		extraction_dialogue.append_array(Story.ending_exchange(recovered_all))
+	if save_session and persist_operator_save() != OK:
+		push_warning("Could not save the extraction rewards to disk.")
 	if not extraction_dialogue.is_empty() and DisplayServer.get_name() != "headless":
 		player.invulnerable_time = maxf(player.invulnerable_time, 0.5)
 		player.set_physics_process(false)

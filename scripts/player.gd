@@ -458,8 +458,8 @@ func simulate_movement(delta: float) -> void:
 	update_wall_contact(delta, axis)
 	var stick_crouch := action_held("crouch_stick") and absf(axis) < 0.35
 	var wants_crouch := action_held("crouch") or stick_crouch
-	var drop_command := shock_stun <= 0.0 and grounded() and wants_crouch and action_pressed("dash") and not is_instance_valid(ladder)
-	var dropping := drop_command and start_platform_drop()
+	var drop_command := wants_crouch and action_pressed("dash")
+	var dropping := drop_command and shock_stun <= 0.0 and grounded() and not is_instance_valid(ladder) and start_platform_drop()
 	if not dropping and update_ladder(delta, axis):
 		cancel_saber_charge()
 		return
@@ -484,7 +484,7 @@ func simulate_movement(delta: float) -> void:
 		jump_buffer = jump_buffer_duration
 	else:
 		jump_buffer = maxf(0.0, jump_buffer - delta)
-	if not dropping and shock_stun <= 0.0 and boss_debuff != 9 and resume_input_guard <= 0.0 and contact_recoil <= 0.0 and action_pressed("dash") and dash_lock <= 0.0 and (grounded() or air_dash_available):
+	if not drop_command and not dropping and shock_stun <= 0.0 and boss_debuff != 9 and resume_input_guard <= 0.0 and contact_recoil <= 0.0 and action_pressed("dash") and dash_lock <= 0.0 and (grounded() or air_dash_available):
 		dash_left = dash_duration
 		dash_elapsed = 0.0
 		dash_facing = facing
@@ -1076,6 +1076,10 @@ func cancel_charge() -> void:
 	present_charge(0.0, false)
 
 func update_charge(delta: float) -> void:
+	if wall_sliding:
+		shot_buffer_left = 0.0
+		cancel_charge()
+		return
 	if shot_buffer_left > 0.0:
 		shot_buffer_left = maxf(0.0, shot_buffer_left - delta)
 		if fire_lock <= 0.0 and melee_lock <= 0.0:
@@ -1174,7 +1178,7 @@ func shoot(charged := false, pose_held := false, suit_shot := false) -> void:
 		restore_energy(-suit_shot_cost())
 	var aim := facing
 	if buster_pose:
-		buster_pose.ladder_direction = aim if is_instance_valid(ladder) or wall_sliding else 0.0
+		buster_pose.ladder_direction = aim if is_instance_valid(ladder) else 0.0
 		buster_pose.crouched = low_profile and is_zero_approx(buster_pose.ladder_direction)
 		buster_pose.influence = 1.0 if pose_held else 0.7
 	if health <= 0.0:
@@ -1182,7 +1186,7 @@ func shoot(charged := false, pose_held := false, suit_shot := false) -> void:
 	if buster_pose:
 		buster_pose.influence = 1.0
 		await buster_pose.modification_processed
-		if health <= 0.0:
+		if health <= 0.0 or wall_sliding:
 			return
 	var muzzle := cannon_muzzle(aim)
 	if not special.is_empty():
@@ -1638,10 +1642,10 @@ func update_character_visuals(axis: float) -> void:
 		model_root.rotation.x = lerpf(model_root.rotation.x, 0.0, 0.48)
 	var swinging := melee_lock > 0.0
 	if buster_pose:
-		buster_pose.ladder_direction = facing if bracing else 0.0
+		buster_pose.ladder_direction = 0.0
 		buster_pose.crouched = low_profile
-		var aiming := not swinging and displayed_saber_charge < 0.10 and not (ground_dash and dash_left > 0.0) and (charge_held or is_instance_valid(charge_orb) or fire_lock > 0.0)
-		buster_pose.influence = move_toward(buster_pose.influence, 1.0 if aiming else 0.0, 0.30)
+		var aiming := not bracing and not swinging and displayed_saber_charge < 0.10 and not (ground_dash and dash_left > 0.0) and (charge_held or is_instance_valid(charge_orb) or fire_lock > 0.0)
+		buster_pose.influence = 0.0 if bracing else move_toward(buster_pose.influence, 1.0 if aiming else 0.0, 0.30)
 	if is_instance_valid(charge_orb):
 		charge_orb.global_position = cannon_muzzle(facing)
 	if swinging:

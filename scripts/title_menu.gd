@@ -10,7 +10,10 @@ signal station_closed
 signal sector_requested(number: int, difficulty: int)
 signal slot_requested(number: int, fresh: bool, operator_name: String)
 signal save_requested
-signal profile_deletion_requested
+signal profile_deletion_requested(email: String, password: String)
+signal cloud_save_requested
+signal online_setup_finished
+signal username_changed
 
 var active_slot := 0
 var developer_session := false
@@ -70,7 +73,7 @@ const FieldManual := preload("res://scripts/field_manual.gd")
 const EquipmentDisplay := preload("res://scripts/equipment_display.gd")
 const EquipmentStats := preload("res://scripts/equipment_stats.gd")
 const UI := preload("res://scripts/rift_ui.gd")
-const PORTRAIT := preload("res://assets/ui/rx07_menu.png")
+const SkinKit := preload("res://scripts/operator_skins.gd")
 const Catalog := preload("res://scripts/sector_catalog.gd")
 const Difficulty := preload("res://scripts/mission_difficulty.gd")
 const Blueprints := preload("res://scripts/blueprint_catalog.gd")
@@ -188,16 +191,35 @@ func show_page(next: String) -> void:
 	columns.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	layout.add_child(columns)
 	match page:
-		"Set up Player Profile", "Player Profile":
+		"Set up Player Profile":
+			SocialPanel.build_directory_account(self, columns, true)
+		"Offline Setup", "Player Profile":
 			build_player_account(columns)
+		"Save Reset Error":
+			var reset := card(columns)
+			UI.label(reset, "Save reset could not finish", 30, UI.CYAN)
+			UI.label(reset, "Close other copies of RIFTCORE and reopen the game to retry.", 18, UI.MUTED)
+			UI.button(reset, "Quit Game", RiftRelay.quit_game, true).grab_focus()
 		"Delete Profile":
 			var form := card(columns)
 			UI.label(form, "Delete %s?" % account.display_name, 32, UI.CYAN)
 			UI.label(form, "This permanently deletes your profile, all operator saves, progress, and your RIFTCORE friends list.", 20, UI.MUTED)
 			UI.button(form, "Keep Profile", show_page.bind("Player Profile"), true).grab_focus()
-			UI.button(form, "Delete Profile and Progress", func(): profile_deletion_requested.emit())
+			if RiftRelay.directory.linked:
+				UI.label(form, "Confirm the email and password for your RIFTCORE online account.", 17, UI.MUTED)
+				var email := SocialPanel.directory_field(form, "Email")
+				var password := SocialPanel.directory_field(form, "Password", 20)
+				password.secret = true
+				UI.button(form, "Delete Profile and Progress", func():
+					var value := password.text
+					password.clear()
+					profile_deletion_requested.emit(email.text.strip_edges(), value))
+			else:
+				UI.button(form, "Delete Profile and Progress", func(): profile_deletion_requested.emit("", ""))
 			save_status = UI.label(form, "", 17, UI.VIOLET)
-		"New Game", "Load Game":
+		"Saves":
+			build_profile_saves(columns)
+		"New Game", "Load Game", "Operators":
 			build_save_slots(columns)
 		"Delete Operator":
 			var form := card(columns)
@@ -222,7 +244,10 @@ func show_page(next: String) -> void:
 			save_button.disabled = active_slot == 0
 			if not save_button.disabled:
 				save_button.grab_focus()
-			save_status = UI.label(form, "", 19, UI.CYAN)
+			save_status = UI.label(form, RiftRelay.directory.progress.status, 19, UI.CYAN)
+			var indicator := save_status
+			SocialPanel.watch(form, RiftRelay.directory.progress.changed, func():
+				indicator.text = RiftRelay.directory.progress.status)
 			portrait(card(columns))
 		"Sector select":
 			build_sector(columns)
@@ -252,6 +277,10 @@ func show_page(next: String) -> void:
 			SocialPanel.build_messages(self, columns)
 		"Add Contact":
 			SocialPanel.build_add(self, columns)
+		"Directory Account":
+			SocialPanel.build_directory_account(self, columns)
+		"Account Settings":
+			SocialPanel.build_account_settings(self, columns)
 		"Invites":
 			SocialPanel.build_invites(self, columns)
 		"Party":
@@ -270,7 +299,7 @@ func show_page(next: String) -> void:
 		"Settings":
 			var settings := UI.settings(card(columns), not station_panel)
 			settings.initial_focus.grab_focus()
-	if page not in ["Title", "Co-op Setup Guide", "Set up Player Profile"]:
+	if page not in ["Title", "Co-op Setup Guide", "Set up Player Profile", "Save Reset Error"]:
 		var back_title := "Back to Title"
 		if station_panel:
 			back_title = "Back to Deployment" if page in ["Level select", "New run"] else "Back to Station"
@@ -297,6 +326,8 @@ func station_tabs() -> Dictionary:
 		return {"Fabrication": "Crafting", "Upgrades": "Core Ascension"}
 	if page in ["Save Game", "Settings"]:
 		return {"Save Game": "Save Game", "Settings": "Settings"}
+	if page in ["Player Profile", "Operators", "Account Settings"]:
+		return {"Player Profile": "Profile", "Operators": "Operators", "Account Settings": "Account Settings"}
 	if page in ["Collection", "Tutorials"]:
 		return {"Collection": "NOVA Archive", "Tutorials": "Tutorials"}
 	if page in ["Social", "Whispers", "Invites", "Leaderboard"]:
@@ -318,11 +349,11 @@ func build_station_header(header: HBoxContainer) -> void:
 		station_name = "EQUIPMENT"
 	elif page in ["Save Game", "Settings"]:
 		station_name = "SYSTEM"
-	elif page in ["Player Profile", "Delete Profile"]:
+	elif page in ["Player Profile", "Delete Profile", "Operators"]:
 		station_name = "PROFILE"
 	elif page in ["Collection", "Tutorials"]:
 		station_name = "NOVA ARCHIVE"
-	elif page in ["Social", "Whispers", "Party", "Invites", "Add Contact", "Leaderboard"]:
+	elif page in ["Social", "Whispers", "Party", "Invites", "Add Contact", "Directory Account", "Leaderboard"]:
 		station_name = "SOCIAL"
 	var heading := UI.label(header, station_name, 25, UI.CYAN)
 	heading.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -425,21 +456,27 @@ func _input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 func leave_page() -> void:
-	if page == "Set up Player Profile":
+	if page in ["Set up Player Profile", "Save Reset Error"]:
 		return
-	if page == "Delete Profile":
-		show_page("Player Profile")
+	if page == "Offline Setup":
+		show_page("Set up Player Profile")
+		return
+	if page == "Account Settings" and not station_panel:
+		show_page("Saves")
+		return
+	if page == "Delete Profile" or page == "Delete Operator" and delete_return_page == "Operators":
+		show_page("Operators" if page == "Delete Operator" else "Player Profile")
 		return
 	if page == "Settings" and find_children("RiftSettingsPanel", "", true, false).any(func(panel): return panel.installing):
 		return
-	if page in ["Co-op Setup Guide", "Add Contact"]:
-		show_page("Social")
+	if page in ["Co-op Setup Guide", "Add Contact", "Directory Account"]:
+		show_page("Social" if station_panel else "Saves")
 		return
 	if page in ["Party", "Social", "Leaderboard", "Co-op Sectors"] and party_from_deploy:
 		party_from_deploy = false
 		show_page("Sector select")
 		return
-	if page in ["Party", "Social", "Leaderboard"] and not RiftRelay.pending.is_empty():
+	if page == "Party" and not RiftRelay.pending.is_empty():
 		RiftRelay.leave()
 	if station_panel:
 		if page == "Co-op Sectors":
@@ -475,12 +512,7 @@ func card(parent: Container, ratio := 1.0) -> VBoxContainer:
 	return UI.card(parent, ratio)
 
 func portrait(parent: VBoxContainer) -> void:
-	var hero := TextureRect.new()
-	hero.texture = PORTRAIT
-	hero.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	hero.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	hero.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	hero.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var hero := preload("res://scripts/equipment_display.gd").new()
 	parent.add_child(hero)
 
 func add_menu_art(dimmed: bool) -> void:
@@ -522,13 +554,13 @@ func build_start_screen() -> void:
 	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	stack.add_child(HSeparator.new())
 	var buttons: Array[Button] = []
-	if active_slot > 0 or developer_session:
-		var label := "Continue" if active_slot > 0 else "Enter Station"
-		buttons.append(UI.button(stack, label, func(): hub_requested.emit(), true))
-	buttons.append(UI.button(stack, "Operators", open_slot_picker.bind("Load Game"), buttons.is_empty()))
-	buttons.append(UI.button(stack, "Settings", show_page.bind("Settings")))
+	if preferred_operator() > 0 or developer_session:
+		var label := "Enter Station" if developer_session else "Continue"
+		buttons.append(UI.button(stack, label, play_local_save, true))
+	buttons.append(UI.button(stack, "Saves", show_page.bind("Saves"), buttons.is_empty()))
 	buttons.append(UI.button(stack, "Tutorials", show_page.bind("Tutorials")))
-	buttons.append(UI.button(stack, "Quit Game", get_tree().quit))
+	buttons.append(UI.button(stack, "Settings", show_page.bind("Settings")))
+	buttons.append(UI.button(stack, "Quit Game", RiftRelay.quit_game))
 	for i in range(buttons.size()):
 		var button := buttons[i]
 		button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
@@ -540,6 +572,90 @@ func build_start_screen() -> void:
 	var status := UI.label(stack, "RX-07    //    SYSTEM READY", 13, UI.MUTED)
 	status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	buttons[0].grab_focus()
+
+func preferred_operator() -> int:
+	if account and ManualSave.read_slot(account.last_operator) != null:
+		return account.last_operator
+	for number in range(1, ManualSave.SLOT_COUNT + 1):
+		if ManualSave.read_slot(number) != null:
+			return number
+	return 0
+
+func play_local_save() -> void:
+	var number := preferred_operator()
+	if number > 0:
+		slot_requested.emit(number, false, "")
+	elif developer_session:
+		hub_requested.emit()
+	else:
+		open_slot_picker("Load Game")
+
+func build_profile_saves(columns: HBoxContainer) -> void:
+	var directory = RiftRelay.directory
+	var cloud = directory.progress
+	var local := card(columns)
+	var online := card(columns)
+	UI.label(local, "LOCAL SAVE", 28, UI.CYAN)
+	describe_profile_save(local, cloud.snapshot(), "On this device")
+	UI.button(local, "Select Save" if preferred_operator() > 0 else "Choose Operator", play_local_save, true)
+	UI.button(local, "Manage Operators", open_slot_picker.bind("Load Game"), false, 35)
+	UI.label(online, "CLOUD SAVE", 28, UI.CYAN)
+	var status := UI.label(online, cloud.status, 17, UI.MUTED)
+	var details := UI.column(online, 8)
+	var actions := HBoxContainer.new()
+	actions.add_theme_constant_override("separation", 8)
+	online.add_child(actions)
+	var last_displayed := {"revision": "", "conflict": false, "online": false}
+	var refresh := func():
+		var revision: String = cloud.remote.get("revision", "")
+		var connected: bool = directory.online()
+		status.text = cloud.status if connected else "Connect online to select a cloud save."
+		var visible_state := {"revision": revision, "conflict": cloud.conflict, "online": connected}
+		if visible_state == last_displayed and actions.get_child_count() > 0:
+			return
+		last_displayed.assign(visible_state)
+		for container in [details, actions]:
+			for item in container.get_children():
+				container.remove_child(item)
+				item.queue_free()
+		if connected:
+			if not revision.is_empty():
+				describe_profile_save(details, cloud.remote.data, "%s UTC" % cloud.remote.get("saved_at", ""))
+				UI.button(actions, "Select Cloud Save", func(): cloud_save_requested.emit(), true, 36)
+			else:
+				UI.label(details, "Your profile and all three operator saves back up here.", 17, UI.MUTED)
+			if cloud.conflict:
+				UI.button(actions, "Keep Local Copy", func(): cloud.sync(true), false, 36)
+		else:
+			UI.button(actions, "Connect Online", show_page.bind("Directory Account"), true, 36)
+	UI.button(actions, "Account Settings", show_page.bind("Account Settings"), false, 36)
+	SocialPanel.watch(online, cloud.changed, refresh)
+	SocialPanel.watch(online, directory.changed, refresh)
+	refresh.call()
+	if directory.online():
+		cloud.sync.call_deferred()
+
+func describe_profile_save(panel: VBoxContainer, data: Dictionary, source: String) -> void:
+	var stored := ConfigFile.new()
+	if data.is_empty() or stored.parse(String(data.get("profile", ""))) != OK:
+		UI.label(panel, "No profile saved", 23)
+		return
+	var xp := int(stored.get_value("player", "xp", 0))
+	var name := String(stored.get_value("player", "name", "RX-07"))
+	UI.label(panel, name, 27)
+	UI.label(panel, "Profile Lv. %d  ·  %s" % [RiftPlayer.level_for_experience(xp), source], 17, UI.MUTED)
+	var ops: Dictionary = data.get("operators", {})
+	var number := int(stored.get_value("player", "last_operator", 0))
+	if not ops.has(str(number)):
+		number = int(ops.keys()[0]) if not ops.is_empty() else 0
+	if number <= 0:
+		UI.label(panel, "No operators created", 17, UI.MUTED)
+		return
+	var active := ConfigFile.new()
+	if active.parse(ops[str(number)]) == OK:
+		var level := RiftPlayer.level_for_experience(int(active.get_value("checkpoint", "experience", 0)))
+		UI.label(panel, "Operator %02d  ·  Lv. %d" % [number, level], 19, UI.CYAN)
+		UI.label(panel, "%d / %d operator slots in use" % [ops.size(), ManualSave.SLOT_COUNT], 17, UI.MUTED)
 
 func build_player_account(columns: HBoxContainer) -> void:
 	var form := card(columns)
@@ -582,9 +698,8 @@ func build_player_account(columns: HBoxContainer) -> void:
 		UI.button(filters, "Co-op", display_records.bind(1), false, 34)
 		display_records.call(0)
 		return
-	UI.label(form, "Create your Player Profile", 36, UI.CYAN)
-	UI.label(form, "Your profile name is permanent and is used for every operator. Profile XP carries across operators.", 20, UI.MUTED)
-	UI.label(form, "Solo play is available offline. Live rooms and Steam presence require a connection.", 17, UI.MUTED)
+	UI.label(form, "Create Offline Profile", 36, UI.CYAN)
+	UI.label(form, "Choose one name for your three operators. This profile saves on this device. Sign in to use cloud saves and the live friends list.", 20, UI.MUTED)
 	var name_field := LineEdit.new()
 	name_field.placeholder_text = "Player name"
 	name_field.max_length = 20
@@ -599,10 +714,10 @@ func build_player_account(columns: HBoxContainer) -> void:
 		if account.create(name_field.text) != OK:
 			status.text = "Could not save the profile. Try again."
 			return
-		show_page("Title")
+		open_slot_picker("Load Game")
 	name_field.text_submitted.connect(func(_value): submit.call())
 	UI.button(form, "Create Profile", submit, true)
-	UI.button(form, "Quit Game", get_tree().quit)
+	UI.button(form, "Quit Game", RiftRelay.quit_game)
 	name_field.grab_focus()
 
 func format_profile_time(value: float) -> String:
@@ -821,6 +936,7 @@ func open_slot_picker(mode: String) -> void:
 func build_save_slots(columns: HBoxContainer) -> void:
 	var cards: Array[Button] = []
 	var saves: Array[ConfigFile] = []
+	var previews := {}
 	for number in range(1, ManualSave.SLOT_COUNT + 1):
 		var saved := ManualSave.read_slot(number)
 		saves.append(saved)
@@ -832,7 +948,9 @@ func build_save_slots(columns: HBoxContainer) -> void:
 		if saved:
 			var model := preload("res://scripts/equipment_display.gd").new()
 			model.compact = true
+			model.skin = account.display_skin(number) if account else ""
 			operator_card.add_child(model)
+			previews[number] = model
 			UI.label(operator_card, operator_name(saved), 25)
 			for line in operator_facts(saved):
 				UI.label(operator_card, line, 16, UI.MUTED)
@@ -860,11 +978,31 @@ func build_save_slots(columns: HBoxContainer) -> void:
 			UI.label(detail, "Profile  /  " + account.display_name, 19, UI.MUTED)
 		action = UI.button(detail, "Create Operator", choose_slot.bind(displayed_operator, true), true, 34)
 	if saved:
-		action = UI.button(detail, "Load Operator", choose_slot.bind(displayed_operator, false), true, 34)
+		action = UI.button(detail, "Select Operator" if station_panel else "Load Operator", choose_slot.bind(displayed_operator, false), true, 34)
+	if saved and (not station_panel or displayed_operator != active_slot):
 		other_action = UI.button(detail, "Delete Operator", func():
 			delete_return_page = page
 			show_page("Delete Operator")
 		, false, 34)
+	if saved and account:
+		var options := OptionButton.new()
+		UI.style_button(options)
+		options.fit_to_longest_item = false
+		detail.add_child(options)
+		var choices: Array = [""] + account.unlocked_skins
+		for choice in choices:
+			options.add_item(SkinKit.label(choice))
+			if choice == account.display_skin(displayed_operator):
+				options.select(options.item_count - 1)
+		var wardrobe_status := UI.label(detail, "Display skin only. Clear Hard sectors for boss suits and Expert sectors for exclusive RX-07 finishes.", 14, UI.MUTED)
+		var slot := displayed_operator
+		options.item_selected.connect(func(index: int):
+			if account.select_skin(slot, choices[index]) == OK:
+				previews[slot].set_appearance(choices[index])
+			else:
+				options.select(choices.find(account.display_skin(slot)))
+				wardrobe_status.text = "Could not save the display skin."
+		)
 	if not slot_error.is_empty():
 		UI.label(detail, slot_error, 16, UI.VIOLET)
 	var selected := cards[displayed_operator - 1]
@@ -1597,7 +1735,10 @@ func confirm_gear_purchase(equip_now: bool) -> void:
 
 func build_storage(columns: HBoxContainer) -> void:
 	var fitted := card(columns, 0.78)
-	UI.label(fitted, "RX-07 Equipment", 28, UI.CYAN)
+	var heading := HBoxContainer.new()
+	fitted.add_child(heading)
+	UI.label(heading, "RX-07 Equipment", 28, UI.CYAN).size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	UI.label(heading, "Operator Lv. %02d" % RiftPlayer.level_for_experience(saved_experience), 18, UI.WHITE).vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	var body := EquipmentBody.new()
 	fitted.add_child(body)
 	body.install(profile, equipment_slot if equipment_view == "Gear" else "", func(slot: String):

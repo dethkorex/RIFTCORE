@@ -10,7 +10,7 @@ const IDLE_MS := 280
 const BUFFER_PACKETS := 3
 const VOICE_READY := "rift_voice_v1"
 const SPEECH_GATE := 0.006
-const MIC_TEST_SECONDS := 4.0
+const MIC_TEST_BUFFER := 0.06
 
 var lobby: Node
 var capturing := false
@@ -19,10 +19,8 @@ var sequence := 0
 var streams: Dictionary = {}
 var last_transmit := -IDLE_MS
 var test_owner: WeakRef
-var test_frames := PackedVector2Array()
-var test_deadline := 0
-var test_peak := 0.0
-var test_mix_rate := 0
+var last_test_meter_at := 0
+var test_meter_peak := 0.0
 var test_player: AudioStreamPlayer
 
 func _ready() -> void:
@@ -57,15 +55,28 @@ func start_microphone_test(owner: Control) -> void:
 	if DisplayServer.get_name() == "headless" or AudioServer.set_input_device_active(true) != OK:
 		microphone_test_changed.emit("Could not open the selected microphone.", 0.0)
 		return
-	test_mix_rate = AudioServer.get_input_mix_rate()
-	if test_mix_rate <= 0:
+	var mix_rate := AudioServer.get_input_mix_rate()
+	if mix_rate <= 0:
 		AudioServer.set_input_device_active(false)
 		microphone_test_changed.emit("The selected microphone is unavailable.", 0.0)
 		return
 	test_owner = weakref(owner)
+	owner.tree_exiting.connect(func():
+		if test_owner != null and test_owner.get_ref() == owner:
+			stop_microphone_test()
+	, CONNECT_ONE_SHOT)
 	AudioServer.get_input_frames(AudioServer.get_input_frames_available())
-	test_deadline = Time.get_ticks_msec() + int(MIC_TEST_SECONDS * 1000.0)
-	microphone_test_changed.emit("Recording… speak into your microphone.", 0.0)
+	last_test_meter_at = Time.get_ticks_msec()
+	var monitor := AudioStreamGenerator.new()
+	monitor.mix_rate_mode = AudioStreamGenerator.MIX_RATE_CUSTOM
+	monitor.mix_rate = mix_rate
+	monitor.buffer_length = MIC_TEST_BUFFER
+	test_player = AudioStreamPlayer.new()
+	test_player.stream = monitor
+	test_player.bus = &"Voice"
+	add_child(test_player)
+	test_player.play()
+	microphone_test_changed.emit("Live monitoring is on. Speak to hear yourself in your headset.", 0.0)
 
 func is_testing_microphone() -> bool:
 	return test_owner != null
@@ -73,12 +84,9 @@ func is_testing_microphone() -> bool:
 func stop_microphone_test(message := "Microphone test stopped.") -> void:
 	if test_owner == null:
 		return
-	if test_deadline > 0:
-		AudioServer.set_input_device_active(false)
-	test_deadline = 0
 	test_owner = null
-	test_frames.clear()
-	test_peak = 0.0
+	test_meter_peak = 0.0
+	AudioServer.set_input_device_active(false)
 	if is_instance_valid(test_player):
 		test_player.stop()
 		test_player.queue_free()
@@ -90,40 +98,26 @@ func update_microphone_test() -> void:
 	if owner == null or not owner.is_visible_in_tree():
 		stop_microphone_test()
 		return
-	if test_deadline == 0:
-		return
+	var playback := test_player.get_stream_playback() as AudioStreamGeneratorPlayback
 	var available_frames := AudioServer.get_input_frames_available()
-	var chunk := AudioServer.get_input_frames(available_frames) if available_frames > 0 else PackedVector2Array()
-	var peak := 0.0
-	for sample in chunk:
-		peak = maxf(peak, maxf(absf(sample.x), absf(sample.y)))
-	test_frames.append_array(chunk)
-	test_peak = maxf(test_peak, peak)
-	var remaining := float(test_deadline - Time.get_ticks_msec()) / 1000.0
-	if remaining > 0.0:
-		microphone_test_changed.emit("Recording… %d s" % ceili(remaining), clampf(sqrt(peak), 0.0, 1.0))
-		return
-	AudioServer.set_input_device_active(false)
-	test_deadline = 0
-	if test_frames.is_empty() or test_peak < SPEECH_GATE:
-		stop_microphone_test("No signal detected. Check the microphone and try again.")
-		return
-	var recording := AudioStreamWAV.new()
-	recording.format = AudioStreamWAV.FORMAT_16_BITS
-	recording.mix_rate = test_mix_rate
-	var pcm := PackedByteArray()
-	pcm.resize(test_frames.size() * 2)
-	for index in test_frames.size():
-		var sample := test_frames[index]
-		pcm.encode_s16(index * 2, roundi(clampf((sample.x + sample.y) * 0.5, -1.0, 1.0) * 32767.0))
-	recording.data = pcm
-	test_player = AudioStreamPlayer.new()
-	test_player.stream = recording
-	test_player.bus = &"Voice"
-	add_child(test_player)
-	test_player.finished.connect(func(): stop_microphone_test("Test complete. Playback uses Voice Volume."))
-	test_player.play()
-	microphone_test_changed.emit("Playing your recording…", 0.0)
+	if playback != null and available_frames > 0:
+		var count := mini(available_frames, playback.get_frames_available())
+		# Keep the newest samples after a slow render frame.
+		if count < available_frames:
+			AudioServer.get_input_frames(available_frames - count)
+		if count > 0:
+			var samples := AudioServer.get_input_frames(count)
+			for index in samples.size():
+				var sample := samples[index]
+				var mono := (sample.x + sample.y) * 0.5
+				test_meter_peak = maxf(test_meter_peak, absf(mono))
+				samples[index] = Vector2(mono, mono)
+			playback.push_buffer(samples)
+	var now := Time.get_ticks_msec()
+	if now - last_test_meter_at >= 60:
+		microphone_test_changed.emit("Live monitoring is on. Speak to hear yourself in your headset.", clampf(sqrt(test_meter_peak), 0.0, 1.0))
+		last_test_meter_at = now
+		test_meter_peak = 0.0
 
 func wants_microphone() -> bool:
 	if DisplayServer.get_name() == "headless" or not get_window().has_focus():
