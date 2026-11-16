@@ -47,6 +47,7 @@ var hard_sectors: Array = []
 var nightmare_unlocked := false
 var steam_invite_lobbies: Dictionary = {}
 var local_name := "RX-07"
+var local_armor_finish := ""
 var unlocked_sector := 1
 
 var blueprint_drops: Dictionary = {}
@@ -126,6 +127,11 @@ func host_room() -> void:
 	for byte in Crypto.new().generate_random_bytes(CodeLength):
 		code += Codes[byte % Codes.length()]
 	_open("host", code)
+
+func publish_armor_finish(id: String) -> void:
+	local_armor_finish = id
+	if is_instance_valid(relay) and not connected_room.is_empty():
+		relay.player_set_data("armor_finish", id)
 
 func copy_invite_code() -> void:
 	if not can_copy_invite_code():
@@ -296,6 +302,7 @@ func _room_joined(lobby_name: String) -> void:
 	pending = ""
 	voice.publish_preference()
 	relay.player_set_data("operator_name", local_name)
+	relay.player_set_data("armor_finish", local_armor_finish)
 	_publish_difficulty_unlocks()
 	if joined_as_guest:
 		guest_joined.emit.call_deferred()

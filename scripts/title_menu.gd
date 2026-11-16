@@ -10,10 +10,11 @@ signal station_closed
 signal sector_requested(number: int, difficulty: int)
 signal slot_requested(number: int, fresh: bool, operator_name: String)
 signal save_requested
-signal profile_deletion_requested(email: String, password: String)
+signal profile_reset_requested
 signal cloud_save_requested
 signal online_setup_finished
 signal username_changed
+signal finish_purchase_requested(id: String)
 
 var active_slot := 0
 var developer_session := false
@@ -58,6 +59,7 @@ var whisper_contact: Variant = 0
 var social_contact := ""
 var social_filter := 0
 var inbox_tab: Button
+var requests_tab: Button
 var messages_tab: Button
 var inventory_slot := "frame"
 var inventory_status := ""
@@ -116,6 +118,7 @@ func _ready() -> void:
 	theme = UI.theme()
 	RiftRelay.changed.connect(refresh_online_room)
 	RiftSocial.invites_changed.connect(update_social_tabs)
+	RiftRelay.directory.changed.connect(update_social_tabs)
 	RiftSocial.whispers_changed.connect(func(_id): update_social_tabs.call_deferred())
 	RiftSocial.records_changed.connect(func():
 		if is_visible_in_tree() and page == "Leaderboard":
@@ -135,6 +138,7 @@ func show_page(next: String) -> void:
 		return
 	page = next
 	inbox_tab = null
+	requests_tab = null
 	messages_tab = null
 	for child in get_children():
 		remove_child(child)
@@ -181,6 +185,8 @@ func show_page(next: String) -> void:
 				inbox_tab = button
 			elif tab_page == "Whispers":
 				messages_tab = button
+			elif tab_page == "Friend Requests":
+				requests_tab = button
 		update_social_tabs()
 		var hint := UI.label(strip, "LB / RB   Switch tab", 14, UI.MUTED)
 		hint.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -202,20 +208,10 @@ func show_page(next: String) -> void:
 			UI.button(reset, "Quit Game", RiftRelay.quit_game, true).grab_focus()
 		"Delete Profile":
 			var form := card(columns)
-			UI.label(form, "Delete %s?" % account.display_name, 32, UI.CYAN)
-			UI.label(form, "This permanently deletes your profile, all operator saves, progress, and your RIFTCORE friends list.", 20, UI.MUTED)
-			UI.button(form, "Keep Profile", show_page.bind("Player Profile"), true).grab_focus()
-			if RiftRelay.directory.linked:
-				UI.label(form, "Confirm the email and password for your RIFTCORE online account.", 17, UI.MUTED)
-				var email := SocialPanel.directory_field(form, "Email")
-				var password := SocialPanel.directory_field(form, "Password", 20)
-				password.secret = true
-				UI.button(form, "Delete Profile and Progress", func():
-					var value := password.text
-					password.clear()
-					profile_deletion_requested.emit(email.text.strip_edges(), value))
-			else:
-				UI.button(form, "Delete Profile and Progress", func(): profile_deletion_requested.emit("", ""))
+			UI.label(form, "Reset operator progress?", 32, UI.CYAN)
+			UI.label(form, "This clears all three operators and saved progression for this profile. Your RIFTCORE account, username, and friends stay intact.", 20, UI.MUTED)
+			UI.button(form, "Keep Progress", show_page.bind("Player Profile"), true).grab_focus()
+			UI.button(form, "Reset Operator Progress", profile_reset_requested.emit)
 			save_status = UI.label(form, "", 17, UI.VIOLET)
 		"Saves":
 			build_profile_saves(columns)
@@ -276,11 +272,15 @@ func show_page(next: String) -> void:
 		"Whispers":
 			SocialPanel.build_messages(self, columns)
 		"Add Contact":
-			SocialPanel.build_add(self, columns)
+			SocialPanel.build_player_directory(self, columns)
+		"Friend Requests":
+			SocialPanel.build_friend_requests(self, columns)
 		"Directory Account":
 			SocialPanel.build_directory_account(self, columns)
 		"Account Settings":
 			SocialPanel.build_account_settings(self, columns)
+		"Cosmetics":
+			build_cosmetics(columns)
 		"Invites":
 			SocialPanel.build_invites(self, columns)
 		"Party":
@@ -326,12 +326,13 @@ func station_tabs() -> Dictionary:
 		return {"Fabrication": "Crafting", "Upgrades": "Core Ascension"}
 	if page in ["Save Game", "Settings"]:
 		return {"Save Game": "Save Game", "Settings": "Settings"}
-	if page in ["Player Profile", "Operators", "Account Settings"]:
-		return {"Player Profile": "Profile", "Operators": "Operators", "Account Settings": "Account Settings"}
+	if page in ["Player Profile", "Operators", "Account Settings", "Storage", "Cosmetics"]:
+		return {"Player Profile": "Profile", "Storage": "Equipment", "Operators": "Operators", "Cosmetics": "Cosmetics", "Account Settings": "Account Settings"}
 	if page in ["Collection", "Tutorials"]:
 		return {"Collection": "NOVA Archive", "Tutorials": "Tutorials"}
-	if page in ["Social", "Whispers", "Invites", "Leaderboard"]:
-		return {"Social": "Friends", "Whispers": "Messages", "Invites": "Invites", "Leaderboard": "Sector Records"}
+	if page in ["Social", "Whispers", "Invites", "Leaderboard", "Add Contact", "Friend Requests"]:
+		var pending: int = RiftRelay.directory.request_count()
+		return {"Social": "Friends", "Add Contact": "Find Players", "Friend Requests": "Requests" + (" (%d)" % pending if pending else ""), "Whispers": "Messages", "Invites": "Invites", "Leaderboard": "Sector Records"}
 	return {}
 
 func build_station_header(header: HBoxContainer) -> void:
@@ -349,11 +350,11 @@ func build_station_header(header: HBoxContainer) -> void:
 		station_name = "EQUIPMENT"
 	elif page in ["Save Game", "Settings"]:
 		station_name = "SYSTEM"
-	elif page in ["Player Profile", "Delete Profile", "Operators"]:
+	elif page in ["Player Profile", "Delete Profile", "Operators", "Account Settings", "Storage"]:
 		station_name = "PROFILE"
 	elif page in ["Collection", "Tutorials"]:
 		station_name = "NOVA ARCHIVE"
-	elif page in ["Social", "Whispers", "Party", "Invites", "Add Contact", "Directory Account", "Leaderboard"]:
+	elif page in ["Social", "Whispers", "Party", "Invites", "Add Contact", "Directory Account", "Leaderboard", "Friend Requests"]:
 		station_name = "SOCIAL"
 	var heading := UI.label(header, station_name, 25, UI.CYAN)
 	heading.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -657,6 +658,30 @@ func describe_profile_save(panel: VBoxContainer, data: Dictionary, source: Strin
 		UI.label(panel, "Operator %02d  ·  Lv. %d" % [number, level], 19, UI.CYAN)
 		UI.label(panel, "%d / %d operator slots in use" % [ops.size(), ManualSave.SLOT_COUNT], 17, UI.MUTED)
 
+func build_cosmetics(columns: HBoxContainer) -> void:
+	var finish_model := preload("res://scripts/equipment_display.gd").new()
+	card(columns).add_child(finish_model)
+	var list := card(columns, 1.18)
+	UI.label(list, "STATION FINISHES", 27, UI.CYAN)
+	UI.label(list, "Purchases stay on this profile. Select a finish in Operators to wear it on your Standard Frame.", 17, UI.MUTED)
+	if not inventory_status.is_empty():
+		UI.label(list, inventory_status, 17, UI.CYAN)
+	for id in SkinKit.STORE:
+		var item: Array = SkinKit.STORE[id]
+		var row := HBoxContainer.new()
+		list.add_child(row)
+		var swatch := ColorRect.new()
+		swatch.color = Color(item[2])
+		swatch.custom_minimum_size = Vector2(20, 18)
+		swatch.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(swatch)
+		var preview := UI.button(row, item[0], finish_model.set_appearance.bind(id), false, 35)
+		preview.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var owned: bool = account.unlocked_skins.has(id)
+		var purchase := UI.button(row, "Owned" if owned else "%s bolts" % item[3], finish_purchase_requested.emit.bind(id), true, 35)
+		purchase.disabled = owned or profile.credits < item[3]
+		preview.focus_entered.connect(finish_model.set_appearance.bind(id))
+
 func build_player_account(columns: HBoxContainer) -> void:
 	var form := card(columns)
 	if not account.display_name.is_empty():
@@ -673,7 +698,7 @@ func build_player_account(columns: HBoxContainer) -> void:
 		UI.label(form, "Longest Operator run    %s" % record, 20)
 		UI.label(form, "Survival time counts active deployment time across sectors until reconstruction.", 16, UI.MUTED)
 		form.add_child(preload("res://scripts/equipment_display.gd").new())
-		UI.button(form, "Delete Profile", show_page.bind("Delete Profile"))
+		UI.button(form, "Reset Progress", show_page.bind("Delete Profile"))
 		var history := card(columns, 1.45)
 		UI.label(history, "Sector Records", 26, UI.CYAN)
 		UI.label(history, "Fastest extractions by sector and difficulty", 16, UI.MUTED)
@@ -833,6 +858,9 @@ func refresh_archive_pin(entries: VBoxContainer, id: String) -> void:
 			return
 
 func update_social_tabs() -> void:
+	if is_instance_valid(requests_tab):
+		var count := RiftRelay.directory.request_count()
+		requests_tab.text = "Requests (%d)" % count if count > 0 else "Requests"
 	if is_instance_valid(inbox_tab):
 		var pending := RiftSocial.invites.size()
 		inbox_tab.text = "Invites (%d)" % pending if pending > 0 else "Invites"
@@ -1739,21 +1767,30 @@ func build_storage(columns: HBoxContainer) -> void:
 	fitted.add_child(heading)
 	UI.label(heading, "RX-07 Equipment", 28, UI.CYAN).size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	UI.label(heading, "Operator Lv. %02d" % RiftPlayer.level_for_experience(saved_experience), 18, UI.WHITE).vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	var body := EquipmentBody.new()
-	fitted.add_child(body)
-	body.install(profile, equipment_slot if equipment_view == "Gear" else "", func(slot: String):
-		equipment_slot = slot
-		focused_item = profile.equipped_for(slot)
-		equipment_view = "Gear"
-		show_page("Storage")
-	)
-	var actor := body.preview_actor
-	EquipmentStats.apply(actor, profile)
-	actor.gain_experience(saved_experience, false)
-	add_stat_group(fitted, "DMG", "%.1f buster  /  %.1f blade" % [actor.buster_power(), actor.buster_power() * actor.melee_multiplier])
-	add_stat_group(fitted, "DEF", "%.1f%% reduction" % (100.0 - actor.mitigate_damage(100.0)))
-	add_stat_group(fitted, "ENG  /  HP", "%.0f energy  /  %.0f max health" % [actor.max_energy, actor.max_health])
-	add_stat_group(fitted, "SPD", "%.1f run  /  %.1f dash" % [actor.move_speed, actor.dash_speed])
+	var body: Control
+	var quick_slots: Array[Button] = []
+	if equipment_view == "Gear":
+		body = EquipmentBody.new()
+		fitted.add_child(body)
+		body.install(profile, equipment_slot, func(slot: String):
+			equipment_slot = slot
+			focused_item = profile.equipped_for(slot)
+			show_page("Storage")
+		)
+		var actor: RiftPlayer = body.preview_actor
+		EquipmentStats.apply(actor, profile)
+		actor.gain_experience(saved_experience, false)
+		add_stat_group(fitted, "DMG", "%.1f buster  /  %.1f blade" % [actor.buster_power(), actor.buster_power() * actor.melee_multiplier])
+		add_stat_group(fitted, "DEF", "%.1f%% reduction" % (100.0 - actor.mitigate_damage(100.0)))
+		add_stat_group(fitted, "ENG  /  HP", "%.0f energy  /  %.0f max health" % [actor.max_energy, actor.max_health])
+		add_stat_group(fitted, "SPD", "%.1f run  /  %.1f dash" % [actor.move_speed, actor.dash_speed])
+	else:
+		var preview := preload("res://scripts/equipment_display.gd").new()
+		preview.skin = account.display_skin(active_slot) if account else ""
+		fitted.add_child(preview)
+		if equipment_view == "Storage":
+			UI.label(fitted, "QUICK SLOTS", 16, UI.CYAN)
+			quick_slots = build_quick_assignments(fitted)
 
 	var equipment := card(columns, 1.35)
 	var tabs := HBoxContainer.new()
@@ -1768,15 +1805,13 @@ func build_storage(columns: HBoxContainer) -> void:
 			tab.add_theme_color_override("font_color", UI.CYAN)
 			tab.grab_focus()
 	match equipment_view:
-		"Gear", "Storage":
-			UI.label(fitted, "QUICK SLOTS", 16, UI.CYAN)
-			var quick_slots := build_quick_assignments(fitted)
+		"Storage":
+			build_storage_grid(equipment, "", quick_slots)
+		"Gear":
 			var first_action := active_tab
-			if equipment_view == "Storage":
-				first_action = build_storage_grid(equipment, "", quick_slots)
-			elif equipment_slot.is_empty():
+			if equipment_slot.is_empty():
 				UI.label(equipment, "SELECT AN EQUIPMENT SLOT", 24, UI.CYAN)
-				UI.label(equipment, "Choose a socket on RX-07 to see compatible gear and installed augments.", 17, UI.MUTED)
+				UI.label(equipment, "Choose a socket to check equipped gear and see compatible items.", 17, UI.MUTED)
 				body.buttons.visor.grab_focus()
 			else:
 				var first_item := build_storage_grid(equipment, equipment_slot)
@@ -2158,7 +2193,11 @@ func _unhandled_input(event: InputEvent) -> void:
 	if station_panel and event is InputEventJoypadButton and event.pressed and event.button_index in [JOY_BUTTON_LEFT_SHOULDER, JOY_BUTTON_RIGHT_SHOULDER]:
 		var step := 1 if event.button_index == JOY_BUTTON_RIGHT_SHOULDER else -1
 		var tabs := station_tabs().keys()
-		if not tabs.is_empty():
+		if page == "Player Profile" and step > 0:
+			get_viewport().set_input_as_handled()
+			show_page("Storage")
+			return
+		if not tabs.is_empty() and page != "Storage":
 			get_viewport().set_input_as_handled()
 			show_page(tabs[posmod(tabs.find(page) + step, tabs.size())])
 			return
@@ -2170,7 +2209,10 @@ func _unhandled_input(event: InputEvent) -> void:
 				var index := filters.find(storage_filter)
 				select_storage_filter(filters[posmod(index + step, filters.size())] if index >= 0 else filters[0 if step > 0 else filters.size() - 1])
 			else:
-				open_equipment_view(EQUIPMENT_TABS[posmod(EQUIPMENT_TABS.find(equipment_view) + step, EQUIPMENT_TABS.size())])
+				var adjacent := EQUIPMENT_TABS.find(equipment_view) + step
+				if adjacent < 0: show_page("Player Profile")
+				elif adjacent >= EQUIPMENT_TABS.size(): show_page("Operators")
+				else: open_equipment_view(EQUIPMENT_TABS[adjacent])
 			return
 		if page == "Shop":
 			var categories := SHOP_FILTERS.keys()

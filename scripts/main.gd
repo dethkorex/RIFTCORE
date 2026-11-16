@@ -108,6 +108,7 @@ func _ready() -> void:
 		or get_tree().has_group(&"interactive_dialogue"))
 	add_child(pointer)
 	RiftRelay.invite_received.connect(show_friend_invite)
+	RiftRelay.directory.friend_request_received.connect(show_friend_request)
 	var arguments := OS.get_cmdline_user_args()
 	if "--verify-social" in arguments or "--verify-relay" in arguments:
 		configure_input()
@@ -146,6 +147,32 @@ func _ready() -> void:
 		load_game.call_deferred()
 	else:
 		show_main_menu()
+
+func show_friend_request(sender: String) -> void:
+	var layer := CanvasLayer.new()
+	layer.layer = 174
+	add_child(layer)
+	var panel := UI.equipment_card(UI.CYAN)
+	panel.theme = UI.theme()
+	layer.add_child(panel)
+	panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+	panel.offset_left = -350
+	panel.offset_right = -20
+	panel.offset_top = 105
+	var content := UI.column(panel, 4)
+	UI.label(content, "%s sent a friend request" % sender, 19, UI.CYAN)
+	var actions := HBoxContainer.new()
+	content.add_child(actions)
+	var accept := UI.button(actions, "Accept Friend", func():
+		var status: String = await RiftRelay.directory.friend_action(sender, "accept")
+		if is_instance_valid(layer) and status == "Friend request accepted.":
+			layer.queue_free()
+	, true, 34)
+	accept.focus_mode = Control.FOCUS_NONE
+	UI.button(actions, "Later", layer.queue_free, false, 34).focus_mode = Control.FOCUS_NONE
+	get_tree().create_timer(12.0).timeout.connect(func():
+		if is_instance_valid(layer):
+			layer.queue_free())
 
 func show_friend_invite(display_name: String, code: String) -> void:
 	RiftSocial.record_invite(display_name, code)
@@ -704,10 +731,11 @@ func show_main_menu() -> void:
 	menu.slot_requested.connect(select_save_slot)
 	menu.operator_deleted.connect(clear_deleted_operator)
 	menu.save_requested.connect(save_at_station)
-	menu.profile_deletion_requested.connect(delete_player_profile)
+	menu.profile_reset_requested.connect(reset_player_profile)
 	menu.cloud_save_requested.connect(restore_cloud_and_play)
 	menu.online_setup_finished.connect(complete_online_setup)
 	menu.username_changed.connect(persist_username)
+	menu.finish_purchase_requested.connect(purchase_finish)
 	if progress_reset_error != OK:
 		menu.show_page("Save Reset Error")
 		return
@@ -893,13 +921,37 @@ func complete_online_setup() -> void:
 		return
 	menu.open_slot_picker("Load Game")
 
+func purchase_finish(id: String) -> void:
+	var catalog := preload("res://scripts/operator_skins.gd")
+	if not save_session or not menu.station_panel or not catalog.STORE.has(id) or account.unlocked_skins.has(id):
+		return
+	var cost: int = catalog.STORE[id][3]
+	if profile.credits < cost:
+		return
+	profile.credits -= cost
+	if persist_operator_save() != OK:
+		profile.credits += cost
+		menu.inventory_status = "Could not save the purchase."
+	else:
+		account.unlocked_skins.append(id)
+		if account.save() != OK:
+			account.unlocked_skins.erase(id)
+			profile.credits += cost
+			var refund := persist_operator_save()
+			menu.inventory_status = "Could not save the finish. Bolts refunded." if refund == OK else "Purchase interrupted. Save your operator to persist the refund."
+		else:
+			menu.inventory_status = "Unlocked %s for this profile." % catalog.label(id)
+			if is_instance_valid(home_hub):
+				home_hub.set_bank(profile.credits, profile.core_shards, profile.player_level())
+	menu.show_page("Cosmetics")
+
+func current_armor_finish() -> String:
+	return account.display_skin(save_session.slot) if account and save_session else ""
+
 func persist_username() -> void:
-	if account.display_name != RiftRelay.directory.username:
-		account.display_name = RiftRelay.directory.username
-	if account.save() == OK:
-		profile.operator_name = account.display_name
-		RiftRelay.local_name = account.display_name
-		RiftSettings.remember_operator_name(account.display_name)
+	RiftRelay.local_name = RiftRelay.directory.username
+	if RiftRelay.directory.online() and not RiftRelay.connected_room.is_empty():
+		RiftRelay.relay.player_set_data("operator_name", RiftRelay.local_name)
 
 func restore_cloud_and_play() -> void:
 	if is_instance_valid(home_hub) or is_instance_valid(coop_mission):
@@ -954,24 +1006,23 @@ func select_save_slot(number: int, fresh: bool, operator_name := "") -> void:
 	if fresh:
 		home_hub.materialize_operator("arrival")
 
-func delete_player_profile(email: String, password: String) -> void:
+func reset_player_profile() -> void:
 	if not account or account.display_name.is_empty() or is_instance_valid(coop_mission):
 		return
 	if RiftRelay.directory.linked:
-		if email.is_empty() or password.is_empty():
-			menu.show_save_result("Enter your online email and password to delete this profile.")
+		if not RiftRelay.directory.online():
+			menu.show_save_result("Sign in to reset the cloud copy along with the local profile.")
 			return
-		var result: String = await RiftRelay.directory.delete_linked_account(email, password)
-		if not result.is_empty():
-			menu.show_save_result(result)
+		var result: int = await RiftRelay.directory.progress.reset_cloud_progress()
+		if result != OK:
+			menu.show_save_result("Could not reset the cloud save. Your account and progress were kept.")
 			return
-	var error := account.remove_local_progress([SAVE_PATH, profile.path, RiftSocial.storage_path])
+	var error := account.remove_local_progress([SAVE_PATH, profile.path])
 	if error != OK:
 		menu.show_save_result("Could not delete the profile. " + error_string(error))
 		return
 	RiftRelay.leave()
-	RiftSocial.reset_profile()
-	RiftRelay.directory.reset_link()
+	RiftRelay.directory.progress.reset()
 	RiftSettings.remember_operator_name("")
 	get_tree().remove_meta(&"riftcore_save_session")
 	remove_home_hub()
@@ -982,6 +1033,10 @@ func delete_player_profile(email: String, password: String) -> void:
 	menu.account = account
 	menu.station_panel = false
 	refresh_menu_save()
+	if RiftRelay.directory.online():
+		if account.create(RiftRelay.directory.username) == OK:
+			menu.open_slot_picker("Load Game")
+			return
 	menu.show_page("Set up Player Profile")
 
 func clear_deleted_operator(slot: int) -> void:
@@ -1056,9 +1111,10 @@ func open_home_hub() -> void:
 	if checkpoint and checkpoint.has_section_key("checkpoint", "recovered_supplies"):
 		var supplies: Dictionary = profile.finish_field_supplies(checkpoint.get_value("checkpoint", "recovered_supplies").duplicate(), true)
 		checkpoint.set_value("checkpoint", "recovered_supplies", supplies)
-	RiftRelay.local_name = account.display_name if account and not account.display_name.is_empty() else profile.operator_name
+	RiftRelay.local_name = RiftRelay.directory.username if RiftRelay.directory.online() else profile.operator_name
 	if account:
 		RiftRelay.directory.configure.call_deferred(account.display_name)
+	RiftRelay.publish_armor_finish(current_armor_finish())
 	RiftRelay.unlocked_sector = profile.unlocked_sector
 	RiftRelay.set_difficulty_unlocks(profile.normal_clears.keys(), profile.nightmare_unlocked())
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
@@ -1070,6 +1126,7 @@ func open_home_hub() -> void:
 	menu.process_mode = Node.PROCESS_MODE_DISABLED
 	home_hub = HOME_HUB.instantiate() as Node3D
 	home_hub.profile = profile
+	home_hub.initial_finish = current_armor_finish()
 	home_hub.persist_blueprint_trade = persist_blueprint_trade
 	add_child(home_hub)
 	home_hub.set_bank(profile.credits, profile.core_shards, profile.player_level())
@@ -1112,6 +1169,9 @@ func persist_blueprint_trade() -> Error:
 	return save_session.persist_blueprint_trade() if save_session else profile.save()
 
 func close_station_panel() -> void:
+	if is_instance_valid(home_hub):
+		home_hub.avatar.set_armor_finish(current_armor_finish())
+		RiftRelay.publish_armor_finish(current_armor_finish())
 	menu.process_mode = Node.PROCESS_MODE_DISABLED
 	if is_instance_valid(home_hub):
 		if save_session and save_session.owns_slot and menu.page in ["Shop", "Storage", "Fabrication", "Upgrades", "Craft Item", "Learn Blueprint", "Blueprint Details"]:
@@ -1444,6 +1504,7 @@ func build_level() -> void:
 	var combat_scale := Difficulty.combat_scale(sector, mission_difficulty)
 	actors_root.set_meta("opponent_health_scale", combat_scale)
 	actors_root.set_meta("mission_difficulty", mission_difficulty)
+	player.set_armor_finish(current_armor_finish())
 	player.damage_taken_scale = combat_scale
 	player.experience = 0
 	player.quick_profile = profile

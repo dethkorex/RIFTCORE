@@ -9,11 +9,10 @@ const AVATAR := preload("res://scenes/actors/riftcore_player.tscn")
 const WINDOW := preload("res://assets/hub/orbital_view.png")
 const STATIONS := [
 	{"x": -18.0, "name": "System", "page": "Save Game", "color": Color("9cbbff"), "prop": "settings_terminal"},
-	{"x": -13.5, "name": "Profile", "page": "Player Profile", "color": Color("f196ff"), "prop": "save_terminal"},
 	{"x": -9.0, "name": "Crafting", "page": "Fabrication", "color": Color("ffc465"), "prop": "forge_bay"},
 	{"x": -4.5, "name": "Shop", "page": "Shop", "color": Color("ffd076"), "prop": "storage_bay"},
 	{"x": 0.0, "name": "Deploy", "page": "Sector select", "color": Color("52edff"), "prop": "deploy_pad"},
-	{"x": 4.5, "name": "Equipment", "page": "Storage", "color": Color("5ffcec"), "prop": "storage_bay"},
+	{"x": 4.5, "name": "Operator", "page": "Player Profile", "color": Color("5ffcec"), "prop": "storage_bay"},
 	{"x": 9.0, "name": "Social", "page": "Social", "color": Color("b883ff"), "prop": "save_terminal"},
 	{"x": 13.5, "name": "Challenges", "page": "Challenges", "color": Color("bd8cff"), "prop": "challenge_terminal"},
 	{"x": 18.0, "name": "NOVA Archive", "page": "Collection", "color": Color("81ffe8"), "prop": "archive_terminal"},
@@ -25,6 +24,7 @@ var persist_blueprint_trade: Callable
 var blueprint_visuals: Dictionary = {}
 var blueprint_requests: Dictionary = {}
 var avatar: RiftPlayer
+var initial_finish := ""
 var partners: Dictionary = {}
 var local_online_label: Label3D
 var station_sync := 0.0
@@ -59,6 +59,7 @@ func _ready() -> void:
 	avatar = AVATAR.instantiate() as RiftPlayer
 	add_child(avatar)
 	avatar.position = Vector3(0, 1.11, 0)
+	avatar.set_armor_finish(initial_finish)
 	avatar.set_physics_process(false)
 	avatar.collision_layer = 0
 	avatar.collision_mask = 0
@@ -239,6 +240,8 @@ func update_partner(id: int, x: float, facing: float, animation: String, display
 		partner.add_child(microphone)
 		partners[id] = {"actor": partner, "label": partner_label, "microphone": microphone}
 	var entry: Dictionary = partners[id]
+	if is_instance_valid(RiftRelay.relay) and not RiftRelay.connected_room.is_empty():
+		entry.actor.set_armor_finish(String(RiftRelay.relay.player_get_data(id, "armor_finish", "")))
 	entry.label.text = display_name
 	entry.label.modulate = UI.operator_tint(id, RiftRelay.relay.get_host(), RiftRelay.relay.lobby_get_all_clients())
 	entry.x = x

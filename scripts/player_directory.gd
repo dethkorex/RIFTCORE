@@ -1,10 +1,12 @@
 extends Node
 
 signal changed
+signal friend_request_received(username: String)
 
 const CloudProgress := preload("res://scripts/cloud_progress.gd")
 const Codes := preload("res://addons/GD-Sync/Scripts/Enums/Enums.gd")
 const LINK_PATH := "user://riftcore_directory.cfg"
+const DIRECTORY_BOARD := "RIFTCORE Players"
 const PRESENCE_PATH := "riftcore_presence"
 const SESSION_TIME := 604800.0
 const PRESENCE_INTERVAL := 38.0
@@ -13,7 +15,7 @@ const PRESENCE_TTL := 120.0
 var lobby: Node
 var progress: CloudProgress
 var whispers: Node
-var profile_name := ""
+var saved_account_name := ""
 var username := ""
 var linked := false
 var remember_sign_in := true
@@ -25,6 +27,8 @@ var presence: Dictionary = {}
 var seen_invites: Dictionary = {}
 var refresh_elapsed := 0.0
 var displayed_contacts: Array = []
+var incoming_names: Array[String] = []
+var directory_index_ready := false
 var last_connection := false
 var presence_elapsed := 0.0
 var refreshing := false
@@ -40,13 +44,12 @@ func _ready() -> void:
 	add_child(whispers)
 	var saved := ConfigFile.new()
 	if saved.load(LINK_PATH) == OK:
-		linked = not String(saved.get_value("profile", "name", "")).is_empty()
+		saved_account_name = String(saved.get_value("account", "username", saved.get_value("profile", "name", "")))
+		linked = not saved_account_name.is_empty()
 		remember_sign_in = bool(saved.get_value("profile", "remember", true))
 
-func configure(name: String) -> void:
-	if username.is_empty() and not busy:
-		profile_name = name
-	if name.is_empty() or not linked or not remember_sign_in or not username.is_empty() or busy:
+func configure(_local_operator_name: String = "") -> void:
+	if not linked or not remember_sign_in or not username.is_empty() or busy:
 		return
 	busy = true
 	if await connect_service():
@@ -79,7 +82,7 @@ func online() -> bool:
 func sign_in(email: String, password: String, create: bool, verification_code := "", registration_name := "") -> String:
 	if busy or online():
 		return status
-	var name := profile_name if not profile_name.is_empty() else registration_name.strip_edges()
+	var name := registration_name.strip_edges()
 	if create and (name.length() < 3 or name.length() > 20):
 		return "Enter a username of 3 to 20 characters to create an account."
 	if not email.contains("@") or password.length() < 3 or password.length() > 20:
@@ -151,12 +154,12 @@ func resend_code(email: String, password: String) -> String:
 
 func finish_sign_in() -> void:
 	var signed_in: String = lobby.relay.player_get_username()
-	if signed_in.is_empty() or (not profile_name.is_empty() and signed_in.nocasecmp_to(profile_name) != 0):
+	if signed_in.is_empty() or (linked and not saved_account_name.is_empty() and signed_in.nocasecmp_to(saved_account_name) != 0):
 		await lobby.relay.account_logout()
-		status = "Use the RIFTCORE account registered to %s." % profile_name
+		status = "This installation is linked to the account %s." % saved_account_name
 		return
 	username = signed_in
-	profile_name = signed_in
+	saved_account_name = signed_in
 	needs_verification = false
 	linked = true
 	var saved_session := save_link() == OK
@@ -166,10 +169,11 @@ func finish_sign_in() -> void:
 	presence_elapsed = PRESENCE_INTERVAL
 	refresh_elapsed = 8.0
 	await refresh_friends()
+	register_directory_listing()
 
 func save_link() -> Error:
 	var saved := ConfigFile.new()
-	saved.set_value("profile", "name", profile_name)
+	saved.set_value("account", "username", saved_account_name)
 	saved.set_value("profile", "remember", remember_sign_in)
 	return saved.save(LINK_PATH)
 
@@ -186,6 +190,8 @@ func sign_out() -> void:
 	await lobby.relay.account_logout()
 	username = ""
 	friends.clear()
+	incoming_names.clear()
+	directory_index_ready = false
 	presence.clear()
 	seen_invites.clear()
 	last_connection = false
@@ -211,7 +217,7 @@ func change_username(name: String) -> String:
 		Codes.ACCOUNT_CHANGE_USERNAME_RESPONSE_CODE.SUCCESS:
 			var previous := username
 			username = name
-			profile_name = name
+			saved_account_name = name
 			lobby.relay.player_set_username(name)
 			save_link()
 			progress.rename_owner(previous, name)
@@ -273,6 +279,25 @@ func poll() -> void:
 		await refresh_friends()
 	refreshing = false
 
+func register_directory_listing() -> void:
+	var backend: Node = lobby.relay
+	var owner := username
+	if not online() or not backend.has_method("leaderboard_exists"):
+		return
+	var board: Dictionary = await backend.leaderboard_exists(DIRECTORY_BOARD)
+	if username != owner or not online() or not bool(board.get("Result", board.get("Exists", false))):
+		return
+	directory_index_ready = await backend.leaderboard_submit_score(DIRECTORY_BOARD, 1, {}) == 0
+	changed.emit()
+
+func browse_registered_players(page: int) -> Dictionary:
+	if not online():
+		return {"Code": ERR_UNAVAILABLE}
+	return await lobby.relay.leaderboard_browse_scores(DIRECTORY_BOARD, 24, maxi(1, page))
+
+func request_count() -> int:
+	return incoming_names.size()
+
 func refresh_friends() -> void:
 	if not online():
 		return
@@ -308,6 +333,14 @@ func refresh_friends() -> void:
 			presence[id] = {"checked": now, "seen": seen}
 	if online():
 		friends = updated
+		var requests: Array[String] = []
+		for entry in friends:
+			if int(entry.get("FriendStatus", 0)) == Codes.FRIEND_STATUS.INCOMING_REQUEST:
+				var sender: String = entry.Username
+				if not incoming_names.has(sender):
+					friend_request_received.emit(sender)
+				requests.append(sender)
+		incoming_names = requests
 		var snapshot := []
 		for friend in friends:
 			snapshot.append([friend.Username, friend.get("FriendStatus", 0), is_friend_online(friend)])
@@ -372,42 +405,6 @@ func friend_action(name: String, action: String) -> String:
 			"accept": return "Friend request accepted."
 			_: return "Contact removed."
 	return response_message("Could not update this friend request", code)
-
-func delete_linked_account(email: String, password: String) -> String:
-	if busy:
-		return "Wait for the directory request to finish."
-	busy = true
-	if not await connect_service():
-		busy = false
-		return "Connect to the directory before deleting your online profile."
-	var result := await authenticate(email, password, false, "")
-	var message := result
-	if online() and result.begins_with("Connected"):
-		var code: int = await lobby.relay.account_delete(email, password)
-		if code == 0:
-			await lobby.relay.account_logout()
-			reset_link()
-			message = ""
-		else:
-			message = response_message("Could not delete your online profile", code)
-	busy = false
-	return message
-
-func reset_link() -> void:
-	linked = false
-	username = ""
-	profile_name = ""
-	needs_verification = false
-	friends.clear()
-	displayed_contacts.clear()
-	last_connection = false
-	presence.clear()
-	seen_invites.clear()
-	progress.reset()
-	status = "Connect your profile to find RIFTCORE friends."
-	if FileAccess.file_exists(LINK_PATH):
-		DirAccess.remove_absolute(LINK_PATH)
-	changed.emit()
 
 func response_message(action: String, code: int) -> String:
 	match code:

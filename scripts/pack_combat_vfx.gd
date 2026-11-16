@@ -10,8 +10,8 @@ const Laser := preload("res://addons/arcflux_fx/nodes_3d/arcflux_laser_3d.gd")
 static func blade_trail(blade: Node3D, duration: float, tint: Color, finisher: bool) -> void:
 	var trail := Trail.new()
 	trail.name = "SaberRibbon"
-	trail.base_offset = Vector3(0.08, 0, 0)
-	trail.tip_offset = Vector3(1.62, 0, 0)
+	trail.base_offset = Vector3(0.36, 0, 0)
+	trail.tip_offset = Vector3(2.02, 0, 0)
 	trail.lifetime = 0.17 if finisher else 0.135
 	trail.intensity = 1.52 if finisher else 1.16
 	trail.palette = saber_palette(tint)

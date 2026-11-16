@@ -363,6 +363,7 @@ func load_stage() -> void:
 			operator.died.connect(respawn_operator.bind(operator))
 			operator.projectile_deflected.connect(func(id: int): peer.call_func(receive_deflection, act, id))
 			operator.shot_fired.connect(send_shot)
+		operator.set_armor_finish(String(peer.player_get_data(roster[index], "armor_finish", "")))
 		operators.append(operator)
 		var plate := Label3D.new()
 		plate.position.y = 1.48

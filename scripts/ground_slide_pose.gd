@@ -1,6 +1,7 @@
 extends SkeletonModifier3D
 
 var mode := ""
+var clips: AnimationPlayer
 var windup_target := 0.0
 var windup := 0.0
 
@@ -14,6 +15,11 @@ func _process_modification_with_delta(delta: float) -> void:
 			wall_slide(rig)
 		"slide":
 			ground_slide(rig)
+		"saber_cut", "saber_return", "slash_finisher":
+			if mode == "slash_finisher" and is_instance_valid(clips) and clips.assigned_animation == mode:
+				var phase := clips.current_animation_position / maxf(clips.get_animation(mode).length, .01)
+				finish_saber(rig, phase)
+			grip_saber(rig, 1.0)
 		_:
 			if windup > 0.0:
 				saber_charge(rig)
@@ -72,11 +78,31 @@ func saber_charge(rig: Skeleton3D) -> void:
 	aim(rig, "LeftForeArm", "LeftHand", Vector3(-.27, .91, .31), windup)
 	aim(rig, "RightArm", "RightForeArm", Vector3(-.41, -.68, .61), windup * .75)
 	aim(rig, "RightForeArm", "RightHand", Vector3(.24, -.23, .94), windup * .75)
+	grip_saber(rig, windup)
+
+func finish_saber(rig: Skeleton3D, phase: float) -> void:
+	var weight := smoothstep(.12, .38, phase) * (1.0 - smoothstep(.66, .95, phase))
+	if weight < .01:
+		return
+	# Keep the swing outside the helmet and drop the tip through the strike.
+	aim(rig, "LeftArm", "LeftForeArm", Vector3(.55, .17, .82), weight)
+	aim(rig, "LeftForeArm", "LeftHand", Vector3(.16, -.31, .94), weight)
+	var hand := rig.find_bone("mixamorig_LeftHand")
+	if hand < 0:
+		return
+	var hand_basis := rig.get_bone_global_pose(hand).basis.orthonormalized()
+	var parent_frame := rig.get_bone_global_pose(rig.get_bone_parent(hand)).basis.orthonormalized().get_rotation_quaternion()
+	var grip_axis := (hand_basis * Vector3(.995, .100, 0)).normalized()
+	var desired := Vector3(.11, lerpf(.55, -.58, smoothstep(.34, .70, phase)), .94).normalized()
+	var correction := Quaternion.IDENTITY.slerp(Quaternion(grip_axis, desired), weight)
+	rig.set_bone_pose_rotation(hand, (parent_frame.inverse() * correction * parent_frame * rig.get_bone_pose_rotation(hand)).normalized())
+
+func grip_saber(rig: Skeleton3D, amount: float) -> void:
 	for digit in ["Index", "Middle", "Ring", "Pinky"]:
 		for joint in range(1, 4):
 			var bone := rig.find_bone("mixamorig_LeftHand%s%d" % [digit, joint])
 			if bone >= 0:
-				var curl := Quaternion(Vector3.RIGHT, -windup * (0.82 if joint == 1 else 1.02))
+				var curl := Quaternion(Vector3.RIGHT, -amount * (0.82 if joint == 1 else 1.02))
 				rig.set_bone_pose_rotation(bone, (rig.get_bone_rest(bone).basis.get_rotation_quaternion() * curl).normalized())
 
 func aim(rig: Skeleton3D, joint: String, tip: String, toward: Vector3, weight := 1.0) -> void:

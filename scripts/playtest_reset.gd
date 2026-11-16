@@ -5,6 +5,9 @@ const Slots := preload("res://scripts/manual_save_session.gd")
 const STAMP := "user://riftcore_playtest_epoch.cfg"
 
 static func epoch() -> String:
+	var configured := String(ProjectSettings.get_setting("riftcore/testing/progress_epoch", ""))
+	if not configured.is_empty():
+		return configured
 	return String(ProjectSettings.get_setting("application/config/version")) if ProjectSettings.get_setting("riftcore/testing/reset_progress_on_update", false) else ""
 
 static func migrate_local(account: Account) -> Error:

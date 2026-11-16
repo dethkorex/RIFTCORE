@@ -4,6 +4,8 @@ const UI := preload("res://scripts/rift_ui.gd")
 const ICONS := preload("res://scripts/equipment_icons.gd")
 const CATALOG := preload("res://scripts/sector_catalog.gd")
 const FILTERS := ["All contacts", "Friends", "In your party", "Online", "Recent"]
+const ONLINE_DOT := preload("res://assets/ui/social-online.svg")
+const OFFLINE_DOT := preload("res://assets/ui/social-offline.svg")
 const Codes := preload("res://addons/GD-Sync/Scripts/Enums/Enums.gd")
 
 static func contacts(include_directory := false) -> Array[Dictionary]:
@@ -71,7 +73,7 @@ static func contact_button(row: VBoxContainer, contact: Dictionary, select: Call
 	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	button.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	button.tooltip_text = contact.status
-	button.icon = ICONS.icon("visor", "visor")
+	button.icon = (ONLINE_DOT if contact.playing else OFFLINE_DOT) if contact.get("directory", false) and contact.saved else ICONS.icon("visor", "visor")
 	button.expand_icon = true
 	button.add_theme_constant_override("icon_max_width", 22)
 	return button
@@ -133,7 +135,7 @@ static func build_friends(menu, columns: HBoxContainer) -> void:
 	details.add_child(HSeparator.new())
 	var actions := UI.column(details, 8)
 	var note := UI.label(details, "", 16, UI.CYAN)
-	var relay_status := UI.label(details, RiftRelay.status, 15, UI.MUTED)
+	var relay_status := UI.label(details, "Invite Friend opens a private party." if RiftRelay.connected_room.is_empty() else RiftRelay.status, 15, UI.MUTED)
 
 	var selected := {"key": menu.social_contact, "button": null, "action": null}
 	var show_contact := func(contact: Dictionary):
@@ -144,8 +146,12 @@ static func build_friends(menu, columns: HBoxContainer) -> void:
 		menu.social_contact = selected.key
 		selected.action = null
 		name.text = contact.get("name", "Choose an operator")
-		status.text = contact.get("status", "Find friends by their RIFTCORE profile name.")
-		status.add_theme_color_override("font_color", UI.CYAN if contact.get("playing", false) else UI.MUTED)
+		status.text = contact.get("status", "Find friends by their account username.")
+		if contact.get("directory", false) and contact.get("saved", false):
+			status.text = "●  " + String(contact.status)
+			status.add_theme_color_override("font_color", Color("62ea98") if contact.playing else Color("ff687e"))
+		else:
+			status.add_theme_color_override("font_color", UI.CYAN if contact.get("playing", false) else UI.MUTED)
 		if contact.get("directory", false):
 			var relation: int = contact.relation
 			if relation == Codes.FRIEND_STATUS.FRIEND:
@@ -311,9 +317,8 @@ static func build_directory_account(menu, columns: HBoxContainer, first_launch :
 			else: menu.online_setup_finished.emit()
 		, true).grab_focus()
 		return
-	var registration: LineEdit
-	if first_launch:
-		registration = directory_field(form, "Username (new accounts only)", 20)
+	UI.label(form, "Friends find you by your account username.", 15, UI.MUTED)
+	var registration := directory_field(form, "Account username (new accounts)", 20)
 	var email := directory_field(form, "Email")
 	var password := directory_field(form, "Password", 20)
 	password.secret = true
@@ -432,7 +437,7 @@ static func build_directory_search(menu, columns: HBoxContainer) -> void:
 		UI.label(form, "Connect your profile to search live.", 17, UI.MUTED)
 		UI.button(form, "Connect Online", menu.show_page.bind("Directory Account"), true, 36).grab_focus()
 		return
-	var query := directory_field(form, "Exact RIFTCORE profile name", 20)
+	var query := directory_field(form, "Exact RIFTCORE account username", 20)
 	var message := UI.label(form, "", 17, UI.MUTED)
 	var actions := HBoxContainer.new()
 	actions.add_theme_constant_override("separation", 8)
@@ -446,7 +451,7 @@ static func build_directory_search(menu, columns: HBoxContainer) -> void:
 			child.queue_free()
 		var name := query.text.strip_edges()
 		if name.length() < 3 or name.nocasecmp_to(directory.username) == 0:
-			message.text = "Enter another player’s full RIFTCORE name."
+			message.text = "Enter another player’s full RIFTCORE account username."
 			return
 		searching[0] = true
 		message.text = "Searching…"
@@ -476,6 +481,76 @@ static func build_directory_search(menu, columns: HBoxContainer) -> void:
 	UI.button(form, "Search", find, true, 36)
 	query.text_submitted.connect(func(_value): find.call())
 	query.grab_focus()
+
+static func build_player_directory(menu, columns: HBoxContainer) -> void:
+	build_directory_search(menu, columns)
+	var form: VBoxContainer = menu.card(columns)
+	UI.label(form, "ALL PLAYERS", 26, UI.CYAN)
+	var directory = RiftRelay.directory
+	if not directory.online():
+		UI.label(form, "Sign in to browse RIFTCORE usernames.", 17, UI.MUTED)
+		return
+	var caption := UI.label(form, "Browse discoverable RIFTCORE accounts.", 16, UI.MUTED)
+	var rows: VBoxContainer = menu.scroll_entries(form)
+	var navigation := HBoxContainer.new()
+	form.add_child(navigation)
+	var state := {"page": 1, "last": 1, "busy": false}
+	var redraw := func(direction: int):
+		if state.busy:
+			return
+		state.busy = true
+		var page := clampi(int(state.page) + direction, 1, int(state.last))
+		caption.text = "Loading players…"
+		var reply: Dictionary = await directory.browse_registered_players(page)
+		if not is_instance_valid(form):
+			return
+		state.busy = false
+		for child in rows.get_children():
+			rows.remove_child(child)
+			child.queue_free()
+		if int(reply.get("Code", 1)) != 0 or not reply.get("Result") is Array:
+			caption.text = "The player index is unavailable. You can still search by exact username."
+			return
+		state.page = page
+		state.last = maxi(page, int(reply.get("FinalPage", page)))
+		caption.text = "Page %d / %d" % [page, state.last]
+		for entry in reply.Result:
+			var username := String(entry.get("Username", "")) if entry is Dictionary else ""
+			if username.is_empty() or username.nocasecmp_to(directory.username) == 0:
+				continue
+			var line := HBoxContainer.new()
+			rows.add_child(line)
+			UI.label(line, username, 18).size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			directory_action(line, "Add Friend", username, "request", caption)
+		if rows.get_child_count() == 0:
+			UI.label(rows, "No other registered players on this page.", 17, UI.MUTED)
+	UI.button(navigation, "Previous", redraw.bind(-1), false, 34)
+	UI.button(navigation, "Next", redraw.bind(1), false, 34)
+	redraw.call(0)
+
+static func build_friend_requests(menu, columns: HBoxContainer) -> void:
+	var form: VBoxContainer = menu.card(columns)
+	UI.label(form, "FRIEND REQUESTS", 28, UI.CYAN)
+	var directory = RiftRelay.directory
+	var message := UI.label(form, "", 16, UI.MUTED)
+	var rows: VBoxContainer = menu.scroll_entries(form)
+	var redraw := func():
+		for child in rows.get_children():
+			rows.remove_child(child)
+			child.queue_free()
+		if not directory.online():
+			UI.label(rows, "Sign in to see incoming friend requests.", 17, UI.MUTED)
+			return
+		if directory.incoming_names.is_empty():
+			UI.label(rows, "You're caught up. No incoming requests.", 17, UI.MUTED)
+		for sender in directory.incoming_names:
+			var actions := HBoxContainer.new()
+			rows.add_child(actions)
+			UI.label(actions, sender, 19).size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			directory_action(actions, "Accept", sender, "accept", message)
+			directory_action(actions, "Decline", sender, "remove", message)
+	watch(rows, directory.changed, redraw)
+	redraw.call()
 
 static func build_add(menu, columns: HBoxContainer) -> void:
 	build_directory_search(menu, columns)

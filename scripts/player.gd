@@ -74,6 +74,10 @@ var special_weapon := ""
 var original_armor: Dictionary = {}
 var forge_armor: Dictionary = {}
 var base_suit_meshes: Array[MeshInstance3D] = []
+var armor_materials: Dictionary = {}
+var armor_finish := ""
+const SkinKit := preload("res://scripts/operator_skins.gd")
+const Paint := preload("res://assets/ui/operator_armor.gdshader")
 var fire_suit_mesh: MeshInstance3D
 var nature_suit_mesh: MeshInstance3D
 var reward_suit_meshes: Dictionary[String, MeshInstance3D] = {}
@@ -143,7 +147,7 @@ var combo_hit := false
 var combo_facing := 1.0
 var combo_duration := 0.0
 const SWING_CLIPS := [&"saber_cut", &"saber_return", &"slash_finisher"]
-const SWING_DURATIONS := [0.20, 0.19, 0.26]
+const SWING_DURATIONS := [0.29, 0.28, 0.37]
 const SABER_CHARGE_TIME := 0.52
 var saber_hold := -1.0
 var saber_primed := false
@@ -224,6 +228,7 @@ func _ready() -> void:
 		climb_pose.influence = 0.0
 		skeleton.add_child(climb_pose)
 		slide_pose = preload("res://scripts/ground_slide_pose.gd").new()
+		slide_pose.set("clips", animation_player)
 		slide_pose.influence = 0.0
 		skeleton.add_child(slide_pose)
 		if buster_pose:
@@ -295,8 +300,11 @@ func bind_sword_to_hand() -> void:
 	hand.bone_name = "mixamorig_LeftHand"
 	skeleton.add_child(hand)
 	sword.reparent(hand, false)
-	sword.position = Vector3.ZERO
-	sword.rotation.z = PI * 0.5
+	# Grip crosses the curled fingers from the pinky toward the thumb.
+	# Mixamo local +Y runs along the fingers, so a quarter turn here
+	# points the emitter backwards through the fingertips.
+	sword.position = Vector3(0.001, 0.077, -0.023)
+	sword.rotation = Vector3(0.0, 0.0, 0.10)
 	sword.scale = Vector3.ONE * 0.39
 	sword_follows_hand = true
 
@@ -516,8 +524,10 @@ func simulate_movement(delta: float) -> void:
 		elif not grounded() and absf(axis) < 0.08:
 			accel = air_braking
 		if contact_recoil <= 0.0 and wall_launch_lock <= 0.0:
+			if grounded() and melee_lock > 0.0:
+				accel = maxf(accel, 115.0)
 			var speed_scale := .66 if boss_debuff == 3 else 1.0
-			velocity.x = move_toward(velocity.x, 0.0 if crouching else locomotion_speed(axis, move_speed * speed_scale * (1.0 + supply_bonus("speed"))), accel * delta)
+			velocity.x = move_toward(velocity.x, 0.0 if crouching or (grounded() and melee_lock > 0.0) else locomotion_speed(axis, move_speed * speed_scale * (1.0 + supply_bonus("speed"))), accel * delta)
 		if not grounded():
 			var gravity_scale := fall_gravity_multiplier if velocity.y < 0.0 else 1.0
 			velocity.y = maxf(-max_fall_speed * clampf(terrain.y * 1.4, 0.36, 1.0), velocity.y - gravity * gravity_scale * terrain.y * delta)
@@ -1326,6 +1336,33 @@ func unlock_sector_weapon(id: String, equip := true) -> void:
 	if equip:
 		equip_sector_weapon(id)
 
+func set_armor_finish(id: String) -> void:
+	if id == armor_finish:
+		return
+	armor_finish = id
+	for mesh in armor_materials:
+		if is_instance_valid(mesh):
+			for surface in armor_materials[mesh]:
+				mesh.set_surface_override_material(surface, armor_materials[mesh][surface])
+	armor_materials.clear()
+	var colors := SkinKit.palette(id)
+	if colors.is_empty():
+		return
+	for mesh in base_suit_meshes:
+		for surface in mesh.mesh.get_surface_count():
+			var original := mesh.get_active_material(surface) as StandardMaterial3D
+			if not original or not original.albedo_texture:
+				continue
+			if not armor_materials.has(mesh):
+				armor_materials[mesh] = {}
+			armor_materials[mesh][surface] = mesh.get_surface_override_material(surface)
+			var material := ShaderMaterial.new()
+			material.shader = Paint
+			material.set_shader_parameter("artwork", original.albedo_texture)
+			material.set_shader_parameter("armor", Color(colors[1]))
+			material.set_shader_parameter("trim", Color(colors[2]))
+			mesh.set_surface_override_material(surface, material)
+
 func equip_sector_weapon(id: String) -> void:
 	if not id.is_empty() and id not in run_weapon_ids:
 		if not (id == "magma_breaker" and magma_unlocked or id == "thorn_swarm" and thorn_unlocked):
@@ -1360,7 +1397,12 @@ func equip_sector_weapon(id: String) -> void:
 			buster_pose.muzzle_local = Vector3.ZERO
 	var blade := find_child("EnergyBlade", true, false) as MeshInstance3D
 	if blade:
-		blade.material_override = RiftProjectile.light_paint(tint, 2.4) if not id.is_empty() else null
+		blade.material_override = RiftProjectile.light_paint(tint.lerp(Color.WHITE, .64), 2.5) if not id.is_empty() else null
+	var halo := find_child("BladeHalo", true, false) as MeshInstance3D
+	if halo:
+		var aura := halo.mesh.surface_get_material(0).duplicate() as ShaderMaterial
+		aura.set_shader_parameter("saber_color", tint)
+		halo.material_override = aura
 	var light := get_node_or_null("CoreLight") as OmniLight3D
 	if light:
 		light.light_color = tint
@@ -1382,9 +1424,10 @@ func build_combat_clips() -> void:
 	if library.has_animation(SWING_CLIPS[0]):
 		return
 	var source := library.get_animation(&"slash")
-	library.add_animation(SWING_CLIPS[0], sample_combat_pose(source, [0.0, 0.25, 0.49, 0.76, 1.0], [0.03, 0.19, 0.52, 0.83, 0.95], 0.06))
-	library.add_animation(SWING_CLIPS[1], sample_combat_pose(source, [0.0, 0.25, 0.46, 0.76, 1.0], [0.91, 0.78, 0.51, 0.27, 0.11], -0.10))
-	library.add_animation(SWING_CLIPS[2], sample_combat_pose(source, [0.0, 0.28, 0.49, 0.75, 1.0], [0.10, 0.20, 0.60, 0.88, 0.98], 0.22))
+	var stance := library.get_animation(&"idle")
+	library.add_animation(SWING_CLIPS[0], sample_combat_pose(source, [0.0, 0.25, 0.49, 0.76, 1.0], [0.03, 0.19, 0.52, 0.83, 0.95], 0.06, false, stance))
+	library.add_animation(SWING_CLIPS[1], sample_combat_pose(source, [0.0, 0.25, 0.46, 0.76, 1.0], [0.91, 0.78, 0.51, 0.27, 0.11], -0.10, false, stance))
+	library.add_animation(SWING_CLIPS[2], sample_combat_pose(source, [0.0, 0.28, 0.49, 0.75, 1.0], [0.10, 0.20, 0.60, 0.88, 0.98], 0.22, false, stance))
 	var crouch := library.get_animation(&"crouch")
 	if crouch:
 		var slide := sample_combat_pose(crouch, [0.0, 0.16, 0.67, 1.0], [0.64, 0.82, 0.85, 0.80], 0.0, true)
@@ -1399,7 +1442,7 @@ func build_wall_slide_clip() -> void:
 	brace.loop_mode = Animation.LOOP_LINEAR
 	library.add_animation(&"wall_slide", brace)
 
-func sample_combat_pose(source: Animation, stops: Array, poses: Array, accent: float, slide := false) -> Animation:
+func sample_combat_pose(source: Animation, stops: Array, poses: Array, accent: float, slide := false, stance: Animation = null) -> Animation:
 	var clip := source.duplicate() as Animation
 	clip.loop_mode = Animation.LOOP_NONE
 	for track in clip.get_track_count():
@@ -1407,6 +1450,8 @@ func sample_combat_pose(source: Animation, stops: Array, poses: Array, accent: f
 		if kind not in [Animation.TYPE_ROTATION_3D, Animation.TYPE_POSITION_3D, Animation.TYPE_SCALE_3D]:
 			continue
 		var path := String(clip.track_get_path(track))
+		var lower := stance != null and (path.ends_with("_Hips") or path.contains("Leg") or path.contains("Foot") or path.contains("ToeBase"))
+		var planted := stance.find_track(clip.track_get_path(track), kind) if lower else -1
 		while clip.track_get_key_count(track) > 0:
 			clip.track_remove_key(track, 0)
 		for sample in stops.size():
@@ -1414,7 +1459,7 @@ func sample_combat_pose(source: Animation, stops: Array, poses: Array, accent: f
 			var key_time: float = clip.length * stops[sample]
 			match kind:
 				Animation.TYPE_ROTATION_3D:
-					var pose := source.rotation_track_interpolate(track, at)
+					var pose := stance.rotation_track_interpolate(planted, 0.0) if planted >= 0 else source.rotation_track_interpolate(track, at)
 					var weight := sin(PI * float(stops[sample]))
 					var offset := 0.0
 					if slide:
@@ -1429,7 +1474,7 @@ func sample_combat_pose(source: Animation, stops: Array, poses: Array, accent: f
 						pose = pose * Quaternion(Vector3.BACK, accent * weight * (0.35 if path.ends_with("_Spine2") else 1.0))
 					clip.rotation_track_insert_key(track, key_time, pose.normalized())
 				Animation.TYPE_POSITION_3D:
-					clip.position_track_insert_key(track, key_time, source.position_track_interpolate(track, at))
+					clip.position_track_insert_key(track, key_time, stance.position_track_interpolate(planted, 0.0) if planted >= 0 else source.position_track_interpolate(track, at))
 				Animation.TYPE_SCALE_3D:
 					clip.scale_track_insert_key(track, key_time, source.scale_track_interpolate(track, at))
 	return clip
@@ -1638,7 +1683,7 @@ func update_character_visuals(axis: float) -> void:
 			visual_facing = -wall_side
 		elif is_instance_valid(charge_orb):
 			visual_facing = facing
-		model_root.rotation.y = PI * 0.5 * (combo_facing if melee_lock > 0.0 else visual_facing)
+		model_root.rotation.y = (PI * 0.5 - 0.22) * combo_facing if melee_lock > 0.0 else PI * 0.5 * visual_facing
 		model_root.rotation.x = lerpf(model_root.rotation.x, 0.0, 0.48)
 	var swinging := melee_lock > 0.0
 	if buster_pose:

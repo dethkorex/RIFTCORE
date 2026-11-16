@@ -8,7 +8,6 @@ var compact := false
 var skin := ""
 var customized: Dictionary = {}
 const SkinKit := preload("res://scripts/operator_skins.gd")
-const Paint := preload("res://assets/ui/operator_armor.gdshader")
 
 func _ready() -> void:
 	stretch = true
@@ -57,35 +56,16 @@ func set_appearance(id: String) -> void:
 	skin = id
 	if not is_instance_valid(actor):
 		return
-	for mesh in customized:
-		if is_instance_valid(mesh):
-			for surface in customized[mesh]:
-				mesh.set_surface_override_material(surface, customized[mesh][surface])
-	customized.clear()
-	if not id.begins_with("variant:"):
-		if not id.is_empty() and not actor.run_weapon_ids.has(id):
-			actor.run_weapon_ids.append(id)
-		actor.equip_sector_weapon(id)
+	if not SkinKit.palette(id).is_empty():
+		actor.equip_sector_weapon("")
+		actor.set_armor_finish(id)
+		customized = actor.armor_materials
 		return
-	actor.equip_sector_weapon("")
-	var index := int(id.trim_prefix("variant:")) - 1
-	if index < 0 or index >= SkinKit.VARIANTS.size():
-		return
-	var colors: Array = SkinKit.VARIANTS[index]
-	for mesh in actor.base_suit_meshes:
-		for surface in mesh.mesh.get_surface_count():
-			var original := mesh.get_active_material(surface) as StandardMaterial3D
-			if not original or not original.albedo_texture:
-				continue
-			if not customized.has(mesh):
-				customized[mesh] = {}
-			customized[mesh][surface] = mesh.get_surface_override_material(surface)
-			var material := ShaderMaterial.new()
-			material.shader = Paint
-			material.set_shader_parameter("artwork", original.albedo_texture)
-			material.set_shader_parameter("armor", Color(colors[1]))
-			material.set_shader_parameter("trim", Color(colors[2]))
-			mesh.set_surface_override_material(surface, material)
+	actor.set_armor_finish("")
+	customized = actor.armor_materials
+	if not id.is_empty() and not actor.run_weapon_ids.has(id):
+		actor.run_weapon_ids.append(id)
+	actor.equip_sector_weapon(id)
 
 func light(view: SubViewport, at: Vector3, tint: Color, brightness: float) -> void:
 	var lamp := OmniLight3D.new()

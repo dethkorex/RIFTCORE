@@ -77,6 +77,24 @@ func reset() -> void:
 			DirAccess.remove_absolute(path)
 	update("Saved on this device.")
 
+func reset_cloud_progress() -> int:
+	if busy or directory.busy or not directory.online():
+		return ERR_BUSY
+	busy = true
+	var error := await prepare_release()
+	var owner: String = directory.username
+	if error == 0:
+		for prior in [true, false]:
+			if owner != directory.username or not directory.online():
+				error = ERR_CONNECTION_ERROR
+				break
+			var code: int = await directory.lobby.relay.account_delete_document(document_path(ReleaseReset.epoch(), prior))
+			if code not in [0, Codes.ACCOUNT_DELETE_DOCUMENT_RESPONSE_CODE.DOESNT_EXIST]:
+				error = ERR_CANT_CREATE
+				break
+	busy = false
+	return error
+
 func document_path(release: String, previous := false) -> String:
 	var suffix := "_" + release.replace(".", "_") if not release.is_empty() else ""
 	return DOCUMENT + suffix + ("_previous" if previous else "")
@@ -131,7 +149,7 @@ func read_remote() -> int:
 	if not (document is Dictionary and document.get("version") == 1 and document.get("revision") is String
 		and not String(document.revision).is_empty() and document.get("data") is Dictionary):
 		return ERR_FILE_CORRUPT
-	if not valid_snapshot(document.data, false):
+	if not valid_snapshot(document.data):
 		return ERR_FILE_CORRUPT
 	remote = document
 	checked_release = true
@@ -192,7 +210,7 @@ func sync(prefer_local := false) -> void:
 	remember(document.revision, current)
 	update("Saved on this device and in the cloud.")
 
-func valid_snapshot(data: Dictionary, check_name := true) -> bool:
+func valid_snapshot(data: Dictionary) -> bool:
 	if not data.get("profile") is String or not data.get("operators") is Dictionary:
 		return false
 	if var_to_bytes(data).size() > MAX_BYTES:
@@ -201,7 +219,7 @@ func valid_snapshot(data: Dictionary, check_name := true) -> bool:
 	if profile.parse(data.profile) != OK:
 		return false
 	var name := String(profile.get_value("player", "name", ""))
-	if name.is_empty() or (check_name and name.nocasecmp_to(directory.username) != 0):
+	if name.is_empty():
 		return false
 	for id in data.operators:
 		if id not in ["1", "2", "3"] or not data.operators[id] is String:
@@ -230,8 +248,6 @@ func restore_cloud() -> Dictionary:
 		var profile := ConfigFile.new()
 		error = profile.parse(copy.profile)
 		if error == OK:
-			profile.set_value("player", "name", directory.username)
-			copy.profile = profile.encode_to_text()
 			error = apply_snapshot(copy)
 	busy = false
 	if error != OK:
