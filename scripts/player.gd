@@ -303,7 +303,7 @@ func bind_sword_to_hand() -> void:
 	# Grip crosses the curled fingers from the pinky toward the thumb.
 	# Mixamo local +Y runs along the fingers, so a quarter turn here
 	# points the emitter backwards through the fingertips.
-	sword.position = Vector3(0.001, 0.077, -0.023)
+	sword.position = Vector3(0.003, 0.086, -0.020)
 	sword.rotation = Vector3(0.0, 0.0, 0.10)
 	sword.scale = Vector3.ONE * 0.39
 	sword_follows_hand = true
@@ -1575,7 +1575,7 @@ func present_saber_charge(held_time: float, swinging: bool) -> void:
 		if amount > 0.0:
 			slide_pose.influence = 1.0
 	if sword_pivot:
-		sword_pivot.visible = swinging or held_time >= 0.10
+		sword_pivot.visible = swinging
 
 func reflect_saber_pose(clip: String, held_time: float) -> void:
 	var step := SWING_CLIPS.find(StringName(clip))

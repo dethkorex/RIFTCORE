@@ -98,12 +98,24 @@ func finish_saber(rig: Skeleton3D, phase: float) -> void:
 	rig.set_bone_pose_rotation(hand, (parent_frame.inverse() * correction * parent_frame * rig.get_bone_pose_rotation(hand)).normalized())
 
 func grip_saber(rig: Skeleton3D, amount: float) -> void:
+	if amount <= 0.0:
+		return
+	var hand := rig.find_bone("mixamorig_LeftHand")
+	if hand < 0:
+		return
+	var palm := rig.get_bone_global_pose(hand).basis.orthonormalized()
+	# Pose each phalanx in palm space: over the barrel, around its side,
+	# then back toward the palm. The thumb closes across the index finger.
+	var curve := [Vector3(0, .93, -.36), Vector3(0, .12, -.99), Vector3(0, -.88, -.48)]
 	for digit in ["Index", "Middle", "Ring", "Pinky"]:
+		var splay := -.07 if digit == "Pinky" else (.03 if digit == "Index" else 0.0)
 		for joint in range(1, 4):
-			var bone := rig.find_bone("mixamorig_LeftHand%s%d" % [digit, joint])
-			if bone >= 0:
-				var curl := Quaternion(Vector3.RIGHT, -amount * (0.82 if joint == 1 else 1.02))
-				rig.set_bone_pose_rotation(bone, (rig.get_bone_rest(bone).basis.get_rotation_quaternion() * curl).normalized())
+			var arc: Vector3 = curve[joint - 1]
+			arc.x = splay
+			aim(rig, "LeftHand%s%d" % [digit, joint], "LeftHand%s%d" % [digit, joint + 1], palm * arc, amount)
+	var thumb := [Vector3(.66, .65, -.37), Vector3(-.20, .88, -.43), Vector3(-.84, .26, -.48)]
+	for joint in range(1, 4):
+		aim(rig, "LeftHandThumb%d" % joint, "LeftHandThumb%d" % (joint + 1), palm * thumb[joint - 1], amount)
 
 func aim(rig: Skeleton3D, joint: String, tip: String, toward: Vector3, weight := 1.0) -> void:
 	var bone := rig.find_bone("mixamorig_" + joint)
