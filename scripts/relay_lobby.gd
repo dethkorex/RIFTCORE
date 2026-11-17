@@ -123,18 +123,19 @@ func quit_game() -> void:
 		return
 	quitting = true
 	if is_instance_valid(relay) and relay.account_is_logged_in():
-		# A slow service must not make the Quit button wait indefinitely.
-		get_tree().create_timer(2.0, true, false, true).timeout.connect(get_tree().quit)
-		directory.whispers.shutdown()
-		directory.unpublish_presence()
-		if directory.online():
-			await directory.progress.sync()
-		if is_instance_valid(relay):
-			relay.quit()
-		else:
-			get_tree().quit()
+		var clear_whispers: bool = not directory.whispers.session_owner.is_empty()
+		relay.quit(_finish_account_session.bind(clear_whispers) if directory.online() else Callable())
 	else:
 		get_tree().quit()
+
+func _finish_account_session(clear_whispers: bool) -> void:
+	# Back up the save before transient chat and presence cleanup can block its write.
+	await directory.progress.sync()
+	if not directory.online():
+		return
+	if clear_whispers:
+		directory.whispers.clear_cloud()
+	directory.unpublish_presence()
 
 func host_room() -> void:
 	if not pending.is_empty() or not connected_room.is_empty():
@@ -371,6 +372,8 @@ func _connection_failed(error: int) -> void:
 func _disconnected() -> void:
 	relay_starting = false
 	relay_ready = false
+	if quitting:
+		return
 	if not pending.is_empty() or not connected_room.is_empty():
 		leave("Lost the connection to the online relay.")
 

@@ -324,8 +324,8 @@ func start_multiplayer() -> void:
 ## An alternative for get_tree().quit(). Only use if you log into a GD-Sync account using [method account_login].
 ## When quitting while logged in the plugin makes some callbacks to the server to update information like
 ## your friend status.
-func quit() -> void:
-	_data_controller.quit()
+func quit(before_disconnect := Callable()) -> void:
+	_data_controller.quit(before_disconnect)
 
 ## Starts the GD-Sync plugin locally. This will allow for local peer-to-peer connections but will disable features
 ## such as database access and automatic host switching. Local mode also disables some optimization features
@@ -1108,15 +1108,16 @@ func lobby_change_password(password : String) -> void:
 	_request_processor.create_change_lobby_password_request(password)
 
 ## Leaves the lobby you are currently in. This does not emit any signals.
-func lobby_leave() -> void:
+func lobby_leave(update_friend_status := true) -> void:
 	if !_connection_controller.valid_connection(): return
 	if _connection_controller.is_local():
 		_local_server.leave_local_lobby()
 		_connection_controller.leave_local_lobby_client()
 	else:
 		_request_processor.create_leave_lobby_request()
-	_data_controller.set_friend_status()
 	_session_controller.lobby_left()
+	if update_friend_status:
+		_data_controller.set_friend_status()
 	_node_tracker.lobby_left()
 	_interest_manager.clear()
 	_steam.leave_steam_lobby()

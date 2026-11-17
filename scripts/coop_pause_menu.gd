@@ -65,6 +65,7 @@ func _ready() -> void:
 	UI.label(content, hint, 17, UI.MUTED)
 	actions = UI.column(content, 8)
 	resume_button = UI.button(actions, "Resume", close, true)
+	menu.first_focus = resume_button
 	settings_button = UI.button(actions, "Settings", show_settings)
 	UI.button(actions, "Leave Mission…" if in_mission else "Leave Party…", show_confirmation.bind(true))
 	confirmation = UI.column(content, 8)
@@ -107,6 +108,7 @@ func show_settings() -> void:
 	var settings := UI.settings(content)
 	menu.sections = settings.tabs
 	menu.pause_action = hide_settings
+	menu.first_focus = settings.initial_focus
 	UI.button(content, "Back to Pause", hide_settings)
 	settings.initial_focus.grab_focus()
 
@@ -119,4 +121,5 @@ func hide_settings() -> void:
 	pause_layout.show()
 	menu.sections = pause_tabs
 	menu.pause_action = close
+	menu.first_focus = resume_button
 	settings_button.grab_focus()

@@ -413,7 +413,7 @@ func refresh_friends() -> void:
 			var present := is_friend_online(friend)
 			snapshot.append([friend.Username, friend.get("FriendStatus", 0), present, friend_room_code(friend)])
 		for id in RiftSocial.whispers.keys():
-			if id is String and id.begins_with("account:") and not whispers.can_send(id.trim_prefix("account:")):
+			if id is String and id.begins_with("account:") and not whispers.still_friends(id.trim_prefix("account:")):
 				RiftSocial.clear_whisper(id)
 		for id in presence.keys():
 			if not friends.any(func(friend): return friend.Username == id):
@@ -462,13 +462,22 @@ func room_code_from_friend(friend: Dictionary, record: Dictionary) -> String:
 
 func lookup_open_room(name: String) -> String:
 	var reply: Dictionary = await lookup(name)
+	var code := int(reply.get("Code", Codes.ACCOUNT_GET_FRIEND_STATUS_RESPONSE_CODE.NO_RESPONSE_FROM_SERVER))
+	if code in [Codes.ACCOUNT_GET_FRIEND_STATUS_RESPONSE_CODE.NO_RESPONSE_FROM_SERVER, Codes.ACCOUNT_GET_FRIEND_STATUS_RESPONSE_CODE.RATE_LIMIT_EXCEEDED]:
+		# A temporary directory failure should not hide a recently advertised room.
+		# The relay still checks the room's current state when the guest joins.
+		for contact in friends:
+			if String(contact.get("Username", "")).nocasecmp_to(name) == 0:
+				return friend_room_code(contact)
 	var friend: Variant = reply.get("Result", {})
-	if reply.get("Code", 1) != 0 or not friend is Dictionary:
+	if code != 0 or not friend is Dictionary:
 		return ""
 	var current := room_code_from_friend(friend, {})
 	if not current.is_empty() or friend_lobby(friend).is_empty() or not online():
 		return current
 	var heartbeat: Dictionary = await lobby.relay.account_get_external_document(name, PRESENCE_PATH)
+	if int(heartbeat.get("Code", 1)) in [Codes.ACCOUNT_GET_DOCUMENT_RESPONSE_CODE.NO_RESPONSE_FROM_SERVER, Codes.ACCOUNT_GET_DOCUMENT_RESPONSE_CODE.RATE_LIMIT_EXCEEDED]:
+		return room_code_from_friend(friend, presence.get(String(friend.get("Username", name)), {}))
 	var record: Variant = heartbeat.get("Result", {})
 	return room_code_from_friend(friend, record) if heartbeat.get("Code", 1) == 0 and record is Dictionary else ""
 
@@ -508,6 +517,8 @@ func friend_action(name: String, action: String) -> String:
 		_:
 			code = await lobby.relay.account_remove_friend(name)
 	if code == 0:
+		if action == "accept":
+			whispers.announce_at = 0
 		await refresh_friends()
 		match action:
 			"request": return "Friend request sent."

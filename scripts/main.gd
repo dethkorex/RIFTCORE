@@ -1421,9 +1421,8 @@ func build_pause_menu() -> void:
 	UI.label(stack, "%s / Act %d" % [Catalog.info(sector).title, act], 17, UI.MUTED)
 	if controller_disconnected:
 		UI.label(stack, "Controller disconnected", 17, UI.VIOLET)
-		pause_menu.pause_action = Callable()
-		pause_menu.back_action = Callable()
-	UI.button(stack, "Resume", toggle_pause, true).grab_focus()
+	pause_menu.first_focus = UI.button(stack, "Resume", toggle_pause, true)
+	pause_menu.first_focus.grab_focus()
 	if save_session:
 		UI.button(stack, "Save Game", show_pause_save)
 	UI.button(stack, "Restart run", restart_run)
@@ -1483,6 +1482,7 @@ func show_pause_settings() -> void:
 	UI.label(stack, "SETTINGS", 32, UI.CYAN)
 	var settings := UI.settings(stack)
 	UI.button(stack, "Back to pause", build_pause_menu)
+	pause_menu.first_focus = settings.initial_focus
 	settings.initial_focus.grab_focus()
 
 func build_level() -> void:

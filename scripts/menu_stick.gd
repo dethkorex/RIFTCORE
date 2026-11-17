@@ -19,6 +19,11 @@ var scroll_axis := Vector2.ZERO
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	get_window().focus_exited.connect(reset_navigation)
+	Input.joy_connection_changed.connect(func(_device: int, connected: bool):
+		if not connected:
+			reset_navigation()
+	)
 
 func _input(event: InputEvent) -> void:
 	var viewport := get_viewport()
@@ -68,8 +73,7 @@ func _input(event: InputEvent) -> void:
 func _process(delta: float) -> void:
 	var focused := get_viewport().gui_get_focus_owner()
 	if not focused:
-		reset_stick()
-		scroll_axis = Vector2.ZERO
+		reset_navigation()
 		return
 	if scroll_axis.length() > ENGAGE:
 		var region := scroll_region(focused)
@@ -170,3 +174,7 @@ func reset_stick() -> void:
 	direction = &""
 	held_pad = -1
 	device = -1
+
+func reset_navigation() -> void:
+	reset_stick()
+	scroll_axis = Vector2.ZERO

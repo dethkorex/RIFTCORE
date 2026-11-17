@@ -3,6 +3,34 @@ extends Control
 var back_action: Callable
 var pause_action: Callable
 var sections: TabContainer
+var first_focus: Control
+var last_focus: Control
+
+func _ready() -> void:
+	get_viewport().gui_focus_changed.connect(remember_focus)
+	get_window().focus_entered.connect(func(): restore_focus.call_deferred())
+
+func remember_focus(control: Control) -> void:
+	if is_instance_valid(control) and is_ancestor_of(control):
+		last_focus = control
+
+func restore_focus() -> void:
+	if not is_visible_in_tree() or not can_process():
+		return
+	# A dialog layered over the pause screen may already own focus.
+	if can_focus(get_viewport().gui_get_focus_owner()):
+		return
+	for control in [last_focus, first_focus]:
+		if can_focus(control):
+			control.grab_focus()
+			return
+
+func can_focus(control: Control) -> bool:
+	return is_instance_valid(control) and control.is_visible_in_tree() and control.can_process() and control.focus_mode != Control.FOCUS_NONE and not (control is BaseButton and control.disabled)
+
+func _input(event: InputEvent) -> void:
+	if (event is InputEventJoypadButton and event.pressed) or (event is InputEventJoypadMotion and event.axis in [JOY_AXIS_LEFT_X, JOY_AXIS_LEFT_Y] and absf(event.axis_value) > 0.28):
+		restore_focus()
 
 static func shoulder_step(event: InputEvent) -> int:
 	if event is InputEventJoypadButton and event.pressed:

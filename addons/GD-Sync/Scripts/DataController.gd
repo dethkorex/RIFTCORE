@@ -24,6 +24,8 @@ extends Node
 #ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 #SUCH DAMAGE.
 
+signal document_write_finished
+
 var https_controller
 var connection_controller
 var session_controller
@@ -34,6 +36,9 @@ var login_token : String
 var previous_token : String
 var logged_in : bool = false
 var safe_quit : bool = false
+var quitting := false
+var quit_finished := false
+var document_write_busy := false
 
 var status_ping_timer : float = 0.0
 
@@ -50,7 +55,7 @@ func _ready() -> void:
 	load_config()
 
 func _process(delta: float) -> void:
-	if logged_in:
+	if logged_in and not quitting:
 		status_ping_timer -= delta
 		
 		if status_ping_timer <= 0.0:
@@ -61,11 +66,26 @@ func _notification(what : int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:
 		quit()
 
-func quit() -> void:
-	if logged_in:
-		GDSync.lobby_leave()
-		await set_friend_status()
-	
+func quit(before_disconnect := Callable()) -> void:
+	if quitting:
+		return
+	quitting = true
+	get_tree().create_timer(2.0, true, false, true).timeout.connect(_finish_quit)
+	if logged_in and GDSync.is_active():
+		if before_disconnect.is_valid():
+			await before_disconnect.call()
+		if quit_finished:
+			return
+		GDSync.lobby_leave(false)
+		if GDSync.is_active():
+			await set_friend_status()
+	_finish_quit()
+
+func _finish_quit() -> void:
+	if quit_finished:
+		return
+	quit_finished = true
+	connection_controller.reset_multiplayer()
 	safe_quit = true
 	save_config()
 	get_tree().quit()
@@ -303,7 +323,7 @@ func reset_password(email : String, reset_code : String, new_password : String) 
 	return result["Code"]
 
 func set_player_document(path : String, data : Dictionary, externally_visible : bool) -> int:
-	var result : Dictionary = await https_controller.perform_https_request(
+	return await write_player_document(
 		"setplayerdocument",
 		{
 			"Token" : login_token,
@@ -313,10 +333,8 @@ func set_player_document(path : String, data : Dictionary, externally_visible : 
 		}
 	)
 	
-	return result["Code"]
-
 func set_external_visible(path : String, externally_visible : bool) -> int:
-	var result : Dictionary = await https_controller.perform_https_request(
+	return await write_player_document(
 		"setexternalvisible",
 		{
 			"Token" : login_token,
@@ -325,8 +343,6 @@ func set_external_visible(path : String, externally_visible : bool) -> int:
 		}
 	)
 	
-	return result["Code"]
-
 func get_player_document(path : String, external_username : String) -> Dictionary:
 	var result : Dictionary = await https_controller.perform_https_request(
 		"getplayerdocument",
@@ -376,7 +392,7 @@ func has_player_document(path : String, external_username : String) -> Dictionar
 	return data
 
 func delete_player_document(path : String) -> int:
-	var result : Dictionary = await https_controller.perform_https_request(
+	return await write_player_document(
 		"deleteplayerdocument",
 		{
 			"Token" : login_token,
@@ -384,7 +400,19 @@ func delete_player_document(path : String) -> int:
 		}
 	)
 	
-	return result["Code"]
+func write_player_document(endpoint: String, data: Dictionary) -> int:
+	# Overlapping writes can replace a recently written document in the same account.
+	while document_write_busy:
+		await document_write_finished
+	if not GDSync.is_active():
+		return ENUMS.ACCOUNT_DOCUMENT_SET_RESPONSE_CODE.NO_RESPONSE_FROM_SERVER
+	if data.get("Token") != login_token:
+		return ENUMS.ACCOUNT_DOCUMENT_SET_RESPONSE_CODE.NOT_LOGGED_IN
+	document_write_busy = true
+	var result: Dictionary = await https_controller.perform_https_request(endpoint, data)
+	document_write_busy = false
+	document_write_finished.emit.call_deferred()
+	return int(result["Code"])
 
 func report_user(user : String, report : String) -> int:
 	var result : Dictionary = await https_controller.perform_https_request(

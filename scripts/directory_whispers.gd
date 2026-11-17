@@ -5,7 +5,12 @@ signal failed(recipient: String)
 const ENDPOINT := "riftcore_whisper_endpoint"
 const LIVE_ROOT := "riftcore_live_whispers"
 const MESSAGE_TTL := 40
+const CLOCK_SKEW := 30
+const QUEUE_TTL_MS := 90_000
+const MAX_QUEUED := 5
 const READ_INTERVAL := 2.5
+const ENDPOINT_REFRESH := 18_000
+const PACKET_RETRY := 10_000
 const CHUNK_BYTES := 200
 
 var directory
@@ -14,13 +19,16 @@ var key: CryptoKey
 var session_owner := ""
 var session := ""
 var preparing := false
-var running := false
+var reading := false
+var sending := false
 var elapsed := 0.0
+var announce_at := 0
 var cursor := 0
-var pending: Dictionary = {}
-var writing: Dictionary = {}
+var offline_cursor := 0
+var offline_elapsed := 0.0
+var outbox: Dictionary[String, Array] = {}
 var delivered: Dictionary = {}
-var receipt_expiry: Dictionary[String, int] = {}
+var receipts: Dictionary[String, Dictionary] = {}
 
 func _process(delta: float) -> void:
 	if not directory.online() or directory.lobby.quitting:
@@ -32,13 +40,20 @@ func _process(delta: float) -> void:
 		reset_session()
 		session_owner = directory.username
 	elapsed += delta
-	if preparing or running or elapsed < READ_INTERVAL:
+	offline_elapsed += delta
+	if elapsed < READ_INTERVAL:
 		return
 	elapsed = 0.0
 	if not key:
-		setup()
+		if not preparing:
+			setup()
 	else:
-		poll()
+		if not preparing and Time.get_ticks_msec() >= announce_at:
+			announce_endpoint(key, session)
+		if not reading:
+			poll_inbox()
+		if not sending and not outbox.is_empty():
+			poll_outbox()
 
 func reset_session() -> void:
 	if session_owner.is_empty():
@@ -46,20 +61,27 @@ func reset_session() -> void:
 	session_owner = ""
 	session = ""
 	key = null
+	announce_at = 0
 	cursor = 0
-	pending.clear()
-	writing.clear()
+	offline_cursor = 0
+	offline_elapsed = 0.0
+	outbox.clear()
 	delivered.clear()
-	receipt_expiry.clear()
+	receipts.clear()
 	RiftSocial.clear_whispers("account:")
 
 func shutdown() -> void:
 	var had_session := not session_owner.is_empty()
 	reset_session()
-	if had_session and directory.online():
+	if had_session:
+		await clear_cloud()
+
+func clear_cloud() -> void:
+	if directory.online():
 		var relay = directory.lobby.relay
-		relay.account_delete_document(ENDPOINT)
 		await relay.account_delete_document(LIVE_ROOT)
+		if directory.online():
+			await relay.account_delete_document(ENDPOINT)
 
 func is_current(token: String) -> bool:
 	return not token.is_empty() and session == token and session_owner == directory.username and directory.online() and not directory.lobby.quitting
@@ -73,9 +95,18 @@ func setup() -> void:
 	var cleared: int = await relay.account_delete_document(LIVE_ROOT)
 	if is_current(token) and cleared in [0, directory.Codes.ACCOUNT_DELETE_DOCUMENT_RESPONSE_CODE.DOESNT_EXIST]:
 		var candidate := crypto.generate_rsa(2048)
-		if candidate and await relay.account_document_set(ENDPOINT, {"session": token, "pem": candidate.save_to_string(true)}, true) == 0 and is_current(token):
-			key = candidate
-			remove_legacy_history(token)
+		if candidate:
+			await announce_endpoint(candidate, token)
+			if is_current(token) and key:
+				remove_legacy_history(token)
+	preparing = false
+
+func announce_endpoint(candidate: CryptoKey, token: String) -> void:
+	preparing = true
+	var result: int = await directory.lobby.relay.account_document_set(ENDPOINT, {"session": token, "pem": candidate.save_to_string(true)}, true)
+	if is_current(token) and result == 0:
+		key = candidate
+		announce_at = Time.get_ticks_msec() + ENDPOINT_REFRESH
 	preparing = false
 
 func remove_legacy_history(token: String) -> void:
@@ -106,103 +137,147 @@ func can_send(name: String) -> bool:
 		return String(friend.get("Username", "")).nocasecmp_to(name) == 0 and directory.is_friend_online(friend))
 
 func queue(name: String, body: String) -> bool:
-	if not key or not can_send(name) or pending.has(name) or writing.has(name):
+	if not can_send(name):
 		return false
-	writing[name] = true
-	send(name, body, session)
+	if session_owner != directory.username:
+		reset_session()
+		session_owner = directory.username
+	var messages: Array = outbox.get(name, [])
+	if messages.size() >= MAX_QUEUED:
+		return false
+	messages.append({
+		"id": crypto.generate_random_bytes(12).hex_encode(),
+		"body": body,
+		"deadline": Time.get_ticks_msec() + QUEUE_TTL_MS,
+		"packet": {},
+		"attempted": false,
+		"retry_at": 0,
+	})
+	outbox[name] = messages
 	return true
 
-func send(name: String, body: String, token: String) -> void:
-	var relay = directory.lobby.relay
-	var response: Dictionary = await relay.account_get_external_document(name, ENDPOINT)
-	if int(response.get("Code", 1)) in [1, 3] and is_current(token) and can_send(name):
-		await get_tree().create_timer(1.0).timeout
-		if is_current(token) and can_send(name):
-			response = await relay.account_get_external_document(name, ENDPOINT)
-	var endpoint := document(response)
+func accepted(friend: Dictionary) -> bool:
+	return int(friend.get("FriendStatus", 0)) == directory.Codes.FRIEND_STATUS.FRIEND
+
+func still_friends(name: String) -> bool:
+	return directory.friends.any(func(friend): return accepted(friend) and String(friend.get("Username", "")).nocasecmp_to(name) == 0)
+
+func prepare_packet(name: String, item: Dictionary, token: String) -> void:
+	var endpoint := document(await directory.lobby.relay.account_get_external_document(name, ENDPOINT))
+	if not is_current(token):
+		return
 	var destination := String(endpoint.get("session", ""))
 	var pem := String(endpoint.get("pem", ""))
 	var recipient := CryptoKey.new()
-	if is_current(token) and can_send(name) and destination.length() == 32 and pem.length() <= 1024 and recipient.load_from_string(pem, true) == OK:
-		var chunks := encode(recipient, body)
+	if destination.length() == 32 and pem.length() <= 1024 and recipient.load_from_string(pem, true) == OK:
+		var chunks := encode(recipient, item.body)
 		if not chunks.is_empty():
-			var id := crypto.generate_random_bytes(12).hex_encode()
-			var expires := int(Time.get_unix_time_from_system()) + MESSAGE_TTL
-			var packet := {"id": id, "to": destination, "expires": expires, "parts": chunks}
-			var result: int = await relay.account_document_set(address(name, "message"), packet, true)
-			if result in [1, 3] and is_current(token) and can_send(name):
-				await get_tree().create_timer(1.0).timeout
-				if is_current(token) and can_send(name):
-					result = await relay.account_document_set(address(name, "message"), packet, true)
-			if is_current(token) and result == 0:
-				pending[name] = {"id": id, "body": body, "expires": expires, "to": destination}
-				writing.erase(name)
-				return
-			if result == 0 and directory.online() and session_owner.is_empty():
-				relay.account_delete_document(address(name, "message"))
-	if is_current(token):
-		writing.erase(name)
+			item.packet = {"id": item.id, "to": destination, "parts": chunks}
+
+func poll_outbox() -> void:
+	sending = true
+	var token := session
+	for name in outbox.keys():
+		if not is_current(token):
+			break
+		await advance_outbox(name, token)
+	sending = false
+
+func advance_outbox(name: String, token: String) -> void:
+	var messages: Array = outbox[name]
+	var item: Dictionary = messages.front()
+	var relay = directory.lobby.relay
+	if not still_friends(name):
+		outbox.erase(name)
+		failed.emit(name)
+		return
+	var expired := Time.get_ticks_msec() >= int(item.deadline)
+	if item.packet.is_empty() and not expired:
+		if not can_send(name):
+			return
+		await prepare_packet(name, item, token)
+		if not is_current(token):
+			return
+	var acknowledged := false
+	if item.attempted:
+		var receipt := document(await relay.account_get_external_document(name, address(session_owner, "receipt")))
+		if not is_current(token):
+			return
+		acknowledged = receipt.get("id") == item.id and receipt.get("session") == item.packet.to
+	if not acknowledged and not expired:
+		if not item.packet.is_empty() and Time.get_ticks_msec() >= int(item.retry_at):
+			# An ambiguous write can be retried without creating a second message.
+			item.attempted = true
+			item.packet.expires = int(Time.get_unix_time_from_system()) + MESSAGE_TTL
+			var result: int = await relay.account_document_set(address(name, "message"), item.packet, true)
+			if is_current(token):
+				item.retry_at = Time.get_ticks_msec() + (PACKET_RETRY if result == 0 else 0)
+		return
+	# Finish deletion before letting the next queued packet reuse this address.
+	if item.attempted:
+		await relay.account_delete_document(address(name, "message"))
+		if not is_current(token):
+			return
+	messages.pop_front()
+	if messages.is_empty():
+		outbox.erase(name)
+	if acknowledged:
+		RiftSocial.add_whisper("account:" + name, item.body, true)
+	else:
 		failed.emit(name)
 
-func poll() -> void:
-	running = true
+func poll_inbox() -> void:
+	reading = true
 	var token := session
-	var friends: Array = directory.friends.filter(func(friend): return directory.is_friend_online(friend))
-	for i in mini(2, friends.size()):
+	var friends: Array = directory.friends.filter(accepted)
+	var online_friends := friends.filter(func(friend): return directory.is_friend_online(friend))
+	for i in mini(2, online_friends.size()):
 		if not is_current(token):
 			break
-		var friend: String = friends[cursor % friends.size()].Username
-		cursor = (cursor + 1) % friends.size()
-		await receive(friend, token)
-	for name: String in pending.keys():
+		var name: String = online_friends[cursor % online_friends.size()].Username
+		cursor = (cursor + 1) % online_friends.size()
+		await receive(name, token)
+	if is_current(token) and offline_elapsed >= 8.0:
+		offline_elapsed = 0.0
+		var other_friends := friends.filter(func(friend): return not directory.is_friend_online(friend))
+		if not other_friends.is_empty():
+			var name: String = other_friends[offline_cursor % other_friends.size()].Username
+			offline_cursor = (offline_cursor + 1) % other_friends.size()
+			await receive(name, token)
+	for name in receipts.keys():
 		if not is_current(token):
 			break
-		await check_delivery(name, token)
-	for name: String in receipt_expiry.keys():
-		if not is_current(token):
-			break
-		if receipt_expiry[name] <= int(Time.get_unix_time_from_system()):
-			var result: int = await directory.lobby.relay.account_delete_document(address(name, "receipt"))
+		var receipt: Dictionary = receipts[name]
+		var relay = directory.lobby.relay
+		if receipt.expires <= Time.get_ticks_msec():
+			var result: int = await relay.account_delete_document(address(name, "receipt"))
 			if is_current(token) and deleted(result):
-				receipt_expiry.erase(name)
-	running = false
+				receipts.erase(name)
+		elif not receipt.sent:
+			var result: int = await relay.account_document_set(address(name, "receipt"), {"id": receipt.id, "session": token}, true)
+			if is_current(token):
+				receipt.sent = result == 0
+	reading = false
 
 func receive(name: String, token: String) -> void:
-	var relay = directory.lobby.relay
-	var packet := document(await relay.account_get_external_document(name, address(session_owner, "message")))
+	var packet := document(await directory.lobby.relay.account_get_external_document(name, address(session_owner, "message")))
 	var id := String(packet.get("id", ""))
 	var expires := int(packet.get("expires", 0))
 	var now := int(Time.get_unix_time_from_system())
-	if not is_current(token) or not can_send(name) or packet.get("to") != token or expires < now or expires > now + MESSAGE_TTL + 4 or id.length() != 24 or delivered.get(name) == id:
+	if not is_current(token) or not still_friends(name) or packet.get("to") != token or expires < now - CLOCK_SKEW or expires > now + MESSAGE_TTL + CLOCK_SKEW or id.length() != 24 or not id.is_valid_hex_number():
+		return
+	if delivered.get(name) == id:
+		var receipt: Dictionary = receipts.get(name, {})
+		if not receipt.is_empty() and expires > int(receipt.wire_expiry):
+			receipt.wire_expiry = expires
+			receipt.sent = false
 		return
 	var body := decode(packet.get("parts", []))
 	if body.is_empty():
 		return
-	var result: int = await relay.account_document_set(address(name, "receipt"), {"id": id, "session": token}, true)
-	if result == 0 and is_current(token):
-		delivered[name] = id
-		receipt_expiry[name] = expires + 4
-		RiftSocial.receive_whisper("account:" + name, body)
-
-func check_delivery(name: String, token: String) -> void:
-	var item: Dictionary = pending[name]
-	var relay = directory.lobby.relay
-	if not item.get("confirmed", false):
-		var receipt := document(await relay.account_get_external_document(name, address(session_owner, "receipt")))
-		if not is_current(token):
-			return
-		item.confirmed = receipt.get("id") == item.id and receipt.get("session") == item.to
-		if not item.confirmed and can_send(name) and int(Time.get_unix_time_from_system()) < item.expires:
-			return
-	# Keep the slot occupied until deletion completes so it cannot erase a newer send.
-	var result: int = await relay.account_delete_document(address(name, "message"))
-	if not is_current(token) or not deleted(result):
-		return
-	pending.erase(name)
-	if item.confirmed:
-		RiftSocial.add_whisper("account:" + name, item.body, true)
-	else:
-		failed.emit(name)
+	delivered[name] = id
+	receipts[name] = {"id": id, "expires": Time.get_ticks_msec() + QUEUE_TTL_MS, "wire_expiry": expires, "sent": false}
+	RiftSocial.receive_whisper("account:" + name, body)
 
 func deleted(result: int) -> bool:
 	return result in [0, directory.Codes.ACCOUNT_DELETE_DOCUMENT_RESPONSE_CODE.DOESNT_EXIST]

@@ -1,9 +1,9 @@
-# RIFTCORE Alpha 6.3.13
+# RIFTCORE Alpha 6.3.14
 
-- Whispers are available to online friends. Conversations start empty when you reopen RIFTCORE, and signing in clears old cloud chat history.
-- Party chat accepts quick follow-up messages and starts empty after a restart.
-- Select a friend in Social and choose Join Game when their lobby is open and has room.
-- Quit Game closes on one click, even when the cloud service is slow.
+- Windows and Linux players can send several whispers in a row. Whispers retry temporary service failures and conversations still clear when you close the game.
+- Fixed a Linux relay shutdown warning when quitting after signing in.
+- Join Game can use a recently advertised friend lobby when the directory is temporarily busy.
+- The pause menu restores controller focus after switching back to the game window.
 - This update keeps your account and saves.
 
 Update through Launcher 0.2 or Settings → Update Game before joining a party.
