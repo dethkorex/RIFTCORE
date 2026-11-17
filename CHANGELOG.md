@@ -1,8 +1,7 @@
-# RIFTCORE Alpha 6.3.15
+# RIFTCORE Alpha 6.3.16
 
-- Friends can find open parties in Social even when the first lobby status update fails.
-- Rejoin Party brings you back after a connection drop at the station or during a mission.
-- During a mission, the party has 90 seconds to reconnect while the game stays open. The mission pauses and keeps your progress, lives, and loot.
+- Use the D-pad, left stick, or confirm button to regain controller focus when a menu loses its selection.
+- Controller Settings updates binding labels as you remap or reset them. Suit Weapon now appears in the list and defaults to the right trigger.
 - This update keeps your account and saves.
 
 Update through Launcher 0.2 or Settings → Update Game before joining a party.

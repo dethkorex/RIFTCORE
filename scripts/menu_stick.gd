@@ -16,14 +16,26 @@ var repeat_in := 0.0
 var device := -1
 var held_pad := -1
 var scroll_axis := Vector2.ZERO
+var last_focus: WeakRef
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	get_viewport().gui_focus_changed.connect(remember_focus)
 	get_window().focus_exited.connect(reset_navigation)
 	Input.joy_connection_changed.connect(func(_device: int, connected: bool):
 		if not connected:
 			reset_navigation()
 	)
+
+func remember_focus(control: Control) -> void:
+	last_focus = weakref(control)
+
+func restore_focus() -> Control:
+	var previous := last_focus.get_ref() as Control if last_focus else null
+	if previous and can_focus(previous) and previous.can_process():
+		previous.grab_focus()
+		return get_viewport().gui_get_focus_owner()
+	return null
 
 func _input(event: InputEvent) -> void:
 	var viewport := get_viewport()
@@ -34,6 +46,8 @@ func _input(event: InputEvent) -> void:
 				reset_stick()
 			return
 		reset_stick()
+		if not focused and (PAD_DIRECTIONS.has(event.button_index) or event.is_action_pressed(&"ui_accept")):
+			focused = restore_focus()
 		if focused and PAD_DIRECTIONS.has(event.button_index):
 			held_pad = event.button_index
 			device = event.device
@@ -52,6 +66,8 @@ func _input(event: InputEvent) -> void:
 		return
 	if not event is InputEventJoypadMotion or event.axis not in [JOY_AXIS_LEFT_X, JOY_AXIS_LEFT_Y]:
 		return
+	if not focused and absf(event.axis_value) >= ENGAGE:
+		focused = restore_focus()
 	if not focused:
 		reset_stick()
 		return

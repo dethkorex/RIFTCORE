@@ -274,7 +274,7 @@ func build_controller_bindings() -> void:
 	groups.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	panel.add_child(groups)
 	var movement := build_action_column(groups, "Movement and interaction", ["move_left", "move_right", "jump", "crouch", "climb_up", "climb_down", "field_interact"])
-	var combat := build_action_column(groups, "Combat and communication", ["dash", "shoot", "melee", "swap_weapon", "previous_suit", "pause", "push_to_talk"])
+	var combat := build_action_column(groups, "Combat and communication", ["dash", "shoot", "suit_fire", "melee", "swap_weapon", "previous_suit", "pause", "push_to_talk"])
 	var shortcuts := build_controller_buttons(groups)
 
 	var footer := HBoxContainer.new()
@@ -295,7 +295,7 @@ func build_controller_bindings() -> void:
 	link_controller_focus(controller_layout, SIDE_RIGHT, vibration)
 	link_controller_focus(controller_layout, SIDE_BOTTOM, movement[0])
 	link_controller_focus(vibration, SIDE_BOTTOM, combat[0])
-	for index in movement.size():
+	for index in mini(movement.size(), combat.size()):
 		link_controller_focus(movement[index], SIDE_RIGHT, combat[index])
 	for index in range(2):
 		var column: Array[Control] = []
@@ -499,7 +499,9 @@ func begin_capture(action: String, device: String) -> void:
 func refresh() -> void:
 	for action in RiftSettings.ACTIONS:
 		for device in ["key", "pad"]:
-			slots[action + ":" + device].text = "Listening…" if action == pending_action and device == pending_device else RiftSettings.binding_label(action, device)
+			var slot: Button = slots.get(action + ":" + device)
+			if slot:
+				slot.text = "Listening…" if action == pending_action and device == pending_device else RiftSettings.binding_label(action, device)
 	refresh_controller_buttons()
 
 func _input(event: InputEvent) -> void:
