@@ -37,6 +37,7 @@ static func contacts(include_directory := false) -> Array[Dictionary]:
 				state = "Request sent"
 			result.append({"key": "directory:" + entry.Username, "id": entry.Username, "name": entry.Username,
 				"directory": true, "relation": relation, "chat": "account:" + entry.Username, "saved": relation == Codes.FRIEND_STATUS.FRIEND,
+				"joinable": online and not RiftRelay.directory.friend_room_code(entry).is_empty(),
 				"party": false, "playing": online, "recent": false, "priority": 0 if online else 2, "status": state})
 	result.sort_custom(func(a, b):
 		var a_pin := RiftSocial.pinned.has(a.key)
@@ -81,13 +82,12 @@ static func contact_button(row: VBoxContainer, contact: Dictionary, select: Call
 static func message_contacts() -> Array[Dictionary]:
 	var rows := contacts(true)
 	for id in RiftSocial.whispers:
-		if not id is int or rows.any(func(contact): return contact.chat == id):
+		if not id is int or not RiftSocial.can_whisper(id) or rows.any(func(contact): return contact.chat == id):
 			continue
 		var name := str(id)
-		if RiftSocial.can_whisper(id):
-			var persona: String = RiftSocial.steam.getFriendPersonaName(id)
-			if not persona.is_empty() and persona != "[unknown]":
-				name = persona
+		var persona: String = RiftSocial.steam.getFriendPersonaName(id)
+		if not persona.is_empty() and persona != "[unknown]":
+			name = persona
 		rows.append({"key": "steam:" + str(id), "chat": id, "id": str(id), "name": name, "status": "Steam conversation", "party": false, "playing": false, "recent": false, "saved": false})
 	return rows
 
@@ -160,11 +160,19 @@ static func build_friends(menu, columns: HBoxContainer) -> void:
 		if contact.get("directory", false):
 			var relation: int = contact.relation
 			if relation == Codes.FRIEND_STATUS.FRIEND:
+				if contact.joinable:
+					var join := UI.button(primary, "Join Game", RiftRelay.join_directory_friend.bind(contact.id), true, 42)
+					join.disabled = not RiftRelay.can_receive_invite() or RiftRelay.checking_friend_room
+					if not join.disabled:
+						selected.action = join
 				var invite := UI.button(primary, "Invite Friend", RiftRelay.invite_directory_friend.bind(contact.id), true, 42)
 				invite.disabled = not contact.playing or not RiftRelay.can_invite_directory_friend()
 				invite.tooltip_text = "Opens a private group if needed and sends a RIFTCORE invite."
 				var message := UI.button(primary, "Message", conversation.focus, false, 36)
-				selected.action = invite if not invite.disabled else message
+				message.disabled = not can_message(contact.chat)
+				message.tooltip_text = "Only online friends can receive messages." if message.disabled else ""
+				if selected.action == null:
+					selected.action = invite if not invite.disabled else (message if not message.disabled else null)
 			var management := HBoxContainer.new()
 			management.add_theme_constant_override("separation", 8)
 			actions.add_child(management)
@@ -181,7 +189,7 @@ static func build_friends(menu, columns: HBoxContainer) -> void:
 				invite.disabled = joined or not contact.playing or not RiftRelay.can_invite_friend()
 				invite.tooltip_text = "Available for Steam friends playing RIFTCORE."
 			var whisper: Button
-			if chat_allowed or RiftSocial.whispers.has(contact.chat):
+			if chat_allowed:
 				whisper = UI.button(primary, "Message", conversation.focus, false, 36)
 			selected.action = invite if invite and not invite.disabled else whisper
 			var management := HBoxContainer.new()
@@ -773,11 +781,11 @@ static func build_conversation(parent: VBoxContainer) -> Dictionary:
 		var key: Variant = current.chat
 		var active := can_message(key)
 		var messages: Array = RiftSocial.whispers.get(key, [])
-		pane.visible = active or not messages.is_empty()
+		pane.visible = active
 		composer.editable = active
 		submit.disabled = not active
 		history.clear()
-		status.text = "" if active else "This conversation is read-only while the contact is unavailable."
+		status.text = ""
 		for line in messages:
 			history.add_text("%s  %s
 %s
@@ -797,6 +805,10 @@ static func build_conversation(parent: VBoxContainer) -> Dictionary:
 			if composer.has_focus():
 				RiftSocial.unread_whispers.erase(id)
 			refresh.call()
+	)
+	watch(history, RiftRelay.directory.whispers.failed, func(recipient: String):
+		if current.chat == "account:" + recipient:
+			status.text = "Message wasn’t delivered. Check that your friend is still online."
 	)
 	return {"select": select, "focus": func():
 		if composer.is_visible_in_tree() and composer.editable:

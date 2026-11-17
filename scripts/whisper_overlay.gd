@@ -60,6 +60,7 @@ func _ready() -> void:
 	peek.offset_bottom = -66
 	peek.hide()
 	RiftRelay.changed.connect(refresh_channels)
+	RiftRelay.directory.changed.connect(refresh_channels)
 
 func is_open() -> bool:
 	return is_instance_valid(card)
@@ -136,7 +137,7 @@ func refresh_channels() -> void:
 	var chosen := 0
 	for contact in SocialPanel.message_contacts():
 		var id: Variant = contact.chat
-		if not can_send(id) and not RiftSocial.whispers.has(id):
+		if not can_send(id):
 			continue
 		var unread := int(RiftSocial.unread_whispers.get(id, 0))
 		selector.add_item("Whisper · %s%s" % [contact.name, " (%d new)" % unread if unread else ""])
@@ -144,7 +145,11 @@ func refresh_channels() -> void:
 		selector.set_item_metadata(index, id)
 		if id == channel:
 			chosen = index
-	channel = selector.get_item_metadata(chosen)
+	var selected: Variant = selector.get_item_metadata(chosen)
+	if channel != null and selected == null:
+		composer.clear()
+		draft = ""
+	channel = selected
 	selector.select(chosen)
 	refresh_history()
 
@@ -178,7 +183,14 @@ func whisper_changed(id: Variant) -> void:
 	refresh_channels()
 
 func party_changed() -> void:
-	if not RiftRelay.party_messages.is_empty():
+	if RiftRelay.party_messages.is_empty():
+		previous_party = {}
+		peek_left = 0.0
+		if channel == null:
+			draft = ""
+			if is_open():
+				composer.clear()
+	else:
 		var line: Dictionary = RiftRelay.party_messages.back()
 		if not is_same(line, previous_party):
 			previous_party = line
@@ -226,6 +238,9 @@ func send_message() -> void:
 			channel = null
 			body = remainder
 		elif command in ["/r", "/reply"] and recent_sender != null:
+			if not can_send(recent_sender):
+				show_status("That player is no longer online.")
+				return
 			channel = recent_sender
 			body = remainder
 		elif command in ["/w", "/whisper"]:
@@ -236,15 +251,15 @@ func send_message() -> void:
 					if target.is_empty() or name.length() > String(target.name).length():
 						target = candidate
 			if target.is_empty():
-				show_status("Use /w followed by a friend's name and a message.")
+				show_status("Use /w followed by an online friend's name and a message.")
 				return
 			channel = target.chat
 			body = remainder.substr(String(target.name).length()).strip_edges()
 		else:
 			show_status("Use /p for party, /w name for whispers, or /r to reply.")
 			return
-		refresh_channels()
 		if body.is_empty():
+			refresh_channels()
 			composer.clear()
 			return
 	if not (RiftRelay.send_party_message(body) if channel == null else RiftSocial.send_whisper(channel, body)):

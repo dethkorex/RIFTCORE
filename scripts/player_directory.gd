@@ -2,6 +2,7 @@ extends Node
 
 signal changed
 signal friend_request_received(username: String)
+signal presence_published
 
 const CloudProgress := preload("res://scripts/cloud_progress.gd")
 const Codes := preload("res://addons/GD-Sync/Scripts/Enums/Enums.gd")
@@ -32,6 +33,8 @@ var incoming_names: Array[String] = []
 var directory_index_ready := false
 var last_connection := false
 var presence_elapsed := 0.0
+var publishing_presence := false
+var published_room := ""
 var refreshing := false
 var retry_at := 0
 
@@ -224,6 +227,8 @@ func sign_out() -> void:
 	busy = true
 	if not lobby.connected_room.is_empty():
 		lobby.leave()
+	await whispers.shutdown()
+	await unpublish_presence()
 	await lobby.relay.account_logout()
 	username = ""
 	friends.clear()
@@ -289,7 +294,7 @@ func change_password(email: String, old_password: String, new_password: String) 
 	return response_message("Could not update your password", code)
 
 func _process(delta: float) -> void:
-	if username.is_empty() or busy:
+	if username.is_empty() or busy or lobby.quitting:
 		return
 	var connected := online()
 	if last_connection != connected:
@@ -301,13 +306,34 @@ func _process(delta: float) -> void:
 			lobby.ensure_relay()
 		return
 	presence_elapsed += delta
-	if presence_elapsed >= PRESENCE_INTERVAL:
-		presence_elapsed = 0.0
-		lobby.relay.account_document_set(PRESENCE_PATH, {"seen": int(Time.get_unix_time_from_system())}, true)
+	var open_room: String = lobby.joinable_room()
+	if not publishing_presence and (presence_elapsed >= PRESENCE_INTERVAL or published_room != open_room):
+		publish_presence(open_room)
 	refresh_elapsed += delta
 	if refresh_elapsed >= 8.0 and not refreshing:
 		refresh_elapsed = 0.0
 		poll()
+
+func publish_presence(open_room: String) -> void:
+	publishing_presence = true
+	presence_elapsed = 0.0
+	# GD-Sync supplies the actual room name through the accepted friend relationship.
+	# A public heartbeat only confirms which room is open for joining.
+	var proof := "" if open_room.is_empty() else open_room.sha256_text()
+	var result: int = await lobby.relay.account_document_set(PRESENCE_PATH, {"seen": int(Time.get_unix_time_from_system()), "room_proof": proof}, true)
+	published_room = open_room
+	if result != 0:
+		# Avoid retrying every frame when the service refuses a presence update.
+		presence_elapsed = PRESENCE_INTERVAL - 5.0
+	publishing_presence = false
+	presence_published.emit()
+
+func unpublish_presence() -> void:
+	if publishing_presence:
+		await presence_published
+	if online():
+		await lobby.relay.account_document_set(PRESENCE_PATH, {"seen": 0, "room_proof": ""}, true)
+	published_room = ""
 
 func poll() -> void:
 	refreshing = true
@@ -356,18 +382,22 @@ func refresh_friends() -> void:
 	# Refresh a few accepted contacts per pass to stay within cloud request limits.
 	var now := Time.get_unix_time_from_system()
 	var checked := 0
-	for friend in updated:
+	var due := updated.duplicate()
+	due.sort_custom(func(a, b): return float(presence.get(a.Username, {}).get("checked", 0.0)) < float(presence.get(b.Username, {}).get("checked", 0.0)))
+	for friend in due:
 		if checked >= 4 or not online():
 			break
 		var id: String = friend.Username
-		if int(friend.get("FriendStatus", 0)) == Codes.FRIEND_STATUS.FRIEND and now - float(presence.get(id, {}).get("checked", 0.0)) >= 45.0:
+		if int(friend.get("FriendStatus", 0)) == Codes.FRIEND_STATUS.FRIEND and now - float(presence.get(id, {}).get("checked", 0.0)) >= 8.0:
 			checked += 1
 			var heartbeat: Dictionary = await lobby.relay.account_get_external_document(id, PRESENCE_PATH)
 			var seen := float(presence.get(id, {}).get("seen", 0.0))
+			var room_proof := String(presence.get(id, {}).get("room_proof", ""))
 			if int(heartbeat.get("Code", 1)) in [0, Codes.ACCOUNT_GET_DOCUMENT_RESPONSE_CODE.DOESNT_EXIST]:
 				var value: Variant = heartbeat.get("Result", {})
 				seen = float(value.get("seen", 0.0)) if value is Dictionary else 0.0
-			presence[id] = {"checked": now, "seen": seen}
+				room_proof = String(value.get("room_proof", "")) if value is Dictionary else ""
+			presence[id] = {"checked": now, "seen": seen, "room_proof": room_proof}
 	if online():
 		friends = updated
 		var requests: Array[String] = []
@@ -380,7 +410,11 @@ func refresh_friends() -> void:
 		incoming_names = requests
 		var snapshot := []
 		for friend in friends:
-			snapshot.append([friend.Username, friend.get("FriendStatus", 0), is_friend_online(friend)])
+			var present := is_friend_online(friend)
+			snapshot.append([friend.Username, friend.get("FriendStatus", 0), present, friend_room_code(friend)])
+		for id in RiftSocial.whispers.keys():
+			if id is String and id.begins_with("account:") and not whispers.can_send(id.trim_prefix("account:")):
+				RiftSocial.clear_whisper(id)
 		for id in presence.keys():
 			if not friends.any(func(friend): return friend.Username == id):
 				presence.erase(id)
@@ -391,14 +425,52 @@ func refresh_friends() -> void:
 func is_friend_online(friend: Dictionary) -> bool:
 	if not online() or int(friend.get("FriendStatus", 0)) != Codes.FRIEND_STATUS.FRIEND:
 		return false
-	var current_lobby: Variant = friend.get("Lobby", {})
-	if current_lobby is Dictionary and String(current_lobby.get("Name", "")).begins_with(lobby.ROOM_PREFIX):
+	if friend.get("Online") is bool:
+		return friend.Online
+	if String(friend_lobby(friend).get("Name", "")).begins_with(lobby.ROOM_PREFIX):
 		return true
-	if friend.get("Online") is bool and friend.Online:
-		return true
-	var seen := float(presence.get(friend.Username, {}).get("seen", 0.0))
+	return fresh_presence(presence.get(friend.get("Username", ""), {}))
+
+func fresh_presence(record: Dictionary) -> bool:
+	var seen := float(record.get("seen", 0.0))
 	var age := Time.get_unix_time_from_system() - seen
 	return age >= -15.0 and age < PRESENCE_TTL
+
+func friend_lobby(friend: Dictionary) -> Dictionary:
+	var info: Variant = friend.get("Lobby")
+	return info if info is Dictionary else {}
+
+func friend_room_code(friend: Dictionary) -> String:
+	return room_code_from_friend(friend, presence.get(friend.get("Username", ""), {}))
+
+func room_code_from_friend(friend: Dictionary, record: Dictionary) -> String:
+	if not online() or int(friend.get("FriendStatus", 0)) != Codes.FRIEND_STATUS.FRIEND or friend.get("Online", true) == false:
+		return ""
+	var room := friend_lobby(friend)
+	var name := String(room.get("Name", ""))
+	if not name.begins_with(lobby.ROOM_PREFIX) or room.get("HasPassword", true) != false or room.get("Open", true) == false:
+		return ""
+	var limit := int(room.get("PlayerLimit", lobby.MAX_PLAYERS))
+	if limit > 0 and int(room.get("PlayerCount", 0)) >= limit:
+		return ""
+	var code: String = name.trim_prefix(lobby.ROOM_PREFIX)
+	if not lobby.valid_code(code):
+		return ""
+	if room.get("Open", false) == true or (fresh_presence(record) and record.get("room_proof") == code.sha256_text()):
+		return code
+	return ""
+
+func lookup_open_room(name: String) -> String:
+	var reply: Dictionary = await lookup(name)
+	var friend: Variant = reply.get("Result", {})
+	if reply.get("Code", 1) != 0 or not friend is Dictionary:
+		return ""
+	var current := room_code_from_friend(friend, {})
+	if not current.is_empty() or friend_lobby(friend).is_empty() or not online():
+		return current
+	var heartbeat: Dictionary = await lobby.relay.account_get_external_document(name, PRESENCE_PATH)
+	var record: Variant = heartbeat.get("Result", {})
+	return room_code_from_friend(friend, record) if heartbeat.get("Code", 1) == 0 and record is Dictionary else ""
 
 func refresh_invites() -> void:
 	var result: Dictionary = await lobby.relay.account_get_lobby_invitations()

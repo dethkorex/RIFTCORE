@@ -22,6 +22,8 @@ const CodeLength := 10
 const ROOM_PREFIX := "riftcore-coop-v15-"
 const Difficulty := preload("res://scripts/mission_difficulty.gd")
 const MAX_PLAYERS := 4
+const PARTY_CHAT_INTERVAL := 150
+const PARTY_CHAT_BURST := 4.0
 const RELAY_UNAVAILABLE := "Online rooms are unavailable. Solo play is available."
 
 var status := "Create a room or enter a friend’s room code."
@@ -32,14 +34,15 @@ var room_size := 0
 var available := false
 var pending_invite := 0
 var directory_invite := ""
+var checking_friend_room := false
+var quitting := false
 var relay_starting := false
 var relay_ready := false
 var copy_on_join := false
 var party_operators: Dictionary[int, String] = {}
 var last_party_whisper: Dictionary[int, int] = {}
 var party_messages: Array[Dictionary] = []
-var last_party_chat: Dictionary[int, int] = {}
-var next_party_message_at := 0
+var party_chat_allowance: Dictionary[int, Vector2] = {}
 var mission_active := false
 var mission_roster: Array = []
 var mission_mode := 0
@@ -116,10 +119,20 @@ func ensure_relay() -> void:
 		relay.start_multiplayer()
 
 func quit_game() -> void:
+	if quitting:
+		return
+	quitting = true
 	if is_instance_valid(relay) and relay.account_is_logged_in():
+		# A slow service must not make the Quit button wait indefinitely.
+		get_tree().create_timer(2.0, true, false, true).timeout.connect(get_tree().quit)
+		directory.whispers.shutdown()
+		directory.unpublish_presence()
 		if directory.online():
 			await directory.progress.sync()
-		relay.quit()
+		if is_instance_valid(relay):
+			relay.quit()
+		else:
+			get_tree().quit()
 	else:
 		get_tree().quit()
 
@@ -183,6 +196,27 @@ func join_room(entered_code: String) -> void:
 		_update("Enter the ten-character room code.")
 		return
 	_open("join", code)
+
+func joinable_room() -> String:
+	return connected_room if pending.is_empty() and not mission_active and room_size < MAX_PLAYERS else ""
+
+func join_directory_friend(name: String) -> void:
+	if checking_friend_room or not can_receive_invite() or not directory.online():
+		return
+	checking_friend_room = true
+	_update("Checking %s’s party…" % name)
+	var code: String = await directory.lookup_open_room(name)
+	if code.is_empty() and can_receive_invite() and directory.online():
+		await get_tree().create_timer(0.5).timeout
+		if can_receive_invite() and directory.online():
+			code = await directory.lookup_open_room(name)
+	checking_friend_room = false
+	if not can_receive_invite():
+		return
+	if code.is_empty():
+		_update("%s’s party is no longer open." % name)
+		return
+	join_room(code)
 
 func listen_for_steam_invites() -> void:
 	if RiftSocial.ready_to_query and available:
@@ -392,10 +426,8 @@ func _receive_party_whisper(body: String) -> void:
 
 func send_party_message(raw: String) -> bool:
 	var body := RiftSocial.clean_whisper(raw)
-	var now := Time.get_ticks_msec()
-	if connected_room.is_empty() or room_size < 2 or not is_instance_valid(relay) or body.is_empty() or now < next_party_message_at:
+	if connected_room.is_empty() or room_size < 2 or not is_instance_valid(relay) or body.is_empty() or not allow_party_message(relay.get_client_id()):
 		return false
-	next_party_message_at = now + 450
 	relay.call_func(_receive_party_message, body)
 	append_party_message(local_name, body, true)
 	return true
@@ -404,15 +436,20 @@ func _receive_party_message(raw: String) -> void:
 	var sender: int = relay.get_sender_id()
 	if connected_room.is_empty() or sender == relay.get_client_id() or not relay.lobby_get_all_clients().has(sender) or raw.length() > RiftSocial.WHISPER_LIMIT:
 		return
-	var now := Time.get_ticks_msec()
-	if now - last_party_chat.get(sender, -1000) < 270:
-		return
 	var body := RiftSocial.clean_whisper(raw)
-	if body.is_empty():
+	if body.is_empty() or not allow_party_message(sender):
 		return
-	last_party_chat[sender] = now
 	var alias := Profile.clean_operator_name(str(relay.player_get_data(sender, "operator_name", "RX-07")))
 	append_party_message(alias, body, false)
+
+func allow_party_message(sender: int) -> bool:
+	var now := Time.get_ticks_msec()
+	var allowance := party_chat_allowance.get(sender, Vector2(now, PARTY_CHAT_BURST)) as Vector2
+	var available_messages := minf(PARTY_CHAT_BURST, allowance.y + (now - allowance.x) / PARTY_CHAT_INTERVAL)
+	if available_messages < 1.0:
+		return false
+	party_chat_allowance[sender] = Vector2(now, available_messages - 1.0)
+	return true
 
 func append_party_message(alias: String, body: String, outgoing: bool) -> void:
 	party_messages.append({"name": alias, "body": body, "outgoing": outgoing})
@@ -535,9 +572,12 @@ func _finish_return() -> void:
 func _peer_left(client_id: int) -> void:
 	voice.remove_speaker(client_id)
 	station_positions.erase(client_id)
+	var operator := party_operators.get(client_id, "") as String
 	party_operators.erase(client_id)
+	if not operator.is_empty():
+		RiftSocial.clear_whisper("rift:" + operator)
 	last_party_whisper.erase(client_id)
-	last_party_chat.erase(client_id)
+	party_chat_allowance.erase(client_id)
 	if relay.is_host() and not mission_active:
 		for key in blueprint_drops.keys():
 			if blueprint_drops[key].owner == client_id:
@@ -570,8 +610,8 @@ func leave(message := "Create a room or enter a friend’s room code.") -> void:
 	copy_on_join = false
 	party_operators.clear()
 	last_party_whisper.clear()
-	last_party_chat.clear()
-	next_party_message_at = 0
+	party_chat_allowance.clear()
+	RiftSocial.clear_whispers("rift:")
 	party_messages.clear()
 	party_chat_changed.emit()
 	room_code = ""

@@ -133,7 +133,8 @@ func _process(_delta: float) -> void:
 					receive_whisper(sender, message_text)
 
 func can_whisper(id: int) -> bool:
-	return id >= STEAM_MIN and ready_to_query and steam.loggedOn() and steam.getFriendRelationship(id) == 3
+	return id >= STEAM_MIN and ready_to_query and steam.loggedOn() and steam.getFriendRelationship(id) == 3 \
+		and int(steam.getFriendPersonaState(id)) in [1, 2, 3, 4, 5, 6]
 
 func accept_whisper_session(id: int) -> void:
 	if can_whisper(id):
@@ -182,6 +183,16 @@ func add_whisper(id: Variant, body: String, outgoing: bool) -> void:
 	if conversation.size() > 50:
 		conversation.pop_front()
 	whispers_changed.emit(id)
+
+func clear_whisper(id: Variant) -> void:
+	unread_whispers.erase(id)
+	if whispers.erase(id):
+		whispers_changed.emit(id)
+
+func clear_whispers(prefix: String) -> void:
+	for id in whispers.keys():
+		if id is String and id.begins_with(prefix):
+			clear_whisper(id)
 
 func contacts() -> Array[Dictionary]:
 	var ids := followed.duplicate()

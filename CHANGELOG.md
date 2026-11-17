@@ -1,8 +1,9 @@
-# RIFTCORE Alpha 6.3.12
+# RIFTCORE Alpha 6.3.13
 
-- Signing in opens Operator Selection. If your credentials are incorrect, the form stays open so you can try again.
-- The Foundry loads when you deploy. Sectors render nearby shadows and do less work in the background during combat.
-- Co-op sends fewer updates while players are idle, avoids duplicate shots on guest screens, and loads Act II in the background.
+- Whispers are available to online friends. Conversations start empty when you reopen RIFTCORE, and signing in clears old cloud chat history.
+- Party chat accepts quick follow-up messages and starts empty after a restart.
+- Select a friend in Social and choose Join Game when their lobby is open and has room.
+- Quit Game closes on one click, even when the cloud service is slow.
 - This update keeps your account and saves.
 
 Update through Launcher 0.2 or Settings → Update Game before joining a party.
