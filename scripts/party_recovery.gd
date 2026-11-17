@@ -5,6 +5,7 @@ signal resumed(roster: Array)
 
 const GRACE_MS := 90_000
 const RETRY_MS := 2_000
+const DEPLOY_TIMEOUT_MS := 15_000
 
 var lobby
 var room := ""
@@ -21,6 +22,9 @@ var deadline := 0
 var retry_at := 0
 var retrying := false
 var crypto := Crypto.new()
+var deploy_offers: Dictionary[int, Array] = {}
+var deploy_deadline := 0
+var next_deploy_retry := 0
 
 func new_mission(roster: Array, sector: int, mode: int) -> bool:
 	var key := crypto.generate_rsa(2048)
@@ -43,8 +47,26 @@ func new_mission(roster: Array, sector: int, mode: int) -> bool:
 	var public_key := Marshalls.utf8_to_base64(key.save_to_string(true))
 	for index in range(1, roster.size()):
 		var credentials := {"id": id, "password": join_password, "ticket": tickets[index], "hashes": hashes, "founder": public_key}
-		relay.call_func_on(roster[index], lobby._receive_deploy, sector, roster, mode, credentials)
+		deploy_offers[roster[index]] = [sector, candidate, mode, credentials]
+	deploy_deadline = Time.get_ticks_msec() + DEPLOY_TIMEOUT_MS
+	send_deploy_offers()
 	return true
+
+func send_deploy_offers() -> void:
+	var relay = lobby.relay
+	# A freshly rejoined client may still be rebuilding the relay's path cache.
+	# Use complete paths for this infrequent handshake.
+	for client in deploy_offers:
+		relay._request_processor.create_function_call_request(lobby._receive_deploy, deploy_offers[client], client, true, -1, false)
+	next_deploy_retry = Time.get_ticks_msec() + RETRY_MS
+
+func confirm_deploy(id: String) -> void:
+	if slot == 0 and id == mission_id:
+		deploy_offers.erase(lobby.relay.get_sender_id())
+
+func acknowledge_deploy() -> void:
+	var relay = lobby.relay
+	relay._request_processor.create_function_call_request(confirm_deploy, [mission_id], relay.get_host(), true, -1, false)
 
 func accept_mission(roster: Array, credentials: Dictionary) -> bool:
 	var id := String(credentials.get("id", ""))
@@ -84,6 +106,7 @@ func expose() -> void:
 	relay.expose_func(check_roster)
 	relay.expose_func(acknowledge_roster)
 	relay.expose_func(restore_roster)
+	relay.expose_func(confirm_deploy)
 
 func active() -> bool:
 	return deadline != 0
@@ -115,9 +138,17 @@ func remaining_seconds() -> int:
 	return maxi(0, ceili(float(deadline - Time.get_ticks_msec()) / 1000.0))
 
 func _process(_delta: float) -> void:
-	if not active() or lobby.quitting:
+	if lobby.quitting:
 		return
 	var now := Time.get_ticks_msec()
+	if not active():
+		if not deploy_offers.is_empty() and lobby.mission_active and not lobby.connected_room.is_empty():
+			if now >= deploy_deadline:
+				lobby.return_to_station()
+				lobby._update("An operator missed deployment. Your party can deploy again.")
+			elif now >= next_deploy_retry:
+				send_deploy_offers()
+		return
 	if now >= deadline:
 		lobby.leave("Rejoin time expired. The party returned to the station.")
 		return
@@ -243,3 +274,6 @@ func clear() -> void:
 	deadline = 0
 	retrying = false
 	retry_at = 0
+	deploy_offers.clear()
+	deploy_deadline = 0
+	next_deploy_retry = 0

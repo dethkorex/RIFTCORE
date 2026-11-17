@@ -981,7 +981,7 @@ func _queue_client_request(request : Array, reliable : bool) -> void:
 	else:
 		requestsUDP.append(request)
 
-func create_function_call_request(function : Callable, parameters : Array, client_id : int, reliable : bool, permission_override : int = -1) -> void:
+func create_function_call_request(function : Callable, parameters : Array, client_id : int, reliable : bool, permission_override : int = -1, use_cache := true) -> void:
 	var object : Object = function.get_object()
 	var function_name : String = function.get_method()
 	var request : Array = []
@@ -1009,7 +1009,7 @@ func create_function_call_request(function : Callable, parameters : Array, clien
 	
 	var encoded_target : int = encode_target_client(client_id, permission)
 	
-	if !connection_controller.is_local() and session_controller.nodepath_is_cached(id) and session_controller.name_is_cached(function_name):
+	if use_cache and !connection_controller.is_local() and session_controller.nodepath_is_cached(id) and session_controller.name_is_cached(function_name):
 		request = _embed_caller_in_sync_request([
 			ENUMS.REQUEST_TYPE.CALL_FUNCTION_CACHED,
 			session_controller.get_nodepath_index(id),
@@ -1024,8 +1024,9 @@ func create_function_call_request(function : Callable, parameters : Array, clien
 			encoded_target
 		], parameters if parameters.size() > 0 else null)
 		
-		create_nodepath_cache(id, function_name)
-		create_name_cache(id, function_name)
+		if use_cache:
+			create_nodepath_cache(id, function_name)
+			create_name_cache(id, function_name)
 	
 	_queue_client_request(request, reliable)
 

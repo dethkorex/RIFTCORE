@@ -607,7 +607,11 @@ func deploy(sector := 1, mode := 0) -> void:
 	deploy_requested.emit(true, sector)
 
 func _receive_deploy(sector: int, roster: Array, mode: int, credentials: Dictionary) -> void:
-	if mission_active or connected_room.is_empty() or sector < 1 or sector > 10 or relay.get_sender_id() != relay.get_host():
+	if connected_room.is_empty() or sector < 1 or sector > 10 or relay.get_sender_id() != relay.get_host():
+		return
+	if mission_active:
+		if credentials.get("id") == recovery.mission_id:
+			recovery.acknowledge_deploy()
 		return
 	if not can_play_difficulty(sector, mode):
 		return
@@ -624,6 +628,7 @@ func _receive_deploy(sector: int, roster: Array, mode: int, credentials: Diction
 	mission_mode = mode
 	_clear_blueprint_drops()
 	mission_active = true
+	recovery.acknowledge_deploy()
 	deploy_requested.emit(false, sector)
 
 func send_station_position(x: float, facing: float, animation: String) -> void:
