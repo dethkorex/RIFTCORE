@@ -1117,7 +1117,7 @@ func lobby_leave(update_friend_status := true) -> void:
 		_request_processor.create_leave_lobby_request()
 	_session_controller.lobby_left()
 	if update_friend_status:
-		_data_controller.set_friend_status()
+		_data_controller.schedule_friend_status()
 	_node_tracker.lobby_left()
 	_interest_manager.clear()
 	_steam.leave_steam_lobby()

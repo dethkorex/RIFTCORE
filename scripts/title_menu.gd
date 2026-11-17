@@ -30,6 +30,7 @@ var relay_status: Label
 var relay_code: LineEdit
 var relay_host: Button
 var relay_join: Button
+var relay_rejoin: Button
 var relay_paste: Button
 var relay_deploy: Button
 var relay_copy: Button
@@ -951,12 +952,15 @@ func build_online_room(columns: HBoxContainer) -> void:
 		relay_code.caret_column = relay_code.text.length()
 	)
 	relay_join = UI.button(join_row, "Join Room", func(): RiftRelay.join_room(relay_code.text))
+	relay_rejoin = UI.button(form, "Rejoin Party", RiftRelay.rejoin_party, true)
 	relay_status = UI.label(form, "", 18, UI.CYAN)
 	relay_deploy = UI.button(form, "Choose Co-op Sector", show_page.bind("Co-op Sectors"), true)
 	relay_copy = UI.button(form, "Copy Room Code", func(): DisplayServer.clipboard_set(RiftRelay.connected_room))
 	relay_leave = UI.button(form, "Leave Room", func(): RiftRelay.leave())
 	refresh_online_room()
-	if not relay_host.disabled:
+	if relay_rejoin.visible:
+		relay_rejoin.grab_focus()
+	elif not relay_host.disabled:
 		relay_host.grab_focus()
 
 func refresh_online_room() -> void:
@@ -969,6 +973,7 @@ func refresh_online_room() -> void:
 	var requesting := not RiftRelay.pending.is_empty()
 	relay_host.disabled = not RiftRelay.available or joined or requesting
 	relay_join.disabled = relay_host.disabled
+	relay_rejoin.visible = RiftRelay.can_rejoin_party()
 	relay_paste.disabled = relay_join.disabled
 	relay_code.editable = not joined and not requesting
 	relay_deploy.visible = RiftRelay.can_deploy()

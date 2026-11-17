@@ -110,6 +110,7 @@ var chat_open := false
 var security_defeated := 0
 var lives_lost := 0
 var extracted_results: Dictionary = {}
+var party_results: Dictionary[int, Array] = {}
 var profile_xp_progress: Dictionary = {}
 var boss_cache: BossCache
 var cache_opened := false
@@ -145,6 +146,7 @@ var enemy_rotation := PackedVector2Array()
 
 func _ready() -> void:
 	peer = RiftRelay.relay
+	relay_owner.recovery.resumed.connect(rebind_roster)
 	if roster.is_empty():
 		roster = peer.lobby_get_all_clients().duplicate()
 		roster.erase(peer.get_host())
@@ -187,6 +189,35 @@ func _ready() -> void:
 	if not host:
 		peer.call_func_on(peer.get_host(), receive_loadout, local_profile.gear, local_profile.owned, local_profile.quick_slots,
 			starting_xp, starting_weapons, starting_suit)
+
+func rebind_roster(rejoined: Array) -> void:
+	var prior := roster
+	roster = rejoined.duplicate()
+	if host:
+		var remapped := {}
+		for index in range(1, roster.size()):
+			var remote: Dictionary = remote_players[prior[index]]
+			remote.timeout = 0.0
+			operators[index].remote_axis = Vector2.ZERO
+			operators[index].remote_held.clear()
+			operators[index].remote_pressed.clear()
+			operators[index].remote_released.clear()
+			remapped[roster[index]] = remote
+			mark_position_reset(operators[index])
+		remote_players = remapped
+		if act == 2:
+			peer.call_func(receive_act, act, team_xp, active_weapon_ids)
+		if cache_opened:
+			peer.call_func(receive_cache_open)
+		for index in party_results:
+			send_party_result(index)
+	for action in INPUTS + [&"move_left", &"move_right", &"climb_up"]:
+		Input.action_release(action)
+	pressed.clear()
+	released.clear()
+	input_positions.clear()
+	correction = Vector3.ZERO
+	resume_controls_pending = true
 
 func receive_loadout(gear: Dictionary, upgrades: Dictionary, quick: Array, xp: int, weapons: Array, suit: String) -> void:
 	var sender: int = peer.get_sender_id()
@@ -521,7 +552,7 @@ func respawn_operator(operator: RiftPlayer) -> void:
 			resetting_arena = true
 			reset_coop_arena.call_deferred()
 		return
-	await get_tree().create_timer(1.2).timeout
+	await get_tree().create_timer(1.2, false).timeout
 	if is_instance_valid(operator) and not changing_act and outcome.is_empty() and operator.has_meta("coop_down"):
 		restore_operator(operator, respawn_point())
 
@@ -609,7 +640,7 @@ func tick_reboot(delta: float) -> void:
 
 func reset_coop_arena() -> void:
 	RiftAudio.play_music(true, sector)
-	await get_tree().create_timer(1.2).timeout
+	await get_tree().create_timer(1.2, false).timeout
 	if not outcome.is_empty() or changing_act:
 		resetting_arena = false
 		return
@@ -864,7 +895,8 @@ func check_campaign_progress() -> void:
 	var remaining := operators.filter(func(operator): return operator.lives > 0)
 	if remaining.is_empty():
 		for index in range(1, roster.size()):
-			peer.call_func_on(roster[index], receive_outcome, false, 0, 0, recovered_blueprint_ids(index), sector_seconds, {"operator_wiped": true, "party_wiped": true})
+			party_results[index] = [false, 0, 0, recovered_blueprint_ids(index), sector_seconds, {"operator_wiped": true, "party_wiped": true}]
+			send_party_result(index)
 		finish_mission(false, 0, 0, recovered_blueprint_ids(local_index), true, true)
 		return
 	var far_edge := exit_marker.global_position.x
@@ -898,7 +930,8 @@ func check_campaign_progress() -> void:
 						var ledger := personal_rewards[index]
 						var wiped := operators[index].lives <= 0
 						var results := {"operator_wiped": true} if wiped else challenge_results(index)
-						peer.call_func_on(roster[index], receive_outcome, not wiped, operators[index].experience, ledger.bolts, recovered_blueprint_ids(index), sector_seconds, results)
+						party_results[index] = [not wiped, operators[index].experience, ledger.bolts, recovered_blueprint_ids(index), sector_seconds, results]
+						send_party_result(index)
 				var wiped := operators[local_index].lives <= 0
 				extracted_results = challenge_results(local_index) if not wiped else {}
 				var ledger := personal_rewards[local_index]
@@ -944,7 +977,7 @@ func change_act(next: int) -> void:
 	loading.show_loading(Catalog.info(sector).title)
 	for operator in operators:
 		operator.set_physics_process(false)
-	await get_tree().create_timer(0.5).timeout
+	await get_tree().create_timer(0.5, false).timeout
 	var path := stage_path(next)
 	var packed: PackedScene
 	if ResourceLoader.load_threaded_request(path, "PackedScene") == OK:
@@ -966,7 +999,7 @@ func change_act(next: int) -> void:
 	act = next
 	load_stage(packed)
 	loading.begin()
-	await get_tree().create_timer(0.5).timeout
+	await get_tree().create_timer(0.5, false).timeout
 	await loading.fade_out()
 	changing_act = false
 	if sector == 1 and act == 2 and operators[local_index].lives > 0:
@@ -1735,8 +1768,12 @@ func receive_deflection(remote_act: int, shot_id: int) -> void:
 			shot.queue_free()
 			return
 
+func send_party_result(index: int) -> void:
+	var result := party_results[index]
+	peer.call_func_on(roster[index], receive_outcome, result[0], result[1], result[2], result[3], result[4], result[5])
+
 func receive_outcome(success: bool, xp: int, bolts: int, blueprints: Array, duration: float, results := {}) -> void:
-	if not host and peer.get_sender_id() == peer.get_host():
+	if outcome.is_empty() and not host and peer.get_sender_id() == peer.get_host():
 		extracted_results = results
 		sector_seconds = duration
 		finish_mission(success, xp, bolts, blueprints, results.get("operator_wiped", false), results.get("party_wiped", false))

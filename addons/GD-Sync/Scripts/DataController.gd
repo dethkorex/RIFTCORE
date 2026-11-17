@@ -41,6 +41,7 @@ var quit_finished := false
 var document_write_busy := false
 
 var status_ping_timer : float = 0.0
+var status_update_running := false
 
 func _ready() -> void:
 	name = "DataController"
@@ -55,12 +56,22 @@ func _ready() -> void:
 	load_config()
 
 func _process(delta: float) -> void:
-	if logged_in and not quitting:
+	if logged_in and not quitting and GDSync.is_active():
 		status_ping_timer -= delta
 		
-		if status_ping_timer <= 0.0:
-			status_ping_timer = 300
-			set_friend_status()
+		if status_ping_timer <= 0.0 and not status_update_running:
+			refresh_friend_status()
+
+func schedule_friend_status() -> void:
+	status_ping_timer = 0.0
+
+func refresh_friend_status() -> void:
+	status_update_running = true
+	status_ping_timer = 300.0
+	var result := await set_friend_status()
+	if result != 0:
+		status_ping_timer = minf(status_ping_timer, 5.0)
+	status_update_running = false
 
 func _notification(what : int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:
@@ -92,6 +103,7 @@ func _finish_quit() -> void:
 
 func log_in(username : String = "") -> void:
 	logged_in = true
+	schedule_friend_status()
 	safe_quit = false
 	get_tree().set_auto_accept_quit(false)
 	GDSync.account_logged_in.emit.call_deferred(username)

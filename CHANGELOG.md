@@ -1,9 +1,8 @@
-# RIFTCORE Alpha 6.3.14
+# RIFTCORE Alpha 6.3.15
 
-- Windows and Linux players can send several whispers in a row. Whispers retry temporary service failures and conversations still clear when you close the game.
-- Fixed a Linux relay shutdown warning when quitting after signing in.
-- Join Game can use a recently advertised friend lobby when the directory is temporarily busy.
-- The pause menu restores controller focus after switching back to the game window.
+- Friends can find open parties in Social even when the first lobby status update fails.
+- Rejoin Party brings you back after a connection drop at the station or during a mission.
+- During a mission, the party has 90 seconds to reconnect while the game stays open. The mission pauses and keeps your progress, lives, and loot.
 - This update keeps your account and saves.
 
 Update through Launcher 0.2 or Settings → Update Game before joining a party.

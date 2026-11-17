@@ -625,7 +625,6 @@ func process_message(request : Array) -> void:
 		ENUMS.MESSAGE_TYPE.LOBBY_CREATED:
 			if request.size() <= ENUMS.MESSAGE_DATA.VALUE: return
 			session_controller.lobby_created()
-			data_controller.set_friend_status()
 			GDSync.lobby_created.emit(request[ENUMS.MESSAGE_DATA.VALUE])
 		ENUMS.MESSAGE_TYPE.LOBBY_CREATION_FAILED:
 			if request.size() <= ENUMS.MESSAGE_DATA.ERROR: return
@@ -634,7 +633,6 @@ func process_message(request : Array) -> void:
 			if request.size() <= ENUMS.MESSAGE_DATA.VALUE: return
 			if connection_controller.is_local():
 				connection_controller.in_local_lobby = true
-			data_controller.set_friend_status()
 			_join_holding = true
 			server_switch_controller.lobby_joined()
 			matchmaking_controller.lobby_joined()
@@ -657,6 +655,7 @@ func process_message(request : Array) -> void:
 		ENUMS.MESSAGE_TYPE.LOBBY_DATA_RECEIVED:
 			if request.size() <= ENUMS.MESSAGE_DATA.VALUE: return
 			session_controller.override_lobby_data(request[ENUMS.MESSAGE_DATA.VALUE])
+			data_controller.schedule_friend_status()
 			GDSync.lobby_joined.emit(request[ENUMS.MESSAGE_DATA.VALUE]["Name"])
 			await get_tree().process_frame
 			_join_holding = false

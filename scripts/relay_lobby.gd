@@ -8,6 +8,7 @@ signal blueprint_received(id: String)
 signal guest_joined
 signal mission_returned
 signal mission_disconnected(message: String)
+signal party_rejoin_offered
 signal invite_received(display_name: String, code: String)
 signal party_chat_changed
 
@@ -16,10 +17,11 @@ const Keys := preload("res://addons/GD-Sync/Scripts/KeyStore.gd")
 const Client := preload("res://addons/GD-Sync/MultiplayerClient.gd")
 const PlayerDirectory := preload("res://scripts/player_directory.gd")
 const PartyVoice := preload("res://scripts/party_voice.gd")
+const PartyRecovery := preload("res://scripts/party_recovery.gd")
 const RelayEnums := preload("res://addons/GD-Sync/Scripts/Enums/Enums.gd")
 const Codes := "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 const CodeLength := 10
-const ROOM_PREFIX := "riftcore-coop-v15-"
+const ROOM_PREFIX := "riftcore-coop-v16-"
 const Difficulty := preload("res://scripts/mission_difficulty.gd")
 const MAX_PLAYERS := 4
 const PARTY_CHAT_INTERVAL := 150
@@ -46,6 +48,7 @@ var party_chat_allowance: Dictionary[int, Vector2] = {}
 var mission_active := false
 var mission_roster: Array = []
 var mission_mode := 0
+var previous_room := ""
 var hard_sectors: Array = []
 var nightmare_unlocked := false
 var steam_invite_lobbies: Dictionary = {}
@@ -63,8 +66,15 @@ var relay: Node
 var request_timeout: Timer
 var voice: PartyVoice
 var directory: PlayerDirectory
+var recovery: PartyRecovery
 
 func _ready() -> void:
+	process_mode = PROCESS_MODE_ALWAYS
+	recovery = PartyRecovery.new()
+	recovery.name = "PartyRecovery"
+	recovery.lobby = self
+	add_child(recovery)
+	recovery.resumed.connect(func(roster: Array): mission_roster = roster.duplicate())
 	voice = PartyVoice.new()
 	voice.name = "PartyVoice"
 	voice.lobby = self
@@ -78,7 +88,12 @@ func _ready() -> void:
 	request_timeout = Timer.new()
 	request_timeout.one_shot = true
 	request_timeout.wait_time = 30.0
-	request_timeout.timeout.connect(func(): leave("The connection timed out. Try again."))
+	request_timeout.timeout.connect(func():
+		if is_rejoining_mission():
+			rejoin_attempt_failed("The relay did not answer. Retrying…")
+		else:
+			leave("The connection timed out. Try again.", false)
+	)
 	add_child(request_timeout)
 
 func _initialize_client() -> void:
@@ -198,6 +213,18 @@ func join_room(entered_code: String) -> void:
 		return
 	_open("join", code)
 
+func can_rejoin_party() -> bool:
+	return available and not previous_room.is_empty() and can_receive_invite()
+
+func rejoin_party() -> void:
+	if recovery.active():
+		recovery.start_rejoin()
+	elif can_rejoin_party():
+		_open("rejoin_party", previous_room)
+
+func is_rejoining_mission() -> bool:
+	return pending in ["rejoin_mission", "recreate_mission"]
+
 func joinable_room() -> String:
 	return connected_room if pending.is_empty() and not mission_active and room_size < MAX_PLAYERS else ""
 
@@ -306,7 +333,9 @@ func _open(operation: String, code: String) -> void:
 func _request_room() -> void:
 	if pending.is_empty():
 		return
-	if not relay.account_is_logged_in():
+	if relay.account_is_logged_in() and not directory.username.is_empty():
+		relay.player_set_username(directory.username)
+	elif not relay.account_is_logged_in():
 		relay.player_set_username("RX-%s" % Crypto.new().generate_random_bytes(6).hex_encode())
 	match pending:
 		"host":
@@ -315,10 +344,20 @@ func _request_room() -> void:
 		"join":
 			_update("Joining your friend’s room…")
 			relay.lobby_join(_room_name())
+		"rejoin_party":
+			_update("Rejoining your party…")
+			relay.lobby_join(_room_name())
+		"rejoin_mission":
+			_update("Rejoining your mission…")
+			relay.lobby_join(_room_name(), recovery.password)
+		"recreate_mission":
+			relay.lobby_create(_room_name(), recovery.password, false, MAX_PLAYERS)
 
 func _join_created_room(lobby_name: String) -> void:
 	if pending == "host" and lobby_name == _room_name():
 		relay.lobby_join(lobby_name)
+	elif pending == "recreate_mission" and lobby_name == _room_name():
+		relay.lobby_join(lobby_name, recovery.password)
 
 func _room_joined(lobby_name: String) -> void:
 	if pending.is_empty() or lobby_name != _room_name():
@@ -326,6 +365,8 @@ func _room_joined(lobby_name: String) -> void:
 	request_timeout.stop()
 	relay.expose_func(_receive_deploy, RelayEnums.EXPOSE_PERMISSION.HOST)
 	relay.expose_func(_receive_return, RelayEnums.EXPOSE_PERMISSION.HOST)
+	relay.expose_func(_receive_abandon)
+	recovery.expose()
 	relay.expose_func(_receive_partner_position)
 	relay.expose_func(_receive_sector_records)
 	relay.expose_func(_receive_party_whisper)
@@ -335,8 +376,10 @@ func _room_joined(lobby_name: String) -> void:
 	relay.expose_func(_request_blueprint_pickup)
 	relay.expose_func(_receive_blueprint_drop, RelayEnums.EXPOSE_PERMISSION.HOST)
 	relay.expose_func(_deliver_blueprint, RelayEnums.EXPOSE_PERMISSION.HOST)
-	var joined_as_guest := pending == "join"
+	var joined_as_guest := pending in ["join", "rejoin_party"]
+	var rejoining := is_rejoining_mission()
 	connected_room = room_code
+	previous_room = ""
 	pending = ""
 	voice.publish_preference()
 	relay.player_set_data("operator_name", local_name)
@@ -345,6 +388,10 @@ func _room_joined(lobby_name: String) -> void:
 	if joined_as_guest:
 		guest_joined.emit.call_deferred()
 	_players_changed(0)
+	if rejoining:
+		recovery.retry_at = 0
+		recovery.changed.emit()
+		return
 	if copy_on_join:
 		copy_on_join = false
 		copy_invite_code()
@@ -356,31 +403,68 @@ func _room_joined(lobby_name: String) -> void:
 func _room_failed(lobby_name: String, error: int) -> void:
 	if pending.is_empty() or lobby_name != _room_name():
 		return
+	if is_rejoining_mission():
+		if pending == "rejoin_mission" and recovery.slot == 0 and error == RelayEnums.LOBBY_JOIN_ERROR.LOBBY_DOES_NOT_EXIST:
+			pending = "recreate_mission"
+			_request_room()
+		else:
+			rejoin_attempt_failed("The mission room is still unavailable. Retrying…")
+		return
 	var message := "Could not create a room. Try again." if pending == "host" else "Could not join this room. Check the code and make sure both players are on the same game version."
-	leave("%s (GD Sync code %d)" % [message, error])
+	leave("%s (GD Sync code %d)" % [message, error], false)
 
 func _connection_failed(error: int) -> void:
 	relay_starting = false
 	relay_ready = false
 	if pending.is_empty():
 		return
+	if is_rejoining_mission():
+		rejoin_attempt_failed("Could not reach the relay. Retrying…")
+		return
 	if error == RelayEnums.CONNECTION_FAILED.INVALID_PUBLIC_KEY:
-		leave("GD Sync rejected the relay configuration. Check the RIFTCORE playtest keys.")
+		leave("GD Sync rejected the relay configuration. Check the RIFTCORE playtest keys.", false)
 	else:
-		leave("Could not reach the online relay. Try again.")
+		leave("Could not reach the online relay. Try again.", false)
+
+func rejoin_attempt_failed(message: String) -> void:
+	request_timeout.stop()
+	pending = ""
+	room_code = ""
+	relay._session_controller.lobby_left()
+	_update(message)
+	recovery.attempt_failed()
 
 func _disconnected() -> void:
 	relay_starting = false
 	relay_ready = false
 	if quitting:
 		return
+	if mission_active and not recovery.mission_id.is_empty():
+		pending = ""
+		connected_room = ""
+		room_code = ""
+		room_size = 0
+		voice.reset()
+		request_timeout.stop()
+		relay._session_controller.lobby_left()
+		relay._request_processor.clear_for_server_switch()
+		_update("Relay connection lost. Your mission is paused.")
+		recovery.transport_lost()
+		return
 	if not pending.is_empty() or not connected_room.is_empty():
-		leave("Lost the connection to the online relay.")
+		if not connected_room.is_empty():
+			previous_room = connected_room
+		relay._session_controller.lobby_left()
+		relay._request_processor.clear_for_server_switch()
+		leave("Lost the connection to the online relay.", false)
+		if can_rejoin_party():
+			party_rejoin_offered.emit()
 
 func _players_changed(_client_id: int) -> void:
 	if connected_room.is_empty():
 		return
 	room_size = relay.lobby_get_player_count()
+	relay._data_controller.schedule_friend_status()
 	_update("%d / %d players connected" % [room_size, MAX_PLAYERS])
 	if room_size >= 2 and not mission_active:
 		share_sector_records.call_deferred()
@@ -513,14 +597,16 @@ func deploy(sector := 1, mode := 0) -> void:
 	mission_roster.push_front(relay.get_client_id())
 	if mission_roster.size() < 2 or mission_roster.size() > MAX_PLAYERS:
 		return
+	if not recovery.new_mission(mission_roster, sector, mode):
+		mission_roster.clear()
+		_update("Could not set up mission recovery. Try deploying again.")
+		return
 	_clear_blueprint_drops()
 	mission_active = true
 	mission_mode = mode
-	relay.lobby_close()
-	relay.call_func(_receive_deploy, sector, mission_roster, mission_mode)
 	deploy_requested.emit(true, sector)
 
-func _receive_deploy(sector: int, roster: Array, mode: int) -> void:
+func _receive_deploy(sector: int, roster: Array, mode: int, credentials: Dictionary) -> void:
 	if mission_active or connected_room.is_empty() or sector < 1 or sector > 10 or relay.get_sender_id() != relay.get_host():
 		return
 	if not can_play_difficulty(sector, mode):
@@ -530,6 +616,10 @@ func _receive_deploy(sector: int, roster: Array, mode: int) -> void:
 	var members: Array = relay.lobby_get_all_clients()
 	if roster.any(func(id): return not id is int or roster.count(id) != 1 or not members.has(id)):
 		return
+	if not recovery.accept_mission(roster, credentials):
+		return
+	relay._session_controller.lobby_password = recovery.password
+	relay._data_controller.schedule_friend_status()
 	mission_roster = roster.duplicate()
 	mission_mode = mode
 	_clear_blueprint_drops()
@@ -557,8 +647,10 @@ func _receive_partner_position(x: float, facing: float, animation: String, displ
 		partner_moved.emit(sender, clampf(x, -19.15, 19.15), clampf(facing, -1.57, 1.57), animation, Profile.clean_operator_name(display_name))
 
 func return_to_station() -> void:
-	if mission_active and relay.is_host():
+	if mission_active and not recovery.active() and relay.is_host():
 		relay.call_func(_receive_return)
+		relay.lobby_change_password("")
+		relay._session_controller.lobby_password = ""
 		relay.lobby_open()
 		_finish_return()
 
@@ -569,6 +661,8 @@ func _receive_return() -> void:
 func _finish_return() -> void:
 	mission_active = false
 	mission_roster.clear()
+	recovery.clear()
+	recovery.changed.emit()
 	_players_changed(0)
 	mission_returned.emit()
 
@@ -586,22 +680,42 @@ func _peer_left(client_id: int) -> void:
 			if blueprint_drops[key].owner == client_id:
 				_publish_blueprint_drop(key, "", client_id, 0.0)
 	if mission_active and mission_roster.has(client_id):
-		mission_active = false
-		mission_roster.clear()
-		if relay.is_host():
-			relay.lobby_open()
-		mission_disconnected.emit("An operator disconnected. Your party is back at the station.")
+		recovery.begin()
 	_players_changed(client_id)
 
 func _host_changed(is_host: bool, _host_id: int) -> void:
-	if is_host and not mission_active and not connected_room.is_empty():
-		relay.lobby_open()
-		changed.emit()
+	if not is_host or connected_room.is_empty():
+		return
+	if mission_active:
+		if recovery.slot == 0:
+			return
+		recovery.begin()
+		# When the relay promotes a guest, keep the original room open to the reserved seats.
+		relay.lobby_change_password(recovery.password)
+	relay.lobby_open()
+	relay._data_controller.schedule_friend_status()
+	changed.emit()
 
-func leave(message := "Create a room or enter a friend’s room code.") -> void:
+func _receive_abandon() -> void:
+	if mission_active and mission_roster.has(relay.get_sender_id()):
+		if relay.is_host() and not connected_room.is_empty():
+			relay.lobby_change_password("")
+			relay._session_controller.lobby_password = ""
+			relay.lobby_open()
+		_finish_return()
+
+func leave(message := "Create a room or enter a friend’s room code.", deliberate := true) -> void:
 	voice.reset()
 	_clear_blueprint_drops()
 	var was_in_mission := mission_active
+	if deliberate:
+		previous_room = ""
+		if was_in_mission and not connected_room.is_empty() and relay.is_active():
+			relay.call_func(_receive_abandon)
+			if relay.is_host():
+				relay.lobby_change_password("")
+	recovery.clear()
+	recovery.changed.emit()
 	mission_active = false
 	mission_roster.clear()
 	var was_joined := not connected_room.is_empty()

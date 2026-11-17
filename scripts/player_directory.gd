@@ -307,7 +307,7 @@ func _process(delta: float) -> void:
 		return
 	presence_elapsed += delta
 	var open_room: String = lobby.joinable_room()
-	if not publishing_presence and (presence_elapsed >= PRESENCE_INTERVAL or published_room != open_room):
+	if not publishing_presence and presence_elapsed >= 0.0 and (presence_elapsed >= PRESENCE_INTERVAL or published_room != open_room):
 		publish_presence(open_room)
 	refresh_elapsed += delta
 	if refresh_elapsed >= 8.0 and not refreshing:
@@ -321,10 +321,10 @@ func publish_presence(open_room: String) -> void:
 	# A public heartbeat only confirms which room is open for joining.
 	var proof := "" if open_room.is_empty() else open_room.sha256_text()
 	var result: int = await lobby.relay.account_document_set(PRESENCE_PATH, {"seen": int(Time.get_unix_time_from_system()), "room_proof": proof}, true)
-	published_room = open_room
-	if result != 0:
-		# Avoid retrying every frame when the service refuses a presence update.
-		presence_elapsed = PRESENCE_INTERVAL - 5.0
+	if result == 0:
+		published_room = open_room
+	else:
+		presence_elapsed = -5.0
 	publishing_presence = false
 	presence_published.emit()
 
@@ -425,11 +425,13 @@ func refresh_friends() -> void:
 func is_friend_online(friend: Dictionary) -> bool:
 	if not online() or int(friend.get("FriendStatus", 0)) != Codes.FRIEND_STATUS.FRIEND:
 		return false
+	if friend.get("Online", false) or fresh_presence(presence.get(friend.get("Username", ""), {})):
+		return true
 	if friend.get("Online") is bool:
-		return friend.Online
+		return false
 	if String(friend_lobby(friend).get("Name", "")).begins_with(lobby.ROOM_PREFIX):
 		return true
-	return fresh_presence(presence.get(friend.get("Username", ""), {}))
+	return false
 
 func fresh_presence(record: Dictionary) -> bool:
 	var seen := float(record.get("seen", 0.0))
@@ -444,7 +446,7 @@ func friend_room_code(friend: Dictionary) -> String:
 	return room_code_from_friend(friend, presence.get(friend.get("Username", ""), {}))
 
 func room_code_from_friend(friend: Dictionary, record: Dictionary) -> String:
-	if not online() or int(friend.get("FriendStatus", 0)) != Codes.FRIEND_STATUS.FRIEND or friend.get("Online", true) == false:
+	if not online() or int(friend.get("FriendStatus", 0)) != Codes.FRIEND_STATUS.FRIEND:
 		return ""
 	var room := friend_lobby(friend)
 	var name := String(room.get("Name", ""))
@@ -456,7 +458,8 @@ func room_code_from_friend(friend: Dictionary, record: Dictionary) -> String:
 	var code: String = name.trim_prefix(lobby.ROOM_PREFIX)
 	if not lobby.valid_code(code):
 		return ""
-	if room.get("Open", false) == true or (fresh_presence(record) and record.get("room_proof") == code.sha256_text()):
+	var live_room: bool = fresh_presence(record) and record.get("room_proof") == code.sha256_text()
+	if live_room or (friend.get("Online", true) and room.get("Open", false) == true):
 		return code
 	return ""
 

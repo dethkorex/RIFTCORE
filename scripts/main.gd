@@ -67,6 +67,9 @@ var hud: CanvasLayer
 var menu: Control
 var game_root: Node3D
 var pause_menu: Control
+var recovery_menu: CanvasLayer
+var recovery_label: Label
+var recovery_button: Button
 var invite_overlay: CanvasLayer
 var chat: WhisperOverlay
 var account: PlayerAccount
@@ -102,6 +105,7 @@ func _ready() -> void:
 		or is_instance_valid(coop_mission) and coop_mission.is_pause_open()
 		or is_instance_valid(home_hub) and (home_hub.is_pause_open() or home_hub.has_dialogue())
 		or chat.is_open()
+		or is_instance_valid(recovery_menu)
 		or is_instance_valid(invite_overlay)
 		or get_tree().has_group(&"interactive_dialogue"))
 	add_child(pointer)
@@ -712,6 +716,8 @@ func show_main_menu() -> void:
 		RiftRelay.guest_joined.connect(enter_leader_hub)
 		RiftRelay.mission_disconnected.connect(close_coop_mission)
 		RiftRelay.mission_returned.connect(close_coop_mission.bind("Back at Operations Station."))
+		RiftRelay.party_rejoin_offered.connect(show_party_rejoin)
+		RiftRelay.recovery.changed.connect(update_recovery_menu)
 	RiftAudio.play_music(false)
 	menu = RiftTitleMenu.new()
 	menu.account = account
@@ -868,6 +874,70 @@ func close_coop_mission(message: String) -> void:
 		home_hub.station_requested.emit("Social")
 		menu.show_page("Party")
 		menu.relay_status.text = message
+
+func show_party_rejoin() -> void:
+	if is_instance_valid(home_hub) and is_instance_valid(menu):
+		home_hub.station_requested.emit("Social")
+		menu.show_page("Party")
+
+func update_recovery_menu() -> void:
+	var recovery := RiftRelay.recovery
+	if not is_instance_valid(coop_mission) or not recovery.active():
+		if is_instance_valid(recovery_menu):
+			recovery_menu.hide()
+			recovery_menu.queue_free()
+			recovery_menu = null
+			get_tree().paused = false
+		return
+	if not is_instance_valid(recovery_menu):
+		if chat.is_open():
+			chat.close()
+		if is_instance_valid(coop_mission.pause_menu) and coop_mission.pause_menu.is_open():
+			coop_mission.pause_menu.close()
+		get_tree().paused = true
+		recovery_menu = CanvasLayer.new()
+		recovery_menu.layer = 195
+		recovery_menu.process_mode = Node.PROCESS_MODE_ALWAYS
+		add_child(recovery_menu)
+		var backdrop := ColorRect.new()
+		backdrop.color = Color(0.015, 0.035, 0.075, 0.78)
+		recovery_menu.add_child(backdrop)
+		backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		var center := CenterContainer.new()
+		backdrop.add_child(center)
+		center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		var panel := UI.equipment_card(UI.CYAN)
+		panel.theme = UI.theme()
+		panel.custom_minimum_size.x = 490
+		center.add_child(panel)
+		var content := UI.column(panel, 12)
+		UI.label(content, "CONNECTION INTERRUPTED", 30, UI.CYAN)
+		recovery_label = UI.label(content, "", 19)
+		recovery_button = UI.button(content, "Rejoin Party", RiftRelay.rejoin_party, true)
+		UI.button(content, "Return to Station", RiftRelay.leave.bind("You left the interrupted mission."))
+		var clock := Timer.new()
+		clock.wait_time = 0.25
+		clock.timeout.connect(refresh_recovery_menu)
+		recovery_menu.add_child(clock)
+		clock.start()
+		refresh_recovery_menu()
+		if recovery_button.visible:
+			recovery_button.grab_focus()
+		else:
+			(content.get_child(-1) as Button).grab_focus()
+	refresh_recovery_menu()
+
+func refresh_recovery_menu() -> void:
+	var recovery := RiftRelay.recovery
+	if not is_instance_valid(recovery_menu) or not recovery.active():
+		return
+	var disconnected := RiftRelay.connected_room.is_empty()
+	recovery_button.visible = disconnected
+	recovery_button.disabled = recovery.retrying
+	var message := "Waiting for the party to reconnect."
+	if disconnected:
+		message = "Reconnecting to your party…" if recovery.retrying else "Rejoin to continue from where you disconnected."
+	recovery_label.text = "%s\nMission paused · %d seconds remaining" % [message, recovery.remaining_seconds()]
 
 func refresh_menu_save() -> void:
 	menu.profile = profile
