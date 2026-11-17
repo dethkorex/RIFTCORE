@@ -75,6 +75,8 @@ var second_act := false
 var difficulty_mode := 0
 var shot_windup := 0.0
 var locked_aim := Vector3.ZERO
+var ledge_probe := PhysicsRayQueryParameters3D.new()
+var ledge_target := RID()
 
 func scale_for_sector(sector: int, act: int, health_scale: float, mode: int) -> void:
 	sector_number = sector
@@ -95,6 +97,7 @@ func _ready() -> void:
 	max_health = [40.0, 55.0, 95.0, 60.0, 35.0][variant]
 	move_speed = PATROL_SPEEDS[variant]
 	super._ready()
+	ledge_probe.exclude = [get_rid()]
 	patrol_center = global_position.x
 	home_height = global_position.y
 	build_visuals()
@@ -241,11 +244,13 @@ func _physics_process(delta: float) -> void:
 	velocity.x = 0.0 if planted_override or shot_windup > 0.0 else direction * move_speed * move_factor
 	if is_on_floor() and variant != Variant.TURRET:
 		var ledge := global_position + Vector3(direction * 0.75, 0.0, 0.0)
-		var probe := PhysicsRayQueryParameters3D.create(ledge, ledge + Vector3.DOWN * 1.1)
-		probe.exclude = [get_rid()]
-		if is_instance_valid(target):
-			probe.exclude = [get_rid(), target.get_rid()]
-		if get_world_3d().direct_space_state.intersect_ray(probe).is_empty():
+		var target_rid := target.get_rid() if is_instance_valid(target) else RID()
+		if target_rid != ledge_target:
+			ledge_probe.exclude = [get_rid(), target_rid] if target_rid.is_valid() else [get_rid()]
+			ledge_target = target_rid
+		ledge_probe.from = ledge
+		ledge_probe.to = ledge + Vector3.DOWN * 1.1
+		if get_world_3d().direct_space_state.intersect_ray(ledge_probe).is_empty():
 			if not tracking:
 				direction = -direction
 			velocity.x = 0.0
@@ -278,11 +283,12 @@ func _physics_process(delta: float) -> void:
 		take_damage(max_health)
 		return
 	for index in range(get_slide_collision_count()):
-		var body := get_slide_collision(index).get_collider() as RiftPlayer
+		var contact := get_slide_collision(index)
+		var collider := contact.get_collider()
+		var body := collider as RiftPlayer
 		if body:
 			damage_on_contact(body)
-		var contact := get_slide_collision(index)
-		var support := contact.get_collider() as StaticBody3D
+		var support := collider as StaticBody3D
 		if support and contact.get_normal().y > 0.62:
 			last_support = support
 			last_ground_local = support.to_local(contact.get_position() + Vector3.UP * 0.42)

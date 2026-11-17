@@ -196,8 +196,7 @@ func finish_sign_in() -> void:
 		status += " · Sign-in could not be remembered"
 	presence_elapsed = PRESENCE_INTERVAL
 	refresh_elapsed = 8.0
-	await refresh_friends()
-	register_directory_listing()
+	register_directory_listing.call_deferred()
 
 func save_link() -> Error:
 	var saved := ConfigFile.new()

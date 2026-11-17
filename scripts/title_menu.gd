@@ -24,6 +24,7 @@ var delete_return_page := "New Game"
 var slot_error := ""
 var sign_in_email_hint := ""
 var directory_return_page := ""
+var checking_cloud_save := false
 var save_status: Label
 var relay_status: Label
 var relay_code: LineEdit
@@ -292,7 +293,7 @@ func show_page(next: String) -> void:
 		"Settings":
 			var settings := UI.settings(card(columns), not station_panel)
 			settings.initial_focus.grab_focus()
-	if page not in ["Title", "Co-op Setup Guide", "Set up Player Profile", "Save Reset Error"]:
+	if not checking_cloud_save and page not in ["Title", "Co-op Setup Guide", "Set up Player Profile", "Save Reset Error"]:
 		var back_title := "Back to Title"
 		if page in ["Create Account", "Sign In", "Offline Setup"]:
 			back_title = "Back to Welcome"
@@ -496,6 +497,8 @@ func _input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 func leave_page() -> void:
+	if checking_cloud_save:
+		return
 	if is_instance_valid(item_actions) and item_actions.visible:
 		item_actions.hide()
 		if is_instance_valid(item_origin):
@@ -658,7 +661,7 @@ func build_profile_saves(columns: HBoxContainer) -> void:
 			await cloud.sync(true)
 			if not is_instance_valid(local) or cloud.conflict:
 				return
-		open_after_startup()
+		open_slot_picker("Load Game")
 	, true)
 	UI.label(online, "CLOUD SAVE", 28, UI.CYAN)
 	var status := UI.label(online, cloud.status, 17, UI.MUTED)
@@ -989,6 +992,10 @@ func open_slot_picker(mode: String) -> void:
 	show_page(mode)
 
 func build_save_slots(columns: HBoxContainer) -> void:
+	if checking_cloud_save:
+		var loading := card(columns)
+		UI.label(loading, "Checking cloud saves…", 24, UI.CYAN)
+		return
 	var cards: Array[Button] = []
 	var saves: Array[ConfigFile] = []
 	for number in range(1, ManualSave.SLOT_COUNT + 1):

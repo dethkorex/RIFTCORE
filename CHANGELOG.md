@@ -1,10 +1,8 @@
-# RIFTCORE Alpha 6.3.11
+# RIFTCORE Alpha 6.3.12
 
-- Every launch offers Sign In, Create Account, and Continue Offline.
-- Operators open directly from the title. Play, switch, or create an operator from its card.
-- The Workshop handles purchases, crafting, and Core Ascension. Profile handles operator switching and account settings.
-- Find Friends, conversations, and notifications are easier to reach. The challenge countdown is more prominent, and in-game chat stays readable.
-- Check challenges and unlocked loot from Deploy. Select items in Storage or pause to manage quick slots.
-- This playtest includes a one-time account and save reset. Create a new account or continue offline. Future progress resets preserve accounts and friends.
+- Signing in opens Operator Selection. If your credentials are incorrect, the form stays open so you can try again.
+- The Foundry loads when you deploy. Sectors render nearby shadows and do less work in the background during combat.
+- Co-op sends fewer updates while players are idle, avoids duplicate shots on guest screens, and loads Act II in the background.
+- This update keeps your account and saves.
 
 Update through Launcher 0.2 or Settings → Update Game before joining a party.

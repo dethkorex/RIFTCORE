@@ -156,7 +156,7 @@ func read_remote() -> int:
 	checked_release = true
 	return 0
 
-func sync(prefer_local := false) -> void:
+func sync(prefer_local := false, check_only := false) -> void:
 	if busy or directory.busy or not directory.online():
 		return
 	if prefer_local and not conflict:
@@ -185,6 +185,10 @@ func sync(prefer_local := false) -> void:
 		last_checked_hash = fingerprint(current)
 		busy = false
 		update("A different cloud save is available. Choose which copy to keep before playing.")
+		return
+	if check_only:
+		conflict = false
+		busy = false
 		return
 	if not valid_snapshot(current):
 		busy = false

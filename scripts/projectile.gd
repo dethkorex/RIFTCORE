@@ -34,6 +34,16 @@ var boss_status_sector := 0
 signal reward_hit(at: Vector3, links: PackedVector3Array)
 signal reward_spent(at: Vector3)
 
+func _ready() -> void:
+	var ancestor := get_parent()
+	while ancestor:
+		if ancestor.has_meta(&"replicate_projectile"):
+			var replicate: Callable = ancestor.get_meta(&"replicate_projectile")
+			# Spawners set their origin and firing parameters in the same tick.
+			replicate.call_deferred(self)
+			break
+		ancestor = ancestor.get_parent()
+
 func setup(dir: Vector3, faction: String, tint: Color = Color.CYAN, drill := false, charged := false, magma := false, sector := 0, role := 0, saber := false) -> void:
 	direction = dir.normalized()
 	owner_faction = faction

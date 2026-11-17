@@ -25,6 +25,8 @@ const INPUT_SUSPENDED := 1 << 30
 const PauseMenu := preload("res://scripts/coop_pause_menu.gd")
 const TICK := 0.05
 const INPUT_INTERVAL := 1.0 / 30.0
+const IDLE_INPUT_INTERVAL := 0.1
+const HUD_INTERVAL := 0.05
 const MAX_SNAPSHOT_LEAD := 0.10
 const INPUT_HISTORY_LIMIT := 48
 const MAX_CORRECTION_SPEED := 12.0
@@ -99,6 +101,8 @@ var resume_controls_pending := false
 var rewards_status: Label
 var stats: Label
 var clock := 0.0
+var update_pending := false
+var hud_clock := HUD_INTERVAL
 var outcome := ""
 var team_xp := 0
 var sector_seconds := 0.0
@@ -115,12 +119,14 @@ const SalvageOrbs := preload("res://scripts/material_pickup.gd")
 var rewards_delivered := false
 var blueprint_count := 0
 var last_sent_axis := Vector2.ZERO
+var last_sent_input := 0
 var snapshot_age := 0.0
 var input_sequence := 0
 var state_sequence := 0
 var latest_state := -1
 var latest_operators := -1
 var presented_snapshot := -1
+var presented_world := -1
 var correction := Vector3.ZERO
 var input_positions: Dictionary[int, Vector3] = {}
 var acknowledged_input := -1
@@ -255,7 +261,13 @@ func receive_quick_config(revision: int, quick: Array) -> void:
 	remote.quick_revision = revision
 	apply_quick_config(remote.profile, quick, operators[roster.find(sender)])
 
-func load_stage() -> void:
+func stage_path(number: int) -> String:
+	var info := Catalog.info(sector)
+	return info.level if number == 1 else "res://scenes/levels/%s_act_2.tscn" % info.id
+
+func load_stage(packed: PackedScene = null) -> void:
+	update_pending = false
+	hud_clock = HUD_INTERVAL
 	cancel_reboot()
 	reboot_used = false
 	reboot_markers.clear()
@@ -292,9 +304,11 @@ func load_stage() -> void:
 	last_boss_health = -1.0
 	remote_checkpoint = Vector3.ZERO
 	var info := Catalog.info(sector)
-	var path: String = info.level if act == 1 else "res://scenes/levels/%s_act_2.tscn" % info.id
-	var packed := load(path) as PackedScene
+	if not packed:
+		packed = load(stage_path(act)) as PackedScene
 	stage = packed.instantiate() as Node3D
+	if host:
+		stage.set_meta(&"replicate_projectile", send_shot)
 	add_child(stage)
 	var actors := stage.get_node("Actors")
 	actors.set_meta("opponent_health_scale", difficulty)
@@ -362,7 +376,6 @@ func load_stage() -> void:
 			operator.fell_into_pit.connect(respawn_operator.bind(operator))
 			operator.died.connect(respawn_operator.bind(operator))
 			operator.projectile_deflected.connect(func(id: int): peer.call_func(receive_deflection, act, id))
-			operator.shot_fired.connect(send_shot)
 		operator.set_armor_finish(String(peer.player_get_data(roster[index], "armor_finish", "")))
 		operators.append(operator)
 		var plate := Label3D.new()
@@ -373,6 +386,7 @@ func load_stage() -> void:
 		plate.outline_size = 10
 		plate.modulate = UI.operator_tint(roster[index], peer.get_host(), roster)
 		plate.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		plate.text = Profile.clean_operator_name(str(peer.player_get_data(roster[index], "operator_name", "RX-07")))
 		operator.add_child(plate)
 		nameplates.append(plate)
 		var marker := Label3D.new()
@@ -931,8 +945,26 @@ func change_act(next: int) -> void:
 	for operator in operators:
 		operator.set_physics_process(false)
 	await get_tree().create_timer(0.5).timeout
+	var path := stage_path(next)
+	var packed: PackedScene
+	if ResourceLoader.load_threaded_request(path, "PackedScene") == OK:
+		var progress: Array = []
+		var status := ResourceLoader.load_threaded_get_status(path, progress)
+		while status == ResourceLoader.THREAD_LOAD_IN_PROGRESS:
+			if not progress.is_empty():
+				loading.progress.value = progress[0]
+			await get_tree().process_frame
+			status = ResourceLoader.load_threaded_get_status(path, progress)
+		if status == ResourceLoader.THREAD_LOAD_LOADED:
+			packed = ResourceLoader.load_threaded_get(path) as PackedScene
+	if not packed:
+		if host:
+			relay_owner.return_to_station()
+		else:
+			relay_owner.leave("Act II could not load. Check your installation and try again.")
+		return
 	act = next
-	load_stage()
+	load_stage(packed)
 	loading.begin()
 	await get_tree().create_timer(0.5).timeout
 	await loading.fade_out()
@@ -1198,24 +1230,21 @@ func _physics_process(delta: float) -> void:
 		collect_personal_totals()
 		if is_instance_valid(boss) and boss_started:
 			boss.target = nearest_operator(boss.global_position)
-		for shot in get_tree().get_nodes_in_group(&"rift_projectile"):
-			if not shot.is_queued_for_deletion() and not shot.has_meta(&"coop_sent"):
-				shot.set_meta(&"coop_sent", true)
-				send_shot(shot)
 		check_campaign_progress()
 		if boss_intro_active or changing_act or not outcome.is_empty():
 			return
 	clock += delta
 	factory_trap_clock += delta
-	var interval := TICK if host else INPUT_INTERVAL
-	var responsive_input := not host and (not pressed.is_empty() or not released.is_empty() or get_player_axis().distance_to(last_sent_axis) >= 0.15)
-	if clock < interval and not responsive_input:
-		return
-	clock = 0.0 if responsive_input else fmod(clock, interval)
-	if host:
-		broadcast_state()
-	else:
+	if not host and (not pressed.is_empty() or not released.is_empty() or get_player_axis().distance_to(last_sent_axis) >= 0.15):
+		clock = 0.0
+		update_pending = false
 		send_input()
+		return
+	var idle := last_sent_axis.is_zero_approx() and (last_sent_input & ~INPUT_SUSPENDED) == 0
+	var interval := TICK if host else (IDLE_INPUT_INTERVAL if idle else INPUT_INTERVAL)
+	if clock >= interval:
+		clock = fmod(clock, interval)
+		update_pending = true
 
 func resume_controls() -> void:
 	if not local_input_blocked():
@@ -1248,6 +1277,7 @@ func send_input(force_reliable := false) -> void:
 	released.clear()
 	var axis := get_player_axis()
 	last_sent_axis = axis
+	last_sent_input = current
 	input_sequence += 1
 	input_positions[input_sequence] = operators[local_index].global_position
 	if input_positions.size() > INPUT_HISTORY_LIMIT:
@@ -1529,6 +1559,15 @@ func apply_operator_state(operator: RiftPlayer, data: Array, is_local: bool) -> 
 		operator.set_physics_process(operator.health > 0.0)
 
 func _process(delta: float) -> void:
+	# A slow render frame can run several physics ticks. Send one current
+	# periodic update once per frame and keep input edges immediate.
+	if update_pending:
+		update_pending = false
+		if outcome.is_empty() and not changing_act and not boss_intro_active and RiftRelay.mission_active:
+			if host:
+				broadcast_state()
+			else:
+				send_input()
 	if not host:
 		snapshot_age += delta
 		var blend := 1.0 - exp(-19.0 * delta)
@@ -1552,15 +1591,19 @@ func _process(delta: float) -> void:
 				apply_operator_state(operator, data, false)
 				operator.present_charge(float(data[11]), data[3] >= operator.charged_shot_cost())
 		presented_snapshot = latest_operators
+		var fresh_world := latest_state > presented_world
 		for index in enemy_targets.size():
 			var enemy := enemies[index]
-			enemy.visible = enemy_health[index] > 0.0
-			if enemy.visible:
+			if fresh_world:
+				enemy.visible = enemy_health[index] > 0.0
+				if enemy.visible:
+					enemy.robot.rotation = Vector3(0.0, enemy_rotation[index].x, enemy_rotation[index].y)
+					if enemy.health != enemy_health[index]:
+						enemy.health = enemy_health[index]
+						enemy.health_changed.emit(enemy.health, enemy.max_health)
+			if enemy.visible and not enemy.global_position.is_equal_approx(enemy_targets[index]):
 				enemy.global_position = enemy.global_position.lerp(enemy_targets[index], blend)
-				enemy.robot.rotation = Vector3(0.0, enemy_rotation[index].x, enemy_rotation[index].y)
-				if enemy.health != enemy_health[index]:
-					enemy.health = enemy_health[index]
-					enemy.health_changed.emit(enemy.health, enemy.max_health)
+		presented_world = latest_state
 	var local := operators[local_index]
 	if not boss_intro_active and not changing_act:
 		if local.health > 0.0 or local.lives > 0:
@@ -1568,13 +1611,15 @@ func _process(delta: float) -> void:
 		elif not is_instance_valid(camera.target) or camera.target.health <= 0.0:
 			var survivor := nearest_operator(local.global_position)
 			camera.target = survivor if survivor else local
+	hud_clock += delta
+	if hud_clock < HUD_INTERVAL:
+		return
+	hud_clock = fmod(hud_clock, HUD_INTERVAL)
 	var teammates := PackedStringArray()
 	var view := camera.get_node("Camera3D") as Camera3D
 	for index in operators.size():
 		var plate := nameplates[index]
-		var display_name := Profile.clean_operator_name(str(peer.player_get_data(roster[index], "operator_name", "RX-07")))
-		if plate.text != display_name:
-			plate.text = display_name
+		var display_name := plate.text
 		var marker := reboot_markers[index]
 		marker.visible = index != local_index and operators[index].health <= 0.0 and reboot_available() and local_profile.rank(Profile.FIELD_REBOOT) > 0
 		if marker.visible:
@@ -1611,7 +1656,11 @@ func _process(delta: float) -> void:
 
 	var blueprints: int = local.recovered_blueprints.size() if outcome.is_empty() else blueprint_count
 	objective.text = Story.objective(sector, act, boss_defeated, Miniboss.TITLES[sector - 1])
-	stats.text = "Security %d left  ·  %d blueprints" % [enemies.filter(func(enemy): return is_instance_valid(enemy) and enemy.health > 0 and enemy.visible).size(), blueprints]
+	var security_left := 0
+	for enemy in enemies:
+		if is_instance_valid(enemy) and enemy.health > 0 and enemy.visible:
+			security_left += 1
+	stats.text = "Security %d left  ·  %d blueprints" % [security_left, blueprints]
 	update_personal_hud(operators[local_index])
 
 func challenge_results(index := 0) -> Dictionary:
@@ -1634,6 +1683,8 @@ func challenge_results(index := 0) -> Dictionary:
 		"weapons": operators[index].run_weapon_ids.duplicate(), "equipped": operators[index].equipped_suit()}
 
 func send_shot(shot: RiftProjectile) -> void:
+	if not is_instance_valid(shot) or shot.is_queued_for_deletion() or not is_instance_valid(stage) or not stage.is_ancestor_of(shot) or not shot.is_in_group(&"rift_projectile") or not outcome.is_empty():
+		return
 	peer.call_func(receive_shot, shot.global_position, shot.direction, shot.speed, shot.palette, shot.is_charged, shot.is_magma, shot.owner_faction, shot.launch_profile, shot.range_remaining if is_finite(shot.range_remaining) else -1.0, shot.lifetime, shot.get_instance_id(), shot.weapon_id)
 	if not shot.weapon_id.is_empty():
 		var suit := shot.weapon_id
@@ -1653,6 +1704,8 @@ func receive_shot(at: Vector3, direction: Vector3, speed: float, tint: Color, ch
 	shot.set_meta(&"coop_shot_id", shot_id)
 	shot.collision_layer = 0
 	shot.collision_mask = 0
+	shot.monitoring = false
+	shot.monitorable = false
 	shot.weapon_id = suit
 	shot.speed = speed
 	shot.lifetime = flight_time

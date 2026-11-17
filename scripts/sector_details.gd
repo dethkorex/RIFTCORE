@@ -4,6 +4,9 @@ const ATTACK_FX := preload("res://scripts/attack_fx.gd")
 const CATALOG := preload("res://scripts/sector_catalog.gd")
 const CHAMFER := preload("res://scripts/factory_chamfer.gd")
 const PROP_NAMES := ["sci-vent", "sci-beacon", "sci-reactor", "sci-cable-spool"]
+# The side camera is about eight metres from the play lane. Keep nearby
+# terrain and cutscene shadows without rendering them across the whole act.
+const SHADOW_DISTANCE := 36.0
 var player: Node3D
 var sector := 1
 var act := 1
@@ -12,6 +15,8 @@ var tint: Color
 var trim_scene: PackedScene
 
 func install(level: Node3D, target: Node3D, number: int, act_number: int) -> void:
+	for light: DirectionalLight3D in level.find_children("*", "DirectionalLight3D", true, false):
+		light.directional_shadow_max_distance = minf(light.directional_shadow_max_distance, SHADOW_DISTANCE)
 	player = target
 	sector = number
 	act = act_number

@@ -8,7 +8,7 @@ static var field_mesh: ArrayMesh
 static var metal: StandardMaterial3D
 static var contact_pin: StandardMaterial3D
 var field: ShaderMaterial
-var side := 1.0
+var side := 0.0
 var reach := 0.92
 var hit_remaining := 0.0
 
@@ -35,10 +35,13 @@ func install(hull: BoxShape3D) -> void:
 	set_process(false)
 
 func update_pose(facing: float, guarding: bool) -> void:
-	side = -1.0 if facing < 0.0 else 1.0
-	position = Vector3(side * reach, 0.02, 0.08)
-	rotation.y = side * 1.04
-	visible = guarding
+	var facing_side := -1.0 if facing < 0.0 else 1.0
+	if side != facing_side:
+		side = facing_side
+		position = Vector3(side * reach, 0.02, 0.08)
+		rotation.y = side * 1.04
+	if visible != guarding:
+		visible = guarding
 
 func flash_at(at: Vector3) -> void:
 	var local := to_local(at)

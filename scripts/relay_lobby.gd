@@ -52,6 +52,9 @@ var unlocked_sector := 1
 
 var blueprint_drops: Dictionary = {}
 var station_positions: Dictionary = {}
+var last_station_pose := Vector2(INF, INF)
+var last_station_animation := ""
+var last_station_update_at := 0
 var drop_serial := 0
 var relay: Node
 var request_timeout: Timer
@@ -496,6 +499,13 @@ func _receive_deploy(sector: int, roster: Array, mode: int) -> void:
 func send_station_position(x: float, facing: float, animation: String) -> void:
 	if room_size >= 2 and not mission_active and is_instance_valid(relay):
 		station_positions[relay.get_client_id()] = x
+		var now := Time.get_ticks_msec()
+		var pose := Vector2(x, facing)
+		if now - last_station_update_at < 500 and animation == last_station_animation and pose.is_equal_approx(last_station_pose):
+			return
+		last_station_update_at = now
+		last_station_pose = pose
+		last_station_animation = animation
 		relay.call_func_unreliable(_receive_partner_position, x, facing, animation, local_name)
 
 func _receive_partner_position(x: float, facing: float, animation: String, display_name: String) -> void:

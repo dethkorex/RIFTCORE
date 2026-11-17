@@ -59,7 +59,9 @@ func step(delta: float, open: bool, operators: Array) -> void:
 	apply(next, next >= clearance)
 
 func apply(opening: float, can_cross: bool) -> void:
-	panel.position.y = closed_y + clampf(opening, 0.0, MAX_LIFT)
+	var height := closed_y + clampf(opening, 0.0, MAX_LIFT)
+	if panel.position.y != height:
+		panel.position.y = height
 	if can_cross == passable and blocker.disabled == can_cross:
 		return
 	passable = can_cross

@@ -60,7 +60,6 @@ var mission_stats := {"seconds": 0.0, "kills": 0, "operator_xp": 0, "player_xp":
 var run_weapons: Dictionary = {}
 var run_module := ""
 
-const NEON_FACTORY_LEVEL := preload("res://scenes/levels/neon_factory_test.tscn")
 
 var player: RiftPlayer
 var camera_rig: SideCameraRig
@@ -72,7 +71,6 @@ var invite_overlay: CanvasLayer
 var chat: WhisperOverlay
 var account: PlayerAccount
 var progress_reset_error := OK
-var editor_level: Node3D
 var coop_mission: Node3D
 var coop_join_loading: CanvasLayer
 var active_controller := -1
@@ -120,9 +118,6 @@ func _ready() -> void:
 		else:
 			verify_social.call_deferred()
 		return
-	editor_level = get_node_or_null("NeonFactoryEditable") as Node3D
-	if editor_level:
-		editor_level.visible = false
 	configure_input()
 	RiftSettings.configure_bindings()
 	add_child(preload("res://scripts/menu_stick.gd").new())
@@ -192,7 +187,8 @@ func show_friend_invite(display_name: String, code: String) -> void:
 	var content := UI.column(panel, 3)
 	content.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	UI.label(content, "%s invited you to a game" % display_name, 20, UI.CYAN)
-	var can_enter_station: bool = is_instance_valid(menu) and not is_instance_valid(player) and menu.preferred_operator() > 0
+	var can_enter_station: bool = is_instance_valid(menu) and not menu.checking_cloud_save \
+		and not RiftRelay.directory.progress.conflict and not is_instance_valid(player) and menu.preferred_operator() > 0
 	if RiftRelay.can_receive_invite() and (is_instance_valid(home_hub) or can_enter_station):
 		var buttons := HBoxContainer.new()
 		buttons.add_theme_constant_override("separation", 8)
@@ -898,26 +894,31 @@ func refresh_menu_save() -> void:
 	profile.operator_level = menu.saved_level
 
 func complete_online_setup() -> void:
+	if menu.checking_cloud_save:
+		return
 	var newly_signed_in := account.display_name.is_empty()
 	if newly_signed_in and account.create(RiftRelay.directory.username) != OK:
 		menu.show_page("Set up Player Profile")
 		return
 	RiftSettings.confirm_startup_choice("online")
 	get_tree().set_meta(&"startup_choice_confirmed", true)
+	menu.checking_cloud_save = true
+	menu.open_slot_picker("Load Game")
 	var cloud = RiftRelay.directory.progress
-	await cloud.sync()
+	await cloud.sync(false, true)
 	if not is_instance_valid(menu):
 		return
 	if newly_signed_in and not cloud.remote.is_empty() and cloud.conflict:
 		var result: Dictionary = await cloud.restore_cloud()
-		if result.get("error") != OK:
-			menu.show_page("Saves")
+		if not is_instance_valid(menu):
 			return
-		account.restore()
-	elif cloud.conflict:
+		if result.get("error") == OK:
+			account.restore()
+	menu.checking_cloud_save = false
+	if cloud.conflict:
 		menu.show_page("Saves")
 		return
-	menu.open_after_startup()
+	menu.open_slot_picker("Load Game")
 
 func purchase_finish(id: String) -> void:
 	var catalog := preload("res://scripts/operator_skins.gd")
@@ -962,12 +963,8 @@ func restore_cloud_and_play() -> void:
 	account = PlayerAccount.new()
 	account.restore()
 	menu.account = account
-	var number: int = menu.preferred_operator()
-	if number > 0:
-		select_save_slot(number, false)
-	else:
-		refresh_menu_save()
-		menu.open_slot_picker("Load Game")
+	refresh_menu_save()
+	menu.open_slot_picker("Load Game")
 
 func select_save_slot(number: int, fresh: bool, operator_name := "") -> void:
 	var selected := ManualSave.new(number)
@@ -1489,14 +1486,9 @@ func show_pause_settings() -> void:
 	settings.initial_focus.grab_focus()
 
 func build_level() -> void:
-	if editor_level and sector == 1 and act == 1:
-		game_root = editor_level
-		game_root.visible = true
-		game_root.process_mode = Node.PROCESS_MODE_INHERIT
-	else:
-		var stage := NEON_FACTORY_LEVEL if sector == 1 and act == 1 else load(level_path(act)) as PackedScene
-		game_root = stage.instantiate()
-		add_child(game_root)
+	var stage := load(level_path(act)) as PackedScene
+	game_root = stage.instantiate()
+	add_child(game_root)
 	player = game_root.get_node("Actors/RiftcoreMecha") as RiftPlayer
 	var actors_root := game_root.get_node("Actors")
 	actors_root.set_meta("loot_scale", Difficulty.LOOT[mission_difficulty])
