@@ -53,6 +53,13 @@ jobs:
       - name: Verify release notes
         run: |
           python3 -c 'import json, pathlib; p=pathlib.Path("release-tools/artifacts"); assert json.loads((p / "update.json").read_text())["notes"] == (p / "PATCH_NOTES.md").read_text().strip()'
+      - name: Preserve build diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: riftcore-build-logs
+          path: release-tools/build/*.log
+          retention-days: 7
       - name: Verify squad checkpoints and revival
         run: |
           for test in coop_revival coop_position frozen_sector; do

@@ -52,7 +52,15 @@ def embedded_release(tag: str, repo: str):
 
 def godot(engine: Path, project: Path, log: Path, *flags: str) -> None:
     command = [str(engine), "--headless", "--path", str(project), "--log-file", str(log), *flags]
-    proc = subprocess.run(command, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=240)
+    # A clean runner must compress every model texture. BC7 imports take longer
+    # than exports; give that one-time work its own bounded budget.
+    timeout = 900 if "--import" in flags else 240
+    try:
+        proc = subprocess.run(command, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout)
+    except subprocess.TimeoutExpired as error:
+        if log.exists():
+            print(log.read_text(encoding="utf-8", errors="replace")[-11000:])
+        raise RuntimeError(f"Godot exceeded {timeout} seconds: {flags}") from error
     output = log.read_text(encoding="utf-8", errors="replace") if log.exists() else proc.stdout + proc.stderr
     if proc.returncode or "SCRIPT ERROR:" in output or "Export failed" in output:
         print(output[-11000:])
