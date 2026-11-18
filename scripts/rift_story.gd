@@ -129,6 +129,8 @@ static func deployment(sector: int, act: int) -> Array:
 		advice = "The return shutter has a pressure plate in the lower gallery. Past it, break the cracked wall. Wait at the mouth of the smelter chute and destroy the rolling slag before you cross."
 	elif sector == 2:
 		advice = "One of the gate relays is up in the nursery. Step on the launch bloom and hold up to grab the vine. Jump when it swings forward. The other relay is behind a cracked wall." if act == 1 else "The canopy lift will get you to the first vine. Hold up between jumps and move fast. There’s nothing under the crossing, and the first relay is on the far ledge. The irrigation ferry leads to the other one."
+	elif sector == 3 and act == 2:
+		advice = "There's a rocket board beside the midway beacon. Hold up to board it. Relay A is at the end of the coolant spillway: hold jump to thrust over gaps, crouch under the ice gates, and steer left to brake. The return lift brings you back here."
 	return [
 		["NOVA", BRIEFINGS[index] if act == 1 else SECOND_ACT[index]],
 		["RX-07", OPERATOR_BRIEF_RESPONSES[index][act - 1]],

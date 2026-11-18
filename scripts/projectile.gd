@@ -287,7 +287,10 @@ func chain_reward_lightning(body: Node3D) -> void:
 func impact() -> void:
 	if not weapon_id.is_empty():
 		reward_spent.emit(global_position)
-	spawn_impact(is_charged)
+	if launch_profile >= 0 and launch_profile >> 3 == 3:
+		preload("res://scripts/frost_fx.gd").shatter.call_deferred(get_parent(),global_position,is_charged)
+	else:
+		spawn_impact(is_charged)
 	queue_free()
 
 static func draw_reward_hit(parent: Node, at: Vector3, tint: Color, weapon: String, links: PackedVector3Array) -> void:

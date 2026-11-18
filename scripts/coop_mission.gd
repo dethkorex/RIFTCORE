@@ -459,7 +459,7 @@ func load_stage(packed: PackedScene = null) -> void:
 	arena_door = CampaignDoor.new(gate)
 	arena_door.reset()
 	gate_relays = GateRelays.new()
-	gate_relays.install(stage, Color(info.color), sector != 2)
+	gate_relays.install(stage, Color(info.color), sector not in [2,3])
 	exit_marker = stage.get_node("MARKERS/RoomExit")
 	boss = actors.get_node(info.boss_node) as Combatant
 	boss_position = boss.position
@@ -1471,7 +1471,7 @@ func broadcast_state(reliable_operators := false) -> void:
 	guards.resize(enemies.size())
 	props_consumed.clear()
 	for operator in operators:
-		players.append([operator.global_position, operator.model_root.rotation, operator.health, operator.energy, operator.current_animation, operator.facing, operator.equipped_suit(), operator.lives, operator.max_health, operator.max_energy, operator.velocity, operator.fire_lock, operator.charge_held, operator.melee_lock, operator.quick_profile.quick_slots if operator.quick_profile else [], operator.supplies, operator.charge_elapsed if operator.charge_held else 0.0, operator.saber_hold, remote_players.get(roster[players.size()], {}).get("quick_revision", 0), operator.recovered_supplies, operator.experience, Vector4(operator.boss_debuff, operator.debuff_left, operator.debuff_tick, operator.shock_stun)])
+		players.append([operator.global_position, operator.model_root.rotation, operator.health, operator.energy, operator.current_animation, operator.facing, operator.equipped_suit(), operator.lives, operator.max_health, operator.max_energy, operator.velocity, operator.fire_lock, operator.charge_held, operator.melee_lock, operator.quick_profile.quick_slots if operator.quick_profile else [], operator.supplies, operator.charge_elapsed if operator.charge_held else 0.0, operator.saber_hold, remote_players.get(roster[players.size()], {}).get("quick_revision", 0), operator.recovered_supplies, operator.experience, Vector4(operator.boss_debuff, operator.debuff_left, operator.debuff_tick, operator.shock_stun), Vector3(1.0 if is_instance_valid(operator.rocket_course) else 0.0, operator.rocket_speed, operator.rocket_seconds)])
 	for index in enemies.size():
 		var enemy := enemies[index]
 		if is_instance_valid(enemy) and enemy.health > 0:
@@ -1511,6 +1511,8 @@ func broadcast_state(reliable_operators := false) -> void:
 			boss_state[13] = boss.foundry_snapshot()
 		elif sector == 2:
 			boss_state[13] = boss.jungle_snapshot()
+		elif sector == 3:
+			boss_state[13] = boss.frozen_snapshot()
 	state_sequence += 1
 	for index in range(1, roster.size()):
 		var snapshot := players.duplicate()
@@ -1546,6 +1548,8 @@ func receive_state(remote_act: int, security: PackedFloat32Array, arena: Array, 
 				boss.apply_foundry_snapshot(arena[13])
 			elif sector == 2:
 				boss.apply_jungle_snapshot(arena[13])
+			elif sector == 3:
+				boss.apply_frozen_snapshot(arena[13])
 		if last_boss_health != boss.health:
 			last_boss_health = boss.health
 			boss.health_changed.emit(boss.health, boss.max_health)
@@ -1694,6 +1698,16 @@ func apply_operator_state(operator: RiftPlayer, data: Array, is_local: bool) -> 
 		operator.debuff_left = effect.y
 		operator.debuff_tick = effect.z
 		operator.shock_stun = effect.w
+	if data.size() > 22:
+		var board: Vector3 = data[22]
+		var previous_course := operator.rocket_course
+		operator.rocket_course = stage.get_node_or_null("TERRAIN/RocketCourse") if board.x > 0.0 else null
+		operator.rocket_speed = board.y
+		operator.rocket_seconds = board.z
+		if is_instance_valid(operator.rocket_course) and operator.rocket_course != previous_course:
+			operator.rocket_course.relocated(operator)
+	if not is_local:
+		operator.velocity = data[10]
 	if operator.visible and RiftPlayer.level_for_experience(operator.experience) > previous_level:
 		operator.play_level_up_feedback()
 	if is_local and not changing_act and not boss_intro_active:

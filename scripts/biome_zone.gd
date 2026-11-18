@@ -101,6 +101,10 @@ func build_surface() -> void:
 	var plane := PlaneMesh.new()
 	plane.size = Vector2(dimensions.x * 0.98, minf(dimensions.z, 2.0))
 	surface = ShaderMaterial.new()
+	if kind == Kind.ICE:
+		surface = preload("res://assets/campaign/frozen_reactor/kit/ice.tres")
+		mesh_part(self,plane,surface,Vector3(0,-dimensions.y*.5+.048,0))
+		return
 	surface.shader = SURFACE
 	surface.set_shader_parameter("tint", tint)
 	surface.set_shader_parameter("style", 1 if kind == Kind.WATER else 0)
@@ -187,6 +191,9 @@ func draw_arcs() -> void:
 	mesh.surface_end()
 
 func build_particles() -> void:
+	if kind == Kind.VENT and tint.b > tint.r * 1.3:
+		particles = preload("res://scripts/frost_fx.gd").vent(effect,Vector3(0,.09,0),dimensions.y*.47)
+		return
 	particles = CPUParticles3D.new()
 	particles.amount = clampi(roundi(dimensions.x * 7.0), 23, 55)
 	particles.lifetime = 1.25
@@ -244,7 +251,7 @@ func update_visuals(phase: float, live: bool) -> void:
 			warning_light.light_energy = 3.0 if live else 0.9 + charge * 1.1
 	if indicators:
 		indicators.emission_energy_multiplier = 0.48 + charge * 4.0
-	if surface:
+	if surface and kind != Kind.ICE:
 		surface.set_shader_parameter("activity", 0.70 if kind < Kind.VENT else charge)
 	if particles:
 		particles.emitting = nearby and (live or kind < Kind.VENT)

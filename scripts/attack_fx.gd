@@ -39,9 +39,7 @@ static func projectile(parent: Node3D, sector: int, role: int, heavy: bool, tint
 	var edge := tint.lerp(Color.WHITE, 0.72)
 	match sector:
 		3:
-			for i in range(3):
-				var shard := piece(parent, crystal, Vector3(0, 0, 0.07 - 0.21 * i), Vector3(0.17, 0.54, 0.15) * size, edge if i == 0 else tint)
-				shard.rotation = Vector3(PI / 2.0, 0, i * 2.1)
+			preload("res://scripts/frost_fx.gd").projectile(parent,heavy)
 		4, 9:
 			var start := Vector3(0, 0, 0.24)
 			for i in range(1, 7):
@@ -119,7 +117,10 @@ static func charge(parent: Node3D, at: Vector3, tint: Color, duration: float) ->
 	build.tween_property(core, "scale", Vector3.ONE * 2.15, duration)
 	build.chain().tween_callback(warning.queue_free)
 
-static func telegraph(parent: Node3D, width: float, tint: Color, duration: float) -> void:
+static func telegraph(parent: Node3D, width: float, tint: Color, duration: float, sector := 0) -> void:
+	if sector == 3:
+		preload("res://scripts/frost_fx.gd").telegraph(parent,width,duration)
+		return
 	var count := clampi(ceili(width / 1.8), 1, 18)
 	var ring := TorusMesh.new()
 	ring.inner_radius = 0.39
@@ -140,6 +141,9 @@ static func telegraph(parent: Node3D, width: float, tint: Color, duration: float
 			pulse.tween_property(spark, "position:y", 0.37, maxf(duration, 0.12))
 
 static func field(parent: Node3D, sector: int, radius: float, height: float, duration: float, move: String) -> void:
+	if sector == 3:
+		preload("res://scripts/frost_fx.gd").field(parent,radius,height,duration)
+		return
 	var tint := tint_for(sector)
 	if move == "orbital_beam":
 		PACK_VFX.orbital_beam(parent, radius, height, tint, duration)

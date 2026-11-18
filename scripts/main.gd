@@ -442,6 +442,8 @@ func verify_coop_mission(host: bool, smoke_sector: int, wipe_test := false) -> v
 			var jungle_passed := true
 			if smoke_sector == 2:
 				jungle_passed = await verify_canopy_coop_crossing(mission.operators[local_index], mission)
+			elif smoke_sector == 3:
+				jungle_passed = await verify_frozen_coop_board(mission.operators[local_index], mission)
 			RiftRelay.relay.lobby_set_data("coop_guest_act_two", jungle_passed)
 	else:
 		if not await wait_for_relay(func(): return RiftRelay.relay.lobby_get_data("coop_guest_moved", false), 10.0):
@@ -456,6 +458,10 @@ func verify_coop_mission(host: bool, smoke_sector: int, wipe_test := false) -> v
 			return
 		if smoke_sector == 2 and not await verify_canopy_coop_crossing(mission.operators[local_index], mission):
 			print("Campaign check failed at the Canopy Escape")
+			finish_relay_check(false)
+			return
+		if smoke_sector == 3 and not await verify_frozen_coop_board(mission.operators[local_index], mission):
+			print("Campaign check failed at the rocket spillway")
 			finish_relay_check(false)
 			return
 		if not await wait_for_relay(func(): return RiftRelay.relay.lobby_get_data("coop_guest_act_two", false), 20.0):
@@ -490,6 +496,33 @@ func verify_coop_mission(host: bool, smoke_sector: int, wipe_test := false) -> v
 	if host and returned and rewards:
 		returned = await wait_for_relay(func(): return RiftRelay.relay.lobby_get_data("coop_guest_returned", false), 8.0)
 	finish_relay_check(returned and rewards)
+
+func verify_frozen_coop_board(operator: RiftPlayer, mission: Node) -> bool:
+	var course: Node3D = mission.stage.get_node("TERRAIN/RocketCourse")
+	if mission.host:
+		for actor in mission.operators:
+			course.mount(actor)
+	if not await wait_for_relay(func(): return is_instance_valid(operator.rocket_course),5.0):
+		return false
+	Input.action_press("jump")
+	await get_tree().create_timer(.65).timeout
+	Input.action_release("jump")
+	Input.action_press("crouch")
+	await get_tree().create_timer(.35).timeout
+	Input.action_release("crouch")
+	await get_tree().create_timer(.65).timeout
+	var ok: bool = operator.rocket_speed>9.0 and operator.rocket_speed<=20.0 and operator.rocket_seconds>1.0 and mission.camera.max_x>2800
+	if mission.host:
+		ok = ok and await wait_for_relay(func(): return RiftRelay.relay.lobby_get_data("frozen_guest_board",false),6.0)
+		for actor in mission.operators:
+			course.finish(actor)
+		# The next smoke check explicitly tests both door relays from a locked state.
+		mission.gate_relays.set_active(0)
+	else:
+		RiftRelay.relay.lobby_set_data("frozen_guest_board",ok)
+		ok = ok and await wait_for_relay(func(): return not is_instance_valid(operator.rocket_course) and operator.global_position.x<800,6.0)
+	print("FROZEN BOARD SYNC ",ok)
+	return ok
 
 func verify_coop_wipe(host: bool, mission: Node) -> void:
 	var room := RiftRelay.connected_room
@@ -558,6 +591,14 @@ func verify_coop_input_isolation(mission: Node, local_index: int) -> bool:
 			if operator.global_position.distance_to(idle_start) > .25:
 				return false
 			lobby.lobby_set_data("coop_input_observed_%d" % moving_index, true)
+		# Ice preserves momentum after input release. Start the next player's
+		# isolation check only after the previous rider has landed and stopped.
+		if local_index == moving_index:
+			if not await wait_for_relay(func(): return operator.grounded() and absf(operator.velocity.x)<.08,5.0):
+				return false
+			lobby.lobby_set_data("coop_input_settled_%d" % moving_index,true)
+		elif not await wait_for_relay(func(): return lobby.lobby_get_data("coop_input_settled_%d" % moving_index,false),6.0):
+			return false
 	if not await wait_for_relay(func(): return operator.grounded(), 3.0):
 		return false
 	print("CO-OP INPUT ISOLATION PASS ", "host" if local_index == 0 else "guest")
@@ -1709,7 +1750,7 @@ func build_level() -> void:
 	arena_door = CampaignDoor.new(gate)
 	arena_door.reset()
 	gate_relays = GateRelays.new()
-	gate_relays.install(game_root, Color(Catalog.info(sector).color), sector != 2)
+	gate_relays.install(game_root, Color(Catalog.info(sector).color), sector not in [2,3])
 	boss_spawn = boss.position
 	if act == 1:
 		var actors := boss.get_parent()

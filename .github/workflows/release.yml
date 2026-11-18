@@ -73,6 +73,7 @@ jobs:
           chmod +x "$base/RIFTCORE"
           python3 distribution/verify_coop.py "$base/RIFTCORE"
           python3 distribution/verify_coop.py "$base/RIFTCORE" jungle
+          python3 distribution/verify_coop.py "$base/RIFTCORE" frozen
       - name: Test portable and installed builds on Arch
         run: |
           docker run --rm -v "$PWD/release-tools/artifacts:/artifacts:ro" archlinux:latest sh -ec '
@@ -164,6 +165,8 @@ jobs:
           python distribution/verify_coop.py game/RIFTCORE.exe
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python distribution/verify_coop.py game/RIFTCORE.exe jungle
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python distribution/verify_coop.py game/RIFTCORE.exe frozen
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Verify launcher self-replacement on Windows
         shell: pwsh

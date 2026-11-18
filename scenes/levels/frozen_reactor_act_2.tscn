@@ -1,5 +1,7 @@
 [gd_scene format=3]
 
+[ext_resource type="Script" path="res://scripts/frozen_rocket_course.gd" id="RocketCourse"]
+
 [ext_resource type="PackedScene" path="res://assets/campaign/frozen_reactor/terrain/relay.tscn" id="relay"]
 
 [ext_resource type="PackedScene" path="res://assets/campaign/doorways/cryo_gate.tscn" id="gate"]
@@ -770,6 +772,11 @@ light_color = Color(0.8532, 0.9699, 1.0000, 1.0000)
 shadow_enabled = true
 
 [node name="TERRAIN" type="Node3D" parent="."]
+
+[node name="RocketCourse" type="Node3D" parent="TERRAIN"]
+position = Vector3(800,0,0)
+script = ExtResource("RocketCourse")
+
 
 [node name="DECOR" type="Node3D" parent="."]
 
@@ -4822,3 +4829,6 @@ right_edge = 630.8721
 cave_floor = 1.3500
 cave_roof = 23.3500
 arena = true
+
+[node name="GateRelay1" type="Marker3D" parent="MARKERS"]
+position = Vector3(2844,-108,0)

@@ -40,6 +40,7 @@ var contact_left := 0.0
 var warning: Node3D
 var hazards: Array[Dictionary] = []
 var joints: Dictionary = {}
+var frozen_rig: Node3D
 var lamp: OmniLight3D
 @onready var armor: Node3D = $Armor
 
@@ -54,7 +55,22 @@ func _ready() -> void:
 	var level := get_parent().get_parent()
 	left = level.get_node("Gate").global_position.x + 2.3
 	right = level.get_node("ExitBarrier").global_position.x - 2.7
-	preload("res://scripts/boss_armor_kit.gd").mount(armor, sector_number, false, accent)
+	if sector_number == 3:
+		frozen_rig = preload("res://scripts/frozen_boss_rig.gd").new()
+		frozen_rig.name = "Armor"
+		var model := armor.get_child(0) as Node3D
+		armor.remove_child(model)
+		var old := armor
+		remove_child(old)
+		add_child(frozen_rig)
+		frozen_rig.position = old.position
+		frozen_rig.rotation = old.rotation
+		frozen_rig.add_child(model)
+		frozen_rig.bind_model(model,3.10,0.0)
+		armor = frozen_rig
+		old.queue_free()
+	else:
+		preload("res://scripts/boss_armor_kit.gd").mount(armor, sector_number, false, accent)
 	for limb in ["ArmLeft", "ArmRight", "LegLeft", "LegRight", "Rotor"]:
 		var part := armor.find_child(limb, true, false) as Node3D
 		if part:
@@ -105,6 +121,8 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 	global_position.x = clampf(global_position.x, left, right)
 	armor.rotation.y = lerp_angle(armor.rotation.y, facing * 1.03, 1.0 - exp(-12.0 * delta))
+	if frozen_rig:
+		frozen_rig.set_combat_pose(facing,absf(velocity.x),attack if sprint_left<=0 else "charge")
 	var stepping := sin(clock * 9.5) * minf(absf(velocity.x) * 0.11, 0.39)
 	for label in joints:
 		var limb: Node3D = joints[label]
@@ -152,7 +170,7 @@ func windup() -> void:
 	var width := (right - left) * 0.51 if broad else (6.0 if dash else 1.7)
 	var x := (left + right) * 0.5 if broad else (global_position.x + strike_dir * 5.5 if dash else strike_x)
 	warning.global_position = Vector3(x, floor_y + 0.075, 0)
-	ATTACK_FX.telegraph(warning, width * 2.0, accent, cooldown)
+	ATTACK_FX.telegraph(warning, width * 2.0, accent, cooldown, sector_number)
 	if attack == "crossfire":
 		var signal_light := Label3D.new()
 		signal_light.font = preload("res://assets/ui/fonts/BarlowCondensed-ExtraBoldItalic.ttf")
@@ -165,6 +183,8 @@ func windup() -> void:
 
 func execute(move: String) -> void:
 	var power := 19.0 + sector_number * 2.05 + phase() * 5.0
+	if sector_number == 3:
+		power = (40.0+phase()*5.0) * Difficulty.boss_damage_scale(difficulty_mode)
 	match move:
 		"crossfire":
 			fan(4 + phase(), 0.22, power * 0.84, 18.5)
@@ -248,9 +268,10 @@ func fire(at: Vector3, aim: Vector3, power: float, speed: float, heavy := false)
 		ATTACK_FX.muzzle(get_parent(), at, accent, 0.78)
 
 func fan(count: int, spread: float, power: float, speed: float) -> void:
+	var muzzle: Vector3 = frozen_rig.muzzle_position() if frozen_rig else global_position + Vector3(strike_dir * 1.24, 0.49, 0)
 	for i in count:
 		var y := (i - (count - 1) * 0.5) * spread
-		fire(global_position + Vector3(strike_dir * 1.24, 0.49, 0), Vector3(strike_dir, y, 0), power, speed, i == floori(count * 0.5))
+		fire(muzzle, Vector3(strike_dir, y, 0), power, speed, i == floori(count * 0.5))
 
 func ground_wave(power: float) -> void:
 	for side in [-1.0, 1.0]:
@@ -294,9 +315,10 @@ func ice_wall(x: float) -> void:
 	var collision := CollisionShape3D.new()
 	collision.shape = shape
 	obstacle.add_child(collision)
-	var armor_mesh := BoxMesh.new()
-	armor_mesh.size = shape.size
-	RiftProjectile.part(obstacle, armor_mesh, RiftProjectile.light_paint(accent.darkened(0.2), 0.76), Vector3.ZERO, Vector3.ONE)
+	for i in 5:
+		var tooth := RiftProjectile.part(obstacle, preload("res://scripts/frost_fx.gd").crystal_mesh(),
+			preload("res://assets/campaign/frozen_reactor/kit/ice.tres"),Vector3(0,-1.12,(i-2)*.35),Vector3(1.7,2.10 + (i%3)*.17,1.0))
+		tooth.rotation.z = (i%2-.5)*.12
 	add_collision_exception_with(obstacle)
 	obstacle.create_tween().tween_interval(3.1).finished.connect(obstacle.queue_free)
 
@@ -343,3 +365,10 @@ func _explode() -> void:
 	RiftAudio.play_effect(&"enemy_break")
 	hide()
 	queue_free()
+
+func frozen_snapshot() -> Array:
+	return frozen_rig.snapshot() if frozen_rig else []
+
+func apply_frozen_snapshot(data: Array) -> void:
+	if frozen_rig:
+		frozen_rig.apply_snapshot(data)

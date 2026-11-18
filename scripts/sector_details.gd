@@ -23,8 +23,11 @@ func install(level: Node3D, target: Node3D, number: int, act_number: int) -> voi
 	tint = ATTACK_FX.tint_for(sector)
 	trim_scene = load("res://assets/campaign/%s/terrain/sector_trim.tscn" % CATALOG.info(sector).id)
 	level.add_child(self)
+	if sector == 3:
+		install_frozen_details(level)
 	if level.has_meta("interior_layout"):
 		return
+
 	for deck in level.get_node("TERRAIN").get_children():
 		if deck is Node3D:
 			fit_platform(deck)
@@ -57,6 +60,27 @@ func install(level: Node3D, target: Node3D, number: int, act_number: int) -> voi
 			index += 1
 			if index % (4 if act == 2 else 6) == 0:
 				add_detail(deck.global_position, false)
+
+func install_frozen_details(level: Node3D) -> void:
+	var kit := preload("res://scripts/frozen_kit.gd")
+	var decor := level.get_node("DECOR") as Node3D
+	var index := 0
+	for surface in level.find_children("SectorSurfaces","Node3D",true,false):
+		if not "cave_roof" in surface:
+			continue
+		var span: float = surface.right_edge - surface.left_edge
+		for i in maxi(1,ceili(span/18.0)):
+			var tips := kit.new()
+			tips.piece = kit.Piece.ICICLES
+			decor.add_child(tips)
+			tips.global_position = Vector3(surface.left_edge + (i+.5)*span/maxi(1,ceili(span/18.0)),surface.cave_roof-.55,-1.4)
+			tips.scale = Vector3(1.6,1.5+float(index%3)*.25,1.6)
+		index += 1
+		if not surface.arena and index%2 == 0:
+			var pump := kit.new()
+			pump.piece = kit.Piece.COOLANT_PUMP
+			decor.add_child(pump)
+			pump.global_position = Vector3(surface.left_edge+3,surface.cave_floor,-2.7)
 
 func mount_pillars(terrain: Node3D, decor: Node3D) -> void:
 	var supports: Array[CollisionShape3D] = []

@@ -393,6 +393,9 @@ var remote_held: Dictionary = {}
 var remote_pressed: Dictionary = {}
 var remote_released: Dictionary = {}
 var controls_suspended := false
+var rocket_course: Node3D
+var rocket_speed := 0.0
+var rocket_seconds := 0.0
 
 func set_controls_suspended(suspended: bool) -> void:
 	if controls_suspended == suspended:
@@ -451,6 +454,9 @@ func simulate_movement(delta: float) -> void:
 	if health <= 0.0:
 		cancel_charge()
 		cancel_saber_charge()
+		return
+	if is_instance_valid(rocket_course):
+		rocket_course.simulate(self,delta)
 		return
 	var terrain := environment_control()
 	if boss_debuff == 8:
@@ -1767,6 +1773,13 @@ func play_ground_locomotion(axis: float, speed: float, top_speed: float) -> void
 			animation_player.speed_scale = clampf(absf(speed) / (top_speed * 0.32), 0.45, 1.6)
 
 func update_character_visuals(axis: float) -> void:
+	if is_instance_valid(rocket_course):
+		if model_root:
+			model_root.rotation = Vector3(0,PI*.5,0)
+		if buster_pose:
+			buster_pose.influence = 0.0
+		play_character_animation("crouch" if low_profile else "idle")
+		return
 	var bracing := wall_sliding and not grounded() and dash_left <= 0.0 and melee_lock <= 0.0
 	if model_root:
 		var visual_facing := signf(velocity.x) if absf(velocity.x) > 0.65 and fire_lock <= 0.0 and melee_lock <= 0.0 else facing

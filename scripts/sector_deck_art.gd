@@ -35,7 +35,7 @@ func make_kit() -> ArrayMesh:
 	var colors: Array = PALETTES[sector - 1]
 	var chassis := finish(Color(colors[0]), .39)
 	var trim := finish(Color(colors[1]), .52)
-	var lamp := finish(Color(colors[2]), .19, .90)
+	var lamp := finish(Color(colors[2]), .19, .35 if sector == 3 else .90)
 	var tread := ShaderMaterial.new()
 	tread.shader = SURFACE
 	tread.set_shader_parameter("terrain_albedo", surface)
@@ -50,6 +50,8 @@ func make_kit() -> ArrayMesh:
 		tread.set_shader_parameter("metal", .38)
 		tread.set_shader_parameter("roughness", .18)
 		tread.set_shader_parameter("brightness", 1.5)
+	if sector == 3 and not shaft:
+		tread = preload("res://assets/campaign/frozen_reactor/kit/ice.tres") if ice_coating else preload("res://assets/campaign/frozen_reactor/kit/snow.tres")
 	if shaft:
 		build_shaft(tread, chassis, trim, lamp)
 	else:

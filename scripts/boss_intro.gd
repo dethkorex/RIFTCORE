@@ -25,7 +25,7 @@ func play(rig: SideCameraRig, boss: Combatant, floor_y: float, title: String, ti
 	var neutral := articulation.transform
 	var foundry := armor as FoundryRig
 	var jungle := armor as JungleRig
-	var animate := Callable(armor, &"cinematic_pose") if foundry or jungle else Callable()
+	var animate := Callable(armor, &"cinematic_pose") if armor and armor.has_method("cinematic_pose") else Callable()
 	if jungle:
 		jungle.cinematic = true
 		jungle.rotation.y = -0.44
@@ -129,6 +129,8 @@ func play(rig: SideCameraRig, boss: Combatant, floor_y: float, title: String, ti
 		foundry.cinematic_pose(0.2, 0.0, 0.0, 0.0, 0.0)
 	if jungle:
 		jungle.finish_cinematic()
+	elif armor and armor.has_method("finish_cinematic"):
+		armor.finish_cinematic()
 	boss.collision_layer = original_layer
 	var target := rig.target
 	var position := target.global_position if is_instance_valid(target) else landing

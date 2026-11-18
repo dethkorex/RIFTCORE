@@ -15,7 +15,7 @@ def verify(executable: Path, sector: str = "") -> None:
     def launch(*arguments: str) -> subprocess.Popen:
         return subprocess.Popen(
             [str(executable), "--headless", "--", "--verify-relay", *arguments, "mission",
-             *(["jungle"] if sector == "jungle" else [])],
+             *(["jungle"] if sector == "jungle" else ["sector=3"] if sector == "frozen" else [])],
             cwd=executable.parent,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
@@ -63,6 +63,12 @@ def verify(executable: Path, sector: str = "") -> None:
                     print(result)
                     raise RuntimeError("A client did not cross both Jungle canopy routes.")
             print("Both live clients crossed the Jungle canopy routes and completed both acts.")
+        elif sector == "frozen":
+            for result in (output,"".join(lines)):
+                if "FROZEN BOARD SYNC true" not in result:
+                    print(result)
+                    raise RuntimeError("A client's rocket board state did not synchronize.")
+            print("Both live clients synchronized rocket boards and completed both Frozen Reactor acts.")
         else:
             print("Live party join, names, independent cameras and controls, shared rewards and return passed.")
     finally:

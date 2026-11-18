@@ -30,6 +30,9 @@ static func boss_health_scale(sector: int, mode: int, act: int) -> float:
 	return scale * (1.16 + 0.04 * index(mode)) if act == 1 else scale
 
 static func jungle_boss_damage_scale(mode: int) -> float:
+	return boss_damage_scale(mode)
+
+static func boss_damage_scale(mode: int) -> float:
 	return [1.0, 1.18, 1.38][index(mode)]
 
 static func jungle_boss_damage_taken(mode: int, miniboss: bool) -> float:

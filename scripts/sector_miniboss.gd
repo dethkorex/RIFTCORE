@@ -52,6 +52,7 @@ var turn := 0
 var attack := ""
 var warning: Node3D
 var armor: Node3D
+var frozen_rig: Node3D
 var skin: Node3D
 var chassis_height := 1.05
 var core: MeshInstance3D
@@ -85,6 +86,8 @@ func configure(number: int, tint: Color, weakness: String, gate_position: Vector
 	sector = number
 	accent = tint
 	max_health = 825.0 if sector == 2 else 315.0 + 66.0 * (sector - 1)
+	if sector == 3:
+		max_health = 1100.0
 	weakness_weapon = weakness
 	fire_weakness = 1.38 if sector in [2, 3] else 1.0
 	floor_y = gate_position.y
@@ -134,6 +137,16 @@ func _ready() -> void:
 			anchor_sites.append(site.global_position)
 		for deck in get_tree().get_nodes_in_group("factory_one_way"):
 			add_collision_exception_with(deck)
+		died.connect(break_apart)
+		return
+	if sector == 3:
+		frozen_rig = preload("res://scripts/frozen_boss_rig.gd").new()
+		frozen_rig.name = "Armor"
+		armor = frozen_rig
+		add_child(armor)
+		skin = preload("res://assets/campaign/frozen_reactor/enemies/rime_keeper_tripo.glb").instantiate()
+		armor.add_child(skin)
+		frozen_rig.bind_model(skin,1.95,chassis_height)
 		died.connect(break_apart)
 		return
 	armor = Node3D.new()
@@ -189,6 +202,8 @@ func damage_on_contact(player: RiftPlayer) -> void:
 	if active and contact_lock <= 0.0:
 		contact_lock = 0.55
 		var power := (34.0 if charge_time > 0.0 else 22.0) * briar_damage_scale if jungle_rig else 11.0 + sector
+		if frozen_rig:
+			power = 32.0 if charge_time > 0.0 else 26.0
 		player.take_damage(power, global_position)
 
 func _physics_process(delta: float) -> void:
@@ -217,6 +232,8 @@ func _physics_process(delta: float) -> void:
 	if jungle_rig:
 		update_briar_pose(delta)
 		update_briar_vfx()
+	elif frozen_rig:
+		frozen_rig.set_combat_pose(facing,absf(velocity.x),attack if charge_time<=0 else "charge")
 	else:
 		armor.rotation.y = lerp_angle(armor.rotation.y, facing * 1.03, minf(12.0 * delta, 1.0))
 		armor.rotation.z = sin(elapsed * 11.0) * minf(absf(velocity.x) * 0.012, 0.12)
@@ -235,6 +252,13 @@ func _physics_process(delta: float) -> void:
 func grow_seed_anchor() -> void:
 	exposed = false
 	root_anchor.present(anchor_sites[root_phase], 2 + difficulty_mode, true)
+
+func frozen_snapshot() -> Array:
+	return frozen_rig.snapshot() if frozen_rig else []
+
+func apply_frozen_snapshot(data: Array) -> void:
+	if frozen_rig:
+		frozen_rig.apply_snapshot(data)
 
 func expose_briar() -> void:
 	exposed = true
@@ -384,7 +408,7 @@ func mark(x: float, radius: float, height: float) -> void:
 	var footprint := Node3D.new()
 	warning.add_child(footprint)
 	footprint.position.x = x
-	ATTACK_FX.telegraph(footprint, radius * 2.0, accent, cooldown)
+	ATTACK_FX.telegraph(footprint, radius * 2.0, accent, cooldown, sector)
 
 func strike() -> void:
 	if jungle_rig:
@@ -393,11 +417,15 @@ func strike() -> void:
 	if is_instance_valid(warning):
 		warning.queue_free()
 	var power := 32.0 * briar_damage_scale if jungle_rig else 15.0 + sector * 1.65
+	if frozen_rig:
+		power = 38.0 * Difficulty.boss_damage_scale(difficulty_mode)
 	match attack:
 		"charge":
 			charge_time = 0.53
 		"volley":
 			var muzzle := global_position + Vector3(locked_direction * 0.87, 0.18, 0)
+			if frozen_rig:
+				muzzle = frozen_rig.muzzle_position()
 			var direction := (aim - muzzle).normalized()
 			var spread := [-0.25, -0.12, 0.0, 0.12, 0.25] if difficulty_mode == Difficulty.NIGHTMARE else [-0.14, 0.0, 0.14]
 			for angle in spread:
