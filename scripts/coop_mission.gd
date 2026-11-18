@@ -20,6 +20,7 @@ const BossIntro := preload("res://scripts/boss_intro.gd")
 const Story := preload("res://scripts/rift_story.gd")
 const StoryDialogue := preload("res://scripts/story_dialogue.gd")
 const CampaignDoor := preload("res://scripts/campaign_door.gd")
+const GateRelays := preload("res://scripts/gate_relays.gd")
 const INPUTS := [&"jump", &"dash", &"crouch", &"crouch_stick", &"shoot", &"melee", &"climb_down", &"swap_weapon", &"previous_suit", &"quick_0", &"quick_1", &"quick_2", &"quick_3", &"suit_fire"]
 const INPUT_SUSPENDED := 1 << 30
 const PauseMenu := preload("res://scripts/coop_pause_menu.gd")
@@ -50,6 +51,7 @@ var stage: Node3D
 var boss: Combatant
 var gate: Node3D
 var arena_door: CampaignDoor
+var gate_relays: GateRelays
 var repair_hall: Node3D
 var exit_marker: Marker3D
 var boss_started := false
@@ -65,6 +67,8 @@ var stage_props: Array[NodePath] = []
 var factory_trap_clock := 0.0
 var factory_relays: Array[Node3D] = []
 var foundry_boulders: Array[AnimatableBody3D] = []
+var lava_escape: Node3D
+const CHECKPOINT_PATHS := ["TERRAIN/CanopyLiftCheckpoint", "TERRAIN/MidpointCheckpoint", "TERRAIN/EscapeShaftCheckpoint", "TERRAIN/ForgeHallCheckpoint"]
 var personal_replicas: Dictionary[String, Area3D] = {}
 var personal_rewards: Array[Dictionary] = []
 var next_personal_drop := 0
@@ -445,6 +449,8 @@ func load_stage(packed: PackedScene = null) -> void:
 	gate = stage.get_node("Gate")
 	arena_door = CampaignDoor.new(gate)
 	arena_door.reset()
+	gate_relays = GateRelays.new()
+	gate_relays.install(stage, Color(info.color), sector != 2)
 	exit_marker = stage.get_node("MARKERS/RoomExit")
 	boss = actors.get_node(info.boss_node) as Combatant
 	boss_position = boss.position
@@ -469,7 +475,7 @@ func load_stage(packed: PackedScene = null) -> void:
 	camera.min_x = bounds.get_meta("min_x")
 	camera.max_x = bounds.get_meta("max_x")
 	camera.global_position = camera.target.global_position + Vector3.UP * 0.35
-	for path_name in ["TERRAIN/MidpointCheckpoint", "TERRAIN/ForgeHallCheckpoint"]:
+	for path_name in CHECKPOINT_PATHS:
 		var beacon := stage.get_node_or_null(path_name)
 		if beacon and host:
 			beacon.activated.connect(func(at: Vector3): checkpoint = at)
@@ -510,6 +516,9 @@ func load_stage(packed: PackedScene = null) -> void:
 			# Guests need the replicated platform collider for local movement prediction.
 			platform.disable_mode = CollisionObject3D.DISABLE_MODE_KEEP_ACTIVE
 			platform.process_mode = Node.PROCESS_MODE_DISABLED
+	lava_escape = stage.get_node_or_null("TERRAIN/LavaEscape")
+	if lava_escape:
+		lava_escape.authority = host
 	repair_hall = stage.get_node("ForgeHallDoor")
 	repair_hall.operators = operators
 	repair_hall.authority = host
@@ -521,10 +530,7 @@ func load_stage(packed: PackedScene = null) -> void:
 		update_personal_hud(operators[local_index])
 
 func scale_opponent(enemy: Combatant) -> void:
-	if enemy.has_method("configure_difficulty"):
-		enemy.configure_difficulty(mode)
-	enemy.max_health *= (1.0 + DIFFICULTY_PER_GUEST * (roster.size() - 1)) * Difficulty.boss_health_scale(sector, mode, act)
-	enemy.health = enemy.max_health
+	enemy.apply_boss_scaling(sector, mode, act, 1.0 + DIFFICULTY_PER_GUEST * (roster.size() - 1))
 	enemy.health_changed.emit(enemy.health, enemy.max_health)
 
 func disable_replica(body: Combatant) -> void:
@@ -891,6 +897,27 @@ func update_doors() -> void:
 			barrier.hide()
 			barrier.get_node("CollisionShape3D").set_deferred("disabled", true)
 
+func gate_status() -> String:
+	if not gate_relays.complete():
+		return "Find and activate both gate relays."
+	return "Enter the boss room together." if entrance_open else "Everyone must reach the boss door."
+
+func interact_gate_relay(operator: RiftPlayer) -> bool:
+	if not host or changing_act or boss_started or not outcome.is_empty():
+		return false
+	var before := operator.global_position
+	if not gate_relays.interact(operator, arena_door.near(operator)):
+		return false
+	if before != operator.global_position:
+		mark_position_reset(operator)
+	broadcast_state(true)
+	return true
+
+func receive_gate_relay_request(remote_act: int) -> void:
+	var source := roster.find(peer.get_sender_id())
+	if host and source > 0 and source < operators.size() and remote_act == act:
+		interact_gate_relay(operators[source])
+
 func check_campaign_progress() -> void:
 	var remaining := operators.filter(func(operator): return operator.lives > 0)
 	if remaining.is_empty():
@@ -901,7 +928,7 @@ func check_campaign_progress() -> void:
 		return
 	var far_edge := exit_marker.global_position.x
 	if not boss_started:
-		if not entrance_open and remaining.all(func(operator): return arena_door.near(operator)):
+		if not entrance_open and gate_relays.complete() and remaining.all(func(operator): return arena_door.near(operator)):
 			entrance_open = true
 		if entrance_open and arena_door.passable and remaining.all(func(operator): return arena_door.inside(operator, far_edge)):
 			boss_started = true
@@ -910,7 +937,7 @@ func check_campaign_progress() -> void:
 			play_boss_intro(track)
 	update_doors()
 	if not boss_defeated and not boss_started:
-		room_status.text = "Everyone must reach the boss door." if not entrance_open else "Enter the boss room together."
+		room_status.text = gate_status()
 	elif not boss_defeated:
 		room_status.text = "%s  •  %d / %d HP" % [Miniboss.TITLES[sector - 1] if act == 1 else Catalog.info(sector).boss, boss.health, boss.max_health]
 	if boss_defeated and not changing_act:
@@ -1212,6 +1239,7 @@ func update_personal_hud(operator: RiftPlayer) -> void:
 		personal_hud.boss_tint = Color(Catalog.info(sector).color)
 		personal_hud.boss_health = boss.health
 		personal_hud.boss_max_health = boss.max_health
+	personal_hud.update_boss_mechanic(boss if personal_hud.boss_visible else null)
 	if personal_hud.experience != operator.experience:
 		personal_hud.set_experience(operator.experience)
 	else:
@@ -1407,12 +1435,17 @@ func broadcast_state(reliable_operators := false) -> void:
 	var foundry_state := foundry_boulders.map(func(rock): return rock.snapshot())
 	var boss_state := [Vector3.ZERO, Vector3.ZERO, 0.0, boss_started, boss_defeated, arena_door.lift(), platform_positions, entrance_open, checkpoint, factory_trap_clock, fractures, doors, relay_lamps, [], foundry_state, guards]
 	boss_state.append([reboot_used, reboot_from, reboot_target, reboot_left])
+	boss_state.append(gate_relays.active)
+	if is_instance_valid(lava_escape):
+		boss_state.append(lava_escape.snapshot())
 	if is_instance_valid(boss):
 		boss_state[0] = boss.global_position
 		boss_state[1] = boss.rotation
 		boss_state[2] = boss.health
 		if boss.has_method("foundry_snapshot"):
 			boss_state[13] = boss.foundry_snapshot()
+		elif sector == 2:
+			boss_state[13] = boss.jungle_snapshot()
 	state_sequence += 1
 	for index in range(1, roster.size()):
 		var snapshot := players.duplicate()
@@ -1430,6 +1463,10 @@ func receive_state(remote_act: int, security: PackedFloat32Array, arena: Array, 
 	if host or changing_act or remote_act != act or not outcome.is_empty() or peer.get_sender_id() != peer.get_host() or sequence <= latest_state or security.size() != enemies.size() * 6:
 		return
 	latest_state = sequence
+	if arena.size() > 17:
+		gate_relays.set_active(int(arena[17]))
+	if arena.size() > 18 and is_instance_valid(lava_escape):
+		lava_escape.apply_snapshot(arena[18])
 	if arena.size() > 16:
 		reboot_used = arena[16][0]
 		reboot_from = arena[16][1]
@@ -1439,8 +1476,11 @@ func receive_state(remote_act: int, security: PackedFloat32Array, arena: Array, 
 		boss.global_position = arena[0]
 		boss.rotation = arena[1]
 		boss.health = arena[2]
-		if arena.size() > 13 and not arena[13].is_empty() and boss.has_method("apply_foundry_snapshot"):
-			boss.apply_foundry_snapshot(arena[13])
+		if arena.size() > 13 and not arena[13].is_empty():
+			if boss.has_method("apply_foundry_snapshot"):
+				boss.apply_foundry_snapshot(arena[13])
+			elif sector == 2:
+				boss.apply_jungle_snapshot(arena[13])
 		if last_boss_health != boss.health:
 			last_boss_health = boss.health
 			boss.health_changed.emit(boss.health, boss.max_health)
@@ -1452,19 +1492,24 @@ func receive_state(remote_act: int, security: PackedFloat32Array, arena: Array, 
 		create_boss_cache()
 	boss_defeated = arena[4]
 	if is_instance_valid(boss) and not boss_intro_active:
+		var was_visible := boss.visible
 		boss.visible = boss_started and not boss_defeated
+		if boss.has_method("foundry_snapshot"):
+			boss.collision_layer = 1 if boss.visible else 0
+			if was_visible and not boss.visible:
+				boss.clear_attack()
 	entrance_open = arena[7]
 	if boss_defeated:
 		room_status.text = "Enter the Act II gate." if act == 1 else "Reach the extraction pad."
 	elif boss_started:
 		room_status.text = "%s  •  %d / %d HP" % [Miniboss.TITLES[sector - 1] if act == 1 else Catalog.info(sector).boss, arena[2], boss.max_health]
 	else:
-		room_status.text = "Enter the boss room together." if entrance_open else "Everyone must reach the boss door."
+		room_status.text = gate_status()
 	arena_door.apply(arena[5], arena[11][0])
 	repair_hall.motor.apply(arena[11][1], arena[11][2])
 	if arena[8] != remote_checkpoint:
 		remote_checkpoint = arena[8]
-		for path_name in ["TERRAIN/MidpointCheckpoint", "TERRAIN/ForgeHallCheckpoint"]:
+		for path_name in CHECKPOINT_PATHS:
 			var beacon := stage.get_node_or_null(path_name) as Node3D
 			if beacon and beacon.global_position.distance_to(remote_checkpoint - Vector3.UP * 0.88) < 0.15:
 				beacon.set("online", true)
@@ -1688,7 +1733,8 @@ func _process(delta: float) -> void:
 	partner_status.visible = not teammates.is_empty()
 
 	var blueprints: int = local.recovered_blueprints.size() if outcome.is_empty() else blueprint_count
-	objective.text = Story.objective(sector, act, boss_defeated, Miniboss.TITLES[sector - 1])
+	objective.text = "%s\nGATE RELAYS   %d/2" % [Story.objective(sector, act, boss_defeated, Miniboss.TITLES[sector - 1]), gate_relays.count()]
+	gate_relays.update_prompt(local, not boss_started and arena_door.near(local))
 	var security_left := 0
 	for enemy in enemies:
 		if is_instance_valid(enemy) and enemy.health > 0 and enemy.visible:
@@ -1878,9 +1924,16 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("pause") and not local_input_blocked():
 		get_viewport().set_input_as_handled()
 		open_pause()
-	elif event.is_action_pressed("field_interact") and not local_input_blocked() and local_profile.rank(Profile.FIELD_REBOOT) > 0 and reboot_candidate(operators[local_index]) >= 0:
-		get_viewport().set_input_as_handled()
-		if host:
-			start_reboot(local_index)
+	elif event.is_action_pressed("field_interact") and not local_input_blocked():
+		var local := operators[local_index]
+		if local_profile.rank(Profile.FIELD_REBOOT) > 0 and reboot_candidate(local) >= 0:
+			get_viewport().set_input_as_handled()
+			if host:
+				start_reboot(local_index)
+			else:
+				peer.call_func_on(peer.get_host(), receive_reboot_request, act)
+		elif host:
+			if interact_gate_relay(local):
+				get_viewport().set_input_as_handled()
 		else:
-			peer.call_func_on(peer.get_host(), receive_reboot_request, act)
+			peer.call_func_on(peer.get_host(), receive_gate_relay_request, act)

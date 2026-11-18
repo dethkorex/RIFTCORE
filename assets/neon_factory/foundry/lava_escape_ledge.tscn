@@ -1,0 +1,227 @@
+[gd_scene format=3]
+
+[ext_resource type="Texture2D" path="res://assets/campaign/neon_factory/surfaces/sector_wall.jpg" id="Steel"]
+
+[sub_resource type="StandardMaterial3D" id="Tread"]
+albedo_texture = ExtResource("Steel")
+albedo_color = Color(0.64, 0.52, 0.45, 1)
+metallic = 0.48
+roughness = 0.69
+uv1_scale = Vector3(2.8, 1.0, 1)
+
+[sub_resource type="StandardMaterial3D" id="Frame"]
+albedo_color = Color(0.58, 0.17, 0.049, 1)
+metallic = 0.4
+roughness = 0.48
+
+[sub_resource type="StandardMaterial3D" id="StripeBed"]
+albedo_color = Color(0.055, 0.037, 0.026, 1)
+metallic = 0.4
+roughness = 0.48
+
+[sub_resource type="StandardMaterial3D" id="Caution"]
+albedo_color = Color(0.96, 0.49, 0.075, 1)
+metallic = 0.4
+roughness = 0.48
+emission_enabled = true
+emission = Color(0.96, 0.49, 0.075, 1)
+emission_energy_multiplier = 0.3
+
+[sub_resource type="StandardMaterial3D" id="Lamp"]
+albedo_color = Color(1, 0.51, 0.06, 1)
+metallic = 0.4
+roughness = 0.48
+emission_enabled = true
+emission = Color(1, 0.51, 0.06, 1)
+emission_energy_multiplier = 2.2
+
+[sub_resource type="BoxMesh" id="Slab"]
+material = SubResource("Tread")
+size = Vector3(6, 0.25, 3.2)
+
+[sub_resource type="BoxMesh" id="Front"]
+material = SubResource("StripeBed")
+size = Vector3(5.84, 0.27, 0.13)
+
+[sub_resource type="BoxMesh" id="Trim"]
+material = SubResource("Frame")
+size = Vector3(5.92, 0.058, 0.16)
+
+[sub_resource type="BoxMesh" id="Rail"]
+material = SubResource("Frame")
+size = Vector3(5.74, 0.086, 0.085)
+
+[sub_resource type="BoxMesh" id="Post"]
+material = SubResource("Frame")
+size = Vector3(0.095, 0.45, 0.096)
+
+[sub_resource type="BoxMesh" id="Stripe"]
+material = SubResource("Caution")
+size = Vector3(0.14, 0.23, 0.05)
+
+[sub_resource type="BoxMesh" id="Glow"]
+material = SubResource("Lamp")
+size = Vector3(2.55, 0.074, 0.14)
+
+[sub_resource type="BoxMesh" id="Brace"]
+material = SubResource("Frame")
+size = Vector3(0.23, 0.24, 1.25)
+
+[sub_resource type="BoxShape3D" id="Collider"]
+size = Vector3(6, 0.25, 3.2)
+
+[node name="LavaEscapeLedge" type="StaticBody3D" groups=["factory_one_way"]]
+
+[node name="Collider" type="CollisionShape3D" parent="."]
+position = Vector3(0, -0.125, 0)
+shape = SubResource("Collider")
+
+[node name="Deck" type="MeshInstance3D" parent="."]
+position = Vector3(0, -0.125, 0)
+mesh = SubResource("Slab")
+
+[node name="CautionBand" type="MeshInstance3D" parent="."]
+position = Vector3(0, -0.14, 1.61)
+mesh = SubResource("Front")
+
+[node name="TopTrim" type="MeshInstance3D" parent="."]
+position = Vector3(0, -0.02, 1.63)
+mesh = SubResource("Trim")
+
+[node name="LowerTrim" type="MeshInstance3D" parent="."]
+position = Vector3(0, -0.28, 1.63)
+mesh = SubResource("Trim")
+
+[node name="RearRail" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.39, -1.53)
+mesh = SubResource("Rail")
+
+[node name="Light" type="MeshInstance3D" parent="."]
+position = Vector3(0, -0.32, 1.46)
+mesh = SubResource("Glow")
+
+[node name="WestBrace" type="MeshInstance3D" parent="."]
+position = Vector3(-1.83, -0.52, -0.62)
+mesh = SubResource("Brace")
+rotation = Vector3(0.48, 0, 0)
+
+[node name="EastBrace" type="MeshInstance3D" parent="."]
+position = Vector3(1.83, -0.52, -0.62)
+mesh = SubResource("Brace")
+rotation = Vector3(0.48, 0, 0)
+
+[node name="RailPost0" type="MeshInstance3D" parent="."]
+position = Vector3(-2.81, 0.19, -1.53)
+mesh = SubResource("Post")
+
+[node name="RailPost1" type="MeshInstance3D" parent="."]
+position = Vector3(-0.94, 0.19, -1.53)
+mesh = SubResource("Post")
+
+[node name="RailPost2" type="MeshInstance3D" parent="."]
+position = Vector3(0.94, 0.19, -1.53)
+mesh = SubResource("Post")
+
+[node name="RailPost3" type="MeshInstance3D" parent="."]
+position = Vector3(2.81, 0.19, -1.53)
+mesh = SubResource("Post")
+
+[node name="CautionStripe00" type="MeshInstance3D" parent="."]
+position = Vector3(-2.6315, -0.14, 1.685)
+mesh = SubResource("Stripe")
+rotation = Vector3(0, 0, -0.46)
+
+[node name="CautionStripe01" type="MeshInstance3D" parent="."]
+position = Vector3(-2.3545, -0.14, 1.685)
+mesh = SubResource("Stripe")
+rotation = Vector3(0, 0, -0.46)
+
+[node name="CautionStripe02" type="MeshInstance3D" parent="."]
+position = Vector3(-2.0775, -0.14, 1.685)
+mesh = SubResource("Stripe")
+rotation = Vector3(0, 0, -0.46)
+
+[node name="CautionStripe03" type="MeshInstance3D" parent="."]
+position = Vector3(-1.8005, -0.14, 1.685)
+mesh = SubResource("Stripe")
+rotation = Vector3(0, 0, -0.46)
+
+[node name="CautionStripe04" type="MeshInstance3D" parent="."]
+position = Vector3(-1.5235, -0.14, 1.685)
+mesh = SubResource("Stripe")
+rotation = Vector3(0, 0, -0.46)
+
+[node name="CautionStripe05" type="MeshInstance3D" parent="."]
+position = Vector3(-1.2465, -0.14, 1.685)
+mesh = SubResource("Stripe")
+rotation = Vector3(0, 0, -0.46)
+
+[node name="CautionStripe06" type="MeshInstance3D" parent="."]
+position = Vector3(-0.9695, -0.14, 1.685)
+mesh = SubResource("Stripe")
+rotation = Vector3(0, 0, -0.46)
+
+[node name="CautionStripe07" type="MeshInstance3D" parent="."]
+position = Vector3(-0.6925, -0.14, 1.685)
+mesh = SubResource("Stripe")
+rotation = Vector3(0, 0, -0.46)
+
+[node name="CautionStripe08" type="MeshInstance3D" parent="."]
+position = Vector3(-0.4155, -0.14, 1.685)
+mesh = SubResource("Stripe")
+rotation = Vector3(0, 0, -0.46)
+
+[node name="CautionStripe09" type="MeshInstance3D" parent="."]
+position = Vector3(-0.1385, -0.14, 1.685)
+mesh = SubResource("Stripe")
+rotation = Vector3(0, 0, -0.46)
+
+[node name="CautionStripe10" type="MeshInstance3D" parent="."]
+position = Vector3(0.1385, -0.14, 1.685)
+mesh = SubResource("Stripe")
+rotation = Vector3(0, 0, -0.46)
+
+[node name="CautionStripe11" type="MeshInstance3D" parent="."]
+position = Vector3(0.4155, -0.14, 1.685)
+mesh = SubResource("Stripe")
+rotation = Vector3(0, 0, -0.46)
+
+[node name="CautionStripe12" type="MeshInstance3D" parent="."]
+position = Vector3(0.6925, -0.14, 1.685)
+mesh = SubResource("Stripe")
+rotation = Vector3(0, 0, -0.46)
+
+[node name="CautionStripe13" type="MeshInstance3D" parent="."]
+position = Vector3(0.9695, -0.14, 1.685)
+mesh = SubResource("Stripe")
+rotation = Vector3(0, 0, -0.46)
+
+[node name="CautionStripe14" type="MeshInstance3D" parent="."]
+position = Vector3(1.2465, -0.14, 1.685)
+mesh = SubResource("Stripe")
+rotation = Vector3(0, 0, -0.46)
+
+[node name="CautionStripe15" type="MeshInstance3D" parent="."]
+position = Vector3(1.5235, -0.14, 1.685)
+mesh = SubResource("Stripe")
+rotation = Vector3(0, 0, -0.46)
+
+[node name="CautionStripe16" type="MeshInstance3D" parent="."]
+position = Vector3(1.8005, -0.14, 1.685)
+mesh = SubResource("Stripe")
+rotation = Vector3(0, 0, -0.46)
+
+[node name="CautionStripe17" type="MeshInstance3D" parent="."]
+position = Vector3(2.0775, -0.14, 1.685)
+mesh = SubResource("Stripe")
+rotation = Vector3(0, 0, -0.46)
+
+[node name="CautionStripe18" type="MeshInstance3D" parent="."]
+position = Vector3(2.3545, -0.14, 1.685)
+mesh = SubResource("Stripe")
+rotation = Vector3(0, 0, -0.46)
+
+[node name="CautionStripe19" type="MeshInstance3D" parent="."]
+position = Vector3(2.6315, -0.14, 1.685)
+mesh = SubResource("Stripe")
+rotation = Vector3(0, 0, -0.46)

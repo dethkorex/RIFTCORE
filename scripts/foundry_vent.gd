@@ -45,7 +45,12 @@ func _physics_process(delta: float) -> void:
 	var at := fposmod(time + offset, period)
 	if relief_valve and relief_valve.shown_power == 1:
 		at = -1.0
-	flame.show_phase(at)
+	var camera := get_viewport().get_camera_3d()
+	var nearby := false
+	if camera:
+		var distance := (camera.global_position - global_position).abs()
+		nearby = distance.x < 26.0 and distance.y < 16.0
+	flame.show_phase(at if nearby else -1.0)
 	var burning: bool = at >= flame.warning_time and at < flame.warning_time + flame.burst_time - 0.08
 	if burning and not lit:
 		RiftAudio.foundry_sound(&"fire_jet", global_position)

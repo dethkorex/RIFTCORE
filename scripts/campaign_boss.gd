@@ -338,11 +338,7 @@ func check_supply() -> void:
 
 func _explode() -> void:
 	active = false
-	var blast := preload("res://scripts/pit_burst.gd").new()
-	get_parent().add_child.call_deferred(blast)
-	blast.set_deferred("global_position", global_position)
-	blast.ignite.call_deferred(accent)
-	get_tree().create_timer(0.48, false).timeout.connect(blast.queue_free)
+	preload("res://scripts/pit_burst.gd").spawn.call_deferred(get_parent(), global_position, accent, .48)
 	set_deferred("collision_layer", 0)
 	RiftAudio.play_effect(&"enemy_break")
 	hide()

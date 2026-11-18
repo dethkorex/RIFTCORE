@@ -1,0 +1,112 @@
+[gd_scene format=3]
+
+[sub_resource type="StandardMaterial3D" id="Iron"]
+albedo_color = Color(0.103, 0.094, 0.103, 1)
+roughness = 0.53
+metallic = 0.47
+
+[sub_resource type="StandardMaterial3D" id="Copper"]
+albedo_color = Color(0.34, 0.143, 0.071, 1)
+roughness = 0.44
+metallic = 0.58
+
+[sub_resource type="StandardMaterial3D" id="Amber"]
+albedo_color = Color(1, 0.51, 0.18, 1)
+emission_enabled = true
+emission = Color(1, 0.31, 0.08, 1)
+emission_energy_multiplier = 1.25
+
+[sub_resource type="StandardMaterial3D" id="Cool"]
+albedo_color = Color(0.63, 0.81, 0.83, 1)
+emission_enabled = true
+emission = Color(0.30, 0.62, 0.68, 1)
+emission_energy_multiplier = 1.0
+
+[sub_resource type="BoxMesh" id="OuterLintel"]
+material = SubResource("Iron")
+size = Vector3(1.35, 1.13, 5.82)
+
+[sub_resource type="BoxMesh" id="InletSkin"]
+material = SubResource("Copper")
+size = Vector3(1.4, 0.13, 5.96)
+
+[sub_resource type="BoxMesh" id="RoofUpstand"]
+material = SubResource("Copper")
+size = Vector3(0.81, 0.49, 5.74)
+
+[sub_resource type="BoxMesh" id="RearJamb"]
+material = SubResource("Iron")
+size = Vector3(1.23, 5.02, 0.76)
+
+[sub_resource type="BoxMesh" id="JambPanel"]
+material = SubResource("Copper")
+size = Vector3(0.8, 4.9, 0.14)
+
+[sub_resource type="BoxMesh" id="JambLight"]
+material = SubResource("Amber")
+size = Vector3(0.16, 2.04, 0.05)
+
+[sub_resource type="BoxMesh" id="FrontColumnFoot"]
+material = SubResource("Iron")
+size = Vector3(1.32, 0.75, 0.66)
+
+[sub_resource type="BoxMesh" id="FrontColumnCap"]
+material = SubResource("Copper")
+size = Vector3(1.29, 0.41, 0.31)
+
+[sub_resource type="BoxMesh" id="UnderRoofLight"]
+material = SubResource("Cool")
+size = Vector3(0.29, 0.08, 1.74)
+
+[sub_resource type="BoxMesh" id="RoofFace"]
+material = SubResource("Iron")
+size = Vector3(0.2, 0.69, 5.84)
+
+[sub_resource type="BoxShape3D" id="LintelShape"]
+size = Vector3(1.40, 1.18, 5.90)
+
+[node name="FoundryBuildingThreshold" type="StaticBody3D"]
+
+[node name="LintelCollision" type="CollisionShape3D" parent="."]
+position = Vector3(0, 5.215, -0.39)
+shape = SubResource("LintelShape")
+
+[node name="OuterLintel" type="MeshInstance3D" parent="."]
+position = Vector3(0, 5.22, -0.39)
+mesh = SubResource("OuterLintel")
+
+[node name="InletSkin" type="MeshInstance3D" parent="."]
+position = Vector3(0, 4.68, -0.39)
+mesh = SubResource("InletSkin")
+
+[node name="RoofUpstand" type="MeshInstance3D" parent="."]
+position = Vector3(0.11, 5.95, -0.39)
+mesh = SubResource("RoofUpstand")
+
+[node name="RearJamb" type="MeshInstance3D" parent="."]
+position = Vector3(0, 2.38, -2.88)
+mesh = SubResource("RearJamb")
+
+[node name="JambPanel" type="MeshInstance3D" parent="."]
+position = Vector3(-0.05, 2.38, -2.42)
+mesh = SubResource("JambPanel")
+
+[node name="JambLight" type="MeshInstance3D" parent="."]
+position = Vector3(0, 2.95, -2.33)
+mesh = SubResource("JambLight")
+
+[node name="FrontColumnFoot" type="MeshInstance3D" parent="."]
+position = Vector3(0, -0.39, 2.35)
+mesh = SubResource("FrontColumnFoot")
+
+[node name="FrontColumnCap" type="MeshInstance3D" parent="."]
+position = Vector3(0, 4.49, 2.3)
+mesh = SubResource("FrontColumnCap")
+
+[node name="UnderRoofLight" type="MeshInstance3D" parent="."]
+position = Vector3(0, 4.57, 0.04)
+mesh = SubResource("UnderRoofLight")
+
+[node name="RoofFace" type="MeshInstance3D" parent="."]
+position = Vector3(0.69, 5.49, -0.39)
+mesh = SubResource("RoofFace")

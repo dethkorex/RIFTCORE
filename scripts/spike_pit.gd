@@ -5,8 +5,11 @@ extends Area3D
 @export var tint := Color("ff9c45")
 @export var shot_height := 6.4
 @export var period := 3.8
+@export var molten_visual := false
 @export var purge_relay: NodePath
 @onready var relief_valve := get_node_or_null(purge_relay) if not purge_relay.is_empty() else null
+
+const MOLTEN_SHADER := preload("res://assets/neon_factory/foundry/molten_fireball.gdshader")
 
 const WARNING := 0.69
 const ASCENT := 0.86
@@ -58,15 +61,21 @@ func _ready() -> void:
 	fireball = Node3D.new()
 	launcher.add_child(fireball)
 	var orange := Color("fa4c1e").lerp(tint, 0.15)
-	var flame := RiftProjectile.light_paint(orange, 1.35)
-	RiftProjectile.part(fireball, RiftProjectile.cached_mesh("Orb"), flame, Vector3.ZERO, Vector3(0.42, 0.54, 0.41))
-	RiftProjectile.part(fireball, RiftProjectile.cached_mesh("Orb"), RiftProjectile.light_paint(Color("ffbc55"), 1.9), Vector3(0, 0.07, 0.16), Vector3(0.31, 0.42, 0.30))
+	if molten_visual:
+		build_molten_fireball(orange)
+	else:
+		var flame := RiftProjectile.light_paint(orange, 1.35)
+		RiftProjectile.part(fireball, RiftProjectile.cached_mesh("Orb"), flame, Vector3.ZERO, Vector3(0.42, 0.54, 0.41))
+		RiftProjectile.part(fireball, RiftProjectile.cached_mesh("Orb"), RiftProjectile.light_paint(Color("ffbc55"), 1.9), Vector3(0, 0.07, 0.16), Vector3(0.31, 0.42, 0.30))
+		for index in 5:
+			var angle := TAU * float(index) / 5.0
+			var spot := Vector3(cos(angle), 0, sin(angle))
+			var plume := RiftProjectile.part(fireball, RiftProjectile.cached_mesh("Wake"), flame,
+				spot * 0.25 + Vector3.DOWN * (0.29 + index * 0.07), Vector3(0.17, 0.89, 0.17))
+			plume.rotation.z = 0.27 * spot.x
 	for index in 5:
 		var angle := TAU * float(index) / 5.0
 		var spot := Vector3(cos(angle), 0, sin(angle))
-		var plume := RiftProjectile.part(fireball, RiftProjectile.cached_mesh("Wake"), flame,
-			spot * 0.25 + Vector3.DOWN * (0.29 + index * 0.07), Vector3(0.17, 0.89, 0.17))
-		plume.rotation.z = 0.27 * spot.x
 		RiftProjectile.part(warning_embers, RiftProjectile.cached_mesh("Wake"), hot,
 			spot * 0.35 + Vector3.UP * (0.7 + index * 0.31), Vector3(0.055, 0.29, 0.055))
 	var fire_light := OmniLight3D.new()
@@ -86,6 +95,26 @@ func _ready() -> void:
 		stage = stage.get_parent()
 	if stage:
 		find_operators.call_deferred(stage.get_node("Actors"))
+
+func build_molten_fireball(orange: Color) -> void:
+	var core := SphereMesh.new()
+	core.radius = BALL_RADIUS
+	core.height = BALL_RADIUS * 2.35
+	core.radial_segments = 24
+	core.rings = 12
+	var surface := ShaderMaterial.new()
+	surface.shader = MOLTEN_SHADER
+	surface.set_shader_parameter("flame_tint", orange)
+	RiftProjectile.part(fireball, core, surface, Vector3.ZERO, Vector3.ONE)
+	var wake := SphereMesh.new()
+	wake.radius = BALL_RADIUS
+	wake.height = 1.74
+	wake.radial_segments = 16
+	wake.rings = 10
+	var wake_surface := surface.duplicate() as ShaderMaterial
+	wake_surface.set_shader_parameter("wake", true)
+	RiftProjectile.part(fireball, wake, wake_surface, Vector3(0, -0.61, 0), Vector3.ONE)
+
 
 func find_operators(actors: Node) -> void:
 	if is_instance_valid(actors):

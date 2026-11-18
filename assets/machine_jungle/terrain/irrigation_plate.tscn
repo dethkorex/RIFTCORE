@@ -1,0 +1,39 @@
+[gd_scene format=3]
+
+[ext_resource type="Material" path="res://assets/machine_jungle/tread.tres" id="bark"]
+[ext_resource type="Material" path="res://assets/machine_jungle/jade.tres" id="jade"]
+
+[sub_resource type="CylinderMesh" id="Base"]
+top_radius = 0.86
+bottom_radius = 1.02
+height = 0.12
+radial_segments = 12
+material = ExtResource("bark")
+
+[sub_resource type="CylinderMesh" id="Pedal"]
+top_radius = 0.65
+bottom_radius = 0.75
+height = 0.10
+radial_segments = 10
+material = ExtResource("jade")
+
+[sub_resource type="TorusMesh" id="OuterRing"]
+inner_radius = 0.79
+outer_radius = 0.91
+rings = 16
+ring_segments = 8
+material = ExtResource("jade")
+
+[node name="IrrigationPlate" type="Node3D"]
+
+[node name="DeckMount" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.045, 0)
+mesh = SubResource("Base")
+
+[node name="ValvePedal" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.13, 0)
+mesh = SubResource("Pedal")
+
+[node name="Retainer" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.09, 0)
+mesh = SubResource("OuterRing")

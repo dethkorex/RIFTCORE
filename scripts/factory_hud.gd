@@ -43,11 +43,14 @@ var failed := false
 var boss_visible := false
 var boss_health := 0.0
 var boss_max_health := 1.0
+var boss_mechanic := ""
+var boss_core_exposed := false
 var boss_name := "FORGE TITAN"
 var boss_tint := Color("ff8c36")
 var boss_sector := 1
 var boss_act := 2
 const BOSS_SIGILS := ["◆", "✿", "❄", "◈", "⌘", "≋", "⬢", "⊙", "▦", "✧"]
+var gate_relay_count := -1
 var exit_task := "REACH THE FACTORY EXIT"
 
 func show_quick_slots(profile) -> void:
@@ -169,6 +172,32 @@ func draw_boss_readout(hud_size: Vector2) -> void:
 		var segment := Rect2(meter.position + Vector2(span * index, 0), Vector2((span - 2.0) * part, meter.size.y))
 		draw_rect(segment, tint.lerp(Color.WHITE, .14 + (index % 2) * .14))
 
+	if not boss_mechanic.is_empty():
+		for remaining in [0.64, 0.30]:
+			var x := meter.position.x + meter.size.x * float(remaining)
+			draw_line(Vector2(x, meter.position.y), Vector2(x, meter.end.y), Color("fbfbff"), 2.0)
+		var mechanic_at := at + Vector2(0, 90)
+		var status_tint := Color("8dffe5") if boss_core_exposed else Color("ffbd78")
+		plate(Rect2(mechanic_at, Vector2(width, 51)), 7, status_tint)
+		var lines := boss_mechanic.split("\n", false)
+		for index in lines.size():
+			var font_size := 21 if index == 0 else 15
+			var text_width := UI.DISPLAY.get_string_size(lines[index], HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
+			while font_size > 11 and text_width > width - 24.0:
+				font_size -= 1
+				text_width = UI.DISPLAY.get_string_size(lines[index], HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
+			var ink := status_tint if index == 0 else WHITE
+			caption(mechanic_at + Vector2((width - text_width) * 0.5, 21 + index * 21), lines[index], font_size, ink)
+
+
+func update_boss_mechanic(boss: Combatant) -> void:
+	var status: String = boss.encounter_status() if is_instance_valid(boss) and boss.has_method("encounter_status") else ""
+	var open: bool = not status.is_empty() and boss.exposed
+	if status != boss_mechanic or open != boss_core_exposed:
+		boss_mechanic = status
+		boss_core_exposed = open
+		queue_redraw()
+
 func set_experience(total: int) -> void:
 	var old_level := RiftPlayer.level_for_experience(experience)
 	experience = total
@@ -202,6 +231,11 @@ func announce(message: String, tint: Color, font_size := 36) -> void:
 	notice_tween.tween_interval(1.2)
 	notice_tween.tween_property(notice, "modulate:a", 0.0, 0.32)
 	notice_tween.tween_callback(notice.hide)
+
+func set_gate_relays(count: int) -> void:
+	if gate_relay_count != count:
+		gate_relay_count = count
+		queue_redraw()
 
 func set_run_time(seconds: float) -> void:
 	var next := floori(seconds * 10.0)
@@ -317,14 +351,17 @@ func _draw() -> void:
 	var right := hud_size.x - 20.0
 	if not coop:
 		var x := right - 348.0
-		plate(Rect2(x, 21, 348, 105), 14)
-		for y in range(56, 120, 5):
+		var panel_height := 128 if gate_relay_count >= 0 else 105
+		plate(Rect2(x, 21, 348, panel_height), 14)
+		for y in range(56, panel_height + 15, 5):
 			draw_line(Vector2(x + 5, y), Vector2(right - 5, y), Color("102752"), 1.0)
 		caption(Vector2(x + 18, 49), "ACT %s  /  OBJECTIVE" % ("II" if act == 2 else "I"), 22)
 		draw_line(Vector2(x + 12, 55), Vector2(right - 12, 55), CYAN, 1.0)
 		task(Vector2(x + 20, 80), exit_task, reached_exit)
 		task(Vector2(x + 20, 106), "OPTIONAL: SECURITY   %d LEFT" % remaining, remaining == 0)
-	var counters := Vector2(right - 222, 139)
+		if gate_relay_count >= 0:
+			task(Vector2(x + 20, 130), "GATE RELAYS   %d/2" % gate_relay_count, gate_relay_count == 2)
+	var counters := Vector2(right - 222, 162 if not coop and gate_relay_count >= 0 else 139)
 	if coop and is_instance_valid(coop_objective):
 		counters.y = maxf(counters.y, coop_objective.get_rect().end.y / hud_scale + 12.0)
 	plate(Rect2(counters, Vector2(222, 65)), 11)

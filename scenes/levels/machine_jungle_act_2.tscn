@@ -53,6 +53,12 @@
 [ext_resource type="Script" path="res://scripts/sector_dressing.gd" id="SectorDressing"]
 [ext_resource type="Texture2D" path="res://assets/campaign/machine_jungle/surfaces/sector_wall.jpg" id="SectorAlbedo"]
 
+[ext_resource type="Script" path="res://scripts/jungle_canopy_route.gd" id="CanopyRoute"]
+
+[ext_resource type="PackedScene" path="res://assets/machine_jungle/terrain/irrigation_plate.tscn" id="IrrigationPlate"]
+
+[ext_resource type="PackedScene" path="res://assets/machine_jungle/terrain/root_perch.tscn" id="DrainPerch"]
+
 [sub_resource type="BoxShape3D" id="Checkpoint"]
 size = Vector3(2.1, 1.9, 1.8)
 
@@ -953,7 +959,7 @@ position = Vector3(0, 0.905, 0)
 pit_floor_y = -22.0
 
 [node name="VerdantColossus" parent="Actors" instance=ExtResource("boss")]
-position = Vector3(632.63, 3.45, 0)
+position = Vector3(626.8, 3.45, 0)
 
 [node name="Scout00" parent="Actors" groups=["level_enemies"] instance=ExtResource("scout")]
 position = Vector3(38.365, 4.3, 0)
@@ -1465,73 +1471,10 @@ scale = Vector3(1.0667, 1, 1)
 position = Vector3(0, -0.42, 0)
 shape = SubResource("BoxShape3D_0100")
 
-[node name="ViaductThorns" type="Area3D" parent="TERRAIN/Room02_Gallery"]
-position = Vector3(90.425, -3.25, 0)
-script = ExtResource("RCPit")
-width = 6.049999999999997
-tint = Color(0.5294, 0.8627, 0.2392, 1)
-
-[node name="ViaductLanding" type="StaticBody3D" parent="TERRAIN/Room02_Gallery"]
-position = Vector3(96.325, 0.6, 0)
-rotation = Vector3(0, 0, 0)
-collision_layer = 1
-
-[node name="Art" parent="TERRAIN/Room02_Gallery/ViaductLanding" instance=ExtResource("RCDeck")]
-scale = Vector3(0.95833, 1, 1)
-
-[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room02_Gallery/ViaductLanding"]
-position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0104")
-
-[node name="ViaductSecondLanding" type="StaticBody3D" parent="TERRAIN/Room02_Gallery"]
-position = Vector3(105.3, -0.58, 0)
-rotation = Vector3(0, 0, 0)
-collision_layer = 1
-
-[node name="Art" parent="TERRAIN/Room02_Gallery/ViaductSecondLanding" instance=ExtResource("RCDeck")]
-scale = Vector3(0.93333, 1, 1)
-
-[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room02_Gallery/ViaductSecondLanding"]
-position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0107")
-
-[node name="ViaductUnderpassThorns" type="Area3D" parent="TERRAIN/Room02_Gallery"]
-position = Vector3(100.85, -3.7, 0)
-script = ExtResource("RCPit")
-width = 3.299999999999997
-tint = Color(0.5294, 0.8627, 0.2392, 1)
-
-[node name="ViaductDescent" type="StaticBody3D" parent="TERRAIN/Room02_Gallery"]
-position = Vector3(112.55, -1.09, 0)
-rotation = Vector3(0, 0, -0.11411)
-collision_layer = 1
-
-[node name="Art" parent="TERRAIN/Room02_Gallery/ViaductDescent" instance=ExtResource("RCDeck")]
-scale = Vector3(1.493, 1, 1)
-
-[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room02_Gallery/ViaductDescent"]
-position = Vector3(0, -0.42, 0)
-shape = SubResource("BoxShape3D_0111")
-
 [node name="ViaductBedrock" parent="TERRAIN/Room02_Gallery" instance=ExtResource("RCJungleBank")]
 position = Vector3(80.7, 0, 0)
 scale = Vector3(2.2333, 1, 1)
 rotation = Vector3(0, 0, 0)
-
-[node name="ViaductIslandBedrock" parent="TERRAIN/Room02_Gallery" instance=ExtResource("RCJungleBank")]
-position = Vector3(96.325, 0.6, 0)
-scale = Vector3(0.95833, 1, 1)
-rotation = Vector3(0, 0, 0)
-
-[node name="ViaductFarBedrock" parent="TERRAIN/Room02_Gallery" instance=ExtResource("RCJungleBank")]
-position = Vector3(105.3, -0.58, 0)
-scale = Vector3(0.93333, 1, 1)
-rotation = Vector3(0, 0, 0)
-
-[node name="ViaductDescendingBedrock" parent="TERRAIN/Room02_Gallery" instance=ExtResource("RCJungleBank")]
-position = Vector3(112.55, -1.09, 0)
-scale = Vector3(1.493, 1, 1)
-rotation = Vector3(0, 0, -0.11411)
 
 [node name="Exit00" type="StaticBody3D" parent="TERRAIN/Room02_Gallery"]
 position = Vector3(119, -1.6, 0)
@@ -3744,25 +3687,20 @@ position = Vector3(0, -0.23, 0)
 shape = SubResource("BoxShape3D_0713")
 
 [node name="PoweredBridgeRelay" type="StaticBody3D" parent="TERRAIN/Room06_Bridge" groups=["factory_shot_relay"]]
-position = Vector3(423.82, 0.95, 0)
+position = Vector3(423.82, 0.055, 0)
 script = ExtResource("RCRelayScript")
-collision_layer = 16
+collision_layer = 0
 collision_mask = 0
 platform_path = NodePath("../PoweredBridge")
 travel = Vector3(0, -3.15, 0)
-operation = "ROOT FERRY"
+operation = "IRRIGATION FERRY"
 lift = false
-repeat_hold = 6.5
-departure_delay = 0.0
+pressure_plate = true
 
-[node name="Casing" parent="TERRAIN/Room06_Bridge/PoweredBridgeRelay" instance=ExtResource("RCDoorRelay")]
-position = Vector3(0, -0.26, 0)
-
-[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room06_Bridge/PoweredBridgeRelay"]
-shape = SubResource("RCRelayShape")
+[node name="Casing" parent="TERRAIN/Room06_Bridge/PoweredBridgeRelay" instance=ExtResource("IrrigationPlate")]
 
 [node name="Lamp" type="MeshInstance3D" parent="TERRAIN/Room06_Bridge/PoweredBridgeRelay"]
-position = Vector3(0, 0, 0.26)
+position = Vector3(0, 0.19, 0)
 mesh = SubResource("RCRelayLamp")
 
 [node name="Overlook" type="StaticBody3D" parent="TERRAIN/Room06_Bridge" groups=["factory_drop_through"]]
@@ -4800,23 +4738,8 @@ light_color = Color(0.5294, 0.8627, 0.2392, 1)
 light_energy = 1.55
 omni_range = 5.6
 
-[node name="TacticalDeck1" type="StaticBody3D" parent="TERRAIN/BossWing" groups=["arena_player_deck", "factory_drop_through"]]
-position = Vector3(636.95, 7.95, 0)
-rotation = Vector3(0, 0, 0)
-collision_layer = 1
-
-[node name="Art" parent="TERRAIN/BossWing/TacticalDeck1" instance=ExtResource("RCDeck")]
-scale = Vector3(1.1667, 0.54762, 1)
-
-[node name="Collision" type="CollisionShape3D" parent="TERRAIN/BossWing/TacticalDeck1"]
-position = Vector3(0, -0.23, 0)
-shape = SubResource("BoxShape3D_1031")
-
-[node name="TacticalLight1" type="OmniLight3D" parent="TERRAIN/BossWing"]
-position = Vector3(636.95, 9.05, -1.6)
-light_color = Color(0.5294, 0.8627, 0.2392, 1)
-light_energy = 1.55
-omni_range = 5.6
+[node name="WestDrainStep" parent="TERRAIN/BossWing" instance=ExtResource("DrainPerch") groups=["arena_player_deck"]]
+position = Vector3(620.8, 3.62, 0)
 
 [node name="ArenaVineHatch" parent="TERRAIN/BossWing" instance=ExtResource("RCHatch") groups=["arena_player_deck"]]
 position = Vector3(646.36, 6.4, 0)
@@ -4987,3 +4910,46 @@ right_edge = 661.2921
 cave_floor = 1.9000
 cave_roof = 23.9000
 arena = true
+
+[node name="CanopyTraverse" type="Node3D" parent="TERRAIN/Room02_Gallery"]
+position = Vector3(84.2, 0, 0)
+script = ExtResource("CanopyRoute")
+
+[node name="CanopyEscapeCache" type="Area3D" parent="TERRAIN" groups=["factory_salvage_chest"]]
+position = Vector3(116.75, 5.7, -0.44)
+script = ExtResource("RCCacheScript")
+sector = 2
+materials = 5
+collision_layer = 0
+collision_mask = 1
+
+[node name="Casing" parent="TERRAIN/CanopyEscapeCache" instance=ExtResource("RCCache")]
+
+[node name="Collision" type="CollisionShape3D" parent="TERRAIN/CanopyEscapeCache"]
+position = Vector3(0, 0.56, 0)
+shape = SubResource("RCCacheShape")
+
+[node name="GateRelay1" type="Marker3D" parent="MARKERS"]
+position = Vector3(118.6, 5.7, 0)
+
+[node name="GateRelay2" type="Marker3D" parent="MARKERS"]
+position = Vector3(437.45, 2.55, 0)
+
+[node name="CanopyLiftCheckpoint" type="Area3D" parent="TERRAIN"]
+position = Vector3(81.5, 0, 0)
+collision_layer = 0
+script = ExtResource("factory_checkpoint")
+
+[node name="Trigger" type="CollisionShape3D" parent="TERRAIN/CanopyLiftCheckpoint"]
+position = Vector3(0, 0.95, 0)
+shape = SubResource("Checkpoint")
+
+[node name="Beacon" parent="TERRAIN/CanopyLiftCheckpoint" instance=ExtResource("checkpoint_beacon")]
+position = Vector3(0, 0, -0.72)
+
+
+[node name="CanopyDrainWest" type="Marker3D" parent="MARKERS"]
+position = Vector3(617.55, 5.65, 0)
+
+[node name="CanopyDrainEast" type="Marker3D" parent="MARKERS"]
+position = Vector3(647.45, 6.4, 0)

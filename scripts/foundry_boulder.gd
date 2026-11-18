@@ -3,11 +3,14 @@ extends AnimatableBody3D
 const VFX := preload("res://scripts/factory_trap_vfx.gd")
 # Ten standard hits or four charged hits. Mixed hits share the same fracture meter.
 const TO_BREAK := 30
-const WARNING := 1.8
-const ROLL_SPEED := 3.6
+const FLOOR_MARK := preload("res://scripts/foundry_flame.gd")
+const WARNING := 0.62
+const START_SPEED := 5.5
+const ACCELERATION := 8.4
 @export var radius := 1.4
 @export var runway_length := 10.0
 @export var direction := -1.0
+@export var slope_drop := 0.0
 var authority := true
 var hit_count := 0
 var elapsed := 0.0
@@ -38,10 +41,14 @@ func _ready() -> void:
 	material.shader = preload("res://assets/neon_factory/foundry/slag_fracture.gdshader")
 	body_mesh.material_override = material
 	add_child(body_mesh)
+	var track := FLOOR_MARK.floor_mark(Vector2(runway_length, slope_drop).length(), 1.76, FLOOR_MARK.Style.DRILL, Color("ff783b"))
 	warning = Node3D.new()
+	warning.position = Vector3(direction * runway_length * 0.5, -radius - slope_drop * 0.5, 0)
+	warning.rotation.z = atan2(-direction * slope_drop, runway_length)
 	add_child(warning)
-	warning.position = Vector3(direction * runway_length * 0.52, -radius + 0.035, 0)
-	preload("res://scripts/attack_fx.gd").telegraph(warning, runway_length, Color("ff6d3c"), WARNING)
+	warning.add_child(track)
+	track.material_override.set_shader_parameter("direction", direction)
+	track.material_override.set_shader_parameter("progress", 0.75)
 	present()
 
 func _physics_process(delta: float) -> void:
@@ -59,11 +66,11 @@ func _physics_process(delta: float) -> void:
 				RiftAudio.foundry_sound(&"boulder_roll", global_position)
 		2:
 			elapsed += delta
-			var distance := minf(elapsed * ROLL_SPEED, runway_length)
-			var prior_x := global_position.x
-			position.x = start.x + direction * distance
+			var distance := minf((START_SPEED + ACCELERATION * elapsed * 0.5) * elapsed, runway_length)
+			var prior := global_position
+			move_along_slope(distance)
 			for body in operators():
-				var from := Vector2(prior_x, global_position.y)
+				var from := Vector2(prior.x, prior.y)
 				var to := Vector2(global_position.x, global_position.y)
 				var center := Vector2(body.global_position.x, body.global_position.y)
 				if body.health > 0.0 and center.distance_to(Geometry2D.get_closest_point_to_segment(center, from, to)) < radius + 0.32:
@@ -72,15 +79,21 @@ func _physics_process(delta: float) -> void:
 				status = 4
 	present()
 
+func move_along_slope(distance: float) -> void:
+	var progress := clampf(distance / runway_length, 0.0, 1.0)
+	position = start + Vector3(direction * distance, -slope_drop * progress, 0.0)
+
 func threatens(body: RiftPlayer) -> bool:
 	var origin := get_parent_node_3d().to_global(start)
 	var ahead := (body.global_position.x - origin.x) * direction
-	return body.health > 0.0 and absf(body.global_position.y - origin.y) < 2.1 and ahead >= -0.75 and ahead < runway_length + 4.3
+	var floor_y := origin.y - radius - slope_drop * clampf(ahead / runway_length, 0.0, 1.0)
+	return body.health > 0.0 and body.global_position.y >= floor_y - 0.7 and body.global_position.y < floor_y + 3.0 \
+		and ahead >= -0.75 and ahead < runway_length + 4.5
 
 func is_near_room(body: RiftPlayer) -> bool:
 	var origin := get_parent_node_3d().to_global(start)
 	var along := (body.global_position.x - origin.x) * direction
-	return body.health > 0.0 and absf(body.global_position.y - origin.y) < 4.3 and along >= -5.0 and along <= runway_length + 7.0
+	return body.health > 0.0 and absf(body.global_position.y - origin.y + slope_drop * 0.5) < 4.3 and along >= -5.0 and along <= runway_length + 7.0
 
 func operators() -> Array[Node]:
 	var stage := get_parent().get_parent()
@@ -95,7 +108,7 @@ func hit_by_projectile(shot: RiftProjectile) -> bool:
 		status = 3
 		break_rock()
 	else:
-		VFX.throw_sparks(self, Color("ff7e40"), 0.56)
+		VFX.impact(self, 0.56, &"concrete")
 	present()
 	return true
 
@@ -130,7 +143,7 @@ func present() -> void:
 	var body_layer := 3 if status in [0, 1, 4] else 2
 	if collision_layer != body_layer:
 		set_deferred("collision_layer", body_layer)
-	body_mesh.rotation.z = -direction * absf(position.x - start.x) / radius
+	body_mesh.rotation.z = -Vector2(position.x - start.x, position.y - start.y).length() * direction / radius
 	material.set_shader_parameter("damage", float(hit_count) / TO_BREAK)
 	warning.visible = status == 1
 
@@ -147,11 +160,11 @@ func snapshot() -> Array:
 	return [status, hit_count, position.x, elapsed]
 
 func apply_snapshot(state: Array) -> void:
-	var starts_rolling := status == 1 and int(state[0]) == 2
+	var starts_rolling := status < 2 and int(state[0]) == 2
 	var breaks := hit_count < TO_BREAK and int(state[1]) >= TO_BREAK
 	status = int(state[0])
 	hit_count = int(state[1])
-	position.x = float(state[2])
+	move_along_slope(absf(float(state[2]) - start.x))
 	elapsed = float(state[3])
 	if starts_rolling:
 		RiftAudio.foundry_sound(&"boulder_roll", global_position)

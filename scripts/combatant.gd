@@ -5,6 +5,7 @@ signal health_changed(current: float, maximum: float)
 signal died
 
 const DAMAGE_NUMBER := preload("res://scripts/damage_number.gd")
+const BOSS_DIFFICULTY := preload("res://scripts/mission_difficulty.gd")
 
 @export var max_health: float = 100.0
 @export_range(1.0, 3.0, 0.1) var fire_weakness := 1.0
@@ -21,6 +22,12 @@ var burn_effect: Node3D
 var burn_source := 0
 
 func _ready() -> void:
+	health = max_health
+
+func apply_boss_scaling(sector: int, mode: int, act: int, party_scale := 1.0) -> void:
+	if has_method("configure_difficulty"):
+		call("configure_difficulty", mode)
+	max_health *= party_scale * BOSS_DIFFICULTY.boss_health_scale(sector, mode, act)
 	health = max_health
 
 func take_damage(amount: float, source_position := Vector3.ZERO) -> void:
@@ -85,15 +92,19 @@ func _process(delta: float) -> void:
 	burn_clock -= delta
 	if burn_clock <= 0.001:
 		burn_clock += 0.5
-		health = maxf(0.0, health - burn_power)
-		show_damage.call_deferred(burn_power, true)
-		health_changed.emit(health, max_health)
-		if health <= 0.0:
-			died.emit()
+		apply_burn_tick()
 	if burn_left <= 0.0 and is_instance_valid(burn_effect):
 		burn_effect.queue_free()
 		burn_effect = null
 		burn_power = 0.0
+
+
+func apply_burn_tick() -> void:
+	health = maxf(0.0, health - burn_power)
+	show_damage.call_deferred(burn_power, true)
+	health_changed.emit(health, max_health)
+	if health <= 0.0:
+		died.emit()
 
 
 func ignore_arena_access_decks() -> void:

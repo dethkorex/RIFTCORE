@@ -1,164 +1,189 @@
 extends SceneTree
-var failed := 0
-func _initialize():
-	call_deferred("run")
-func frames(n: int):
-	for i in n:
+
+var failures := 0
+
+func _initialize() -> void:
+	run.call_deferred()
+
+func check(value: bool, description: String) -> void:
+	print("PASS " if value else "FAIL ", description)
+	if not value:
+		failures += 1
+
+func frames(count: int) -> void:
+	for index in count:
 		await physics_frame
-func ok(condition: bool, msg: String):
-	print("PASS " if condition else "FAIL ", msg)
-	if not condition:
-		failed += 1
-func make_game(profile_file: String, checkpoint_file: String):
+
+func until(test: Callable, count: int) -> bool:
+	for index in count:
+		if test.call():
+			return true
+		await physics_frame
+	return false
+
+func start(sector: int, act: int, mode: int = 0):
 	var game = load("res://scenes/main.tscn").instantiate()
-	game.profile.path = profile_file
-	game.checkpoint_path = checkpoint_file
+	game.profile.path = "user://sector-test-profile.cfg"
+	game.checkpoint_path = "user://sector-test-checkpoint.cfg"
 	root.add_child(game)
 	current_scene = game
-	return game
-func run():
-	var dir := OS.get_cmdline_user_args()[0] if not OS.get_cmdline_user_args().is_empty() else OS.get_user_data_dir()
-	var a := dir.path_join("sector-qa-profile.cfg")
-	var b := dir.path_join("sector-qa-checkpoint.cfg")
-	for path in [a,b]:
-		if FileAccess.file_exists(path):
-			DirAccess.remove_absolute(path)
-	var game = make_game(a,b)
+	game.profile.manual_only = true
+	game.sector = sector
+	game.act = act
+	game.mission_difficulty = mode
 	game.start_game(false)
-	await frames(4)
-	var p = game.player
-	p.invulnerable_time = 99
-	var ladder: Node3D = game.game_root.get_node("TERRAIN/ArenaCatwalkWest/Assembly/Climb")
-	p.global_position = ladder.global_position + Vector3.UP * 0.86
-	p.model_root.rotation.y = PI / 2.0
-	Input.action_press("climb_up")
-	await frames(18)
-	ok(p.ladder == ladder and p.global_position.y > 1.3 and p.model_root.global_basis.z.dot(-ladder.global_basis.z) > 0.995, "ladder climbs and turns the model squarely toward the rungs")
-	Input.action_release("climb_up")
-	Input.action_press("climb_down")
-	await frames(6)
-	ok(p.ladder == ladder and p.velocity.y < 0.0 and p.model_root.global_basis.z.dot(-ladder.global_basis.z) > 0.995, "descending still faces the rungs")
-	Input.action_release("climb_down")
-	Input.action_press("jump")
-	await frames(3)
-	Input.action_release("jump")
-	ok(p.ladder == null and absf(absf(p.model_root.rotation.y) - PI / 2.0) < 0.01, "jump off restores side-facing movement")
-	var rb := false
-	for event in InputMap.action_get_events("swap_weapon"):
-		if event is InputEventJoypadButton and event.button_index == JOY_BUTTON_RIGHT_SHOULDER:
-			rb = true
-	ok(rb and not p.magma_unlocked, "RB default and no unearned fire weapon")
-	game.boss.active = true
-	game.boss.target = p
-	game.boss.invulnerable_time = 0.0
-	game.boss.take_damage(game.boss.health)
-	await frames(55)
-	p.gain_experience(230)
-	p.global_position = game.game_root.get_node("MARKERS/RoomExit").global_position
-	p.velocity = Vector3.ZERO
-	await frames(4)
-	for frame in range(2400):
-		if not game.advancing_act:
-			break
-		await physics_frame
-	p = game.player
-	ok(game.act == 2 and not p.magma_unlocked, "Factory miniboss opens Act 2 and leaves Magma Breaker with Forge Titan")
-	game.boss.active = true
-	game.boss.target = p
-	game.boss.take_damage(game.boss.health)
-	await frames(285)
-	p.global_position = game.game_root.get_node("MARKERS/RoomExit").global_position
-	p.velocity = Vector3.ZERO
-	await frames(6)
-	ok(game.sector_complete, "Factory extraction records a clear")
-	var extracted_xp: int = p.experience
-	paused = false
-	game.queue_free()
-	await frames(3)
-	var next = make_game(a,b)
-	ok(next.menu.saved_sector == 2 and next.menu.at_sector_start, "Command Deck offers the Machine Jungle deployment")
-	next.load_game()
-	p = next.player
-	ok(next.sector == 2 and p.lives == 3 and extracted_xp >= 230 and p.experience == extracted_xp and p.magma_unlocked, "Machine Jungle loads with three lives, carried XP, and Magma Breaker carried in the saved run")
-	var jungle_roster: int = next.remaining_enemies
-	for enemy in get_nodes_in_group("level_enemies"):
-		enemy.set_physics_process(false)
-	await frames(175)
-	ok(p.is_on_floor() and jungle_roster == 22, "Jungle spawn stands on the floor with 22 configured enemies")
-	var jungle_enemy = next.game_root.get_node("Actors/JungleUnit04")
-	var hp: float = jungle_enemy.health
-	jungle_enemy.take_fire_damage(10.0,p.global_position)
-	ok(absf(jungle_enemy.health - hp + 15.0) < .01, "Magma deals 1.5x fire critical damage against jungle enemies")
-	ok(next.game_root.get_node("TERRAIN/JungleTrap0").device.get_child_count() > 0, "jungle trap builds active geometry")
-	var barrier = next.game_root.get_node("TERRAIN/CanopyVine")
-	barrier.take_damage(1000.0)
-	ok(barrier.health == 1.0, "vines withstand ordinary buster shots")
-	barrier.take_fire_damage(8.0)
-	await frames(5)
-	ok(barrier.health == 0.0 and barrier.get_node("CollisionShape3D").disabled, "fire burns the vines and disables the barrier")
-	ok(p.magma_active, "Deployment retains the last equipped suit")
-	Input.action_press("previous_suit")
-	await frames(3)
-	Input.action_release("previous_suit")
-	ok(p.equipped_suit().is_empty(), "LB returns to the previous suit")
-	Input.action_press("swap_weapon")
-	await frames(3)
-	Input.action_release("swap_weapon")
-	ok(p.magma_active, "RB swaps the persisted fire weapon on after deploying")
-	p.invulnerable_time = 999
+	for actor in get_nodes_in_group(&"level_enemies"):
+		actor.set_physics_process(false)
+		actor.position.z = -8.0
+	return game
 
-	next.boss.active = true
-	next.boss.target = p
-	next.boss.take_damage(next.boss.health)
-	await frames(45)
-	p.global_position = next.game_root.get_node("MARKERS/RoomExit").global_position
-	p.velocity = Vector3.ZERO
-	await frames(4)
-	for frame in range(2400):
-		if not next.advancing_act:
-			break
-		await physics_frame
-	p = next.player
-	ok(next.act == 2 and p.magma_active and not p.thorn_unlocked, "Jungle Act 2 keeps the equipped Magma Breaker")
-	p.invulnerable_time = 999
-	p.global_position = next.gate.global_position + Vector3(-2.15, 0.88, 0)
-	await frames(60)
-	p.global_position = next.gate.global_position + Vector3(3.4, 0.88, 0)
-	await frames(142)
-	var boss = next.boss
-	ok(next.arena_sealed and boss.active, "crossing the boss gate seals the arena and starts the boss")
-	var x_before: float = boss.global_position.x
-	await frames(210)
-	ok(boss.pattern > 1 and boss.global_position.x < x_before and boss.is_on_floor() and boss.facing < 0.0, "Verdant moves on the floor, faces RX-07, and advances the attack pattern")
-	boss.take_damage(680.0)
-	await frames(130)
-	ok(get_nodes_in_group("arena_minions").size() >= 1, "Verdant summons a Canopy Wasp after its health threshold")
-	boss.take_damage(boss.health)
-	await frames(285)
-	ok(next.run_weapons.has("thorn_swarm") and p.thorn_active and p.nature_suit_mesh.visible and not p.fire_suit_mesh.visible, "Verdant defeat unlocks Thorn Swarm")
-	p.set_magma_active(false)
-	p.energy=0.0
-	p.global_position=next.gate.global_position + Vector3(-5.5,.88,0)
-	p.velocity=Vector3.ZERO
-	await frames(4)
-	Input.action_press("dash")
-	await frames(2)
-	Input.action_release("dash")
-	ok(p.dash_left>0.0 and p.energy==0.0,"ground dash works at zero energy and spends none")
-	p.energy=p.max_energy
-	var ammo: float = p.energy
-	p.set_thorn_active()
-	p.shoot(false)
-	await frames(5)
-	ok(absf(ammo - p.energy - 7.0) < .01, "Thorn Swarm fires a burst and costs energy")
-	p.energy = 0.0
-	p.dash_left = 0.0
-	p.dash_lock = 0.0
-	p.air_dash_available = true
-	p.global_position += Vector3.UP * 4.0
-	await frames(4)
-	Input.action_press("dash")
-	await frames(2)
-	Input.action_release("dash")
-	ok(p.dash_left > 0.0 and not p.air_dash_available and p.energy == 0.0, "air dash works at zero energy and spends none")
-	quit(failed)
+func enter(game) -> bool:
+	var player = game.player
+	player.remote_input = true
+	game.gate_relays.set_active(3)
+	var gate: Vector3 = game.gate.global_position
+	player.position = gate + Vector3(-2.3, .91, 0)
+	await until(func(): return game.arena_door.passable, 160)
+	player.remote_axis.x = 1.0
+	var started := await until(func(): return game.arena_intro, 165)
+	player.remote_axis.x = 0.0
+	if not started:
+		return false
+	if not await until(func(): return game.boss.active, 430):
+		return false
+	player.invulnerable_time = 1000.0
+	return true
+
+func break_anchor(game, opponent) -> bool:
+	if not await until(func(): return not opponent.root_anchor.dormant and opponent.root_anchor.collision_layer == 2, 90):
+		return false
+	var anchor: Vector3 = opponent.root_anchor.global_position
+	var player = game.player
+	for hit in opponent.root_anchor.durability:
+		player.position = anchor + Vector3((-2.3 if opponent.position.x >= anchor.x else 2.3), -.05, 0)
+		player.velocity = Vector3.ZERO
+		player.facing = 1 if player.position.x < anchor.x else -1
+		player.shoot(false)
+		await frames(12)
+	return await until(func(): return opponent.exposed, 90)
+
+func run() -> void:
+	await boss_balance()
+	var foundry = start(1, 1)
+	var scout = get_nodes_in_group(&"level_enemies")[0]
+	var base_hp: float = scout.max_health
+	check(scout.enemy_level == 1 and scout.level_tag.text == "LV. 1", "Ember Foundry level 1")
+	foundry.queue_free()
+	await frames(3)
+	for act in [1, 2]:
+		var game = start(2, act)
+		var jungle_enemies := get_nodes_in_group(&"level_enemies")
+		check(jungle_enemies.all(func(enemy): return enemy.enemy_level == 4 and enemy.level_tag.text == "LV. 4" and enemy.sector_damage_scale > 1.0), "all Jungle security is level 4 in act %d" % act)
+		check(await enter(game), "ordinary entrance and intro act %d" % act)
+		var boss = game.boss
+		var hp: float = boss.health
+		boss.take_damage(10000.0)
+		check(boss.health == hp, "sealed armor blocks damage act %d" % act)
+		if act == 1:
+			for phase in 3:
+				var opened := await break_anchor(game, boss)
+				check(opened, "real Buster hits uproot seed anchor %d" % (phase+1))
+				if not opened:
+					break
+				boss.take_damage(10000.0)
+				if phase < 2:
+					check(not boss.exposed and boss.root_phase == phase + 1, "threshold regrows armor")
+		else:
+			var operator = game.player
+			operator.position = Vector3(622.9, 2.82, 0)
+			operator.velocity = Vector3.ZERO
+			await frames(18)
+			operator.remote_axis.x = -1.0
+			operator.remote_pressed["jump"] = true
+			operator.remote_held["jump"] = true
+			for frame in 100:
+				if operator.position.x < 621.1:
+					operator.remote_axis.x = 0.0
+				if operator.grounded() and operator.position.y > 4.20:
+					break
+				await physics_frame
+			check(operator.grounded() and operator.position.y > 4.20, "real jump reaches west root step " + str(operator.position))
+			operator.remote_axis.x = -1.0
+			operator.remote_pressed["jump"] = true
+			for frame in 110:
+				if operator.position.x < 618.25:
+					operator.remote_axis.x = 0.0
+				if operator.grounded() and operator.position.y > 6.30 and absf(operator.position.x - boss.drains[0].global_position.x) < 1.4:
+					break
+				await physics_frame
+			check(operator.grounded() and operator.position.y > 6.3 and absf(operator.position.x - boss.drains[0].global_position.x) < 1.4, "second jump reaches the illuminated drain " + str(operator.position))
+			operator.remote_axis.x = 0.0
+			operator.remote_held.erase("jump")
+			operator.position = boss.drains[0].global_position + Vector3(1.70,.93,0)
+			operator.velocity = Vector3.ZERO
+			check(await until(func(): return boss.flood_left > 0.0, 680), "root flood starts on the normal attack cycle")
+			await frames(52)
+			check(not boss.exposed, "high ground alone does not open the reactor")
+			operator.position = boss.drains[0].global_position + Vector3.UP * .92
+			operator.velocity = Vector3.ZERO
+			check(await until(func(): return boss.exposed, 170), "standing on west drain clears flood and opens reactor")
+			check(boss.flood_left == 0.0, "flood ends immediately on successful drain")
+			await until(func(): return not boss.exposed, 520)
+			check(not boss.exposed, "reactor seals after seven-second opening")
+			operator.position = boss.drains[1].global_position + Vector3.UP * .94
+			operator.velocity = Vector3.ZERO
+			check(await until(func(): return boss.exposed, 760), "east drain opens the reactor on the next cycle")
+			boss.take_damage(10000.0)
+		check(await until(func(): return game.boss_defeated,180), "boss defeat advances act %d" % act)
+		if act == 2:
+			check(game.run_weapons.has("thorn_swarm"), "Thorn Swarm awarded")
+			await frames(320)
+		game.queue_free()
+		await frames(3)
+	for mode in [1,2]:
+		var game = start(2,1,mode)
+		check(get_nodes_in_group(&"level_enemies").all(func(enemy): return enemy.enemy_level == (8 if mode == 1 else 16) and enemy.sector_damage_scale > 1.2), "Jungle level and damage scale with difficulty %d" % mode)
+		game.queue_free()
+		await frames(3)
+	quit(failures)
+
+func boss_balance() -> void:
+	for act in [1, 2]:
+		var foundry = start(1, act)
+		var base: float = foundry.boss.max_health
+		foundry.queue_free()
+		await frames(3)
+		var previous_health := base
+		for difficulty in [0, 1, 2]:
+			var game = start(2, act, difficulty)
+			var boss = game.boss
+			var player = game.player
+			check(boss.max_health > previous_health * 1.50, "act %d mode %d HP scales from %.1f to %.1f" % [act, difficulty, previous_health, boss.max_health])
+			previous_health = boss.max_health
+			boss.active = true
+			boss.target = player
+			var before: float = boss.health
+			boss.burn_power = 100.0
+			boss.apply_burn_tick()
+			check(is_equal_approx(boss.health, before), "act %d mode %d armor blocks damage-over-time" % [act, difficulty])
+			if act == 1:
+				boss.exposed = true
+			else:
+				boss.exposed_left = boss.CORE_WINDOW
+			boss.take_damage(100.0)
+			var expected := float(([80, 74, 68] if act == 1 else [75, 68, 62])[difficulty])
+			check(is_equal_approx(before - boss.health, expected), "act %d mode %d exposed defense reduces 100 damage to %.0f" % [act, difficulty, expected])
+			if act == 1:
+				boss.locked_direction = 1.0
+				boss.aim = boss.global_position + Vector3.RIGHT * 3.0
+				boss.attack = "volley"
+				boss.strike()
+			else:
+				boss.strike_x = boss.global_position.x - 3.0
+				boss.attack = 1
+				boss._release()
+			var shots := get_nodes_in_group(&"rift_projectile")
+			var expected_shot: float = (22.4 if act == 1 else 34.0) * [1.0, 1.18, 1.38][difficulty]
+			check(not shots.is_empty() and is_equal_approx(shots[0].damage, expected_shot), "act %d mode %d spawned shot does %.1f damage" % [act, difficulty, expected_shot])
+			game.queue_free()
+			await frames(3)

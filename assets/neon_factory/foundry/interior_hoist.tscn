@@ -1,0 +1,81 @@
+[gd_scene format=3]
+
+[sub_resource type="StandardMaterial3D" id="Iron"]
+albedo_color = Color(0.103, 0.094, 0.103, 1)
+roughness = 0.53
+metallic = 0.47
+
+[sub_resource type="StandardMaterial3D" id="Copper"]
+albedo_color = Color(0.34, 0.143, 0.071, 1)
+roughness = 0.44
+metallic = 0.58
+
+[sub_resource type="StandardMaterial3D" id="Amber"]
+albedo_color = Color(1, 0.51, 0.18, 1)
+emission_enabled = true
+emission = Color(1, 0.31, 0.08, 1)
+emission_energy_multiplier = 1.25
+
+[sub_resource type="StandardMaterial3D" id="Cool"]
+albedo_color = Color(0.63, 0.81, 0.83, 1)
+emission_enabled = true
+emission = Color(0.30, 0.62, 0.68, 1)
+emission_energy_multiplier = 1.0
+
+[sub_resource type="BoxMesh" id="Carrier"]
+material = SubResource("Iron")
+size = Vector3(2.28, 0.55, 0.96)
+
+[sub_resource type="BoxMesh" id="Track"]
+material = SubResource("Copper")
+size = Vector3(2.72, 0.15, 0.82)
+
+[sub_resource type="BoxMesh" id="Winch"]
+material = SubResource("Copper")
+size = Vector3(0.72, 0.43, 0.75)
+
+[sub_resource type="BoxMesh" id="CableLeft"]
+material = SubResource("Iron")
+size = Vector3(0.085, 1.46, 0.085)
+
+[sub_resource type="BoxMesh" id="CableRight"]
+material = SubResource("Iron")
+size = Vector3(0.085, 1.46, 0.085)
+
+[sub_resource type="BoxMesh" id="Clamp"]
+material = SubResource("Iron")
+size = Vector3(0.93, 0.39, 0.52)
+
+[sub_resource type="BoxMesh" id="Indicator"]
+material = SubResource("Amber")
+size = Vector3(0.38, 0.08, 0.04)
+
+[node name="FoundryInteriorHoist" type="Node3D"]
+
+[node name="Carrier" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.18, 0)
+mesh = SubResource("Carrier")
+
+[node name="Track" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.52, 0)
+mesh = SubResource("Track")
+
+[node name="Winch" type="MeshInstance3D" parent="."]
+position = Vector3(0, -0.12, 0.05)
+mesh = SubResource("Winch")
+
+[node name="CableLeft" type="MeshInstance3D" parent="."]
+position = Vector3(-0.26, -0.92, 0.12)
+mesh = SubResource("CableLeft")
+
+[node name="CableRight" type="MeshInstance3D" parent="."]
+position = Vector3(0.26, -0.92, 0.12)
+mesh = SubResource("CableRight")
+
+[node name="Clamp" type="MeshInstance3D" parent="."]
+position = Vector3(0, -1.68, 0.12)
+mesh = SubResource("Clamp")
+
+[node name="Indicator" type="MeshInstance3D" parent="."]
+position = Vector3(0, -1.67, 0.4)
+mesh = SubResource("Indicator")

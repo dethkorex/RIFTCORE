@@ -48,10 +48,10 @@ func run() -> void:
 	await frames(24)
 	check(not is_instance_valid(actor.ladder) and actor.is_on_floor(), "Climb clears the hatch and hands off to standing")
 	var before: float = actor.global_position.y
-	var down := InputEventJoypadButton.new()
+	var down := InputEventJoypadMotion.new()
 	down.device = 0
-	down.button_index = JOY_BUTTON_DPAD_DOWN
-	down.pressed = true
+	down.axis = JOY_AXIS_LEFT_Y
+	down.axis_value = 1.0
 	Input.parse_input_event(down)
 	var dash := InputEventJoypadButton.new()
 	dash.device = 0
@@ -59,8 +59,8 @@ func run() -> void:
 	dash.pressed = true
 	Input.parse_input_event(dash)
 	await frames(12)
-	check(actor.global_position.y < before - 0.25 and actor.dash_left == 0.0 and not is_instance_valid(actor.ladder), "Controller Down and B drops through a one-way deck")
-	down.pressed = false
+	check(actor.global_position.y < before - 0.25 and actor.dash_left == 0.0 and not is_instance_valid(actor.ladder), "Left stick down and B drop through a one-way deck")
+	down.axis_value = 0.0
 	dash.pressed = false
 	Input.parse_input_event(down)
 	Input.parse_input_event(dash)
@@ -76,14 +76,21 @@ func run() -> void:
 	actor.global_position = solid.global_position + Vector3(0, 1.4, 0)
 	actor.velocity = Vector3.ZERO
 	await frames(30)
-	down.pressed = true
+	down.axis_value = 1.0
 	dash.pressed = true
 	Input.parse_input_event(down)
 	Input.parse_input_event(dash)
 	await frames(3)
-	check(actor.is_on_floor() and actor.dash_left > 0.0, "Down and B still dashes on a solid floor")
-	down.pressed = false
+	check(actor.is_on_floor() and actor.dash_left == 0.0 and actor.crouching, "Crouch and B keep the operator on a solid floor")
+	down.axis_value = 0.0
 	dash.pressed = false
 	Input.parse_input_event(down)
+	Input.parse_input_event(dash)
+	await frames(2)
+	dash.pressed = true
+	Input.parse_input_event(dash)
+	await frames(3)
+	check(actor.dash_left > 0.0, "B dashes on a solid floor when standing")
+	dash.pressed = false
 	Input.parse_input_event(dash)
 	quit(errors)

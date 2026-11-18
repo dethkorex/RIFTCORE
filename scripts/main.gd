@@ -16,6 +16,7 @@ const COMBAT_VFX := preload("res://scripts/combat_vfx.gd")
 const ManualSave := preload("res://scripts/manual_save_session.gd")
 const SuitReveal := preload("res://scripts/suit_reveal.gd")
 const CampaignDoor := preload("res://scripts/campaign_door.gd")
+const GateRelays := preload("res://scripts/gate_relays.gd")
 const WhisperOverlay := preload("res://scripts/whisper_overlay.gd")
 const PlaytestReset := preload("res://scripts/playtest_reset.gd")
 const PlayerAccount := preload("res://scripts/player_account.gd")
@@ -28,13 +29,20 @@ var boss: Combatant
 var gate: Node3D
 var gate_open := false
 var arena_door: CampaignDoor
+var gate_relays: GateRelays
 var repair_hall: Node3D
 var arena_sealed := false
 var arena_intro := false
 var suit_reveal_active := false
 var boss_defeated := false
 var respawning := false
-const CHECKPOINT_STATIONS := {"midpoint": "TERRAIN/MidpointCheckpoint", "forge_hall": "TERRAIN/ForgeHallCheckpoint"}
+const CHECKPOINT_STATIONS := {
+	"canopy_lift": "TERRAIN/CanopyLiftCheckpoint",
+	"midpoint": "TERRAIN/MidpointCheckpoint",
+	"escape_shaft": "TERRAIN/EscapeShaftCheckpoint",
+	"forge_hall": "TERRAIN/ForgeHallCheckpoint",
+}
+const CHECKPOINT_ORDER := ["canopy_lift", "midpoint", "escape_shaft", "forge_hall"]
 var checkpoint_reached := false
 var checkpoint_station := "midpoint"
 var checkpoint_spawn := Vector3.ZERO
@@ -416,8 +424,8 @@ func verify_coop_mission(host: bool, smoke_sector: int, wipe_test := false) -> v
 		print("Campaign check failed at the Foundry intake landing")
 		finish_relay_check(false)
 		return
-	if smoke_sector == 2 and not await verify_jungle_coop_crossing(local_operator, mission, "NurseryThorns"):
-		print("Campaign check failed at the Nursery Thorns")
+	if smoke_sector == 2 and not await verify_canopy_coop_crossing(local_operator, mission):
+		print("Campaign check failed at the nursery swing")
 		finish_relay_check(false)
 		return
 	if wipe_test:
@@ -429,7 +437,7 @@ func verify_coop_mission(host: bool, smoke_sector: int, wipe_test := false) -> v
 		if entered_act_two:
 			var jungle_passed := true
 			if smoke_sector == 2:
-				jungle_passed = await verify_jungle_coop_crossing(mission.operators[local_index], mission, "ViaductThorns")
+				jungle_passed = await verify_canopy_coop_crossing(mission.operators[local_index], mission)
 			RiftRelay.relay.lobby_set_data("coop_guest_act_two", jungle_passed)
 	else:
 		if not await wait_for_relay(func(): return RiftRelay.relay.lobby_get_data("coop_guest_moved", false), 10.0):
@@ -442,8 +450,8 @@ func verify_coop_mission(host: bool, smoke_sector: int, wipe_test := false) -> v
 			print("Campaign check failed to enter Act II")
 			finish_relay_check(false)
 			return
-		if smoke_sector == 2 and not await verify_jungle_coop_crossing(mission.operators[local_index], mission, "ViaductThorns"):
-			print("Campaign check failed at the Vine Viaduct")
+		if smoke_sector == 2 and not await verify_canopy_coop_crossing(mission.operators[local_index], mission):
+			print("Campaign check failed at the Canopy Escape")
 			finish_relay_check(false)
 			return
 		if not await wait_for_relay(func(): return RiftRelay.relay.lobby_get_data("coop_guest_act_two", false), 20.0):
@@ -532,43 +540,49 @@ func verify_foundry_landing(operator: RiftPlayer) -> bool:
 	Input.action_release("dash")
 	return crossed and is_equal_approx(operator.health, start_health)
 
-func verify_jungle_coop_crossing(operator: RiftPlayer, mission: Node, pit_name: String) -> bool:
-	var pit := mission.stage.find_child(pit_name, true, false) as Area3D
-	if pit == null:
+func verify_canopy_coop_crossing(operator: RiftPlayer, mission: Node) -> bool:
+	var route := mission.stage.find_child("CanopyTraverse", true, false) as Node3D
+	if not route:
 		return false
-	# Only the authority can reset the approach. Drive the local crossing with
-	# real movement input once the same start is visible on the guest.
-	var room := pit.get_parent() as Node3D
-	var height := float(room.get_meta("entry_y"))
-	var edge := pit.global_position.x - float(pit.get("width")) * 0.5
-	var landing := pit.global_position.x + float(pit.get("width")) * 0.5
+	var start := route.global_position + Vector3(-2.0, 0.90, 0.0)
+	var approach := "CanopyTraverse%d" % mission.act
 	if mission.host:
-		if not await wait_for_relay(func(): return RiftRelay.relay.lobby_get_data("coop_approach_ready", "") == pit_name, 10.0):
-			print("JUNGLE CROSSING ", pit_name, " guest did not confirm approach")
+		if not await wait_for_relay(func(): return RiftRelay.relay.lobby_get_data("coop_approach_ready", "") == approach, 10.0):
 			return false
 		for player in mission.operators:
-			player.invulnerable_time = 8.0
-			player.global_position = Vector3(edge - 2.8, height + 0.93, 0)
+			player.invulnerable_time = 12.0
+			player.global_position = start
 			player.velocity = Vector3.ZERO
 			mission.mark_position_reset(player)
 		mission.broadcast_state(true)
 	else:
-		RiftRelay.relay.lobby_set_data("coop_approach_ready", pit_name)
-	if not await wait_for_relay(func(): return absf(operator.global_position.x - edge + 2.8) < 1.15, 10.0):
-		print("JUNGLE CROSSING ", pit_name, " did not receive approach position ", operator.global_position)
+		RiftRelay.relay.lobby_set_data("coop_approach_ready", approach)
+	if not await wait_for_relay(func(): return operator.global_position.distance_to(start) < 0.95 and operator.grounded(), 10.0):
 		return false
 	Input.action_press("move_right")
-	var at_lip := await wait_for_jump_lip(operator, edge)
-	if at_lip:
+	Input.action_press("climb_up")
+	var completed := true
+	for vine in route.get_children():
+		if not vine.is_in_group(&"jungle_swing"):
+			continue
+		if not await wait_for_relay(func(): return operator.jungle_vine == vine and operator.jungle_swing_time >= 0.89, 4.0):
+			completed = false
+			break
 		Input.action_press("jump")
-		if pit_name == "ViaductThorns":
-			await get_tree().create_timer(0.23).timeout
-			Input.action_press("dash")
-	var crossed := at_lip and await wait_for_relay(func(): return operator.global_position.x > landing + 0.45 and operator.health > 0.0 and operator.is_on_floor(), 3.5)
+		await get_tree().physics_frame
+		await get_tree().physics_frame
+		Input.action_release("jump")
+	Input.action_release("climb_up")
+	var end := route.global_position + (Vector3(10.25, 4.28, 0.0) if mission.act == 1 else Vector3(33.7, 6.58, 0.0))
+	for tick in 150:
+		if operator.global_position.x >= end.x - 0.90:
+			Input.action_release("move_right")
+		if operator.global_position.distance_to(end) < 2.15 and operator.grounded():
+			break
+		await get_tree().physics_frame
 	Input.action_release("move_right")
-	Input.action_release("jump")
-	Input.action_release("dash")
-	print("JUNGLE CROSSING ", pit_name, " ", crossed)
+	var crossed := completed and operator.grounded() and operator.global_position.distance_to(end) < 2.15
+	print("JUNGLE CANOPY CROSSING ACT ", mission.act, " ", crossed, " at ", operator.global_position)
 	return crossed
 
 
@@ -585,6 +599,27 @@ func wait_for_jump_lip(operator: RiftPlayer, edge: float) -> bool:
 
 func clear_coop_test_boss(mission: Node) -> bool:
 	var gate_position: Vector3 = mission.gate.global_position
+	if mission.gate_relays.count() != 0:
+		print("Campaign check failed: gate relays carried across acts")
+		return false
+	for index in mission.operators.size():
+		mission.operators[index].global_position = gate_position + Vector3(-2.0 - index, 1.0, 0.0)
+	mission.check_campaign_progress()
+	if mission.entrance_open:
+		print("Campaign check failed: arena door opened without gate relays")
+		return false
+	for index in mission.gate_relays.terminals.size():
+		var operator: RiftPlayer = mission.operators[index]
+		operator.global_position = mission.gate_relays.terminals[index].global_position + Vector3.UP * 0.9
+		if not mission.interact_gate_relay(operator) or mission.gate_relays.count() != index + 1:
+			print("Campaign check failed: gate relay did not register for operator ", index)
+			return false
+		if index == 0:
+			operator.global_position = gate_position + Vector3(-2.0, 1.0, 0.0)
+			mission.check_campaign_progress()
+			if mission.entrance_open:
+				print("Campaign check failed: arena door opened with only one gate relay")
+				return false
 	mission.operators[0].global_position = gate_position + Vector3(-2.0, 1.0, 0.0)
 	mission.operators[1].global_position = gate_position + Vector3(-10.0, 1.0, 0.0)
 	mission.check_campaign_progress()
@@ -609,10 +644,49 @@ func clear_coop_test_boss(mission: Node) -> bool:
 	if not mission.boss_started or not await wait_for_relay(func(): return not mission.boss_intro_active, 17.0):
 		print("Campaign check failed: boss intro did not complete, act ", mission.act)
 		return false
-	mission.boss.take_damage(100000.0)
+	if mission.sector == 2:
+		if not await clear_jungle_test_boss(mission):
+			return false
+	elif mission.boss.has_method("open_armor"):
+		for phase in 3:
+			mission.boss.open_armor()
+			mission.boss.take_damage(100000.0)
+	else:
+		mission.boss.take_damage(100000.0)
 	mission.operators[0].global_position = mission.exit_marker.global_position
 	mission.check_campaign_progress()
 	return mission.boss_defeated
+
+func clear_jungle_test_boss(mission: Node) -> bool:
+	var opponent: Combatant = mission.boss
+	var operator: RiftPlayer = mission.operators[0]
+	operator.invulnerable_time = 30.0
+	var armor_hp := opponent.health
+	opponent.take_damage(100000.0)
+	if opponent.health != armor_hp:
+		return false
+	if mission.act == 1:
+		for phase in 3:
+			if not await wait_for_relay(func(): return not opponent.root_anchor.dormant, 3.0):
+				return false
+			var prime: Vector3 = opponent.root_anchor.global_position
+			var side := -1.0 if opponent.global_position.x >= prime.x else 1.0
+			for hit in opponent.root_anchor.durability:
+				operator.global_position = prime + Vector3(side * 2.2, -.05, 0)
+				operator.velocity = Vector3.ZERO
+				operator.facing = -side
+				operator.shoot(false)
+				await get_tree().create_timer(.18).timeout
+			if not await wait_for_relay(func(): return opponent.exposed, 2.0):
+				return false
+			opponent.take_damage(100000.0)
+	else:
+		operator.global_position = opponent.drains[0].global_position + Vector3.UP * .96
+		operator.velocity = Vector3.ZERO
+		if not await wait_for_relay(func(): return opponent.exposed, 11.0):
+			return false
+		opponent.take_damage(100000.0)
+	return true
 
 func wait_for_relay(condition: Callable, timeout: float) -> bool:
 	var deadline := Time.get_ticks_msec() + int(timeout * 1000)
@@ -1284,7 +1358,7 @@ func deploy_selected_sector(number: int, selected_difficulty := 0) -> void:
 		save.set_value("checkpoint", "at_start", true)
 		save.set_value("checkpoint", "sector_deaths", 0)
 		save.set_value("checkpoint", "life_taken", false)
-		for key in ["manual_combat_snapshot", "health", "energy", "equipped", "factory_caches", "factory_bridge_lowered", "interior_relays"]:
+		for key in ["manual_combat_snapshot", "health", "energy", "equipped", "factory_caches", "factory_bridge_lowered", "interior_relays", "gate_relays"]:
 			if save.has_section_key("checkpoint", key):
 				save.erase_section_key("checkpoint", key)
 		if write_checkpoint(save) != OK:
@@ -1408,6 +1482,8 @@ func load_game(show_deployment := true) -> void:
 			if not Catalog.weapon(String(weapon)).is_empty():
 				run_weapons[String(weapon)] = true
 	start_game(false)
+	gate_relays.set_active(int(save.get_value("checkpoint", "gate_relays", 0)))
+	factory_hud.set_gate_relays(gate_relays.count())
 	var at_start := bool(save.get_value("checkpoint", "at_start", false))
 	if not at_start:
 		load_checkpoint_location(save)
@@ -1460,12 +1536,13 @@ func level_path(target_act: int) -> String:
 
 func load_checkpoint_location(save: ConfigFile) -> void:
 	checkpoint_station = String(save.get_value("checkpoint", "station", "midpoint"))
-	if not CHECKPOINT_STATIONS.has(checkpoint_station):
+	if not game_root.has_node(CHECKPOINT_STATIONS.get(checkpoint_station, "TERRAIN/UnknownCheckpoint")):
 		checkpoint_station = "midpoint"
 	var checkpoint = game_root.get_node(CHECKPOINT_STATIONS[checkpoint_station])
-	if checkpoint_station == "forge_hall":
-		var first = game_root.get_node(CHECKPOINT_STATIONS["midpoint"])
-		first.online = true
+	for station in CHECKPOINT_ORDER.slice(0, CHECKPOINT_ORDER.find(checkpoint_station)):
+		var previous := game_root.get_node_or_null(CHECKPOINT_STATIONS[station])
+		if previous:
+			previous.online = true
 	checkpoint.online = true
 	checkpoint_reached = true
 	checkpoint_spawn = checkpoint.global_position + Vector3.UP * 0.95
@@ -1592,6 +1669,8 @@ func build_level() -> void:
 	gate = game_root.get_node("Gate") as Node3D
 	arena_door = CampaignDoor.new(gate)
 	arena_door.reset()
+	gate_relays = GateRelays.new()
+	gate_relays.install(game_root, Color(Catalog.info(sector).color), sector != 2)
 	boss_spawn = boss.position
 	if act == 1:
 		var actors := boss.get_parent()
@@ -1599,8 +1678,7 @@ func build_level() -> void:
 		boss.queue_free()
 		boss = create_miniboss()
 		actors.add_child(boss)
-	boss.max_health *= Difficulty.boss_health_scale(sector, mission_difficulty, act)
-	boss.health = boss.max_health
+	boss.apply_boss_scaling(sector, mission_difficulty, act)
 	boss.hide()
 	build_hud()
 	for station in CHECKPOINT_STATIONS:
@@ -1644,8 +1722,6 @@ func apply_permanent_upgrades() -> void:
 	preload("res://scripts/equipment_stats.gd").apply(player, profile)
 
 func bind_boss_signals() -> void:
-	if boss.has_method("configure_difficulty"):
-		boss.configure_difficulty(mission_difficulty)
 	boss.health_changed.connect(func(current: float, maximum: float):
 		factory_hud.boss_health = current
 		factory_hud.boss_max_health = maximum
@@ -1726,6 +1802,7 @@ func build_hud() -> void:
 	add_child(hud)
 	factory_hud = FactoryHUD.new()
 	factory_hud.exit_task = Story.objective(sector, act, false, Miniboss.TITLES[sector - 1])
+	factory_hud.set_gate_relays(gate_relays.count())
 	factory_hud.boss_name = String(Miniboss.TITLES[sector - 1] if act == 1 else Catalog.info(sector).boss).to_upper()
 	factory_hud.boss_health = boss.health
 	factory_hud.boss_max_health = boss.max_health
@@ -1783,7 +1860,7 @@ func build_hud() -> void:
 	)
 
 func _on_checkpoint_activated(spawn: Vector3, station := "midpoint") -> void:
-	if checkpoint_station == "forge_hall" and station == "midpoint":
+	if checkpoint_reached and CHECKPOINT_ORDER.find(station) < CHECKPOINT_ORDER.find(checkpoint_station):
 		return
 	checkpoint_station = station
 	checkpoint_reached = true
@@ -1819,6 +1896,7 @@ func save_checkpoint(manual_combat_snapshot := false) -> void:
 		if game_root.is_ancestor_of(relay) and relay.triggered and not relay.lift:
 			active_relays.append(String(game_root.get_path_to(relay)))
 	save.set_value("checkpoint", "interior_relays", active_relays)
+	save.set_value("checkpoint", "gate_relays", gate_relays.active)
 	if manual_combat_snapshot:
 		save.set_value("checkpoint", "manual_combat_snapshot", true)
 		save.set_value("checkpoint", "health", player.health)
@@ -1965,8 +2043,7 @@ func reset_boss_room() -> void:
 		boss = (load(Catalog.info(sector).boss_scene) as PackedScene).instantiate() as Combatant
 		boss.position = boss_spawn
 	game_root.get_node("Actors").add_child(boss)
-	boss.max_health *= Difficulty.boss_health_scale(sector, mission_difficulty, act)
-	boss.health = boss.max_health
+	boss.apply_boss_scaling(sector, mission_difficulty, act)
 	boss.hide()
 	bind_boss_signals()
 	gate_open = false
@@ -1975,6 +2052,7 @@ func reset_boss_room() -> void:
 	repair_hall.hold = 0.0
 	repair_hall.motor.reset()
 	factory_hud.boss_visible = false
+	factory_hud.update_boss_mechanic(null)
 	factory_hud.boss_health = boss.health
 	factory_hud.boss_max_health = boss.max_health
 
@@ -2016,7 +2094,7 @@ func _physics_process(delta: float) -> void:
 	arena_door.step(delta, gate_open and (not arena_sealed or boss_defeated), [player])
 	if deploying or advancing_act or arena_intro or suit_reveal_active or sector_complete or respawning:
 		return
-	if not gate_open and arena_door.near(player):
+	if not gate_open and gate_relays.complete() and arena_door.near(player):
 		open_factory_gate()
 	if gate_open and arena_door.passable and not arena_sealed and not boss_defeated and is_instance_valid(boss):
 		var exit := game_root.get_node("MARKERS/RoomExit") as Marker3D
@@ -2028,6 +2106,9 @@ func _process(delta: float) -> void:
 		return
 	mission_stats.seconds += delta
 	factory_hud.set_run_time(mission_stats.seconds)
+	gate_relays.update_prompt(player, arena_door.near(player))
+	if factory_hud.boss_visible:
+		factory_hud.update_boss_mechanic(boss)
 	factory_hud.set_status_effects(player.supplies, player.boss_debuff, player.debuff_left)
 	var exit := game_root.get_node("MARKERS/RoomExit") as Marker3D
 	var at_exit := player.global_position.distance_to(exit.global_position) <= 1.45
@@ -2318,6 +2399,14 @@ func on_joy_connection_changed(device: int, connected: bool) -> void:
 	toggle_pause()
 
 func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("field_interact") and is_instance_valid(gate_relays) and can_open_chat() and not chat.is_open():
+		var before := gate_relays.active
+		if gate_relays.interact(player, arena_door.near(player)):
+			if before != gate_relays.active:
+				factory_hud.set_gate_relays(gate_relays.count())
+				save_checkpoint()
+			get_viewport().set_input_as_handled()
+			return
 	if event.is_action_pressed("pause") and game_root and not deploying and not sector_complete and not advancing_act and not arena_intro and not suit_reveal_active and player.visible:
 		toggle_pause()
 		get_viewport().set_input_as_handled()

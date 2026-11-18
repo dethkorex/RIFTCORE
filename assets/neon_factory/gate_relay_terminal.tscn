@@ -1,0 +1,81 @@
+[gd_scene format=3]
+
+[sub_resource type="StandardMaterial3D" id="Iron"]
+albedo_color = Color(0.103, 0.094, 0.103, 1)
+roughness = 0.53
+metallic = 0.47
+
+[sub_resource type="StandardMaterial3D" id="Copper"]
+albedo_color = Color(0.34, 0.143, 0.071, 1)
+roughness = 0.44
+metallic = 0.58
+
+[sub_resource type="StandardMaterial3D" id="Amber"]
+albedo_color = Color(1, 0.51, 0.18, 1)
+emission_enabled = true
+emission = Color(1, 0.31, 0.08, 1)
+emission_energy_multiplier = 1.25
+
+[sub_resource type="StandardMaterial3D" id="Cool"]
+albedo_color = Color(0.63, 0.81, 0.83, 1)
+emission_enabled = true
+emission = Color(0.30, 0.62, 0.68, 1)
+emission_energy_multiplier = 1.0
+
+[sub_resource type="BoxMesh" id="Foot"]
+material = SubResource("Iron")
+size = Vector3(0.82, 0.17, 0.52)
+
+[sub_resource type="BoxMesh" id="Pedestal"]
+material = SubResource("Copper")
+size = Vector3(0.27, 1.05, 0.32)
+
+[sub_resource type="BoxMesh" id="Shield"]
+material = SubResource("Iron")
+size = Vector3(0.8, 0.83, 0.51)
+
+[sub_resource type="BoxMesh" id="UpperTrim"]
+material = SubResource("Copper")
+size = Vector3(0.79, 0.08, 0.53)
+
+[sub_resource type="BoxMesh" id="LowerTrim"]
+material = SubResource("Copper")
+size = Vector3(0.79, 0.08, 0.53)
+
+[sub_resource type="BoxMesh" id="Signal"]
+material = SubResource("Amber")
+size = Vector3(0.48, 0.42, 0.068)
+
+[sub_resource type="BoxMesh" id="LabelTrim"]
+material = SubResource("Iron")
+size = Vector3(0.56, 0.08, 0.085)
+
+[node name="GateRelayTerminal" type="Node3D"]
+
+[node name="Foot" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.09, -1.39)
+mesh = SubResource("Foot")
+
+[node name="Pedestal" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.59, -1.38)
+mesh = SubResource("Pedestal")
+
+[node name="Shield" type="MeshInstance3D" parent="."]
+position = Vector3(0, 1.4, -1.35)
+mesh = SubResource("Shield")
+
+[node name="UpperTrim" type="MeshInstance3D" parent="."]
+position = Vector3(0, 1.83, -1.35)
+mesh = SubResource("UpperTrim")
+
+[node name="LowerTrim" type="MeshInstance3D" parent="."]
+position = Vector3(0, 1.01, -1.35)
+mesh = SubResource("LowerTrim")
+
+[node name="Signal" type="MeshInstance3D" parent="."]
+position = Vector3(0, 1.44, -1.07)
+mesh = SubResource("Signal")
+
+[node name="LabelTrim" type="MeshInstance3D" parent="."]
+position = Vector3(0, 1.15, -1.062)
+mesh = SubResource("LabelTrim")

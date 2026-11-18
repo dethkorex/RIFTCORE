@@ -74,7 +74,7 @@ func setup(dir: Vector3, faction: String, tint: Color = Color.CYAN, drill := fal
 		var jet := part(skin, cached_mesh("Orb"), light_paint(hot, 2.0), Vector3(0, 0, -0.47), Vector3(0.12, 0.12, 0.23))
 		jet.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	elif sector > 0:
-		ATTACK_FX.projectile(skin, sector, role, charged)
+		ATTACK_FX.projectile(skin, sector, role, charged, tint if sector == 2 and role in [3, 4] else Color.TRANSPARENT)
 	elif magma:
 		var width := 0.56 if charged else 0.31
 		part(skin, cached_mesh("Orb"), light_paint(Color("e84612"), 1.8), Vector3.ZERO, Vector3(width, width, width * 1.12))

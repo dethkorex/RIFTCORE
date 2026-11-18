@@ -1,19 +1,25 @@
 [gd_scene format=3]
 
 [ext_resource type="Script" path="res://scripts/factory_boss.gd" id="boss"]
-[ext_resource type="PackedScene" path="res://assets/neon_factory/foundry/kiln_warden.glb" id="rig"]
+[ext_resource type="PackedScene" path="res://assets/neon_factory/foundry/kiln_warden_tripo.glb" id="rig"]
+[ext_resource type="Script" path="res://scripts/foundry_boss_rig.gd" id="pose"]
 
 [sub_resource type="BoxShape3D" id="hitbox"]
 size = Vector3(2.45, 2.90, 1.62)
 
 [node name="SectorMiniboss" type="CharacterBody3D" groups=["damageable_enemies"]]
 script = ExtResource("boss")
-max_health = 415.0
+max_health = 560.25
 warden = true
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
 shape = SubResource("hitbox")
 
 [node name="Armor" type="Node3D" parent="."]
+script = ExtResource("pose")
+warden = true
 
 [node name="Rig" parent="Armor" instance=ExtResource("rig")]
+position = Vector3(0, -1.435, 0)
+rotation = Vector3(0, -1.5707963, 0)
+scale = Vector3(3.4, 3.4, 3.4)

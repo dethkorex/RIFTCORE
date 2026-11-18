@@ -71,8 +71,6 @@ var thorn_active := false
 var magma_active := false
 var run_weapon_ids: Array = []
 var special_weapon := ""
-var original_armor: Dictionary = {}
-var forge_armor: Dictionary = {}
 var base_suit_meshes: Array[MeshInstance3D] = []
 var armor_materials: Dictionary = {}
 var armor_finish := ""
@@ -82,7 +80,6 @@ var fire_suit_mesh: MeshInstance3D
 var nature_suit_mesh: MeshInstance3D
 var reward_suit_meshes: Dictionary[String, MeshInstance3D] = {}
 var reward_coating: ShaderMaterial
-var suit_coatings: Dictionary[String, ShaderMaterial] = {}
 
 const RUN_THRESHOLD := 0.72
 const RUN_RELEASE_THRESHOLD := 0.64
@@ -166,6 +163,10 @@ var crouching := false
 var low_profile := false
 var contact_recoil := 0.0
 var ladder: Node3D
+var jungle_vine: Node3D
+var jungle_swing_time := 0.0
+var jungle_grab_lock := 0.0
+var jungle_release_left := 0.0
 var ladder_lock := 0.0
 var drop_through: Dictionary = {}
 var ladder_support_exception: StaticBody3D
@@ -462,6 +463,8 @@ func simulate_movement(delta: float) -> void:
 		axis = 0.0
 	elif boss_debuff == 6 and not grounded():
 		axis *= .53
+	if update_jungle_traverse(delta):
+		return
 	ladder_lock = maxf(0.0, ladder_lock - delta)
 	update_wall_contact(delta, axis)
 	var stick_crouch := action_held("crouch_stick") and absf(axis) < 0.35
@@ -548,7 +551,7 @@ func simulate_movement(delta: float) -> void:
 		elif jump_buffer > 0.0 and terrain.w > 0.0 and contact_recoil <= 0.0:
 			velocity.y = 8.4
 			jump_buffer = 0.0
-		if action_released("jump") and not action_held("jump") and velocity.y > 0.0:
+		if jungle_release_left <= 0.0 and action_released("jump") and not action_held("jump") and velocity.y > 0.0:
 			velocity.y *= 0.45
 	velocity.z = -global_position.z * 18.0
 	update_one_way_collisions()
@@ -570,6 +573,82 @@ func simulate_movement(delta: float) -> void:
 	update_character_visuals(axis)
 	if not local_prediction and global_position.y < pit_floor_y:
 		die_in_pit()
+
+func update_jungle_traverse(delta: float) -> bool:
+	jungle_grab_lock = maxf(0.0, jungle_grab_lock - delta)
+	jungle_release_left = maxf(0.0, jungle_release_left - delta)
+	if controls_suspended:
+		jungle_vine = null
+		return false
+	if is_instance_valid(jungle_vine):
+		var at: Vector3 = jungle_vine.hang_at(jungle_swing_time)
+		if global_position.distance_to(at) > 1.45 or shock_stun > 0.0 or contact_recoil > 0.0:
+			jungle_vine = null
+			return false
+		if action_pressed("jump"):
+			var angle: float = jungle_vine.angle_at(jungle_swing_time)
+			var momentum := smoothstep(-0.35, 0.72, angle)
+			velocity = Vector3(lerpf(7.5, 14.0, momentum), lerpf(6.5, 10.75, momentum), 0.0)
+			jungle_vine = null
+			jungle_grab_lock = 0.28
+			jungle_release_left = 0.42
+			wall_launch_lock = 0.22
+			jump_buffer = 0.0
+			coyote = 0.0
+			air_dash_available = true
+			RiftAudio.play_effect(&"dash")
+			# Start the launch this tick without also processing a wall jump.
+			update_one_way_collisions()
+			move_and_slide()
+			return true
+		jungle_swing_time += delta
+		var destination: Vector3 = jungle_vine.hang_at(jungle_swing_time)
+		var hit := move_and_collide(destination - global_position)
+		if climb_pose:
+			climb_pose.cycle = PI * 0.5
+			climb_pose.influence = move_toward(climb_pose.influence, 1.0, delta * 17.0)
+		if hit:
+			jungle_vine = null
+			jungle_grab_lock = 0.26
+		return true
+	if grounded():
+		for route in get_tree().get_nodes_in_group(&"jungle_canopy_route"):
+			var offset: Vector3 = global_position - route.global_position
+			if absf(offset.x) < 0.93 and absf(offset.y - standing_capsule.height * 0.5) < 0.30:
+				velocity.y = 19.2
+				jungle_release_left = 0.42
+				dash_left = 0.0
+				jump_buffer = 0.0
+				coyote = 0.0
+				air_dash_available = true
+				route.launch_rider(self)
+				update_one_way_collisions()
+				move_and_slide()
+				update_character_visuals(0.0)
+				return true
+		return false
+	if jungle_grab_lock > 0.0 or shock_stun > 0.0 or movement_axis("climb_down", "climb_up") < 0.4:
+		return false
+	for vine in get_tree().get_nodes_in_group(&"jungle_swing"):
+		var handle: Vector3 = vine.hang_at(0.0)
+		if absf(global_position.x - handle.x) > 1.05 or absf(global_position.y - handle.y) > 1.05:
+			continue
+		var motion := handle - global_position
+		if test_move(global_transform, motion):
+			continue
+		move_and_collide(motion)
+		jungle_vine = vine
+		jungle_swing_time = 0.0
+		vine.capture(self)
+		velocity = Vector3.ZERO
+		dash_left = 0.0
+		facing = 1.0
+		model_root.rotation.y = PI * 0.5
+		cancel_charge()
+		cancel_saber_charge()
+		play_character_animation("idle", true)
+		return true
+	return false
 
 func die_in_pit() -> void:
 	if health <= 0.0:
@@ -1407,15 +1486,6 @@ func equip_sector_weapon(id: String) -> void:
 	if light:
 		light.light_color = tint
 	weapon_changed.emit(String(info.get("reward_name", "Buster Cannon")).to_upper())
-
-func unlock_magma() -> void:
-	unlock_sector_weapon("magma_breaker")
-
-func set_thorn_active() -> void:
-	equip_sector_weapon("thorn_swarm")
-
-func set_magma_active(enabled: bool) -> void:
-	equip_sector_weapon("magma_breaker" if enabled else "")
 
 func build_combat_clips() -> void:
 	if not animation_player.has_animation(&"slash") or not animation_player.has_animation_library(&""):

@@ -1,0 +1,168 @@
+[gd_scene format=3]
+
+[ext_resource type="Texture2D" path="res://assets/neon_factory/foundry/bulkhead_Heat-treated steel • albedo.png" id="SteelTrim"]
+
+[sub_resource type="StandardMaterial3D" id="Steel"]
+albedo_color = Color(0.40, 0.37, 0.35, 1)
+roughness = 0.44
+metallic = 0.55
+albedo_texture = ExtResource("SteelTrim")
+uv1_scale = Vector3(1.3, 1.6, 1)
+
+[sub_resource type="StandardMaterial3D" id="Frame"]
+albedo_color = Color(0.265, 0.103, 0.05, 1)
+roughness = 0.53
+metallic = 0.61
+
+[sub_resource type="StandardMaterial3D" id="Black"]
+albedo_color = Color(0.052, 0.052, 0.061, 1)
+roughness = 0.62
+metallic = 0.42
+
+[sub_resource type="StandardMaterial3D" id="Accent"]
+albedo_color = Color(0.29, 0.40, 0.44, 1)
+roughness = 0.43
+metallic = 0.38
+
+[sub_resource type="CylinderMesh" id="Mesh0"]
+material = SubResource("Steel")
+top_radius = 0.39
+bottom_radius = 0.39
+height = 3.1
+radial_segments = 24
+rings = 1
+
+[sub_resource type="CylinderMesh" id="Mesh1"]
+material = SubResource("Frame")
+top_radius = 0.51
+bottom_radius = 0.51
+height = 0.53
+radial_segments = 24
+rings = 1
+
+[sub_resource type="CylinderMesh" id="Mesh2"]
+material = SubResource("Steel")
+top_radius = 0.38
+bottom_radius = 0.38
+height = 4.75
+radial_segments = 24
+rings = 1
+
+[sub_resource type="CylinderMesh" id="Mesh3"]
+material = SubResource("Frame")
+top_radius = 0.52
+bottom_radius = 0.52
+height = 0.58
+radial_segments = 24
+rings = 1
+
+[sub_resource type="CylinderMesh" id="Mesh4"]
+material = SubResource("Steel")
+top_radius = 0.39
+bottom_radius = 0.39
+height = 2.83
+radial_segments = 24
+rings = 1
+
+[sub_resource type="CylinderMesh" id="Mesh5"]
+material = SubResource("Frame")
+top_radius = 0.53
+bottom_radius = 0.53
+height = 0.21
+radial_segments = 24
+rings = 1
+
+[sub_resource type="TorusMesh" id="Mesh6"]
+material = SubResource("Accent")
+inner_radius = 0.38
+outer_radius = 0.54
+rings = 28
+ring_segments = 10
+
+[sub_resource type="BoxMesh" id="Mesh7"]
+material = SubResource("Accent")
+size = Vector3(0.08, 0.86, 0.09)
+
+[sub_resource type="CylinderMesh" id="Mesh8"]
+material = SubResource("Black")
+top_radius = 0.16
+bottom_radius = 0.16
+height = 0.12
+radial_segments = 24
+rings = 1
+
+[sub_resource type="BoxMesh" id="Mesh9"]
+material = SubResource("Frame")
+size = Vector3(1.03, 0.21, 1.12)
+
+[node name="FoundrySumpPipework" type="Node3D"]
+
+[node name="Intake" type="MeshInstance3D" parent="."]
+position = Vector3(-2.36, 1.55, 0)
+mesh = SubResource("Mesh0")
+
+[node name="IntakeElbow" type="MeshInstance3D" parent="."]
+position = Vector3(-2.29, 3, 0)
+mesh = SubResource("Mesh1")
+rotation = Vector3(0, 0, -0.62)
+
+[node name="Header" type="MeshInstance3D" parent="."]
+position = Vector3(0.1, 3.16, 0)
+mesh = SubResource("Mesh2")
+rotation = Vector3(0, 0, 1.5708)
+
+[node name="DropElbow" type="MeshInstance3D" parent="."]
+position = Vector3(2.48, 2.99, 0)
+mesh = SubResource("Mesh3")
+rotation = Vector3(0, 0, 0.63)
+
+[node name="Outlet" type="MeshInstance3D" parent="."]
+position = Vector3(2.59, 1.54, 0)
+mesh = SubResource("Mesh4")
+
+[node name="Collar0" type="MeshInstance3D" parent="."]
+position = Vector3(-1.54, 3.16, 0)
+mesh = SubResource("Mesh5")
+rotation = Vector3(0, 0, 1.5708)
+
+[node name="Collar1" type="MeshInstance3D" parent="."]
+position = Vector3(0.48, 3.16, 0)
+mesh = SubResource("Mesh5")
+rotation = Vector3(0, 0, 1.5708)
+
+[node name="Collar2" type="MeshInstance3D" parent="."]
+position = Vector3(1.65, 3.16, 0)
+mesh = SubResource("Mesh5")
+rotation = Vector3(0, 0, 1.5708)
+
+[node name="Handwheel" type="MeshInstance3D" parent="."]
+position = Vector3(0.48, 3.16, 0.7)
+mesh = SubResource("Mesh6")
+rotation = Vector3(1.5708, 0, 0)
+
+[node name="Spoke0" type="MeshInstance3D" parent="."]
+position = Vector3(0.48, 3.16, 0.7)
+mesh = SubResource("Mesh7")
+
+[node name="Spoke1" type="MeshInstance3D" parent="."]
+position = Vector3(0.48, 3.16, 0.7)
+mesh = SubResource("Mesh7")
+rotation = Vector3(0, 0, 1.0472)
+
+[node name="Spoke2" type="MeshInstance3D" parent="."]
+position = Vector3(0.48, 3.16, 0.7)
+mesh = SubResource("Mesh7")
+rotation = Vector3(0, 0, 2.0944)
+
+[node name="WheelHub" type="MeshInstance3D" parent="."]
+position = Vector3(0.48, 3.16, 0.71)
+mesh = SubResource("Mesh8")
+rotation = Vector3(1.5708, 0, 0)
+
+[node name="PipeFoot0" type="MeshInstance3D" parent="."]
+position = Vector3(-2.36, 0.12, 0)
+mesh = SubResource("Mesh9")
+
+[node name="PipeFoot1" type="MeshInstance3D" parent="."]
+position = Vector3(2.59, 0.12, 0)
+mesh = SubResource("Mesh9")

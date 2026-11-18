@@ -127,6 +127,8 @@ static func deployment(sector: int, act: int) -> Array:
 	var advice: String = FIELD_ADVICE[index]
 	if sector == 1 and act == 2:
 		advice = "The return shutter has a pressure plate in the lower gallery. Past it, break the cracked wall. Wait at the mouth of the smelter chute and destroy the rolling slag before you cross."
+	elif sector == 2:
+		advice = "One of the gate relays is up in the nursery. Step on the launch bloom and hold up to grab the vine. Jump when it swings forward. The other relay is behind a cracked wall." if act == 1 else "The canopy lift will get you to the first vine. Hold up between jumps and move fast. There’s nothing under the crossing, and the first relay is on the far ledge. The irrigation ferry leads to the other one."
 	return [
 		["NOVA", BRIEFINGS[index] if act == 1 else SECOND_ACT[index]],
 		["RX-07", OPERATOR_BRIEF_RESPONSES[index][act - 1]],
@@ -137,6 +139,17 @@ static func boss_exchange(sector: int, act: int) -> Array:
 	var index := clampi(sector - 1, 0, BRIEFINGS.size() - 1)
 	var exchange: Array = WARDEN_EXCHANGES[index] if act == 1 else GUARDIAN_EXCHANGES[index]
 	return [["BOSS", exchange[0]], ["RX-07", exchange[1]], ["BOSS", exchange[2]]]
+
+static func foundry_boss_hint(act: int) -> String:
+	if act == 1:
+		return "Shoot either blue purge valve before the fire starts. Then shoot the exposed Warden."
+	return "Stand past a quench lock. When it turns amber, jump clear. Shoot the Titan once the lock catches its drill."
+
+static func jungle_boss_hint(act: int) -> String:
+	if act == 1:
+		return "Follow the green tether and shoot the seed anchor to strip Briar's armor. When it grows back, find the new anchor."
+	return "When the poison rises, stand on a glowing drain above it. Hold your ground until the mist clears, then drop down and shoot the exposed reactor."
+
 
 static func objective(sector: int, act: int, defeated: bool, miniboss: String) -> String:
 	if act == 1:

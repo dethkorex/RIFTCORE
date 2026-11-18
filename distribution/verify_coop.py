@@ -59,11 +59,10 @@ def verify(executable: Path, sector: str = "") -> None:
             raise RuntimeError("Co-op mission did not pass on both clients.")
         if sector == "jungle":
             for result in (output, "".join(lines)):
-                if result.count("JUNGLE CROSSING") != 2 or " false" in "\n".join(
-                    line for line in result.splitlines() if line.startswith("JUNGLE CROSSING")
-                ):
-                    raise RuntimeError("A client did not cross both Jungle jumps.")
-            print("Both live clients crossed the Jungle jumps and completed both acts.")
+                if any(f"JUNGLE CANOPY CROSSING ACT {act} true" not in result for act in (1, 2)):
+                    print(result)
+                    raise RuntimeError("A client did not cross both Jungle canopy routes.")
+            print("Both live clients crossed the Jungle canopy routes and completed both acts.")
         else:
             print("Live party join, names, independent cameras and controls, shared rewards and return passed.")
     finally:

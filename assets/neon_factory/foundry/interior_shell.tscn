@@ -1,0 +1,73 @@
+[gd_scene format=3]
+
+[sub_resource type="StandardMaterial3D" id="Iron"]
+albedo_color = Color(0.103, 0.094, 0.103, 1)
+roughness = 0.53
+metallic = 0.47
+
+[sub_resource type="StandardMaterial3D" id="Copper"]
+albedo_color = Color(0.34, 0.143, 0.071, 1)
+roughness = 0.44
+metallic = 0.58
+
+[sub_resource type="StandardMaterial3D" id="Amber"]
+albedo_color = Color(1, 0.51, 0.18, 1)
+emission_enabled = true
+emission = Color(1, 0.31, 0.08, 1)
+emission_energy_multiplier = 1.25
+
+[sub_resource type="StandardMaterial3D" id="Cool"]
+albedo_color = Color(0.63, 0.81, 0.83, 1)
+emission_enabled = true
+emission = Color(0.30, 0.62, 0.68, 1)
+emission_energy_multiplier = 1.0
+
+[sub_resource type="BoxMesh" id="BackCladding"]
+material = SubResource("Iron")
+size = Vector3(6.01, 8.01, 0.28)
+
+[sub_resource type="BoxMesh" id="Seam"]
+material = SubResource("Copper")
+size = Vector3(0.13, 8.0, 0.16)
+
+[sub_resource type="BoxMesh" id="TopSeal"]
+material = SubResource("Copper")
+size = Vector3(6.0, 0.18, 0.16)
+
+[sub_resource type="BoxMesh" id="Sill"]
+material = SubResource("Iron")
+size = Vector3(6.0, 0.34, 0.23)
+
+[sub_resource type="BoxMesh" id="LowerDuct"]
+material = SubResource("Iron")
+size = Vector3(5.88, 0.23, 0.28)
+
+[sub_resource type="BoxMesh" id="UpperDuct"]
+material = SubResource("Iron")
+size = Vector3(5.88, 0.18, 0.24)
+
+[node name="FoundryInteriorShell" type="Node3D"]
+
+[node name="BackCladding" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0, 0)
+mesh = SubResource("BackCladding")
+
+[node name="Seam" type="MeshInstance3D" parent="."]
+position = Vector3(-2.92, 0, 0.14)
+mesh = SubResource("Seam")
+
+[node name="TopSeal" type="MeshInstance3D" parent="."]
+position = Vector3(0, 3.86, 0.14)
+mesh = SubResource("TopSeal")
+
+[node name="Sill" type="MeshInstance3D" parent="."]
+position = Vector3(0, -3.79, 0.17)
+mesh = SubResource("Sill")
+
+[node name="LowerDuct" type="MeshInstance3D" parent="."]
+position = Vector3(0, -2.24, 0.16)
+mesh = SubResource("LowerDuct")
+
+[node name="UpperDuct" type="MeshInstance3D" parent="."]
+position = Vector3(0, 2.12, 0.14)
+mesh = SubResource("UpperDuct")

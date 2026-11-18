@@ -25,6 +25,10 @@ const OPENING_DEPTH := 1.12
 	set(value):
 		climb_height = value
 		queue_rebuild()
+@export var solid_deck := false:
+	set(value):
+		solid_deck = value
+		queue_rebuild()
 @export var vines := false:
 	set(value):
 		vines = value
@@ -117,7 +121,8 @@ func build_section(left: float, right: float, back: float, front: float) -> void
 	var body := StaticBody3D.new()
 	body.position = Vector3((left + right) * 0.5, -size.y * 0.5, (back + front) * 0.5)
 	assembly.add_child(body)
-	body.add_to_group(&"factory_one_way")
+	if not solid_deck:
+		body.add_to_group(&"factory_one_way")
 	var collider := CollisionShape3D.new()
 	collider.name = "Collider"
 	var shape := BoxShape3D.new()

@@ -69,7 +69,7 @@ func _physics_process(delta: float) -> void:
 	if active and rotor:
 		rotor.rotate_z(delta * 27)
 	if active and not active_last_tick:
-		VFX.throw_sparks(self, Color("ff5560"), 0.90)
+		VFX.impact(self, 0.90)
 	active_last_tick = active
 	update_display(active, warning)
 	for edge in alert_edges:

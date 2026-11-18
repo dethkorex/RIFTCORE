@@ -39,6 +39,10 @@
 [ext_resource type="Script" path="res://scripts/sector_dressing.gd" id="SectorDressing"]
 [ext_resource type="Texture2D" path="res://assets/campaign/machine_jungle/surfaces/sector_wall.jpg" id="SectorAlbedo"]
 
+[ext_resource type="Script" path="res://scripts/jungle_canopy_route.gd" id="CanopyRoute"]
+
+[ext_resource type="PackedScene" path="res://assets/machine_jungle/terrain/root_vault.tscn" id="RootVault"]
+
 [sub_resource type="Environment" id="JungleLight"]
 background_mode = 1
 background_color = Color(0.018, 0.07, 0.055, 1)
@@ -900,7 +904,7 @@ position = Vector3(0, 0.88, 0)
 pit_floor_y = -22.0
 
 [node name="VerdantColossus" parent="Actors" instance=ExtResource("boss")]
-position = Vector3(561, 1.8, 0)
+position = Vector3(565.2, 1.8, 0)
 
 [node name="JungleUnit00" parent="Actors" groups=["level_enemies"] instance=ExtResource("rootrunner")]
 position = Vector3(31, 3.025, 0)
@@ -1177,20 +1181,8 @@ position = Vector3(26, 1.425, 0)
 scale = Vector3(1.3508, 1, 1)
 rotation = Vector3(0, 0, 0.16109)
 
-[node name="CanopyCacheDeck" type="StaticBody3D" parent="TERRAIN/Room01_Gallery" groups=["factory_drop_through"]]
-position = Vector3(5.45, 2.625, 0)
-rotation = Vector3(0, 0, 0)
-collision_layer = 1
-
-[node name="Art" parent="TERRAIN/Room01_Gallery/CanopyCacheDeck" instance=ExtResource("RCDeck")]
-scale = Vector3(0.81667, 0.54762, 1)
-
-[node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room01_Gallery/CanopyCacheDeck"]
-position = Vector3(0, -0.23, 0)
-shape = SubResource("BoxShape3D_0027")
-
 [node name="InteriorCache01" type="Area3D" parent="TERRAIN" groups=["factory_salvage_chest"]]
-position = Vector3(5.4, 2.625, 0)
+position = Vector3(21.4, 3.375, 0)
 script = ExtResource("RCCacheScript")
 sector = 2
 materials = 4
@@ -4541,7 +4533,7 @@ script = ExtResource("RCBarricade")
 accent = Color(0.5294, 0.8627, 0.2392, 1)
 
 [node name="InteriorCache08" type="Area3D" parent="TERRAIN" groups=["factory_salvage_chest"]]
-position = Vector3(532.45, 3.23, 0)
+position = Vector3(531.6, 3.23, -0.44)
 script = ExtResource("RCCacheScript")
 sector = 2
 materials = 4
@@ -4910,3 +4902,26 @@ right_edge = 587.2505
 cave_floor = 0.2500
 cave_roof = 22.2500
 arena = true
+
+[node name="CanopyTraverse" type="Node3D" parent="TERRAIN/Room01_Gallery"]
+position = Vector3(11.15, -0.025, 0)
+script = ExtResource("CanopyRoute")
+practice = true
+
+[node name="RootVaultArch" parent="TERRAIN/Room08_Hall" instance=ExtResource("RootVault")]
+position = Vector3(530.55, 3.23, -1.21)
+
+[node name="GateRelay1" type="Marker3D" parent="MARKERS"]
+position = Vector3(22.55, 3.375, 0)
+
+[node name="GateRelay2" type="Marker3D" parent="MARKERS"]
+position = Vector3(532.38, 3.23, 0)
+
+[node name="BriarSeedWest" type="Marker3D" parent="MARKERS"]
+position = Vector3(552.75, 1.24, 0)
+
+[node name="BriarSeedCanopy" type="Marker3D" parent="MARKERS"]
+position = Vector3(566.7, 2.45, 0)
+
+[node name="BriarSeedEast" type="Marker3D" parent="MARKERS"]
+position = Vector3(574.3, 1.25, 0)

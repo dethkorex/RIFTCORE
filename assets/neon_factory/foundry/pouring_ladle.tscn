@@ -1,0 +1,241 @@
+[gd_scene format=3]
+
+[ext_resource type="Texture2D" path="res://assets/neon_factory/foundry/bulkhead_Heat-treated steel • albedo.png" id="SteelTrim"]
+
+[sub_resource type="StandardMaterial3D" id="Steel"]
+albedo_color = Color(0.40, 0.37, 0.35, 1)
+roughness = 0.44
+metallic = 0.55
+albedo_texture = ExtResource("SteelTrim")
+uv1_scale = Vector3(1.3, 1.6, 1)
+
+[sub_resource type="StandardMaterial3D" id="Frame"]
+albedo_color = Color(0.265, 0.103, 0.05, 1)
+roughness = 0.53
+metallic = 0.61
+
+[sub_resource type="StandardMaterial3D" id="Black"]
+albedo_color = Color(0.052, 0.052, 0.061, 1)
+roughness = 0.62
+metallic = 0.42
+
+[sub_resource type="StandardMaterial3D" id="Ceramic"]
+albedo_color = Color(0.47, 0.27, 0.16, 1)
+roughness = 0.87
+metallic = 0.03
+
+[sub_resource type="StandardMaterial3D" id="Melt"]
+albedo_color = Color(1, 0.255, 0.022, 1)
+roughness = 0.58
+metallic = 0.05
+emission_enabled = true
+emission = Color(1, 0.255, 0.022, 1)
+emission_energy_multiplier = 2.7
+
+[sub_resource type="StandardMaterial3D" id="Core"]
+albedo_color = Color(1, 0.60, 0.065, 1)
+roughness = 0.61
+metallic = 0.05
+emission_enabled = true
+emission = Color(1, 0.60, 0.065, 1)
+emission_energy_multiplier = 4.2
+
+[sub_resource type="BoxMesh" id="Mesh0"]
+material = SubResource("Frame")
+size = Vector3(0.44, 4.9, 0.62)
+
+[sub_resource type="BoxMesh" id="Mesh1"]
+material = SubResource("Black")
+size = Vector3(3.9, 0.42, 0.76)
+
+[sub_resource type="CylinderMesh" id="Mesh2"]
+material = SubResource("Steel")
+top_radius = 1.18
+bottom_radius = 0.66
+height = 1.56
+radial_segments = 24
+rings = 1
+
+[sub_resource type="TorusMesh" id="Mesh3"]
+material = SubResource("Frame")
+inner_radius = 0.7
+outer_radius = 0.87
+rings = 28
+ring_segments = 10
+
+[sub_resource type="TorusMesh" id="Mesh4"]
+material = SubResource("Ceramic")
+inner_radius = 0.87
+outer_radius = 1.22
+rings = 28
+ring_segments = 10
+
+[sub_resource type="CylinderMesh" id="Mesh5"]
+material = SubResource("Melt")
+top_radius = 0.87
+bottom_radius = 0.87
+height = 0.055
+radial_segments = 24
+rings = 1
+
+[sub_resource type="CylinderMesh" id="Mesh6"]
+material = SubResource("Core")
+top_radius = 0.52
+bottom_radius = 0.52
+height = 0.025
+radial_segments = 24
+rings = 1
+
+[sub_resource type="CylinderMesh" id="Mesh7"]
+material = SubResource("Frame")
+top_radius = 0.32
+bottom_radius = 0.32
+height = 0.99
+radial_segments = 24
+rings = 1
+
+[sub_resource type="BoxMesh" id="Mesh8"]
+material = SubResource("Ceramic")
+size = Vector3(0.54, 0.16, 0.19)
+
+[sub_resource type="CylinderMesh" id="Mesh9"]
+material = SubResource("Melt")
+top_radius = 0.17
+bottom_radius = 0.24
+height = 2.18
+radial_segments = 24
+rings = 1
+
+[sub_resource type="CylinderMesh" id="Mesh10"]
+material = SubResource("Core")
+top_radius = 0.096
+bottom_radius = 0.113
+height = 1.88
+radial_segments = 24
+rings = 1
+
+[sub_resource type="BoxMesh" id="Mesh11"]
+material = SubResource("Ceramic")
+size = Vector3(4.75, 0.4, 1.29)
+
+[sub_resource type="BoxMesh" id="Mesh12"]
+material = SubResource("Frame")
+size = Vector3(4.75, 0.43, 0.18)
+
+[sub_resource type="BoxMesh" id="Mesh13"]
+material = SubResource("Melt")
+size = Vector3(4.48, 0.07, 0.74)
+
+[sub_resource type="BoxMesh" id="Mesh14"]
+material = SubResource("Core")
+size = Vector3(2.1, 0.02, 0.2)
+
+[sub_resource type="Animation" id="Motion"]
+resource_name = "flow"
+length = 3.5
+loop_mode = 1
+tracks/0/type = "value"
+tracks/0/path = NodePath("FlowGlint:position:x")
+tracks/0/interp = 2
+tracks/0/keys = {"times": PackedFloat32Array(0.0, 1.75, 3.5), "transitions": PackedFloat32Array(1, 1, 1), "update": 0, "values": [-0.04, 1.96, -0.04]}
+
+[sub_resource type="AnimationLibrary" id="Library"]
+_data = {&"flow": SubResource("Motion")}
+
+[node name="FoundryPouringLadle" type="Node3D"]
+
+[node name="MountLeft" type="MeshInstance3D" parent="."]
+position = Vector3(-2.2, 0.9, -0.24)
+mesh = SubResource("Mesh0")
+
+[node name="MountRight" type="MeshInstance3D" parent="."]
+position = Vector3(1.45, 0.9, -0.24)
+mesh = SubResource("Mesh0")
+
+[node name="TrunnionBeam" type="MeshInstance3D" parent="."]
+position = Vector3(-0.37, 2.31, -0.04)
+mesh = SubResource("Mesh1")
+
+[node name="Vessel" type="Node3D" parent="."]
+position = Vector3(-0.48, 2, 0.58)
+rotation = Vector3(0, 0, -0.64)
+
+[node name="TaperedShell" type="MeshInstance3D" parent="Vessel"]
+position = Vector3(0, 0, 0)
+mesh = SubResource("Mesh2")
+
+[node name="LowerBand" type="MeshInstance3D" parent="Vessel"]
+position = Vector3(0, -0.42, 0)
+mesh = SubResource("Mesh3")
+
+[node name="RefractoryRim" type="MeshInstance3D" parent="Vessel"]
+position = Vector3(0, 0.73, 0)
+mesh = SubResource("Mesh4")
+
+[node name="MoltenBath" type="MeshInstance3D" parent="Vessel"]
+position = Vector3(0, 0.7, 0)
+mesh = SubResource("Mesh5")
+
+[node name="HotCenter" type="MeshInstance3D" parent="Vessel"]
+position = Vector3(0.12, 0.738, 0.05)
+mesh = SubResource("Mesh6")
+
+[node name="Pivot0" type="MeshInstance3D" parent="Vessel"]
+position = Vector3(-0.78, 0.03, 0.23)
+mesh = SubResource("Mesh7")
+rotation = Vector3(0, 0, 1.5708)
+
+[node name="Pivot1" type="MeshInstance3D" parent="Vessel"]
+position = Vector3(0.78, 0.03, 0.23)
+mesh = SubResource("Mesh7")
+rotation = Vector3(0, 0, 1.5708)
+
+[node name="SpoutSide0" type="MeshInstance3D" parent="Vessel"]
+position = Vector3(1.23, 0.52, -0.24)
+mesh = SubResource("Mesh8")
+rotation = Vector3(0, 0, -0.3)
+
+[node name="SpoutSide1" type="MeshInstance3D" parent="Vessel"]
+position = Vector3(1.23, 0.52, 0.24)
+mesh = SubResource("Mesh8")
+rotation = Vector3(0, 0, -0.3)
+
+[node name="PourStream" type="MeshInstance3D" parent="."]
+position = Vector3(0.92, 0.35, 0.64)
+mesh = SubResource("Mesh9")
+rotation = Vector3(0, 0, -0.17)
+
+[node name="HotStream" type="MeshInstance3D" parent="."]
+position = Vector3(0.95, 0.38, 0.65)
+mesh = SubResource("Mesh10")
+rotation = Vector3(0, 0, -0.17)
+
+[node name="Trough" type="MeshInstance3D" parent="."]
+position = Vector3(1.08, -0.8, 0.57)
+mesh = SubResource("Mesh11")
+
+[node name="TroughWall0" type="MeshInstance3D" parent="."]
+position = Vector3(1.08, -0.61, 0.01)
+mesh = SubResource("Mesh12")
+
+[node name="TroughWall1" type="MeshInstance3D" parent="."]
+position = Vector3(1.08, -0.61, 1.12)
+mesh = SubResource("Mesh12")
+
+[node name="SlagChannel" type="MeshInstance3D" parent="."]
+position = Vector3(1.08, -0.57, 0.57)
+mesh = SubResource("Mesh13")
+
+[node name="FlowGlint" type="MeshInstance3D" parent="."]
+position = Vector3(1.06, -0.51, 0.67)
+mesh = SubResource("Mesh14")
+
+[node name="PourLight" type="OmniLight3D" parent="."]
+position = Vector3(0.91, 0.2, 1.01)
+light_color = Color(1, 0.38, 0.09, 1)
+light_energy = 2.48
+omni_range = 5.4
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="."]
+libraries = {&"": SubResource("Library")}
+autoplay = "flow"

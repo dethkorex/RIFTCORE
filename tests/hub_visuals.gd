@@ -9,90 +9,92 @@ func frames(count: int) -> void:
 	for index in count:
 		await physics_frame
 
-func check(passed: bool, message: String) -> void:
+func check(passed: bool, message: String) -> bool:
 	print("PASS " if passed else "FAIL ", message)
 	failures += int(not passed)
+	return passed
+
+func control(parent: Node, caption: String) -> Button:
+	for button in parent.find_children("*", "Button", true, false):
+		if button.text == caption and button.is_visible_in_tree():
+			return button
+	return null
+
+func choose(parent: Node, caption: String) -> bool:
+	var button := control(parent, caption)
+	if not check(is_instance_valid(button), "%s is available" % caption):
+		return false
+	button.pressed.emit()
+	await frames(2)
+	return true
+
+func open_station(hub, x: float) -> void:
+	hub.avatar.position.x = x
+	hub.update_station()
+	hub.activate_station()
+	await frames(2)
 
 func run() -> void:
 	var game = (load("res://scenes/main.tscn") as PackedScene).instantiate()
+	game.profile.manual_only = true
 	root.add_child(game)
 	current_scene = game
+	root.get_node("RiftSettings").show_hub_tips = false
 	game.open_home_hub()
 	await frames(15)
 	var hub = game.home_hub
+	var menu = game.menu
 	check(hub.pads.size() == 8 and hub.prompt.visible and hub.current_station == 3, "Hub opens at the Deploy bay")
 	check(hub.get_node("OperationsBanner/Geometry").get_child_count() > 4, "Modular signage builds")
 	if DisplayServer.get_name() != "headless" and not OS.get_cmdline_user_args().is_empty():
 		await RenderingServer.frame_post_draw
 		root.get_texture().get_image().save_png(OS.get_cmdline_user_args()[0])
 	Input.action_press("move_right")
-	for index in range(52):
+	for index in 70:
 		await frames(1)
 		if hub.avatar.position.x >= 4.18:
 			break
 	Input.action_release("move_right")
-	await frames(8)
-	check(hub.current_station == 4 and hub.pads[4].beam.visible and hub.station_notice.text.contains("STORAGE"), "Walking onto Storage lights the correct pad")
-	game.profile.gear["vital_weave"] = "stored"
-	game.profile.gear["impact_liner"] = "stored"
-	var interact := InputEventKey.new()
-	interact.pressed = true
-	interact.physical_keycode = KEY_E
-	root.push_input(interact)
-	await frames(3)
-	check(game.menu.page == "Storage" and hub.panel_open, "Storage remains accessible from its pad")
-	var grid := game.menu.find_children("*", "GridContainer", true, false)[0] as GridContainer
-	check(grid.columns >= 4 and grid.get_child_count() == 2 and grid.get_child(0).custom_minimum_size == Vector2(58, 58), "Storage displays compact gear tiles")
-	var indices := grid.get_children()
-	indices[1].grab_focus()
-	check(game.menu.focused_item == "vital_weave", "Focusing a tile selects its details")
-	var action = game.menu.find_children("*", "Button", true, false).filter(func(button): return button.text == "Equip")[0]
-	action.pressed.emit()
+	await frames(5)
+	check(hub.current_station == 4 and hub.pads[4].beam.visible and hub.station_notice.text.contains("OPERATOR"), "Walking onto Operator lights the correct pad")
+	hub.activate_station()
 	await frames(2)
-	check(game.profile.equipped_for("frame") == "vital_weave", "Storage equips selected gear")
-	action = game.menu.find_children("*", "Button", true, false).filter(func(button): return button.text == "Stow")[0]
-	action.pressed.emit()
-	await frames(2)
-	check(game.profile.gear.get("vital_weave") == "stored" and game.profile.stored_count() == 2, "Storage stows selected gear and updates capacity")
+	check(menu.page == "Gear" and hub.panel_open, "Operator opens Gear from its pad")
+	game.profile.inventory["patch_kit"] = 2
+	if await choose(menu, "Storage"):
+		check(menu.page == "Storage" and menu.find_children("*", "GridContainer", true, false).size() >= 2, "Inventory and Storage each have a grid")
+		var carried: Button
+		for button in menu.find_children("*", "Button", true, false):
+			if button.get_meta(&"return_focus", "") == "inventory/patch_kit":
+				carried = button
+		if check(is_instance_valid(carried), "Carried patch kits have an Inventory tile"):
+			carried.pressed.emit()
+			if await choose(menu, "Stow Stack"):
+				check(not game.profile.inventory.has("patch_kit") and game.profile.stored_supplies.get("patch_kit") == 2, "Stow Stack transfers both items")
 	if DisplayServer.get_name() != "headless" and OS.get_cmdline_user_args().size() > 1:
 		await RenderingServer.frame_post_draw
 		root.get_texture().get_image().save_png(OS.get_cmdline_user_args()[1])
-	game.menu.leave_page()
-	check(not hub.panel_open and hub.current_station == 4, "Back returns the player to the same bay")
-	hub.station_requested.emit("Fabrication")
-	await frames(2)
-	check(game.menu.find_children("*", "Button", true, false).any(func(button): return button.text == "Core Enhancements"), "Workshop has its own enhancement tab")
-	check(not game.menu.find_children("*", "Button", true, false).any(func(button): return button.text in ["Deploy", "Equipment", "Storage"]), "Other stations require their pads")
+	menu.leave_page()
+	check(not hub.panel_open and hub.current_station == 4, "Back returns to the Operator bay")
+	await open_station(hub, -4.5)
+	check(menu.page == "Shop" and is_instance_valid(control(menu, "Crafting")) and is_instance_valid(control(menu, "Core Ascension")), "Workshop groups its three actions")
 	var shoulder := InputEventJoypadButton.new()
 	shoulder.pressed = true
 	shoulder.button_index = JOY_BUTTON_RIGHT_SHOULDER
 	root.push_input(shoulder)
-	check(game.menu.page == "Upgrades", "RB switches Workshop to Core Enhancements")
+	await frames(2)
+	check(menu.page == "Fabrication", "RB advances from Buy to Crafting")
 	shoulder.button_index = JOY_BUTTON_LEFT_SHOULDER
 	root.push_input(shoulder)
-	check(game.menu.page == "Fabrication", "LB switches Workshop back to Blueprints")
-	game.menu.leave_page()
-	hub.avatar.position.x = -12.0
-	hub.update_station()
-	root.push_input(interact)
-	check(game.menu.page == "Save Game", "System pad opens Save Game")
-	shoulder.button_index = JOY_BUTTON_RIGHT_SHOULDER
-	root.push_input(shoulder)
-	check(game.menu.page == "Settings", "System pad also opens Settings with RB")
-	game.menu.leave_page()
-	hub.avatar.position.x = 9.0
-	hub.update_station()
-	root.push_input(interact)
-	check(game.menu.page == "Loadout", "Loadout still opens from its own pad")
-	check(game.menu.find_children("*", "GridContainer", true, false).size() == 1, "Loadout uses the same gear tile grid")
-	root.push_input(shoulder)
-	check(game.menu.equipment_view == "Boss Abilities", "RB switches Loadout to Boss Abilities")
-	root.push_input(shoulder)
-	check(game.menu.equipment_view == "Presets", "RB switches Loadout to Presets")
-	game.menu.leave_page()
-	hub.avatar.position.x = -18.0
-	hub.update_station()
-	root.push_input(interact)
-	check(game.menu.page == "Social", "Social opens from its own pad")
-	check(game.menu.find_children("*", "Button", true, false).any(func(button): return button.text == "Paste Steam ID"), "Social accepts Steam IDs in-game")
+	await frames(2)
+	check(menu.page == "Shop", "LB returns to Buy")
+	menu.leave_page()
+	await open_station(hub, -18.0)
+	check(menu.page == "Save Game" and is_instance_valid(control(menu, "Settings")), "System exposes saves and settings")
+	menu.leave_page()
+	await open_station(hub, -13.5)
+	check(menu.page == "Player Profile" and is_instance_valid(control(menu, "Cosmetics")), "Profile exposes cosmetics")
+	menu.leave_page()
+	await open_station(hub, 9.0)
+	check(menu.page == "Social" and is_instance_valid(control(menu, "Notifications")), "Social groups friends and notifications")
 	quit(failures)

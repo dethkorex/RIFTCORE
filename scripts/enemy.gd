@@ -71,6 +71,8 @@ var sector_damage_scale := 1.0
 var sector_experience_scale := 1.0
 var operator_at_deploy: RiftPlayer
 var sector_number := 1
+var enemy_level := 1
+var level_tag: Label3D
 var second_act := false
 var difficulty_mode := 0
 var shot_windup := 0.0
@@ -81,12 +83,15 @@ var ledge_target := RID()
 func scale_for_sector(sector: int, act: int, health_scale: float, mode: int) -> void:
 	sector_number = sector
 	difficulty_mode = mode
+	enemy_level = Difficulty.recommended_level(sector, mode)
+	level_tag.text = "LV. %d" % enemy_level
 	second_act = act == 2
 	var steps := maxi(0, sector - 1)
 	max_health = [40.0, 55.0, 95.0, 60.0, 35.0][variant] * (1.0 + 0.30 * steps) * (1.32 if second_act else 1.0) * health_scale
 	move_speed = PATROL_SPEEDS[variant] * Difficulty.enemy_speed_scale(sector, mode)
 	health = max_health
-	sector_damage_scale = (1.0 + 0.20 * steps) * (1.20 if second_act else 1.0)
+	var extra_levels := enemy_level - Difficulty.recommended_level(sector, Difficulty.NORMAL)
+	sector_damage_scale = (1.0 + 0.20 * steps) * (1.20 if second_act else 1.0) * (1.0 + 0.02 * extra_levels)
 	sector_experience_scale = 1.0 + 0.10 * steps
 	health_changed.emit(health, max_health)
 
@@ -215,6 +220,16 @@ func install_health_bar() -> void:
 	bar.material_override = material
 	add_child(bar)
 	bar.position = Vector3(0, 0.72 if variant == Variant.FLYER else 0.94, 0.27)
+	level_tag = Label3D.new()
+	level_tag.name = "EnemyLevel"
+	level_tag.font = preload("res://assets/ui/fonts/BarlowCondensed-ExtraBoldItalic.ttf")
+	level_tag.font_size = 38
+	level_tag.outline_size = 9
+	level_tag.pixel_size = .0036
+	level_tag.modulate = Color("e7f7ff")
+	level_tag.position = Vector3(0, .13, 0)
+	level_tag.text = "LV. %d" % enemy_level
+	bar.add_child(level_tag)
 	health_changed.connect(func(current: float, maximum: float):
 		material.set_shader_parameter("remaining", current / maximum)
 	)

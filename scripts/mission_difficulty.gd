@@ -29,6 +29,12 @@ static func boss_health_scale(sector: int, mode: int, act: int) -> float:
 	var scale := combat_scale(sector, mode)
 	return scale * (1.16 + 0.04 * index(mode)) if act == 1 else scale
 
+static func jungle_boss_damage_scale(mode: int) -> float:
+	return [1.0, 1.18, 1.38][index(mode)]
+
+static func jungle_boss_damage_taken(mode: int, miniboss: bool) -> float:
+	return ([0.80, 0.74, 0.68] if miniboss else [0.75, 0.68, 0.62])[index(mode)]
+
 static func boss_recovery_scale(mode: int, miniboss := false) -> float:
 	return [0.88, 0.72, 0.58][index(mode)] if miniboss else [1.0, 0.86, 0.72][index(mode)]
 

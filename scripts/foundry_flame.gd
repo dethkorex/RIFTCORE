@@ -1,81 +1,91 @@
 extends Node3D
 
-const HOT := Color("ff742b")
+const FLOOR_SHADER := preload("res://assets/neon_factory/foundry/attack_floor.gdshader")
+const Fire := preload("res://addons/pyrolux_fx/nodes_3d/pyrolux_fire_3d.gd")
+
+enum Style { BACKDRAFT, CASTING, HIGH_VENT, DRILL }
+
 var height := 2.4
 var width := 1.2
 var warning_time := 0.65
 var burst_time := 0.66
-var clock := -1.0
-var warning_ring: MeshInstance3D
-var column: Node3D
-var lamp: OmniLight3D
-var sparks: CPUParticles3D
+var style := Style.BACKDRAFT
+var mark: MeshInstance3D
+var mark_material: ShaderMaterial
+var fire: PyroluxFire3D
+var burning_last_frame := false
+
 
 func _ready() -> void:
-	warning_ring = MeshInstance3D.new()
-	var ring := TorusMesh.new()
-	ring.inner_radius = width * 0.48
-	ring.outer_radius = width * 0.61
-	ring.rings = 20
-	ring.ring_segments = 8
-	warning_ring.mesh = ring
-	warning_ring.position.y = 0.041
-	warning_ring.scale.y = 0.17
-	warning_ring.material_override = RiftProjectile.light_paint(Color("ffae37"), 1.9)
-	warning_ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	add_child(warning_ring)
-	column = Node3D.new()
-	add_child(column)
-	for angle in [0.0, PI * 0.38, PI * 0.71]:
-		var flare := MeshInstance3D.new()
-		var quad := QuadMesh.new()
-		quad.size = Vector2(width * 1.35, height * 1.12)
-		flare.mesh = quad
-		flare.position.y = quad.size.y * 0.5 + 0.05
-		flare.rotation.y = angle
-		var fire := ShaderMaterial.new()
-		fire.shader = preload("res://assets/neon_factory/foundry/fire_column.gdshader")
-		fire.set_shader_parameter("seed", angle * 4.7)
-		flare.material_override = fire
-		flare.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		column.add_child(flare)
-	lamp = OmniLight3D.new()
-	lamp.light_color = HOT
-	lamp.omni_range = 3.4
-	lamp.position.y = 0.45
-	add_child(lamp)
-	sparks = CPUParticles3D.new()
-	sparks.emitting = false
-	sparks.amount = 15
-	sparks.lifetime = 0.45
-	sparks.direction = Vector3.UP
-	sparks.spread = 21.0
-	sparks.gravity = Vector3(0.0, -2.2, 0.0)
-	sparks.initial_velocity_min = height * 1.8
-	sparks.initial_velocity_max = height * 3.2
-	sparks.scale_amount_min = 0.5
-	sparks.scale_amount_max = 1.5
-	var ember := SphereMesh.new()
-	ember.radius = 0.031
-	ember.height = 0.062
-	ember.radial_segments = 5
-	ember.rings = 3
-	ember.material = RiftProjectile.light_paint(Color("ffb32b"), 1.85)
-	sparks.mesh = ember
-	sparks.position.y = 0.2
-	add_child(sparks)
+	var footprint := width * 0.98 + 0.64
+	var tint := Color("ff5f29")
+	if style == Style.CASTING:
+		tint = Color("ff8d3f")
+	elif style == Style.HIGH_VENT:
+		tint = Color("ff4a31")
+	mark = floor_mark(footprint, 2.22 if style == Style.CASTING else 1.96, style, tint)
+	add_child(mark)
+	mark_material = mark.material_override as ShaderMaterial
+	fire = Fire.new()
+	fire.autoplay = false
+	fire.preview_in_editor = false
+	fire.fade_time = 0.10
+	fire.lean = 0.11
+	fire.shape = PyroluxFire3D.Shape.LINE
+	fire.size = Vector3(width * 0.38, 0.08, 0.23)
+	fire.flame_height = height * (0.82 if style == Style.CASTING else 0.96)
+	fire.flame_width = clampf(width * 0.24, 0.38, 0.94)
+	fire.tongues = 5 if width > 2.2 else 4
+	fire.puffs = 6
+	fire.embers = 13 if width > 2.2 else 9
+	fire.ember_height = height * 1.23
+	fire.smoke = 5
+	fire.smoke_height = height * 1.33
+	fire.smoke_opacity = 0.29 if style == Style.CASTING else 0.40
+	fire.light_enabled = true
+	fire.light_energy = 0.77 if style == Style.CASTING else 1.32
+	fire.light_range = 3.4
+	var colors := PyroluxPalette.new()
+	colors.cool = Color("922716")
+	colors.hot = tint
+	colors.core = Color("ffd77d")
+	colors.smoke = Color("4c4644")
+	colors.light = tint
+	fire.palette = colors
+	add_child(fire)
+	fire.set_process(false)
+	fire.finished.connect(func(): fire.set_process(false))
 	show_phase(-1.0)
+
+
+static func floor_mark(length: float, depth: float, mode: int, tint: Color) -> MeshInstance3D:
+	var floor_strip := MeshInstance3D.new()
+	var quad := QuadMesh.new()
+	quad.size = Vector2(length, depth)
+	floor_strip.mesh = quad
+	floor_strip.rotation.x = -PI * 0.5
+	floor_strip.position.y = 0.11
+	floor_strip.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var shader := ShaderMaterial.new()
+	shader.shader = FLOOR_SHADER
+	shader.set_shader_parameter("tint", tint)
+	shader.set_shader_parameter("mode", mode)
+	shader.set_shader_parameter("span", length)
+	floor_strip.material_override = shader
+	return floor_strip
+
 
 func show_phase(at: float) -> void:
 	var warning := at >= 0.0 and at < warning_time
 	var burning := at >= warning_time and at < warning_time + burst_time
-	var heat := clampf((at - warning_time) / 0.14, 0.0, 1.0)
-	var settle := clampf((warning_time + burst_time - at) / 0.16, 0.0, 1.0)
-	var pulse := (1.0 + sin(at * 28.0)) * 0.5
-	warning_ring.visible = warning
-	warning_ring.scale.x = 0.86 + pulse * 0.14
-	warning_ring.scale.z = warning_ring.scale.x
-	column.visible = burning
-	column.scale.y = maxf(0.03, minf(heat, settle))
-	lamp.light_energy = 2.25 * column.scale.y if burning else (0.35 + pulse * 0.6 if warning else 0.0)
-	sparks.emitting = burning
+	if warning or burning:
+		mark_material.set_shader_parameter("progress", clampf(at / maxf(warning_time, 0.001), 0.0, 1.0))
+		var cooling := 1.0 - clampf((at - warning_time) / burst_time, 0.0, 1.0)
+		mark_material.set_shader_parameter("heat", cooling if burning else 0.0)
+	mark.visible = warning or burning
+	if burning and not burning_last_frame:
+		fire.set_process(true)
+		fire.ignite()
+	elif not burning and burning_last_frame:
+		fire.extinguish()
+	burning_last_frame = burning

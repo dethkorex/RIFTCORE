@@ -1,0 +1,97 @@
+[gd_scene format=3]
+
+[sub_resource type="StandardMaterial3D" id="Iron"]
+albedo_color = Color(0.103, 0.094, 0.103, 1)
+roughness = 0.53
+metallic = 0.47
+
+[sub_resource type="StandardMaterial3D" id="Copper"]
+albedo_color = Color(0.34, 0.143, 0.071, 1)
+roughness = 0.44
+metallic = 0.58
+
+[sub_resource type="StandardMaterial3D" id="Amber"]
+albedo_color = Color(1, 0.51, 0.18, 1)
+emission_enabled = true
+emission = Color(1, 0.31, 0.08, 1)
+emission_energy_multiplier = 1.25
+
+[sub_resource type="StandardMaterial3D" id="Cool"]
+albedo_color = Color(0.63, 0.81, 0.83, 1)
+emission_enabled = true
+emission = Color(0.30, 0.62, 0.68, 1)
+emission_energy_multiplier = 1.0
+
+[sub_resource type="BoxMesh" id="Chassis"]
+material = SubResource("Iron")
+size = Vector3(4.3, 3.05, 0.7)
+
+[sub_resource type="BoxMesh" id="BaseSkid"]
+material = SubResource("Copper")
+size = Vector3(4.3, 0.25, 1.04)
+
+[sub_resource type="BoxMesh" id="HeadManifold"]
+material = SubResource("Copper")
+size = Vector3(3.82, 0.32, 0.85)
+
+[sub_resource type="BoxMesh" id="ReturnManifold"]
+material = SubResource("Copper")
+size = Vector3(3.75, 0.32, 0.71)
+
+[sub_resource type="BoxMesh" id="PistonMain"]
+material = SubResource("Copper")
+size = Vector3(0.58, 2.21, 0.77)
+
+[sub_resource type="BoxMesh" id="PistonSlave"]
+material = SubResource("Copper")
+size = Vector3(0.58, 2.21, 0.77)
+
+[sub_resource type="BoxMesh" id="StatusHousing"]
+material = SubResource("Iron")
+size = Vector3(0.92, 0.75, 0.44)
+
+[sub_resource type="BoxMesh" id="PressureLamp"]
+material = SubResource("Amber")
+size = Vector3(0.55, 0.14, 0.04)
+
+[sub_resource type="BoxMesh" id="PowerRail"]
+material = SubResource("Cool")
+size = Vector3(3.6, 0.1, 0.05)
+
+[node name="FoundrySluicePumpBank" type="Node3D"]
+
+[node name="Chassis" type="MeshInstance3D" parent="."]
+position = Vector3(0, 1.55, -0.27)
+mesh = SubResource("Chassis")
+
+[node name="BaseSkid" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.19, 0.1)
+mesh = SubResource("BaseSkid")
+
+[node name="HeadManifold" type="MeshInstance3D" parent="."]
+position = Vector3(0, 2.96, 0.05)
+mesh = SubResource("HeadManifold")
+
+[node name="ReturnManifold" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.54, 0.1)
+mesh = SubResource("ReturnManifold")
+
+[node name="PistonMain" type="MeshInstance3D" parent="."]
+position = Vector3(-1.18, 1.71, 0.2)
+mesh = SubResource("PistonMain")
+
+[node name="PistonSlave" type="MeshInstance3D" parent="."]
+position = Vector3(1.18, 1.71, 0.2)
+mesh = SubResource("PistonSlave")
+
+[node name="StatusHousing" type="MeshInstance3D" parent="."]
+position = Vector3(0, 1.76, 0.45)
+mesh = SubResource("StatusHousing")
+
+[node name="PressureLamp" type="MeshInstance3D" parent="."]
+position = Vector3(0, 1.81, 0.68)
+mesh = SubResource("PressureLamp")
+
+[node name="PowerRail" type="MeshInstance3D" parent="."]
+position = Vector3(0, 2.91, 0.51)
+mesh = SubResource("PowerRail")

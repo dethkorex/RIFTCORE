@@ -1,0 +1,70 @@
+[gd_scene format=3]
+
+[sub_resource type="StandardMaterial3D" id="Base"]
+albedo_color = Color(0.045, 0.042, 0.038, 1)
+roughness = 0.72
+metallic = 0.24
+
+[sub_resource type="StandardMaterial3D" id="Caution"]
+albedo_color = Color(0.98, 0.57, 0.13, 1)
+roughness = 0.68
+metallic = 0.22
+emission_enabled = true
+emission = Color(0.98, 0.57, 0.13, 1)
+emission_energy_multiplier = 0.34
+
+[sub_resource type="BoxMesh" id="Mesh0"]
+material = SubResource("Base")
+size = Vector3(0.8, 0.17, 0.055)
+
+[sub_resource type="BoxMesh" id="Mesh1"]
+material = SubResource("Caution")
+size = Vector3(0.095, 0.152, 0.022)
+
+[sub_resource type="BoxMesh" id="Mesh2"]
+material = SubResource("Base")
+size = Vector3(0.74, 0.03, 2.82)
+
+[sub_resource type="BoxMesh" id="Mesh3"]
+material = SubResource("Caution")
+size = Vector3(0.46, 0.015, 0.2)
+
+[node name="FoundryHazardMarking" type="Node3D"]
+
+[node name="Face" type="MeshInstance3D" parent="."]
+position = Vector3(0, -0.105, 2.43)
+mesh = SubResource("Mesh0")
+
+[node name="FaceStripe0" type="MeshInstance3D" parent="."]
+position = Vector3(-0.23, -0.104, 2.463)
+mesh = SubResource("Mesh1")
+rotation = Vector3(0, 0, -0.37)
+
+[node name="FaceStripe1" type="MeshInstance3D" parent="."]
+position = Vector3(0, -0.104, 2.463)
+mesh = SubResource("Mesh1")
+rotation = Vector3(0, 0, -0.37)
+
+[node name="FaceStripe2" type="MeshInstance3D" parent="."]
+position = Vector3(0.23, -0.104, 2.463)
+mesh = SubResource("Mesh1")
+rotation = Vector3(0, 0, -0.37)
+
+[node name="Tread" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.031, 0.88)
+mesh = SubResource("Mesh2")
+
+[node name="TreadStripe0" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.049, 0.04)
+mesh = SubResource("Mesh3")
+rotation = Vector3(0, 0.38, 0)
+
+[node name="TreadStripe1" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.049, 0.82)
+mesh = SubResource("Mesh3")
+rotation = Vector3(0, 0.38, 0)
+
+[node name="TreadStripe2" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.049, 1.6)
+mesh = SubResource("Mesh3")
+rotation = Vector3(0, 0.38, 0)

@@ -24,6 +24,12 @@ const MODELS := [
 const BURST := preload("res://scripts/pit_burst.gd")
 const Difficulty := preload("res://scripts/mission_difficulty.gd")
 const ATTACK_FX := preload("res://scripts/attack_fx.gd")
+const JungleRig := preload("res://scripts/jungle_boss_rig.gd")
+const SeedAnchor := preload("res://scripts/briar_seed_anchor.gd")
+const JUNGLE_FX := preload("res://scripts/jungle_boss_fx.gd")
+const BRIAR_MODEL := preload("res://assets/machine_jungle/enemies/briar_sentinel_tripo.glb")
+const BRIAR_MOTIONS := {"signature": JungleRig.Motion.ERUPT, "volley": JungleRig.Motion.VOLLEY, "charge": JungleRig.Motion.CHARGE}
+const BRIAR_ARMOR_THRESHOLDS := [0.67, 0.32]
 
 var sector := 1
 var accent := Color.ORANGE
@@ -50,6 +56,23 @@ var skin: Node3D
 var chassis_height := 1.05
 var core: MeshInstance3D
 var zones: Array[Vector3] = []
+var jungle_rig: JungleRig
+var windup_duration := 0.0
+var pose_recovery := 0.0
+var previous_motion := JungleRig.Motion.IDLE
+var stagger := 0.0
+var root_anchor: SeedAnchor
+var root_phase := 0
+var exposed := false
+var anchor_sites: Array[Vector3] = []
+var briar_core_light: OmniLight3D
+var briar_core_halo: MeshInstance3D
+var briar_charge_fx: Node3D
+var last_root_strike: Array = []
+var shown_briar_windup := -1
+var shown_root_strike := -1
+var briar_damage_scale := 1.0
+var briar_damage_taken := 1.0
 
 static func for_sector(number: int, tint: Color, weakness: String, gate_position: Vector3, exit_x: float) -> Combatant:
 	if number == 1:
@@ -61,7 +84,7 @@ static func for_sector(number: int, tint: Color, weakness: String, gate_position
 func configure(number: int, tint: Color, weakness: String, gate_position: Vector3, exit_x: float) -> void:
 	sector = number
 	accent = tint
-	max_health = 315.0 + 66.0 * (sector - 1)
+	max_health = 825.0 if sector == 2 else 315.0 + 66.0 * (sector - 1)
 	weakness_weapon = weakness
 	fire_weakness = 1.38 if sector in [2, 3] else 1.0
 	floor_y = gate_position.y
@@ -70,6 +93,9 @@ func configure(number: int, tint: Color, weakness: String, gate_position: Vector
 
 func configure_difficulty(mode: int) -> void:
 	difficulty_mode = mode
+	if sector == 2:
+		briar_damage_scale = Difficulty.jungle_boss_damage_scale(mode)
+		briar_damage_taken = Difficulty.jungle_boss_damage_taken(mode, true)
 
 func _ready() -> void:
 	super._ready()
@@ -81,6 +107,35 @@ func _ready() -> void:
 	hull.height = 2.1
 	body.shape = hull
 	add_child(body)
+	if sector == 2:
+		jungle_rig = JungleRig.new()
+		jungle_rig.name = "Armor"
+		armor = jungle_rig
+		add_child(armor)
+		skin = BRIAR_MODEL.instantiate() as Node3D
+		armor.add_child(skin)
+		jungle_rig.bind_model(skin, 1.95, chassis_height, true)
+		root_anchor = SeedAnchor.new()
+		root_anchor.name = "SeedAnchor"
+		root_anchor.armor_owner = self
+		root_anchor.top_level = true
+		add_child(root_anchor)
+		root_anchor.uprooted.connect(expose_briar)
+		briar_core_light = OmniLight3D.new()
+		briar_core_light.position = Vector3(0, .34, .92)
+		briar_core_light.omni_range = 2.4
+		briar_core_light.light_energy = 0.0
+		add_child(briar_core_light)
+		briar_core_halo = JUNGLE_FX.core_halo(self, Vector3(0, .34, .92), .38)
+		briar_charge_fx = JUNGLE_FX.warning_field(self, global_position, 2.1, 2.2, JUNGLE_FX.DANGER, .25, 2.0)
+		briar_charge_fx.hide()
+		for marker_name in ["BriarSeedWest", "BriarSeedCanopy", "BriarSeedEast"]:
+			var site := get_parent().get_parent().get_node("MARKERS/" + marker_name) as Marker3D
+			anchor_sites.append(site.global_position)
+		for deck in get_tree().get_nodes_in_group("factory_one_way"):
+			add_collision_exception_with(deck)
+		died.connect(break_apart)
+		return
 	armor = Node3D.new()
 	add_child(armor)
 	skin = MODELS[sector - 1].instantiate() as Node3D
@@ -110,16 +165,37 @@ func _ready() -> void:
 
 func take_damage(amount: float, source_position := Vector3.ZERO) -> void:
 	if active:
+		if jungle_rig:
+			if not exposed or invulnerable_time > 0.0 or health <= 0.0 or amount <= 0.0:
+				return
+			amount *= briar_damage_taken
+			if root_phase < BRIAR_ARMOR_THRESHOLDS.size():
+				var limit := max_health * float(BRIAR_ARMOR_THRESHOLDS[root_phase])
+				if health - amount <= limit:
+					amount = health - limit
+					root_phase += 1
+					grow_seed_anchor()
+		if jungle_rig and attack.is_empty() and charge_time <= 0.0:
+			stagger = 0.13
 		super.take_damage(amount, source_position)
+
+func apply_burn_tick() -> void:
+	if jungle_rig:
+		take_damage(burn_power)
+	else:
+		super.apply_burn_tick()
 
 func damage_on_contact(player: RiftPlayer) -> void:
 	if active and contact_lock <= 0.0:
 		contact_lock = 0.55
-		player.take_damage(11.0 + sector, global_position)
+		var power := (34.0 if charge_time > 0.0 else 22.0) * briar_damage_scale if jungle_rig else 11.0 + sector
+		player.take_damage(power, global_position)
 
 func _physics_process(delta: float) -> void:
 	if not active or not is_instance_valid(target) or target.health <= 0.0:
 		return
+	if root_anchor and root_phase == 0 and root_anchor.dormant and not exposed:
+		grow_seed_anchor()
 	elapsed += delta
 	contact_lock = maxf(0.0, contact_lock - delta)
 	cooldown -= delta
@@ -138,9 +214,13 @@ func _physics_process(delta: float) -> void:
 	velocity.y -= 30.0 * delta
 	move_and_slide()
 	global_position.x = clampf(global_position.x, left, right)
-	armor.rotation.y = lerp_angle(armor.rotation.y, facing * 1.03, minf(12.0 * delta, 1.0))
-	armor.rotation.z = sin(elapsed * 11.0) * minf(absf(velocity.x) * 0.012, 0.12)
-	core.scale = Vector3(0.24, 0.24, 0.17) * (1.0 if attack.is_empty() else 1.5 + sin(elapsed * 25.0) * 0.18)
+	if jungle_rig:
+		update_briar_pose(delta)
+		update_briar_vfx()
+	else:
+		armor.rotation.y = lerp_angle(armor.rotation.y, facing * 1.03, minf(12.0 * delta, 1.0))
+		armor.rotation.z = sin(elapsed * 11.0) * minf(absf(velocity.x) * 0.012, 0.12)
+		core.scale = Vector3(0.24, 0.24, 0.17) * (1.0 if attack.is_empty() else 1.5 + sin(elapsed * 25.0) * 0.18)
 	if cooldown > 0.0 or charge_time > 0.0:
 		if attack == "signature" and sector == 9:
 			target.velocity.x = move_toward(target.velocity.x, signf(global_position.x - target.global_position.x) * 5.5, 21.0 * delta)
@@ -151,6 +231,95 @@ func _physics_process(delta: float) -> void:
 		strike()
 		attack = ""
 		cooldown = (0.72 if health > max_health * 0.55 else 0.42) * Difficulty.boss_recovery_scale(difficulty_mode, true)
+
+func grow_seed_anchor() -> void:
+	exposed = false
+	root_anchor.present(anchor_sites[root_phase], 2 + difficulty_mode, true)
+
+func expose_briar() -> void:
+	exposed = true
+	attack = ""
+	charge_time = 0.0
+	cooldown = 0.64
+	if is_instance_valid(warning):
+		warning.queue_free()
+	JUNGLE_FX.burst(self, global_position + Vector3(0, .42, .76), JUNGLE_FX.OPEN, 1.28, 18)
+
+func encounter_status() -> String:
+	if not jungle_rig:
+		return ""
+	return "CORE EXPOSED" if exposed else "ROOT ARMOR SEALED\nDESTROY THE SEED ANCHOR"
+
+func jungle_snapshot() -> Array:
+	var root_strike := last_root_strike.slice(0, 2) if not last_root_strike.is_empty() and elapsed - float(last_root_strike[2]) < .32 else []
+	return [jungle_rig.snapshot(), exposed, root_anchor.global_position, root_anchor.durability,
+		turn, attack, cooldown, aim, locked_direction, charge_time, root_strike]
+
+func apply_jungle_snapshot(state: Array) -> void:
+	if state.size() >= 4 and jungle_rig:
+		jungle_rig.apply_snapshot(state[0])
+		if not exposed and state[1]:
+			JUNGLE_FX.burst(self, global_position + Vector3(0, .42, .76), JUNGLE_FX.OPEN, 1.28, 18)
+		exposed = state[1]
+		if root_anchor.durability != int(state[3]) or root_anchor.global_position != state[2]:
+			root_anchor.present(state[2], state[3], false)
+		if state.size() >= 11:
+			if state[5] == "" and is_instance_valid(warning):
+				warning.queue_free()
+			elif state[5] != "" and shown_briar_windup != int(state[4]):
+				shown_briar_windup = state[4]
+				show_briar_warning(state[5], state[7], state[8], state[6])
+			locked_direction = state[8]
+			charge_time = state[9]
+			var root_strike: Array = state[10]
+			if not root_strike.is_empty() and int(root_strike[0]) > shown_root_strike:
+				shown_root_strike = root_strike[0]
+				draw_root_strike(root_strike[1])
+		update_briar_vfx()
+
+func update_briar_vfx() -> void:
+	briar_core_light.light_color = JUNGLE_FX.OPEN if exposed else Color("8aff55")
+	briar_core_light.light_energy = (1.4 + sin(Time.get_ticks_msec() * .010) * .34) if exposed else .31
+	briar_core_halo.visible = exposed
+	briar_core_halo.scale = Vector3.ONE * (1.0 + sin(Time.get_ticks_msec() * .007) * .10)
+	briar_charge_fx.visible = charge_time > 0.0
+	if briar_charge_fx.visible:
+		briar_charge_fx.global_position = Vector3(global_position.x - locked_direction * .97, floor_y + .095, 0)
+
+func show_briar_warning(move: String, point: Vector3, direction: float, duration: float) -> void:
+	if is_instance_valid(warning):
+		warning.queue_free()
+	match move:
+		"signature":
+			warning = JUNGLE_FX.warning_field(self, Vector3(clampf(point.x, left - .45, right + .45), floor_y + .095, 0), 2.9, 3.0, JUNGLE_FX.DANGER, duration)
+		"charge":
+			var end := clampf(global_position.x + direction * 12.0, left, right)
+			warning = JUNGLE_FX.warning_field(self, Vector3((end + global_position.x) * .5, floor_y + .095, 0), maxf(1.2, absf(end - global_position.x)), 2.6, JUNGLE_FX.DANGER, duration, direction)
+		"volley":
+			warning = JUNGLE_FX.at_world(self, global_position + Vector3(direction * .87, .18, 0))
+			ATTACK_FX.charge(warning, warning.global_position, accent, duration)
+
+func draw_root_strike(zone: Vector3) -> void:
+	JUNGLE_FX.roots(self, Vector3(zone.x, floor_y + .04, 0), zone.y * 2.0, zone.z, 7)
+
+func update_briar_pose(delta: float) -> void:
+	pose_recovery = maxf(0.0, pose_recovery - delta)
+	stagger = maxf(0.0, stagger - delta)
+	var motion := JungleRig.Motion.IDLE
+	var weight := 0.0
+	if charge_time > 0.0:
+		motion = JungleRig.Motion.CHARGE
+		weight = 1.0
+	elif not attack.is_empty():
+		motion = BRIAR_MOTIONS[attack]
+		weight = clampf(1.0 - cooldown / windup_duration, 0.16, 1.0)
+	elif pose_recovery > 0.0:
+		motion = previous_motion
+		weight = pose_recovery / 0.26
+	elif stagger > 0.0:
+		motion = JungleRig.Motion.STAGGER
+		weight = stagger / 0.13
+	jungle_rig.set_combat_pose(facing, absf(velocity.x), motion, weight)
 
 func telegraph() -> void:
 	var pattern := ["signature", "volley", "signature", "charge"]
@@ -163,11 +332,18 @@ func telegraph() -> void:
 	aim = target.global_position
 	locked_direction = facing
 	cooldown = Difficulty.windup_time(0.82 if attack == "signature" else 0.63, difficulty_mode)
+	windup_duration = cooldown
+	zones.clear()
+	if jungle_rig:
+		if attack == "signature":
+			zones.append(Vector3(clampf(aim.x, left - .45, right + .45), 1.45, 2.5))
+		show_briar_warning(attack, aim, locked_direction, cooldown)
+		RiftAudio.play_effect(&"titan_windup")
+		return
 	warning = Node3D.new()
 	add_child(warning)
 	warning.top_level = true
 	warning.global_position = Vector3(0, floor_y + 0.075, 0)
-	zones.clear()
 	if attack == "signature":
 		var label := Label3D.new()
 		label.font = preload("res://assets/ui/fonts/BarlowCondensed-ExtraBoldItalic.ttf")
@@ -178,7 +354,6 @@ func telegraph() -> void:
 		label.position = Vector3(global_position.x, global_position.y - floor_y + 1.67, 0.38)
 		warning.add_child(label)
 		match sector:
-			2: mark(aim.x, 1.45, 2.5)
 			3:
 				for offset in [-3.25, 0.0, 3.25]:
 					mark(aim.x + offset, 0.65, 6.0)
@@ -212,9 +387,12 @@ func mark(x: float, radius: float, height: float) -> void:
 	ATTACK_FX.telegraph(footprint, radius * 2.0, accent, cooldown)
 
 func strike() -> void:
+	if jungle_rig:
+		previous_motion = BRIAR_MOTIONS[attack]
+		pose_recovery = 0.26
 	if is_instance_valid(warning):
 		warning.queue_free()
-	var power := 15.0 + sector * 1.65
+	var power := 32.0 * briar_damage_scale if jungle_rig else 15.0 + sector * 1.65
 	match attack:
 		"charge":
 			charge_time = 0.53
@@ -231,6 +409,12 @@ func signature(power: float) -> void:
 	match sector:
 		1:
 			fire(Vector3(global_position.x + locked_direction, floor_y + 0.62, 0), Vector3(locked_direction, 0, 0), power * 1.4, 23.0, true)
+		2:
+			var zone := zones[0]
+			last_root_strike = [turn, zone, elapsed]
+			draw_root_strike(zone)
+			if absf(target.global_position.x - zone.x) < zone.y and target.global_position.y < floor_y + zone.z + .26:
+				target.take_boss_hit(power * 1.25, Vector3(zone.x, floor_y, 0), sector, true)
 		3:
 			for zone in zones:
 				fire(Vector3(zone.x, floor_y + 6.3, 0), Vector3.DOWN, power, 18.5)
@@ -291,11 +475,7 @@ func fire(at: Vector3, direction: Vector3, power: float, speed: float, drill := 
 
 func break_apart() -> void:
 	active = false
-	var burst := BURST.new()
-	get_parent().add_child.call_deferred(burst)
-	burst.set_deferred("global_position", global_position)
-	burst.ignite.call_deferred(accent)
-	get_tree().create_timer(0.5, false).timeout.connect(burst.queue_free)
+	BURST.spawn.call_deferred(get_parent(), global_position, accent, .5)
 	set_deferred("collision_layer", 0)
 	RiftAudio.play_effect(&"enemy_break")
 	hide()

@@ -1,18 +1,23 @@
 [gd_scene format=3]
 
 [ext_resource type="Script" path="res://scripts/factory_boss.gd" id="boss"]
-[ext_resource type="PackedScene" path="res://assets/neon_factory/foundry/forge_titan.glb" id="rig"]
+[ext_resource type="PackedScene" path="res://assets/neon_factory/foundry/forge_titan_tripo.glb" id="rig"]
+[ext_resource type="Script" path="res://scripts/foundry_boss_rig.gd" id="pose"]
 
 [sub_resource type="BoxShape3D" id="hitbox"]
 size = Vector3(2.65, 2.90, 1.48)
 
 [node name="ForgeTitan" type="CharacterBody3D" groups=["damageable_enemies"]]
 script = ExtResource("boss")
-max_health = 1280.0
+max_health = 1536.0
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
 shape = SubResource("hitbox")
 
 [node name="Armor" type="Node3D" parent="."]
+script = ExtResource("pose")
 
 [node name="Rig" parent="Armor" instance=ExtResource("rig")]
+position = Vector3(0, -1.435, 0)
+rotation = Vector3(0, -1.5707963, 0)
+scale = Vector3(3.62, 3.62, 3.62)

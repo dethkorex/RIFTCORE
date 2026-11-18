@@ -33,8 +33,8 @@ static func piece(parent: Node3D, mesh: Mesh, at: Vector3, dimensions: Vector3, 
 	parent.add_child(part)
 	return part
 
-static func projectile(parent: Node3D, sector: int, role: int, heavy: bool) -> void:
-	var tint := tint_for(sector)
+static func projectile(parent: Node3D, sector: int, role: int, heavy: bool, tint_override := Color.TRANSPARENT) -> void:
+	var tint := tint_override if tint_override.a > 0.0 else tint_for(sector)
 	var size := 1.45 if heavy else 1.0
 	var edge := tint.lerp(Color.WHITE, 0.72)
 	match sector:
@@ -49,10 +49,21 @@ static func projectile(parent: Node3D, sector: int, role: int, heavy: bool) -> v
 				var segment := piece(parent, cube, (start + end) * 0.5, Vector3(0.045, 0.045, start.distance_to(end)), edge if i % 2 else tint)
 				segment.basis = Basis.looking_at((end - start).normalized(), Vector3.UP).scaled_local(segment.scale)
 				start = end
-		2, 5, 7:
-			piece(parent, bulb, Vector3(0, 0, 0.13), Vector3(0.24, 0.24, 0.38) * size, tint)
-			for i in range(3):
-				piece(parent, bulb, Vector3(0.07 * sin(i * 2.5), 0.07 * cos(i * 2.5), -0.17 - 0.15 * i), Vector3.ONE * (0.15 - 0.03 * i) * size, edge)
+		2:
+			if role == 3:
+				var thorn := piece(parent, crystal, Vector3(0, 0, .14), Vector3(.21, .64, .20) * size, tint)
+				thorn.rotation.x = PI * .5
+				piece(parent, bulb, Vector3(0, 0, -.18), Vector3(.15, .14, .44) * size, edge)
+			elif role == 4:
+				piece(parent, bulb, Vector3(0, 0, .11), Vector3(.38, .38, .55) * size, tint)
+				piece(parent, bulb, Vector3(0, 0, .21), Vector3(.23, .23, .48) * size, edge)
+				for index in 3:
+					var angle := float(index) * TAU / 3.0
+					piece(parent, bulb, Vector3(sin(angle) * .18, cos(angle) * .18, -.30 - index * .10), Vector3(.16, .16, .28) * size, tint.darkened(.21))
+			else:
+				draw_spores(parent, size, tint, edge)
+		5, 7:
+			draw_spores(parent, size, tint, edge)
 		_:
 			piece(parent, bulb, Vector3.ZERO, Vector3(0.17, 0.17, 0.67) * size, tint)
 			piece(parent, bulb, Vector3(0, 0, 0.16), Vector3(0.105, 0.105, 0.38) * size, edge)
@@ -61,6 +72,11 @@ static func projectile(parent: Node3D, sector: int, role: int, heavy: bool) -> v
 				fin.rotation.x = PI / 2.0
 	var length := (0.48 + 0.1 * role) * size
 	piece(parent, bulb, Vector3(0, 0, -0.34), Vector3(0.068, 0.068, length), tint.darkened(0.17))
+
+static func draw_spores(parent: Node3D, size: float, tint: Color, edge: Color) -> void:
+	piece(parent, bulb, Vector3(0, 0, 0.13), Vector3(0.24, 0.24, 0.38) * size, tint)
+	for i in 3:
+		piece(parent, bulb, Vector3(0.07 * sin(i * 2.5), 0.07 * cos(i * 2.5), -0.17 - 0.15 * i), Vector3.ONE * (0.15 - 0.03 * i) * size, edge)
 
 static func charged_saber(parent: Node3D, tint: Color) -> void:
 	var surface := ImmediateMesh.new()
