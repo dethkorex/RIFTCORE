@@ -34,6 +34,13 @@ jobs:
           python3 distribution/fetch_templates.py release-tools/templates
           curl -fsSL --retry 3 -o release-tools/GODOT_LICENSE.txt https://raw.githubusercontent.com/godotengine/godot/4.7.2-stable/LICENSE.txt
           curl -fsSL --retry 3 -o release-tools/GODOT_COPYRIGHT.txt https://raw.githubusercontent.com/godotengine/godot/4.7.2-stable/COPYRIGHT.txt
+      - name: Restore imported assets
+        uses: actions/cache@v4
+        with:
+          path: .godot/imported
+          key: godot-4.7.2-${{ runner.os }}-${{ hashFiles('assets/**', 'scenes/**', 'addons/**', 'export_presets.cfg') }}
+          restore-keys: |
+            godot-4.7.2-${{ runner.os }}-
       - name: Build installers and release manifest
         env:
           REF_TYPE: ${{ github.ref_type }}

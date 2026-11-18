@@ -1,4 +1,7 @@
-# RIFTCORE Alpha 6.3.20
+# RIFTCORE Alpha 6.3.21
+
+- Creating an account signs you in automatically and opens operator selection. A failed automatic sign-in stays in the same form with a retry button; it never submits another registration for the account just created.
+- Incorrect login details keep the sign-in screen open and show the error. Successful sign-in closes it and continues to operator selection.
 
 - One player reaching a checkpoint now saves it for the whole squad. Every party member receives the checkpoint notification; reconnecting preserves it without repeating the banner.
 - Every co-op player can revive a fallen teammate by holding Field Interact beside their body. A progress bar fills during the hold; releasing, moving away or taking damage interrupts it.

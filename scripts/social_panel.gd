@@ -340,7 +340,8 @@ static func build_directory_account(menu, columns: HBoxContainer, create := fals
 	var form: VBoxContainer = menu.card(columns)
 	var directory = RiftRelay.directory
 	var heading := "Create a RIFTCORE Account" if create else "Sign In to RIFTCORE"
-	UI.label(form, heading, 31, UI.CYAN)
+	var title := UI.label(form, heading, 31, UI.CYAN)
+	var flow := {"creating": create, "created": false}
 	if directory.online():
 		UI.label(form, directory.status, 18, UI.CYAN)
 		UI.button(form, "Continue", func(): finish_directory_form(menu), true).grab_focus()
@@ -403,21 +404,26 @@ static func build_directory_account(menu, columns: HBoxContainer, create := fals
 		message.text = "Connecting…"
 		primary.disabled = true
 		resend.disabled = true
-		if create:
+		if flow.creating:
 			var registration_result: Dictionary = await directory.register_account(email_address, passphrase, registration.text)
 			if not is_instance_valid(form):
 				return
 			if registration_result.created:
-				password.clear()
-				show_account_created(menu, form, email_address)
+				flow.creating = false
+				flow.created = true
+				registration.hide()
+				title.text = "Sign In to RIFTCORE"
+				primary.text = "Sign In"
+				message.text = "Account created! Signing you in…"
+			else:
+				message.text = registration_result.message
+				primary.disabled = false
+				resend.disabled = false
 				return
-			message.text = registration_result.message
-			primary.disabled = false
-			return
 		var result: String = await directory.sign_in(email_address, passphrase, token)
 		if not is_instance_valid(form):
 			return
-		message.text = result
+		message.text = "Account created. " + result if flow.created and not directory.online() else result
 		primary.disabled = false
 		resend.disabled = false
 		if directory.online():
@@ -451,22 +457,6 @@ static func build_directory_account(menu, columns: HBoxContainer, create := fals
 	elif menu.page == "Directory Registration":
 		UI.button(form, "Sign In", menu.show_page.bind("Directory Account"), false, 34)
 	(registration if registration else email).grab_focus()
-
-static func show_account_created(menu, form: Control, email: String) -> void:
-	var dialog := AcceptDialog.new()
-	dialog.title = "Account Created"
-	dialog.dialog_text = "Congratulations! Your RIFTCORE account has been created. Sign in with your email and password to continue."
-	dialog.ok_button_text = "Continue to Sign In"
-	dialog.transient = true
-	dialog.exclusive = true
-	dialog.unresizable = true
-	form.add_child(dialog)
-	var sign_in := func():
-		menu.sign_in_email_hint = email
-		menu.show_page("Directory Account" if menu.station_panel or menu.page == "Directory Registration" else "Sign In")
-	dialog.confirmed.connect(sign_in)
-	dialog.canceled.connect(sign_in)
-	dialog.popup_centered(Vector2i(470, 0))
 
 static func finish_directory_form(menu) -> void:
 	if menu.directory_return_page == "Account Settings":
