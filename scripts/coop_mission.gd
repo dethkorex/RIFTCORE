@@ -22,15 +22,23 @@ const StoryDialogue := preload("res://scripts/story_dialogue.gd")
 const CampaignDoor := preload("res://scripts/campaign_door.gd")
 const GateRelays := preload("res://scripts/gate_relays.gd")
 const INPUTS := [&"jump", &"dash", &"crouch", &"crouch_stick", &"shoot", &"melee", &"climb_down", &"swap_weapon", &"previous_suit", &"quick_0", &"quick_1", &"quick_2", &"quick_3", &"suit_fire"]
+const INPUT_ACT_SHIFT := 28
+const INPUT_ACT_MASK := 3 << INPUT_ACT_SHIFT
 const INPUT_SUSPENDED := 1 << 30
 const PauseMenu := preload("res://scripts/coop_pause_menu.gd")
 const TICK := 0.05
 const INPUT_INTERVAL := 1.0 / 30.0
 const IDLE_INPUT_INTERVAL := 0.1
+const REMOTE_INPUT_TIMEOUT := 0.32
+const MAX_LATE_EDGE_PACKETS := 8
 const HUD_INTERVAL := 0.05
 const MAX_SNAPSHOT_LEAD := 0.10
 const INPUT_HISTORY_LIMIT := 48
 const MAX_CORRECTION_SPEED := 12.0
+const MAX_CORRECTION_SNAPSHOT_AGE := 0.30
+const HARD_CORRECTION_DISTANCE := 8.0
+const BLOCKED_CORRECTION_DELAY := 0.18
+const BLOCKED_CORRECTION_DISTANCE := 1.15
 # Terrain movement fields can see the guest prediction body. Combat and pickups use layer 1.
 const PREDICTION_LAYER := 1 << 6
 const DIFFICULTY_PER_GUEST := 0.25
@@ -111,6 +119,7 @@ var outcome := ""
 var team_xp := 0
 var sector_seconds := 0.0
 var chat_open := false
+var window_input_blocked := false
 var security_defeated := 0
 var lives_lost := 0
 var extracted_results: Dictionary = {}
@@ -133,6 +142,8 @@ var latest_operators := -1
 var presented_snapshot := -1
 var presented_world := -1
 var correction := Vector3.ZERO
+var blocked_correction_time := 0.0
+var awaiting_local_snapshot := true
 var input_positions: Dictionary[int, Vector3] = {}
 var acknowledged_input := -1
 var position_revision := 0
@@ -201,11 +212,7 @@ func rebind_roster(rejoined: Array) -> void:
 		var remapped := {}
 		for index in range(1, roster.size()):
 			var remote: Dictionary = remote_players[prior[index]]
-			remote.timeout = 0.0
-			operators[index].remote_axis = Vector2.ZERO
-			operators[index].remote_held.clear()
-			operators[index].remote_pressed.clear()
-			operators[index].remote_released.clear()
+			suspend_remote_input(operators[index], remote)
 			remapped[roster[index]] = remote
 			mark_position_reset(operators[index])
 		remote_players = remapped
@@ -221,6 +228,8 @@ func rebind_roster(rejoined: Array) -> void:
 	released.clear()
 	input_positions.clear()
 	correction = Vector3.ZERO
+	blocked_correction_time = 0.0
+	awaiting_local_snapshot = not host
 	resume_controls_pending = true
 
 func receive_loadout(gear: Dictionary, upgrades: Dictionary, quick: Array, xp: int, weapons: Array, suit: String) -> void:
@@ -366,7 +375,7 @@ func load_stage(packed: PackedScene = null) -> void:
 			operator.quick_profile = loadout
 		operator.pit_floor_y = first.pit_floor_y
 		operator.remote_input = host and index != local_index
-		operator.set_controls_suspended(remote.get("suspended", false) if operator.remote_input else is_pause_open() and index == local_index)
+		operator.set_controls_suspended(remote.get("suspended", false) if operator.remote_input else local_input_blocked() and index == local_index)
 		operator.damage_taken_scale = difficulty
 		Equipment.apply(operator, loadout)
 		if previous.is_empty():
@@ -474,7 +483,7 @@ func load_stage(packed: PackedScene = null) -> void:
 	var bounds := stage.get_node("MARKERS/CameraBounds")
 	camera.min_x = bounds.get_meta("min_x")
 	camera.max_x = bounds.get_meta("max_x")
-	camera.global_position = camera.target.global_position + Vector3.UP * 0.35
+	camera.snap_to_target()
 	for path_name in CHECKPOINT_PATHS:
 		var beacon := stage.get_node_or_null(path_name)
 		if beacon and host:
@@ -524,6 +533,8 @@ func load_stage(packed: PackedScene = null) -> void:
 	repair_hall.authority = host
 	Details.new().install(stage, first, sector, act)
 	correction = Vector3.ZERO
+	blocked_correction_time = 0.0
+	awaiting_local_snapshot = not host
 	input_positions.clear()
 	if stage_title:
 		update_hud_title()
@@ -585,6 +596,8 @@ func restore_operator(operator: RiftPlayer, at: Vector3, health_ratio := 1.0) ->
 func mark_position_reset(operator: RiftPlayer) -> void:
 	position_revision += 1
 	operator.set_meta(&"coop_position_revision", position_revision)
+	if is_instance_valid(camera) and camera.target == operator and camera.is_processing():
+		camera.snap_to_target()
 
 func reboot_available() -> bool:
 	return outcome.is_empty() and boss_started and not boss_intro_active and not boss_defeated and not resetting_arena and not reboot_used and not changing_act
@@ -730,9 +743,11 @@ func play_suit_reveal(reward: String) -> void:
 	if until.time_left > 0.0:
 		await until.timeout
 	suit_reveal_playing = false
-	for operator in operators:
-		if host or operator == actor:
-			operator.set_controls_suspended(operator == actor and is_pause_open())
+	for index in operators.size():
+		if index == local_index:
+			operators[index].set_controls_suspended(local_input_blocked())
+		elif host:
+			suspend_remote_input(operators[index], remote_players[roster[index]])
 
 func collect_personal_totals(settle_loot := false) -> void:
 	for index in operators.size():
@@ -975,7 +990,12 @@ func play_boss_intro(track: int) -> void:
 	if is_instance_valid(field_briefing):
 		field_briefing.hide()
 	RiftAudio.play_boss_music(track)
-	for operator in operators:
+	pressed.clear()
+	released.clear()
+	for index in operators.size():
+		var operator := operators[index]
+		if host and index != local_index:
+			suspend_remote_input(operator, remote_players[roster[index]])
 		operator.cancel_charge()
 		operator.velocity = Vector3.ZERO
 		operator.set_physics_process(false)
@@ -1202,7 +1222,7 @@ func set_chat_open(open: bool) -> void:
 	set_local_controls_suspended(chat_open or is_pause_open() or suit_reveal_playing)
 
 func local_input_blocked() -> bool:
-	return chat_open or is_pause_open()
+	return chat_open or is_pause_open() or window_input_blocked
 
 func open_pause() -> void:
 	if local_input_blocked() or not outcome.is_empty() or changing_act or boss_intro_active or suit_reveal_playing:
@@ -1212,8 +1232,8 @@ func open_pause() -> void:
 	set_local_controls_suspended(true)
 
 func set_local_controls_suspended(suspended: bool) -> void:
-	operators[local_index].set_controls_suspended(suspended)
-	if not host and outcome.is_empty() and not changing_act:
+	operators[local_index].set_controls_suspended(suspended or local_input_blocked() or suit_reveal_playing)
+	if not host and RiftRelay.mission_active and outcome.is_empty() and not changing_act and not boss_intro_active:
 		pressed.clear()
 		released.clear()
 		send_input(true)
@@ -1251,6 +1271,10 @@ func get_player_axis() -> Vector2:
 	return Vector2(Input.get_axis("move_left", "move_right"), Input.get_axis("climb_down", "climb_up"))
 
 func _physics_process(delta: float) -> void:
+	var unfocused := DisplayServer.get_name() != "headless" and not get_window().has_focus()
+	if unfocused != window_input_blocked:
+		window_input_blocked = unfocused
+		set_local_controls_suspended(local_input_blocked())
 	if host and is_instance_valid(gate):
 		arena_door.step(delta, boss_defeated or entrance_open and not boss_started, operators)
 	elif boss_intro_active:
@@ -1264,11 +1288,7 @@ func _physics_process(delta: float) -> void:
 		return
 	if not host:
 		# Keep the guest responsive while the host remains authoritative.
-		var local := operators[local_index]
-		if local.health > 0.0 and correction.length_squared() > 0.0025:
-			var step := (correction * (1.0 - exp(-9.0 * delta))).limit_length(MAX_CORRECTION_SPEED * delta)
-			local.move_and_collide(step)
-			correction -= step
+		reconcile_local_movement(delta)
 		if not local_input_blocked():
 			for action in INPUTS:
 				if Input.is_action_just_pressed(action):
@@ -1281,10 +1301,10 @@ func _physics_process(delta: float) -> void:
 		tick_reboot(delta)
 		for index in range(1, operators.size()):
 			var remote: Dictionary = remote_players[roster[index]]
-			remote.timeout -= delta
-			if remote.timeout <= 0.0:
-				operators[index].remote_axis = Vector2.ZERO
-				operators[index].remote_held.clear()
+			if remote.timeout > 0.0:
+				remote.timeout -= delta
+				if remote.timeout <= 0.0:
+					suspend_remote_input(operators[index], remote)
 		for enemy in enemies:
 			if is_instance_valid(enemy):
 				enemy.target = nearest_operator(enemy.global_position)
@@ -1296,12 +1316,13 @@ func _physics_process(delta: float) -> void:
 			return
 	clock += delta
 	factory_trap_clock += delta
-	if not host and (not pressed.is_empty() or not released.is_empty() or get_player_axis().distance_to(last_sent_axis) >= 0.15):
+	var axis := get_player_axis() if not host else Vector2.ZERO
+	if not host and (not pressed.is_empty() or not released.is_empty() or axis.distance_to(last_sent_axis) >= 0.15 or axis_released(axis)):
 		clock = 0.0
 		update_pending = false
 		send_input()
 		return
-	var idle := last_sent_axis.is_zero_approx() and (last_sent_input & ~INPUT_SUSPENDED) == 0
+	var idle := last_sent_axis.is_zero_approx() and (last_sent_input & ~(INPUT_ACT_MASK | INPUT_SUSPENDED)) == 0
 	var interval := TICK if host else (IDLE_INPUT_INTERVAL if idle else INPUT_INTERVAL)
 	if clock >= interval:
 		clock = fmod(clock, interval)
@@ -1310,6 +1331,36 @@ func _physics_process(delta: float) -> void:
 func resume_controls() -> void:
 	if not local_input_blocked():
 		set_local_controls_suspended(false)
+
+func reconcile_local_movement(delta: float) -> void:
+	var local := operators[local_index]
+	if local.health <= 0.0 or snapshot_age > MAX_CORRECTION_SNAPSHOT_AGE or correction.length_squared() <= 0.0025:
+		blocked_correction_time = 0.0
+		return
+	var step := (correction * (1.0 - exp(-9.0 * delta))).limit_length(MAX_CORRECTION_SPEED * delta)
+	var before := local.global_position
+	var obstruction := local.move_and_collide(step)
+	var applied := local.global_position - before
+	correction -= applied
+	if obstruction and applied.dot(step) < step.length_squared() * 0.5:
+		blocked_correction_time += delta
+	else:
+		blocked_correction_time = 0.0
+	if blocked_correction_time >= BLOCKED_CORRECTION_DELAY:
+		var data: Array = targets[local_index]
+		if not data.is_empty() and local.global_position.distance_squared_to(data[0]) > BLOCKED_CORRECTION_DISTANCE * BLOCKED_CORRECTION_DISTANCE:
+			snap_local_to_host(local, data)
+
+func snap_local_to_host(operator: RiftPlayer, data: Array) -> void:
+	operator.reset_predicted_position(data[0], data[10], data[5])
+	correction = Vector3.ZERO
+	blocked_correction_time = 0.0
+	input_positions.clear()
+	if is_instance_valid(camera) and camera.target == operator and camera.is_processing():
+		camera.snap_to_target()
+
+func axis_released(axis: Vector2) -> bool:
+	return (axis.x == 0.0 and last_sent_axis.x != 0.0) or (axis.y == 0.0 and last_sent_axis.y != 0.0)
 
 func nearest_operator(at: Vector3) -> RiftPlayer:
 	var best: RiftPlayer
@@ -1322,21 +1373,23 @@ func nearest_operator(at: Vector3) -> RiftPlayer:
 	return best
 
 func send_input(force_reliable := false) -> void:
-	var suspended := local_input_blocked()
-	var current := INPUT_SUSPENDED if suspended else 0
+	var suspended := operators[local_index].controls_suspended or local_input_blocked()
+	# Reserve two bits in the existing held-button field for the current act.
+	var current := (act << INPUT_ACT_SHIFT) | (INPUT_SUSPENDED if suspended else 0)
 	var down := 0
 	var up := 0
 	for index in INPUTS.size():
 		var action: StringName = INPUTS[index]
 		if not suspended and Input.is_action_pressed(action):
 			current |= 1 << index
-		if pressed.has(action):
+		if not suspended and pressed.has(action):
 			down |= 1 << index
-		if released.has(action):
+		if not suspended and released.has(action):
 			up |= 1 << index
 	pressed.clear()
 	released.clear()
-	var axis := get_player_axis()
+	var axis := Vector2.ZERO if suspended else get_player_axis()
+	var send_reliably := force_reliable or axis_released(axis) or down != 0 or up != 0
 	last_sent_axis = axis
 	last_sent_input = current
 	input_sequence += 1
@@ -1345,30 +1398,42 @@ func send_input(force_reliable := false) -> void:
 		input_positions.erase(input_positions.keys().front())
 	# Take the first arrival for action edges, with reliable delivery as a fallback.
 	peer.call_func_on_unreliable(peer.get_host(), receive_input, axis, current, down, up, input_sequence)
-	if force_reliable or down != 0 or up != 0:
+	if send_reliably:
 		peer.call_func_on(peer.get_host(), receive_input, axis, current, down, up, input_sequence)
+
+func suspend_remote_input(operator: RiftPlayer, remote: Dictionary) -> void:
+	remote.timeout = 0.0
+	remote.suspended = true
+	remote.edge = maxi(remote.edge, remote.input)
+	operator.set_controls_suspended(true)
+	operator.remote_axis = Vector2.ZERO
+	operator.remote_held.clear()
+	operator.remote_pressed.clear()
+	operator.remote_released.clear()
 
 func receive_input(axis: Vector2, current: int, down: int, up: int, sequence: int) -> void:
 	var sender: int = peer.get_sender_id()
-	if not host or suit_reveal_playing or not outcome.is_empty() or not axis.is_finite() or not remote_players.has(sender):
+	var input_act := (current & INPUT_ACT_MASK) >> INPUT_ACT_SHIFT
+	if not host or suit_reveal_playing or boss_intro_active or changing_act or not outcome.is_empty() or not axis.is_finite() or not remote_players.has(sender) or (input_act != 0 and input_act != act):
 		return
 	var operator := operators[roster.find(sender)]
 	var remote: Dictionary = remote_players[sender]
 	if sequence > remote.input:
 		remote.input = sequence
-		remote.timeout = 0.65
-		remote.suspended = (current & INPUT_SUSPENDED) != 0
-		operator.set_controls_suspended(remote.suspended)
+		if current & INPUT_SUSPENDED:
+			suspend_remote_input(operator, remote)
+			return
+		remote.timeout = REMOTE_INPUT_TIMEOUT
+		remote.suspended = false
+		operator.set_controls_suspended(false)
 		operator.remote_axis = axis.clamp(Vector2(-1, -1), Vector2(1, 1))
 		operator.remote_held.clear()
 		for index in INPUTS.size():
 			if current & (1 << index):
 				operator.remote_held[INPUTS[index]] = true
-		if remote.suspended:
-			remote.edge = sequence
 	if remote.suspended:
 		return
-	if (down != 0 or up != 0) and sequence > remote.edge:
+	if (down != 0 or up != 0) and sequence > remote.edge and sequence >= remote.input - MAX_LATE_EDGE_PACKETS:
 		remote.edge = sequence
 		for index in INPUTS.size():
 			if down & (1 << index):
@@ -1573,24 +1638,22 @@ func receive_operators(remote_act: int, players: Array, sequence: int, rewards: 
 	var relocated := revision > applied_position_revision
 	if relocated:
 		applied_position_revision = revision
-	if local_data[2] <= 0.0 or revived or life_changed or relocated:
-		local.global_position = local_data[0]
-		local.velocity = local_data[10]
-		correction = Vector3.ZERO
-		input_positions.clear()
+	if awaiting_local_snapshot or local_data[2] <= 0.0 or revived or life_changed or relocated:
+		awaiting_local_snapshot = false
+		snap_local_to_host(local, local_data)
 	elif rewards.size() > 3:
 		var ack := int(rewards[3])
 		if ack > acknowledged_input and input_positions.has(ack):
 			# Compare positions for the same input. The current guest is already several frames ahead.
 			var offset: Vector3 = local_data[0] - input_positions[ack]
 			acknowledged_input = ack
-			if offset.length_squared() > 64.0:
-				local.global_position = local_data[0]
-				local.velocity = local_data[10]
-				correction = Vector3.ZERO
-				input_positions.clear()
+			if offset.length_squared() > HARD_CORRECTION_DISTANCE * HARD_CORRECTION_DISTANCE:
+				snap_local_to_host(local, local_data)
 			else:
 				correction = offset.limit_length(3.0)
+		elif local.global_position.distance_squared_to(local_data[0]) > HARD_CORRECTION_DISTANCE * HARD_CORRECTION_DISTANCE:
+			# A long stall can put the acknowledged input outside our prediction history.
+			snap_local_to_host(local, local_data)
 	else:
 		var projected: Vector3 = local_data[0] + local_data[10] * TICK
 		correction = (projected - local.global_position).limit_length(2.5)
@@ -1683,12 +1746,15 @@ func _process(delta: float) -> void:
 				enemy.global_position = enemy.global_position.lerp(enemy_targets[index], blend)
 		presented_world = latest_state
 	var local := operators[local_index]
-	if not boss_intro_active and not changing_act:
+	if not boss_intro_active and not changing_act and not suit_reveal_playing:
+		var previous_target := camera.target
 		if local.health > 0.0 or local.lives > 0:
 			camera.target = local
 		elif not is_instance_valid(camera.target) or camera.target.health <= 0.0:
 			var survivor := nearest_operator(local.global_position)
 			camera.target = survivor if survivor else local
+		if camera.target != previous_target:
+			camera.snap_to_target()
 	hud_clock += delta
 	if hud_clock < HUD_INTERVAL:
 		return

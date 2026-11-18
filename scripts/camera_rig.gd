@@ -24,7 +24,13 @@ func _ready() -> void:
 	add_child(camera)
 
 func _process(delta: float) -> void:
-	if not target: return
-	var desired := Vector3(clampf(target.global_position.x + target.facing * look_ahead, min_x, max_x), maxf(minimum_follow_y, target.global_position.y + 0.35), 0.0)
-	global_position = global_position.lerp(desired, 1.0 - exp(-damping * delta))
+	if is_instance_valid(target):
+		global_position = global_position.lerp(target_position(), 1.0 - exp(-damping * delta))
+
+func snap_to_target() -> void:
+	if is_instance_valid(target):
+		global_position = target_position()
+
+func target_position() -> Vector3:
+	return Vector3(clampf(target.global_position.x + target.facing * look_ahead, min_x, max_x), maxf(minimum_follow_y, target.global_position.y + 0.35), 0.0)
 

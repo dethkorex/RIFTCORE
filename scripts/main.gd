@@ -412,6 +412,10 @@ func verify_coop_mission(host: bool, smoke_sector: int, wipe_test := false) -> v
 		print("Campaign check failed guest input prediction")
 		finish_relay_check(false)
 		return
+	if not await verify_coop_input_isolation(mission, local_index):
+		print("Campaign check failed to isolate jump and movement inputs")
+		finish_relay_check(false)
+		return
 	Input.action_press("move_right")
 	await get_tree().create_timer(0.4).timeout
 	Input.action_release("move_right")
@@ -523,6 +527,41 @@ func verify_coop_wipe(host: bool, mission: Node) -> void:
 			await get_tree().create_timer(1.3).timeout
 	print("LIVE PARTY WIPE ", reset, " / same room, Lv. 1 and permanent progress")
 	finish_relay_check(reset)
+
+func verify_coop_input_isolation(mission: Node, local_index: int) -> bool:
+	var operator: RiftPlayer = mission.operators[local_index]
+	var teammate: RiftPlayer = mission.operators[1 - local_index]
+	if not await wait_for_relay(func(): return operator.grounded(), 3.0):
+		return false
+	var lobby := RiftRelay.relay
+	var local_start := operator.global_position
+	lobby.lobby_set_data("coop_input_ready_%d" % local_index, local_start.x)
+	if not await wait_for_relay(func(): return lobby.lobby_get_data("coop_input_ready_%d" % (1 - local_index), null) != null, 5.0):
+		return false
+	var remote_start := float(lobby.lobby_get_data("coop_input_ready_%d" % (1 - local_index), 0.0))
+	for moving_index in 2:
+		if local_index == moving_index:
+			Input.action_press("move_right")
+			Input.action_press("jump")
+			var jumped := await wait_for_relay(func(): return operator.global_position.y > local_start.y + .45 and operator.global_position.x > local_start.x + .55, .6)
+			Input.action_release("move_right")
+			Input.action_release("jump")
+			if not jumped:
+				return false
+			lobby.lobby_set_data("coop_input_jump_%d" % moving_index, true)
+			if not await wait_for_relay(func(): return lobby.lobby_get_data("coop_input_observed_%d" % moving_index, false), 5.0):
+				return false
+		else:
+			var idle_start := operator.global_position
+			if not await wait_for_relay(func(): return lobby.lobby_get_data("coop_input_jump_%d" % moving_index, false) and teammate.global_position.x > remote_start + .4, 5.0):
+				return false
+			if operator.global_position.distance_to(idle_start) > .25:
+				return false
+			lobby.lobby_set_data("coop_input_observed_%d" % moving_index, true)
+	if not await wait_for_relay(func(): return operator.grounded(), 3.0):
+		return false
+	print("CO-OP INPUT ISOLATION PASS ", "host" if local_index == 0 else "guest")
+	return true
 
 func verify_foundry_landing(operator: RiftPlayer) -> bool:
 	var start_health := operator.health

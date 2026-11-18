@@ -1023,6 +1023,27 @@ func clear_ladder_support() -> void:
 		remove_collision_exception_with(ladder_support_exception)
 	ladder_support_exception = null
 
+func reset_predicted_position(at: Vector3, motion: Vector3, direction: float) -> void:
+	clear_ladder_support()
+	for deck in drop_through:
+		if is_instance_valid(deck):
+			remove_collision_exception_with(deck)
+	drop_through.clear()
+	hatch_floor = null
+	ladder = null
+	jungle_vine = null
+	wall_grace = 0.0
+	wall_side = 0.0
+	wall_sliding = false
+	wall_launch_lock = 0.0
+	jump_buffer = 0.0
+	coyote = 0.0
+	dash_left = 0.0
+	contact_recoil = 0.0
+	global_position = at
+	velocity = motion
+	facing = direction
+
 static func experience_threshold(level: int) -> int:
 	var steps := maxi(level - 1, 0)
 	return 60 * steps + 20 * steps * steps
