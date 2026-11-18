@@ -23,7 +23,7 @@ const UPGRADES := [
 		"prices": [15, 28, 54], "levels": [1, 9, 16], "effects": ["+12 starting HP", "+28 starting HP and 10% damage resistance", "+46 starting HP and 14% damage resistance"]},
 	{"id": "field_reboot", "branch": "Survivability", "tier": 1, "name": "Field Reboot", "icon": "quick_heal",
 		"prices": [85, 145, 220], "levels": [8, 14, 22],
-		"effects": ["Revive one ally per boss attempt with 35% HP.", "Revive one ally per boss attempt with 50% HP.", "Revive one ally per boss attempt with 70% HP. The reboot completes faster."]},
+		"effects": ["Revive allies 20% faster: hold Field Interact for 3.2 seconds.", "Revive allies 35% faster: hold Field Interact for 2.6 seconds.", "Revive allies 50% faster: hold Field Interact for 2 seconds."]},
 	{"id": "last_stand", "branch": "Survivability", "tier": 1, "name": "Last Stand", "icon": "impact_liner",
 		"prices": [65, 110, 175], "levels": [5, 12, 20], "values": [12, 20, 30], "effect": "Take %d%% less damage when below 30%% HP."},
 	{"id": "shock_dampers", "branch": "Survivability", "tier": 2, "name": "Shock Dampers", "icon": "armor_plate",

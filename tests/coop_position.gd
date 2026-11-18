@@ -74,6 +74,26 @@ func run() -> void:
 	actor.global_position.x = host_position.x + .5
 	mission.receive_operators(1, mission.targets, 3, [0, 0, 0.0, 501, 1])
 	check(actor.global_position.is_equal_approx(host_position) and rig.global_position.is_equal_approx(rig.target_position()), "A checkpoint relocation updates the operator and camera together")
+	var support:=StaticBody3D.new()
+	var deck:=CollisionShape3D.new()
+	var deck_shape:=BoxShape3D.new()
+	deck_shape.size=Vector3(20,1,6)
+	deck.shape=deck_shape
+	support.add_child(deck)
+	root.add_child(support)
+	support.position=Vector3(-10,-.5,0)
+	actor.global_position=Vector3(-10,.9,0)
+	await physics_frame
+	actor.velocity=Vector3.DOWN*3
+	actor.move_and_slide()
+	actor.move_and_slide()
+	actor.velocity=Vector3.ZERO
+	mission.targets[0][0]=Vector3(-9,actor.global_position.y,0)
+	mission.targets[0][10]=Vector3.ZERO
+	mission.input_positions[502]=Vector3(-8,actor.global_position.y,0)
+	mission.last_sent_axis=Vector2.ZERO
+	mission.receive_operators(1,mission.targets,4,[0,0,0.0,502,1])
+	check(actor.grounded() and mission.correction.x>0,"A resting guest corrects toward the server despite an older prediction sample on the opposite side")
 	mission.free()
 	peer.free()
 	quit(failures)

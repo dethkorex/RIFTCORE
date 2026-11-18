@@ -120,6 +120,11 @@ func _ready() -> void:
 	RiftRelay.invite_received.connect(show_friend_invite)
 	RiftRelay.directory.friend_request_received.connect(show_friend_request)
 	var arguments := OS.get_cmdline_user_args()
+	if "--coop-stress" in arguments:
+		configure_input()
+		profile.manual_only = true
+		show_main_menu()
+		return
 	if "--verify-social" in arguments or "--verify-relay" in arguments:
 		configure_input()
 		profile.manual_only = true

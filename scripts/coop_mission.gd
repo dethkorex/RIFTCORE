@@ -21,7 +21,7 @@ const Story := preload("res://scripts/rift_story.gd")
 const StoryDialogue := preload("res://scripts/story_dialogue.gd")
 const CampaignDoor := preload("res://scripts/campaign_door.gd")
 const GateRelays := preload("res://scripts/gate_relays.gd")
-const INPUTS := [&"jump", &"dash", &"crouch", &"crouch_stick", &"shoot", &"melee", &"climb_down", &"swap_weapon", &"previous_suit", &"quick_0", &"quick_1", &"quick_2", &"quick_3", &"suit_fire"]
+const INPUTS := [&"jump", &"dash", &"crouch", &"crouch_stick", &"shoot", &"melee", &"climb_down", &"swap_weapon", &"previous_suit", &"quick_0", &"quick_1", &"quick_2", &"quick_3", &"suit_fire", &"field_interact"]
 const INPUT_ACT_SHIFT := 28
 const INPUT_ACT_MASK := 3 << INPUT_ACT_SHIFT
 const INPUT_SUSPENDED := 1 << 30
@@ -106,7 +106,14 @@ var reboot_from := -1
 var reboot_target := -1
 var reboot_left := 0.0
 var reboot_health := 0.0
-var reboot_origin := Vector3.ZERO
+var reboot_offset := Vector3.ZERO
+var reboot_duration := 4.0
+var revive_meter: ProgressBar
+var revive_caption: Label
+var safe_corpses := {}
+var shared_checkpoints := {}
+var checkpoint_index := -1
+var checkpoint_notices := 0
 var return_button: Button
 var pause_menu: PauseMenu
 var resume_controls_pending := false
@@ -196,6 +203,7 @@ func _ready() -> void:
 	peer.expose_func(receive_loadout)
 	peer.expose_func(receive_quick_config)
 	peer.expose_func(receive_reboot_request)
+	peer.expose_func(receive_checkpoint)
 	peer.expose_func(receive_module_choice)
 	peer.expose_func(receive_deflection)
 	load_stage()
@@ -216,6 +224,8 @@ func rebind_roster(rejoined: Array) -> void:
 			remapped[roster[index]] = remote
 			mark_position_reset(operators[index])
 		remote_players = remapped
+		for path in shared_checkpoints:
+			peer.call_func(receive_checkpoint, act, path, shared_checkpoints[path], false)
 		if act == 2:
 			peer.call_func(receive_act, act, team_xp, active_weapon_ids)
 		if cache_opened:
@@ -315,6 +325,9 @@ func load_stage(packed: PackedScene = null) -> void:
 	cancel_reboot()
 	reboot_used = false
 	reboot_markers.clear()
+	safe_corpses.clear()
+	shared_checkpoints.clear()
+	checkpoint_index=-1
 	var previous := []
 	for operator in operators:
 		previous.append([operator.health, operator.energy, operator.lives, operator.equipped_suit(), operator.recovered_supplies, operator.salvage, operator.recovered_blueprints, operator.experience, operator.run_weapon_ids])
@@ -389,7 +402,7 @@ func load_stage(packed: PackedScene = null) -> void:
 			operator.gain_experience(previous[index][7], false)
 			operator.energy = minf(previous[index][1], operator.max_energy)
 			operator.lives = previous[index][2]
-			if operator.lives <= 0:
+			if operator.lives <= 0 and previous[index][0]<=0:
 				operator.health = 0.0
 				operator.set_meta("coop_down", true)
 				operator.hide()
@@ -417,7 +430,7 @@ func load_stage(packed: PackedScene = null) -> void:
 			operator.blueprint_found.connect(func(id: String): report_loot(index, {}, id, ""))
 			operator.bolts_picked_up.connect(func(amount: int): report_loot(index, {}, "", "", amount))
 			operator.life_picked_up.connect(func(): report_loot(index, {}, "", "", 0, true))
-			operator.fell_into_pit.connect(respawn_operator.bind(operator))
+			operator.fell_into_pit.connect(respawn_operator.bind(operator,true))
 			operator.died.connect(respawn_operator.bind(operator))
 			operator.projectile_deflected.connect(func(id: int): peer.call_func(receive_deflection, act, id))
 		operator.set_armor_finish(String(peer.player_get_data(roster[index], "armor_finish", "")))
@@ -487,7 +500,7 @@ func load_stage(packed: PackedScene = null) -> void:
 	for path_name in CHECKPOINT_PATHS:
 		var beacon := stage.get_node_or_null(path_name)
 		if beacon and host:
-			beacon.activated.connect(func(at: Vector3): checkpoint = at)
+			beacon.activated.connect(activate_checkpoint.bind(path_name))
 	for node in get_tree().get_nodes_in_group(&"factory_shot_relay"):
 		if stage.is_ancestor_of(node):
 			factory_relays.append(node)
@@ -550,14 +563,21 @@ func disable_replica(body: Combatant) -> void:
 	body.collision_layer = 0
 	body.collision_mask = 0
 
-func respawn_operator(operator: RiftPlayer) -> void:
+func respawn_operator(operator: RiftPlayer, pit := false) -> void:
 	if operator.has_meta("coop_down") or not outcome.is_empty() or changing_act:
 		return
 	operator.set_meta("coop_down", true)
-	operator.lives -= 1
+	operator.lives = maxi(0,operator.lives-1)
 	lives_lost += 1
 	operator.health = 0.0
-	operator.hide()
+	operator.rocket_course=null
+	operator.melee_lock=0.0
+	operator.dash_left=0.0
+	operator.global_position=corpse_anchor(operator,pit)
+	operator.velocity=Vector3.ZERO
+	bind_corpse_support(operator)
+	preload("res://scripts/coop_corpse.gd").present(operator)
+	mark_position_reset(operator)
 	operator.cancel_charge()
 	operator.cancel_saber_charge()
 	operator.set_physics_process(false)
@@ -576,15 +596,17 @@ func respawn_operator(operator: RiftPlayer) -> void:
 func respawn_point() -> Vector3:
 	return stage.get_node("MARKERS/PlayerSpawn").global_position if checkpoint == Vector3.ZERO else checkpoint
 
-func restore_operator(operator: RiftPlayer, at: Vector3, health_ratio := 1.0) -> void:
-	if operator.lives <= 0 or not operator.has_meta("coop_down"):
+func restore_operator(operator: RiftPlayer, at: Vector3, health_ratio := 1.0, allow_exhausted := false) -> void:
+	if (operator.lives <= 0 and not allow_exhausted) or not operator.has_meta("coop_down"):
 		return
 	for boulder in foundry_boulders:
 		if boulder.status != 0 and not operators.any(boulder.is_near_room):
 			boulder.reset_runway()
-	operator.global_position = at
+	operator.reset_predicted_position(at, Vector3.ZERO, operator.facing)
+	operator.remove_meta(&"corpse_support")
 	mark_position_reset(operator)
 	operator.health = operator.max_health * health_ratio
+	preload("res://scripts/coop_corpse.gd").present(operator)
 	operator.clear_boss_debuff()
 	operator.velocity = Vector3.ZERO
 	operator.invulnerable_time = 1.4
@@ -600,7 +622,7 @@ func mark_position_reset(operator: RiftPlayer) -> void:
 		camera.snap_to_target()
 
 func reboot_available() -> bool:
-	return outcome.is_empty() and boss_started and not boss_intro_active and not boss_defeated and not resetting_arena and not reboot_used and not changing_act
+	return outcome.is_empty() and not boss_intro_active and not resetting_arena and not changing_act and not suit_reveal_playing
 
 func reboot_candidate(from: RiftPlayer) -> int:
 	if not reboot_available() or from.health <= 0.0 or from.controls_suspended:
@@ -627,13 +649,16 @@ func start_reboot(index: int) -> void:
 	var reviver := operators[index]
 	var rank: int = reviver.quick_profile.rank(Profile.FIELD_REBOOT)
 	var downed := reboot_candidate(reviver)
-	if rank == 0 or downed < 0 or not operators[downed].has_meta("coop_down"):
+	if downed < 0 or not operators[downed].has_meta("coop_down"):
 		return
 	reboot_from = index
 	reboot_target = downed
 	reboot_health = reviver.health
-	reboot_origin = reviver.global_position
-	reboot_left = 0.9 if rank == 3 else 1.4
+	reboot_offset = reviver.global_position-operators[downed].global_position
+	reboot_duration = [4.0,3.2,2.6,2.0][rank]
+	reboot_left = reboot_duration
+	reviver.cancel_charge()
+	reviver.cancel_saber_charge()
 
 func cancel_reboot() -> void:
 	reboot_from = -1
@@ -642,18 +667,20 @@ func cancel_reboot() -> void:
 
 func tick_reboot(delta: float) -> void:
 	if reboot_left <= 0.0:
+		for index in operators.size():
+			if operators[index].action_held(&"field_interact") and reboot_candidate(operators[index])>=0:
+				start_reboot(index)
+				break
 		return
 	var reviver := operators[reboot_from]
 	var downed := operators[reboot_target]
-	if not reboot_available() or reviver.health < reboot_health or reviver.controls_suspended or downed.health > 0.0 or reviver.global_position.distance_to(reboot_origin) > 0.65 or reviver.global_position.distance_to(downed.global_position) > 2.25:
+	var moved := (reviver.global_position-downed.global_position).distance_to(reboot_offset)>0.65
+	if not reboot_available() or not reviver.action_held(&"field_interact") or reviver.health<=0 or reviver.health < reboot_health or reviver.controls_suspended or downed.health > 0.0 or moved or reviver.global_position.distance_to(downed.global_position) > 2.25:
 		cancel_reboot()
 		return
 	reboot_left -= delta
 	if reboot_left <= 0.0:
-		var rank: int = reviver.quick_profile.rank(Profile.FIELD_REBOOT)
-		reboot_used = true
-		downed.lives = maxi(1, downed.lives)
-		restore_operator(downed, reviver.global_position, [0.35, 0.50, 0.70][rank - 1])
+		restore_operator(downed,downed.global_position,1.0,true)
 		cancel_reboot()
 		broadcast_state(true)
 
@@ -755,7 +782,7 @@ func collect_personal_totals(settle_loot := false) -> void:
 		var ledger := personal_rewards[index]
 		ledger.bolts += operator.credits
 		operator.credits = 0
-		if not settle_loot or operator.lives <= 0:
+		if not settle_loot or (operator.lives <= 0 and operator.health<=0):
 			continue
 		for id in operator.recovered_blueprints:
 			if not ledger.blueprints.has(id):
@@ -934,7 +961,7 @@ func receive_gate_relay_request(remote_act: int) -> void:
 		interact_gate_relay(operators[source])
 
 func check_campaign_progress() -> void:
-	var remaining := operators.filter(func(operator): return operator.lives > 0)
+	var remaining := operators.filter(func(operator): return operator.lives > 0 or operator.health>0)
 	if remaining.is_empty():
 		for index in range(1, roster.size()):
 			party_results[index] = [false, 0, 0, recovered_blueprint_ids(index), sector_seconds, {"operator_wiped": true, "party_wiped": true}]
@@ -970,11 +997,11 @@ func check_campaign_progress() -> void:
 				for index in operators.size():
 					if index != local_index:
 						var ledger := personal_rewards[index]
-						var wiped := operators[index].lives <= 0
+						var wiped := operators[index].lives <= 0 and operators[index].health<=0
 						var results := {"operator_wiped": true} if wiped else challenge_results(index)
 						party_results[index] = [not wiped, operators[index].experience, ledger.bolts, recovered_blueprint_ids(index), sector_seconds, results]
 						send_party_result(index)
-				var wiped := operators[local_index].lives <= 0
+				var wiped := operators[local_index].lives <= 0 and operators[local_index].health<=0
 				extracted_results = challenge_results(local_index) if not wiped else {}
 				var ledger := personal_rewards[local_index]
 				finish_mission(true, operators[local_index].experience, ledger.bolts, recovered_blueprint_ids(local_index), wiped)
@@ -1049,7 +1076,7 @@ func change_act(next: int) -> void:
 	await get_tree().create_timer(0.5, false).timeout
 	await loading.fade_out()
 	changing_act = false
-	if sector == 1 and act == 2 and operators[local_index].lives > 0:
+	if sector == 1 and act == 2 and operators[local_index].health > 0:
 		await choose_module()
 	show_field_briefing()
 
@@ -1102,6 +1129,7 @@ func build_hud() -> void:
 	layer.add_child(personal_hud)
 	personal_hud.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	personal_hud.show_quick_slots(local_profile)
+	build_revive_meter(layer)
 	var panel := PanelContainer.new()
 	panel.theme = UI.theme()
 	layer.add_child(panel)
@@ -1299,6 +1327,7 @@ func _physics_process(delta: float) -> void:
 		if not suit_reveal_playing and not is_instance_valid(module_chooser) and not is_instance_valid(field_briefing) and not resetting_arena:
 			sector_seconds += delta
 		tick_reboot(delta)
+		record_corpse_anchors(delta)
 		for index in range(1, operators.size()):
 			var remote: Dictionary = remote_players[roster[index]]
 			if remote.timeout > 0.0:
@@ -1499,7 +1528,7 @@ func broadcast_state(reliable_operators := false) -> void:
 		relay_lamps.append(maxi(0, relay.shown_power))
 	var foundry_state := foundry_boulders.map(func(rock): return rock.snapshot())
 	var boss_state := [Vector3.ZERO, Vector3.ZERO, 0.0, boss_started, boss_defeated, arena_door.lift(), platform_positions, entrance_open, checkpoint, factory_trap_clock, fractures, doors, relay_lamps, [], foundry_state, guards]
-	boss_state.append([reboot_used, reboot_from, reboot_target, reboot_left])
+	boss_state.append([reboot_used, reboot_from, reboot_target, reboot_left,reboot_duration])
 	boss_state.append(gate_relays.active)
 	if is_instance_valid(lava_escape):
 		boss_state.append(lava_escape.snapshot())
@@ -1518,7 +1547,7 @@ func broadcast_state(reliable_operators := false) -> void:
 		var snapshot := players.duplicate()
 		for other in players.size():
 			if other != index:
-				snapshot[other] = players[other].slice(0, 11) + [players[other][16], players[other][17]]
+				snapshot[other] = players[other].slice(0, 11) + [players[other][16], players[other][17], players[other].slice(20, 23)]
 		var totals := [personal_rewards[index].bolts, operators[index].recovered_blueprints.size(), sector_seconds, remote_players[roster[index]].input, operators[index].get_meta(&"coop_position_revision", 0)]
 		if reliable_operators:
 			peer.call_func_on(roster[index], receive_operators, act, snapshot, state_sequence, totals)
@@ -1539,6 +1568,7 @@ func receive_state(remote_act: int, security: PackedFloat32Array, arena: Array, 
 		reboot_from = arena[16][1]
 		reboot_target = arena[16][2]
 		reboot_left = arena[16][3]
+		if arena[16].size()>4: reboot_duration=arena[16][4]
 	if is_instance_valid(boss) and not boss_intro_active:
 		boss.global_position = arena[0]
 		boss.rotation = arena[1]
@@ -1578,6 +1608,7 @@ func receive_state(remote_act: int, security: PackedFloat32Array, arena: Array, 
 	repair_hall.motor.apply(arena[11][1], arena[11][2])
 	if arena[8] != remote_checkpoint:
 		remote_checkpoint = arena[8]
+		checkpoint = remote_checkpoint
 		for path_name in CHECKPOINT_PATHS:
 			var beacon := stage.get_node_or_null(path_name) as Node3D
 			if beacon and beacon.global_position.distance_to(remote_checkpoint - Vector3.UP * 0.88) < 0.15:
@@ -1661,6 +1692,11 @@ func receive_operators(remote_act: int, players: Array, sequence: int, rewards: 
 	else:
 		var projected: Vector3 = local_data[0] + local_data[10] * TICK
 		correction = (projected - local.global_position).limit_length(2.5)
+	# Once both simulations stop, compare their current resting positions. Reusing
+	# an older prediction sample here can push a stationary guest away from the
+	# server after rapid reversals and delayed acknowledgements.
+	if last_sent_axis.is_zero_approx() and local.grounded() and absf(local.velocity.x)<0.15 and absf(local_data[10].x)<0.15:
+		correction.x=clampf(local_data[0].x-local.global_position.x,-3.0,3.0)
 	apply_operator_state(local, local_data, true)
 	local.supplies = local_data[15].duplicate()
 	local.fire_lock = local_data[11]
@@ -1690,16 +1726,22 @@ func apply_operator_state(operator: RiftPlayer, data: Array, is_local: bool) -> 
 			operator.equip_sector_weapon("")
 		else:
 			operator.unlock_sector_weapon(data[6])
-	operator.visible = operator.health > 0.0
-	operator.experience = int(data[20]) if data.size() > 20 else team_xp
-	if data.size() > 21:
-		var effect: Vector4 = data[21]
+	if operator.health<=0:
+		operator.set_meta("coop_down",true)
+	else:
+		operator.remove_meta("coop_down")
+	preload("res://scripts/coop_corpse.gd").present(operator)
+	# Remote actors omit inventory/input detail but still need level, debuff and board visuals.
+	var presentation: Array = data.slice(20, 23) if data.size() > 22 else (data[13] if data.size() == 14 and data[13] is Array else [])
+	operator.experience = int(presentation[0]) if presentation.size() == 3 else team_xp
+	if presentation.size() == 3:
+		var effect: Vector4 = presentation[1]
 		operator.boss_debuff = int(effect.x)
 		operator.debuff_left = effect.y
 		operator.debuff_tick = effect.z
 		operator.shock_stun = effect.w
-	if data.size() > 22:
-		var board: Vector3 = data[22]
+	if presentation.size() == 3:
+		var board: Vector3 = presentation[2]
 		var previous_course := operator.rocket_course
 		operator.rocket_course = stage.get_node_or_null("TERRAIN/RocketCourse") if board.x > 0.0 else null
 		operator.rocket_speed = board.y
@@ -1759,6 +1801,9 @@ func _process(delta: float) -> void:
 			if enemy.visible and not enemy.global_position.is_equal_approx(enemy_targets[index]):
 				enemy.global_position = enemy.global_position.lerp(enemy_targets[index], blend)
 		presented_world = latest_state
+	for actor in operators:
+		preload("res://scripts/coop_corpse.gd").present(actor)
+	update_revive_meter()
 	var local := operators[local_index]
 	if not boss_intro_active and not changing_act and not suit_reveal_playing:
 		var previous_target := camera.target
@@ -1779,7 +1824,7 @@ func _process(delta: float) -> void:
 		var plate := nameplates[index]
 		var display_name := plate.text
 		var marker := reboot_markers[index]
-		marker.visible = index != local_index and operators[index].health <= 0.0 and reboot_available() and local_profile.rank(Profile.FIELD_REBOOT) > 0
+		marker.visible = index != local_index and operators[index].health <= 0.0 and reboot_available()
 		if marker.visible:
 			marker.global_position = operators[index].global_position + Vector3.UP * 1.2
 			marker.text = "REBOOTING" if reboot_target == index else "✚  " + display_name
@@ -1792,23 +1837,23 @@ func _process(delta: float) -> void:
 		var teammate := operators[index]
 		var offset := teammate.global_position.x - local.global_position.x
 		var status := "Nearby"
-		if teammate.lives <= 0:
-			status = "Out of lives"
-		elif teammate.health <= 0.0:
-			status = "Down"
+		if teammate.health <= 0.0:
+			status = "Down · revive available"
+		elif teammate.lives<=0:
+			status = "No spare lives"
 		elif not get_viewport().get_visible_rect().has_point(view.unproject_position(teammate.global_position)):
 			status = "%s %.0f m" % ["←" if offset < 0.0 else "→", absf(offset)]
 			display_name = "%s  %s" % [display_name, status]
 		update_teammate_status(index, display_name, status)
 	if local.health <= 0.0:
-		var down := "Out of lives / spectating" if local.lives <= 0 else ("Down / waiting for the team" if boss_started and not boss_defeated else "Respawning at checkpoint")
+		var down := "Waiting for a teammate to revive you" if local.lives <= 0 else ("Down / waiting for the team" if boss_started and not boss_defeated else "Respawning at checkpoint")
 		teammates.insert(0, down)
 	elif reboot_from == local_index:
 		teammates.insert(0, "Rebooting ally · stay close")
-	elif local_profile.rank(Profile.FIELD_REBOOT) > 0 and reboot_left <= 0.0 and reboot_candidate(local) >= 0:
+	elif reboot_left <= 0.0 and reboot_candidate(local) >= 0:
 		var key := RiftSettings.binding_label("field_interact", "key")
 		var pad := RiftSettings.binding_label("field_interact", "pad")
-		teammates.insert(0, "%s / %s  ·  Reboot ally" % [key, pad])
+		teammates.insert(0, "HOLD %s / %s  ·  Revive ally" % [key, pad])
 	partner_status.text = "\n".join(teammates)
 	partner_status.visible = not teammates.is_empty()
 
@@ -1832,7 +1877,7 @@ func challenge_results(index := 0) -> Dictionary:
 	var health := 100.0
 	var energy := 100.0
 	for operator in operators:
-		if operator.lives <= 0:
+		if operator.lives <= 0 and operator.health<=0:
 			continue
 		health = minf(health, 100.0 * operator.health / operator.max_health)
 		energy = minf(energy, 100.0 * operator.energy / operator.max_energy)
@@ -2006,7 +2051,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		open_pause()
 	elif event.is_action_pressed("field_interact") and not local_input_blocked():
 		var local := operators[local_index]
-		if local_profile.rank(Profile.FIELD_REBOOT) > 0 and reboot_candidate(local) >= 0:
+		if reboot_candidate(local) >= 0:
 			get_viewport().set_input_as_handled()
 			if host:
 				start_reboot(local_index)
@@ -2017,3 +2062,133 @@ func _unhandled_input(event: InputEvent) -> void:
 				get_viewport().set_input_as_handled()
 		else:
 			peer.call_func_on(peer.get_host(), receive_gate_relay_request, act)
+
+func build_revive_meter(layer: CanvasLayer) -> void:
+	revive_meter=ProgressBar.new()
+	layer.add_child(revive_meter)
+	revive_meter.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
+	revive_meter.offset_left=-200
+	revive_meter.offset_right=200
+	revive_meter.offset_top=-180
+	revive_meter.offset_bottom=-150
+	revive_meter.mouse_filter=Control.MOUSE_FILTER_IGNORE
+	revive_meter.theme=UI.theme()
+	var track := UI.frame(Color("081426"), UI.CYAN, 2)
+	track.set_content_margin_all(3)
+	var fill := StyleBoxFlat.new()
+	fill.bg_color=Color("55e7ff")
+	fill.set_corner_radius_all(4)
+	revive_meter.add_theme_stylebox_override("background",track)
+	revive_meter.add_theme_stylebox_override("fill",fill)
+	revive_meter.show_percentage=false
+	revive_meter.hide()
+	revive_caption=Label.new()
+	layer.add_child(revive_caption)
+	revive_caption.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
+	revive_caption.offset_left=-280
+	revive_caption.offset_right=280
+	revive_caption.offset_top=-215
+	revive_caption.offset_bottom=-182
+	revive_caption.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
+	revive_caption.add_theme_font_override("font",UI.DISPLAY)
+	revive_caption.add_theme_font_size_override("font_size",24)
+	revive_caption.add_theme_color_override("font_color",UI.CYAN)
+	revive_caption.add_theme_color_override("font_outline_color",Color("081426"))
+	revive_caption.add_theme_constant_override("outline_size",5)
+	revive_caption.mouse_filter=Control.MOUSE_FILTER_IGNORE
+	revive_caption.hide()
+
+func update_revive_meter() -> void:
+	if not is_instance_valid(revive_meter): return
+	revive_meter.visible=reboot_left>0 and (reboot_from==local_index or reboot_target==local_index)
+	revive_caption.visible=revive_meter.visible
+	if revive_meter.visible:
+		revive_meter.value=100.0*(1.0-reboot_left/maxf(reboot_duration,.1))
+		revive_caption.text="REVIVING TEAMMATE · %d%%"%revive_meter.value if reboot_from==local_index else "TEAMMATE IS REVIVING YOU"
+
+func record_corpse_anchors(delta: float) -> void:
+	for actor in operators:
+		if actor.health<=0:
+			if actor.has_meta(&"corpse_support"):
+				var support: Dictionary=actor.get_meta(&"corpse_support")
+				if is_instance_valid(support.body.get_ref()):
+					actor.global_position=support.body.get_ref().to_global(support.local)
+				else:
+					actor.global_position=corpse_anchor(actor,true)
+					bind_corpse_support(actor)
+			continue
+		if is_instance_valid(actor.rocket_course): continue
+		var entry: Dictionary=safe_corpses.get(actor.get_instance_id(),{})
+		entry.time=float(entry.get("time",0.0))+delta if actor.grounded() else 0.0
+		if actor.grounded() and entry.time>=.12:
+			entry.at=actor.global_position
+			for i in actor.get_slide_collision_count():
+				var hit:=actor.get_slide_collision(i)
+				if hit.get_normal().y>.65 and hit.get_collider() is Node3D:
+					entry.body=weakref(hit.get_collider())
+					entry.local=hit.get_collider().to_local(actor.global_position)
+					break
+		safe_corpses[actor.get_instance_id()]=entry
+
+func bind_corpse_support(actor: RiftPlayer) -> void:
+	actor.remove_meta(&"corpse_support")
+	var feet := actor.global_position-Vector3.UP*actor.standing_capsule.height*.5
+	var ignore: Array[RID]=[]
+	for other in operators: ignore.append(other.get_rid())
+	var ray := PhysicsRayQueryParameters3D.create(feet+Vector3.UP*.25,feet-Vector3.UP*.5,1,ignore)
+	var hit := actor.get_world_3d().direct_space_state.intersect_ray(ray)
+	if not hit.is_empty() and hit.collider is Node3D:
+		actor.set_meta(&"corpse_support",{"body":weakref(hit.collider),"local":hit.collider.to_local(actor.global_position)})
+
+func corpse_anchor(actor: RiftPlayer, pit: bool) -> Vector3:
+	var entry: Dictionary=safe_corpses.get(actor.get_instance_id(),{})
+	var places: Array[Vector3]=[]
+	if not pit: places.append(actor.global_position)
+	if entry.has("body") and is_instance_valid(entry.body.get_ref()):
+		places.append(entry.body.get_ref().to_global(entry.local))
+	if entry.has("at"): places.append(entry.at)
+	if boss_started and not boss_defeated:
+		places.append(gate.global_position+Vector3(3,.9,0))
+	else:
+		places.append(respawn_point())
+		places.append(stage.get_node("MARKERS/PlayerSpawn").global_position)
+	var ignore: Array[RID]=[]
+	for body in stage.get_node("Actors").get_children():
+		if body is CollisionObject3D: ignore.append(body.get_rid())
+	for place in places:
+		if boss_started and not boss_defeated and place.x<gate.global_position.x+1.0: continue
+		var ray:=PhysicsRayQueryParameters3D.create(place+Vector3.UP*1.3,place-Vector3.UP*5.0,1,ignore)
+		var floor_hit:=actor.get_world_3d().direct_space_state.intersect_ray(ray)
+		if not floor_hit.is_empty() and floor_hit.normal.y>.65:
+			return floor_hit.position+Vector3.UP*(actor.standing_capsule.height*.5+.04)
+	return places[-1]
+
+func activate_checkpoint(at: Vector3, path: String) -> void:
+	if not host or not CHECKPOINT_PATHS.has(path) or shared_checkpoints.has(path): return
+	var index:=CHECKPOINT_PATHS.find(path)
+	if index<checkpoint_index: return
+	checkpoint_index=index
+	checkpoint=at
+	shared_checkpoints[path]=at
+	announce_checkpoint(path)
+	peer.call_func(receive_checkpoint,act,path,at,true)
+	broadcast_state(true)
+
+func receive_checkpoint(remote_act: int,path: String,at: Vector3,notify:=true) -> void:
+	if host or remote_act!=act or peer.get_sender_id()!=peer.get_host() or not CHECKPOINT_PATHS.has(path) or not at.is_finite(): return
+	var station:=stage.get_node_or_null(path)
+	if not station: return
+	var fresh:=not shared_checkpoints.has(path)
+	shared_checkpoints[path]=at
+	station.online=true
+	var index:=CHECKPOINT_PATHS.find(path)
+	if index>=checkpoint_index:
+		checkpoint_index=index
+		checkpoint=at
+	if notify and fresh: announce_checkpoint(path)
+
+func announce_checkpoint(_path: String) -> void:
+	checkpoint_notices+=1
+	if is_instance_valid(personal_hud):
+		personal_hud.announce("CHECKPOINT · SQUAD RESPAWN UPDATED",Color("68efff"),32)
+	RiftAudio.play_effect(&"checkpoint")

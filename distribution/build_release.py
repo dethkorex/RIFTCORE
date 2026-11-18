@@ -193,6 +193,11 @@ def main() -> None:
             with game_zip.open("rb") as handle:
                 checksum = hashlib.file_digest(handle, "sha256").hexdigest()
             manifest["assets"][platform] = {"file": game_zip.name, "size": game_zip.stat().st_size, "sha256": checksum}
+
+            # Existing launchers reject packages over 512 MiB. Never publish an
+            # update manifest they cannot install; reduce packaged resources first.
+            if game_zip.stat().st_size > 512 * 1024 * 1024:
+                raise RuntimeError(f"{game_zip.name} exceeds the existing updater's 512 MiB limit.")
             print(f"Packaged {platform}: {game_zip.name}", flush=True)
             if platform == "windows-x64":
                 if not a.skip_windows_installer:

@@ -38,6 +38,10 @@ func run() -> void:
 	mission.apply_operator_state(actor,state,false)
 	check(actor.rocket_course==course and game.camera_rig.max_x>2800,"guest and rejoin snapshots restore course and camera bounds")
 	check(actor.velocity==Vector3(12,2,0),"remote board receives the rider's velocity for slope and thruster visuals")
+	actor.rocket_course=null
+	var compact: Array=state.slice(0,11)+[state[16],state[17],state.slice(20,23)]
+	mission.apply_operator_state(actor,compact,false)
+	check(actor.rocket_course==course,"compact teammate snapshots retain rocket-board visuals")
 	mission.free()
 	actor.velocity = Vector3(12,0,0)
 	var max_speed := 0.0

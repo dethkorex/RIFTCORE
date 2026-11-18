@@ -1,6 +1,6 @@
 # Frozen Reactor update
 
-Release target: Alpha 6.3.19, distributed through the existing Windows/Linux release and updater pipeline.
+Release target: Alpha 6.3.20, distributed through the existing Windows/Linux release and updater pipeline. The 6.3.19 build was cancelled before publication to include the requested co-op stress testing and fixes.
 
 - Rime Keeper and Cryo Warden use new textured Tripo meshes matching the approved navy, white and cyan concepts.
 - Rebuilt mechanical skeletons and rigid armor weights in Blender. Replaced deforming humanoid poses with constrained idle, walking, shooting, attack and cinematic poses. Chest armor, coolant tanks, cannon and shield stay rigid.

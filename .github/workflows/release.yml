@@ -53,6 +53,12 @@ jobs:
       - name: Verify release notes
         run: |
           python3 -c 'import json, pathlib; p=pathlib.Path("release-tools/artifacts"); assert json.loads((p / "update.json").read_text())["notes"] == (p / "PATCH_NOTES.md").read_text().strip()'
+      - name: Verify squad checkpoints and revival
+        run: |
+          for test in coop_revival coop_position frozen_sector; do
+            ./release-tools/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --fixed-fps 60 --script "res://tests/$test.gd" --log-file "$RUNNER_TEMP/$test.log"
+            ! grep -E 'SCRIPT ERROR:|^FAIL ' "$RUNNER_TEMP/$test.log"
+          done
       - name: Recover an interrupted Linux update
         run: |
           engine="$PWD/release-tools/Godot_v4.7.2-stable_linux.x86_64"
