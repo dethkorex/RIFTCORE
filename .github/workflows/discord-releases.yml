@@ -1,0 +1,30 @@
+name: Announce published changelogs
+on:
+  release:
+    types: [published]
+  workflow_run:
+    workflows: [Standalone playtest releases]
+    types: [completed]
+  schedule:
+    - cron: '12,42 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: riftcore-release-announcements
+  cancel-in-progress: false
+jobs:
+  announce:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          sparse-checkout: .github/scripts
+          persist-credentials: false
+      - name: Post and verify release notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DISCORD_PATCH_WEBHOOK: ${{ secrets.DISCORD_PATCH_WEBHOOK }}
+        run: python3 .github/scripts/announce_releases.py
