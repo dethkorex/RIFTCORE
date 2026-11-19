@@ -38,7 +38,8 @@ def main():
     feed_url = f"https://www.youtube.com/feeds/videos.xml?channel_id={CHANNEL}"
     with urlopen(Request(feed_url, headers={"User-Agent": "Riftcore-Notifier/1"}), timeout=25) as response:
         feed = ElementTree.parse(response).getroot()
-    if feed.tag != ATOM + "feed" or feed.findtext(YT + "channelId") != CHANNEL:
+    # YouTube sometimes omits the UC prefix on the feed itself.
+    if feed.tag != ATOM + "feed" or feed.findtext(YT + "channelId") not in (CHANNEL, CHANNEL[2:]):
         raise ValueError("Unexpected YouTube feed")
     entries = sorted(feed.findall(ATOM + "entry"), key=lambda entry: entry.findtext(ATOM + "published"))
     sent = 0
