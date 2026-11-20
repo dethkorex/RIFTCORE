@@ -1,6 +1,7 @@
 extends Control
 
 signal advanced
+signal lettering_changed(active: bool)
 
 const COMMS_CHIRP := preload("res://assets/audio/combat/comms_chirp.wav")
 const CHARACTERS_PER_SECOND := 48.0
@@ -15,6 +16,7 @@ var auto_advance := false
 var voice_pitch := 1.14
 var chirp: AudioStreamPlayer
 var last_chirp_at := 0
+var lettering := false
 
 func _ready() -> void:
 	chirp = AudioStreamPlayer.new()
@@ -34,20 +36,17 @@ func show_line(text: String, automatic := false) -> void:
 	body.text = text
 	body.visible_characters = 0
 	last_chirp_at = -CHIRP_SPACING
-	next.disabled = true
 	waiting = true
+	lettering = true
+	lettering_changed.emit(true)
 	writing = create_tween()
 	var duration := float(text.length()) / CHARACTERS_PER_SECOND
 	writing.tween_method(reveal, 0, text.length(), duration)
+	writing.tween_callback(finish_lettering)
 	if automatic:
 		next.hide()
 		writing.tween_interval(automatic_seconds(text) - duration)
 		writing.tween_callback(finish_line)
-	else:
-		writing.tween_callback(func():
-			next.disabled = false
-			next.grab_focus()
-		)
 	await advanced
 
 func reveal(count: int) -> void:
@@ -64,9 +63,20 @@ func reveal(count: int) -> void:
 			return
 
 func advance() -> void:
-	if not waiting or next.disabled or auto_advance:
+	if not waiting or auto_advance:
+		return
+	if lettering:
+		writing.kill()
+		body.visible_characters = -1
+		finish_lettering()
 		return
 	finish_line()
+
+func finish_lettering() -> void:
+	if lettering:
+		lettering = false
+		chirp.stop()
+		lettering_changed.emit(false)
 
 func skip() -> void:
 	skipped = true
@@ -75,7 +85,7 @@ func skip() -> void:
 
 func finish_line() -> void:
 	waiting = false
-	chirp.stop()
+	finish_lettering()
 	if writing and writing.is_running():
 		writing.kill()
 	advanced.emit()
@@ -86,7 +96,14 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventJoypadButton and event.pressed and event.button_index == JOY_BUTTON_START:
 		get_viewport().set_input_as_handled()
 		skip()
+	elif not auto_advance and event.is_action_pressed(&"ui_cancel"):
+		get_viewport().set_input_as_handled()
+		skip()
 	elif not auto_advance and event.is_action_pressed(&"ui_accept"):
 		get_viewport().set_input_as_handled()
 		if not event.is_echo():
-			advance()
+			var focused := get_viewport().gui_get_focus_owner() as Button
+			if focused and focused != next and focused.get_parent() == next.get_parent():
+				focused.pressed.emit()
+			else:
+				advance()

@@ -33,6 +33,7 @@ var hud_scale := 1.0
 var vibration := true
 var show_hub_tips := true
 var seen_hub_tips := PackedStringArray()
+var seen_story_beats := PackedStringArray()
 var last_operator_name := ""
 var startup_mode := ""
 var defaults: Dictionary = {}
@@ -50,6 +51,7 @@ func restore() -> void:
 	var data := ConfigFile.new()
 	last_operator_name = ""
 	startup_mode = ""
+	seen_story_beats = PackedStringArray()
 	if data.load(path) == OK:
 		for bus_name in volumes:
 			volumes[bus_name] = clampf(float(data.get_value("audio", bus_name, volumes[bus_name])), 0.0, 1.0)
@@ -72,6 +74,9 @@ func restore() -> void:
 		var seen: Variant = data.get_value("tutorial", "seen_stations", PackedStringArray())
 		if seen is PackedStringArray:
 			seen_hub_tips = seen
+		var beats: Variant = data.get_value("tutorial", "seen_story_beats", PackedStringArray())
+		if beats is PackedStringArray:
+			seen_story_beats = beats
 		var loaded = data.get_value("controls", "bindings", {})
 		if loaded is Dictionary:
 			bindings = loaded
@@ -101,9 +106,24 @@ func save() -> Error:
 	data.set_value("controls", "bindings", bindings)
 	data.set_value("tutorial", "enabled", show_hub_tips)
 	data.set_value("tutorial", "seen_stations", seen_hub_tips)
+	data.set_value("tutorial", "seen_story_beats", seen_story_beats)
 	data.set_value("player", "last_operator_name", last_operator_name)
 	data.set_value("player", "startup_mode", startup_mode)
 	return data.save(path)
+
+func claim_story_beat(key: String, previously_seen := false) -> bool:
+	if seen_story_beats.has(key):
+		return false
+	seen_story_beats.append(key)
+	var error := save()
+	if error != OK:
+		push_warning("Could not remember story dialogue (%s)." % error_string(error))
+	return not previously_seen
+
+func claim_deployment_briefing(profile: RefCounted, sector: int, act: int) -> bool:
+	# Keep legacy slot history, but save this visit even if the player loses the run before saving.
+	var previously_seen: bool = not profile.claim_briefing(sector, act)
+	return claim_story_beat("briefing_%d" % ((sector - 1) * 2 + act), previously_seen)
 
 func confirm_startup_choice(mode: String) -> void:
 	if startup_mode != mode:

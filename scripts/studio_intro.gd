@@ -8,6 +8,7 @@ const INTRO_SOUND := preload("res://assets/audio/dfg_intro.ogg")
 const AMBIENT := preload("res://assets/audio/dfg_ambient.ogg")
 const ART := preload("res://assets/ui/riftcore_title_art.png")
 const PORTRAIT := preload("res://assets/ui/rx07_menu.png")
+const PROLOGUE_SCRIPT := "res://scripts/campaign_prologue.gd"
 
 @onready var video: VideoStreamPlayer = $Video
 var wordmark: Label
@@ -149,6 +150,11 @@ func _process(delta: float) -> void:
 		bar.value = 1.0
 		percent.text = "100%"
 		await create_tween().tween_property(ambiance, "volume_db", -50.0, 0.38).finished
+		if RiftSettings.claim_story_beat("campaign_prologue"):
+			var prologue = load(PROLOGUE_SCRIPT).new()
+			prologue.name = "CampaignPrologue"
+			add_child(prologue)
+			await prologue.play()
 		get_tree().change_scene_to_packed(game)
 
 func _input(event: InputEvent) -> void:

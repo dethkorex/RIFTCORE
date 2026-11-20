@@ -1108,7 +1108,7 @@ func set_module(index: int, id: String) -> void:
 		operators[index].run_module = id
 
 func show_field_briefing() -> void:
-	if DisplayServer.get_name() == "headless" or not local_profile.claim_briefing(sector, act):
+	if DisplayServer.get_name() == "headless" or not RiftSettings.claim_deployment_briefing(local_profile, sector, act):
 		return
 	var dialogue := StoryDialogue.new()
 	field_briefing = dialogue

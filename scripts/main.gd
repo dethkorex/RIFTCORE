@@ -1228,7 +1228,8 @@ func select_save_slot(number: int, fresh: bool, operator_name := "") -> void:
 		account.save()
 	open_home_hub()
 	if fresh:
-		home_hub.materialize_operator("arrival")
+		var first_arrival := DisplayServer.get_name() != "headless" and RiftSettings.claim_story_beat("arrival")
+		home_hub.materialize_operator("arrival" if first_arrival else "")
 
 func reset_player_profile() -> void:
 	if not account or account.display_name.is_empty() or is_instance_valid(coop_mission):
@@ -1274,7 +1275,7 @@ func clear_deleted_operator(slot: int) -> void:
 		refresh_menu_save()
 
 func reconstruct_in_hub() -> void:
-	var first: bool = not profile.reconstruction_seen
+	var first := DisplayServer.get_name() != "headless" and RiftSettings.claim_story_beat("reconstruction", profile.reconstruction_seen)
 	await home_hub.materialize_operator("reconstruction" if first else "")
 	if first:
 		profile.reconstruction_seen = true
@@ -1504,7 +1505,7 @@ func play_deploy_intro() -> void:
 	deploying = false
 
 func play_deployment_briefing() -> void:
-	if DisplayServer.get_name() == "headless" or not profile.claim_briefing(sector, act):
+	if DisplayServer.get_name() == "headless" or not RiftSettings.claim_deployment_briefing(profile, sector, act):
 		return
 	player.invulnerable_time = maxf(player.invulnerable_time, 0.5)
 	await play_story_lines(Story.deployment(sector, act), "Begin Act")

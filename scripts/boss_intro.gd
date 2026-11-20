@@ -174,21 +174,32 @@ func make_charge(parent: Node3D, tint: Color, height: float, width: float) -> Py
 	return fire
 
 func play_dialogue(camera: Camera3D, boss: Combatant, head: Vector3, height: float, title: String, tint: Color, sector: int, act: int, online: bool) -> void:
-	if sector == 1 and boss.has_method("mechanic_preview_target"):
+	var hint := Story.foundry_boss_hint(act) if sector == 1 else Story.jungle_boss_hint(act) if sector == 2 else ""
+	var beat := "%d_%d" % [sector, act]
+	if not hint.is_empty() and RiftSettings.claim_story_beat("arena_hint_" + beat):
 		var boss_shot := camera.transform
-		var prop_focus: Vector3 = boss.mechanic_preview_target()
-		aim(camera, prop_focus, Vector3(1.4, 0.9, 5.7))
-		boss.show_intro_target(true)
-		await play_nova_hint(Story.foundry_boss_hint(act), online)
-		boss.show_intro_target(false)
+		var show_target := sector == 1 and boss.has_method("mechanic_preview_target")
+		if show_target:
+			var prop_focus: Vector3 = boss.mechanic_preview_target()
+			aim(camera, prop_focus, Vector3(1.4, 0.9, 5.7))
+			boss.show_intro_target(true)
+		await play_nova_hint(hint, online)
+		if show_target:
+			boss.show_intro_target(false)
 		camera.transform = boss_shot
-	elif sector == 2:
-		await play_nova_hint(Story.jungle_boss_hint(act), online)
+	elif online and not hint.is_empty():
+		await get_tree().create_timer(StoryDialogue.playback_seconds([["NOVA", hint]]), false).timeout
+	var exchange := Story.boss_exchange(sector, act)
+	if not RiftSettings.claim_story_beat("arena_story_" + beat):
+		# Players may have different tutorial histories. Keep the online intro duration shared.
+		if online:
+			await get_tree().create_timer(StoryDialogue.playback_seconds(exchange), false).timeout
+		return
 	var portrait := await capture_portrait(camera, head, height)
 	var dialogue := StoryDialogue.new()
 	dialogue.add_to_group(&"boss_dialogue")
 	add_child(dialogue)
-	await dialogue.play(Story.boss_exchange(sector, act), "Continue", online, title, portrait, tint, online)
+	await dialogue.play(exchange, "Continue", online, title, portrait, tint, online)
 	dialogue.queue_free()
 
 func play_nova_hint(hint: String, online: bool) -> void:

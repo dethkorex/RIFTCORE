@@ -1,7 +1,8 @@
-# RIFTCORE Alpha 6.3.22
+# RIFTCORE Alpha 6.3.23
 
-- Rebuilt all eight Operations Hub standing pads with segmented steel rims, inset lights and tread. Deploy has its own wider platform with a double cyan ring.
-- Each station's colored ring is visible as you approach. Standing on the pad activates the rising beam and expanding pulse.
-- Enlarged station signs and increased their lettering by 25%. The overhead Operations Station banner is also easier to read, and the terminal casings have a brushed-metal finish.
+- A new 95-second opening cinematic introduces Meridian in 2189, the Blackout, Dr. Voss, Dr. Soren, and RX-07’s first mission. It plays once on the first launch of this update and can be skipped.
+- Rewrote the story and dialogue across all 20 acts, including deployment briefings, boss encounters, recovered records, and endings.
+- Added animated dialogue portraits, new expressions for RX-07, and a friendly floating NOVA drone in Operations Station.
+- First-visit tutorials and boss hints stay completed when your operator is rebuilt or you start another run.
 
 Update through Launcher 0.2 or Settings → Update Game. Windows and Linux builds are available.

@@ -9,6 +9,7 @@ const AVATAR := preload("res://scenes/actors/riftcore_player.tscn")
 const WINDOW := preload("res://assets/hub/orbital_view.png")
 const STATION_PLATFORM := preload("res://assets/hub/station_platform.glb")
 const DEPLOYMENT_PLATFORM := preload("res://assets/hub/deployment_platform.glb")
+const NOVA_DRONE := preload("res://assets/hub/nova_drone.glb")
 const STATIONS := [
 	{"x": -18.0, "name": "System", "page": "Save Game", "color": Color("9cbbff"), "prop": "settings_terminal"},
 	{"x": -13.5, "name": "Profile", "page": "Player Profile", "color": Color("b6a3ff"), "prop": "save_terminal"},
@@ -37,6 +38,9 @@ var panel_open := false
 var pause_menu: PauseMenu
 var reconstructing := false
 var story: CanvasLayer
+var nova: Node3D
+var nova_iris: Node3D
+var nova_hover_time := 0.0
 const Story := preload("res://scripts/rift_story.gd")
 const StoryDialogue := preload("res://scripts/story_dialogue.gd")
 var pads: Array[Dictionary] = []
@@ -58,6 +62,11 @@ func _ready() -> void:
 	build_room()
 	for station in STATIONS:
 		build_pad(station)
+	nova = NOVA_DRONE.instantiate() as Node3D
+	nova.name = "NOVA"
+	nova.position = Vector3(-1.46, 1.92, -0.23)
+	add_child(nova)
+	nova_iris = nova.find_child("Iris", true, false) as Node3D
 	avatar = AVATAR.instantiate() as RiftPlayer
 	add_child(avatar)
 	avatar.position = Vector3(0, 1.11, 0)
@@ -188,6 +197,13 @@ func _physics_process(delta: float) -> void:
 	update_station()
 
 func _process(delta: float) -> void:
+	nova_hover_time += delta
+	nova.position.y = 1.92 + sin(nova_hover_time * 2.6) * 0.085
+	nova.rotation.y = lerpf(nova.rotation.y, clampf((avatar.position.x - nova.position.x) * 0.19, -0.48, 0.48), minf(1.0, delta * 4.0))
+	nova.rotation.z = sin(nova_hover_time * 2.6 + 1.2) * 0.10
+	if nova_iris:
+		var blink := maxf(0.0, 1.0 - absf(fposmod(nova_hover_time, 5.1) - 4.76) / 0.12)
+		nova_iris.scale.y = 1.0 - blink * 0.89
 	for id: int in partners:
 		var entry: Dictionary = partners[id]
 		var partner: RiftPlayer = entry.actor
