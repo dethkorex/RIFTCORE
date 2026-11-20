@@ -2,7 +2,7 @@ extends Control
 
 const UpdateClient := preload("res://update_client.gd")
 
-const LAUNCHER_BUILD := 4
+const LAUNCHER_BUILD := 5
 const SteamArtwork := preload("res://steam_artwork.gd")
 
 var client := UpdateClient.new()
@@ -15,6 +15,7 @@ var launcher_update := false
 var bundled_notes := ""
 var preview_channel := false
 var status: Label
+var build_label: Label
 var notes_title: Label
 var notes_body: RichTextLabel
 var update: Button
@@ -22,6 +23,7 @@ var play: Button
 var progress: ProgressBar
 var busy := false
 var resume_upgrade := false
+var checking := false
 
 func _ready() -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
@@ -33,6 +35,9 @@ func _ready() -> void:
 		repo = String(config.get_value("updates", "repository", ""))
 		preview_channel = config.get_value("updates", "preview_channel", false)
 	resume_upgrade = root_arg.has("--resume-upgrade")
+	for argument in root_arg:
+		if argument.begins_with("--cleanup-launcher="):
+			clean_launcher_download.call_deferred(argument.trim_prefix("--cleanup-launcher="))
 	if root_arg.has("--replace-launcher"):
 		var folder := OS.get_executable_path().get_base_dir()
 		if folder.get_file().begins_with("launcher-") and folder.get_base_dir().get_file() == "downloads":
@@ -60,8 +65,28 @@ func _ready() -> void:
 	if client.is_match(UpdateClient.REPO_PATTERN, repo):
 		check_updates()
 	else:
-		status.text = "Installed build %s  /  no release channel configured." % installed
-		show_fallback_notes("No release channel is configured for this installation.")
+		status.text = "No release channel is configured."
+		show_fallback_notes("")
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST:
+		client.cancel_download()
+
+func clean_launcher_download(folder: String) -> void:
+	if not client.is_match("^launcher-[0-9]+-[0-9]+$", folder):
+		return
+	var downloads := install_root.path_join("downloads")
+	var directory := DirAccess.open(downloads)
+	if directory == null or directory.is_link(folder):
+		return
+	var staging := DirAccess.open(downloads.path_join(folder))
+	if staging == null or staging.is_link(client.game_filename):
+		return
+	for attempt in 35:
+		if not staging.file_exists(client.game_filename) or staging.remove(client.game_filename) == OK:
+			directory.remove(folder)
+			return
+		await get_tree().create_timer(.12).timeout
 
 func _input(event: InputEvent) -> void:
 	if event is InputEventMouse:
@@ -98,12 +123,13 @@ func migrate_launcher(self_update := false) -> void:
 		DirAccess.rename_absolute(backup, target)
 		status.text = "The installed update settings could not be read."
 		return
-	config.set_value("updates", "preview_channel", true)
-	if config.save(config_path) != OK:
-		DirAccess.remove_absolute(target)
-		DirAccess.rename_absolute(backup, target)
-		status.text = "The update settings could not be saved. Check the installation permissions."
-		return
+	if not self_update:
+		config.set_value("updates", "preview_channel", true)
+		if config.save(config_path) != OK:
+			DirAccess.remove_absolute(target)
+			DirAccess.rename_absolute(backup, target)
+			status.text = "The update settings could not be saved. Check the installation permissions."
+			return
 	if OS.create_process(target, relaunched_arguments()) <= 0:
 		DirAccess.remove_absolute(target)
 		DirAccess.rename_absolute(backup, target)
@@ -116,78 +142,126 @@ func migrate_launcher(self_update := false) -> void:
 func relaunched_arguments() -> PackedStringArray:
 	if DisplayServer.get_name() == "headless":
 		return PackedStringArray(["--headless", "--quit-after", "60"])
-	return PackedStringArray(["--", "--resume-upgrade"])
+	var args := PackedStringArray(["--"])
+	if not OS.get_cmdline_user_args().has("--no-autoplay"):
+		args.append("--resume-upgrade")
+	var folder := OS.get_executable_path().get_base_dir().get_file()
+	if client.is_match("^launcher-[0-9]+-[0-9]+$", folder):
+		args.append("--cleanup-launcher=" + folder)
+	return args
 
 func build_ui() -> void:
 	var font_theme := Theme.new()
-	font_theme.default_font = preload("res://branding/BarlowCondensed-ExtraBoldItalic.ttf")
+	font_theme.default_font_size = 16
 	theme = font_theme
 	var shade := ColorRect.new()
-	shade.color = Color("091526")
+	shade.color = Color("070e1d")
+	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(shade)
 	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	var margins := MarginContainer.new()
 	add_child(margins)
 	margins.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	for side in ["left", "top", "right", "bottom"]:
-		margins.add_theme_constant_override("margin_" + side, 28)
-	var stack := VBoxContainer.new()
-	stack.add_theme_constant_override("separation", 14)
-	margins.add_child(stack)
+		margins.add_theme_constant_override("margin_" + side, 22)
+	var layout := VBoxContainer.new()
+	layout.add_theme_constant_override("separation", 16)
+	margins.add_child(layout)
+
+	var banner := PanelContainer.new()
+	banner.add_theme_stylebox_override("panel", panel_style(Color("111e34"), Color("45d9f4")))
+	layout.add_child(banner)
 	var header := HBoxContainer.new()
 	header.add_theme_constant_override("separation", 14)
-	stack.add_child(header)
-	add_brand_art(header, preload("res://branding/riftcore-icon.svg"), Vector2(92, 92))
-	add_brand_art(header, preload("res://branding/riftcore-wordmark.svg"), Vector2(400, 82))
-	var version := Label.new()
-	version.text = "LAUNCHER  0.2  /  BUILD %d" % LAUNCHER_BUILD
-	version.add_theme_color_override("font_color", Color("ff78cb"))
-	stack.add_child(version)
-	var description := Label.new()
-	description.text = FileAccess.get_file_as_string("res://branding/DESCRIPTION.txt").strip_edges()
-	description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	description.add_theme_color_override("font_color", Color("bfd8eb"))
-	stack.add_child(description)
-	stack.add_child(HSeparator.new())
-	status = Label.new()
-	status.text = "Checking for updates…"
-	status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	status.custom_minimum_size.y = 53
-	status.add_theme_color_override("font_color", Color("bfd8eb"))
-	stack.add_child(status)
+	banner.add_child(header)
+	add_brand_art(header, preload("res://branding/riftcore-icon.svg"), Vector2(56, 56))
+	add_brand_art(header, preload("res://branding/riftcore-wordmark.svg"), Vector2(280, 48))
+	var spacer := Control.new()
+	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.add_child(spacer)
+	var version := label(header, "Launcher 0.3", 18, Color("b3ccdf"), true)
+	version.autowrap_mode = TextServer.AUTOWRAP_OFF
+	version.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+
+	var columns := HBoxContainer.new()
+	columns.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	columns.add_theme_constant_override("separation", 14)
+	layout.add_child(columns)
+	var start := card(columns, Color("172a42"), Color("355974"))
+	start.custom_minimum_size.x = 270
+	label(start, "GAME STATUS", 23, Color("55e9ff"), true)
+	build_label = label(start, "", 16, Color("b3ccdf"))
+	refresh_build_label()
+	var splash := load("res://assets/ui/steam/hero.jpg") as Texture2D
+	if splash:
+		var art := TextureRect.new()
+		art.texture = splash
+		art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+		art.custom_minimum_size.y = 132
+		art.modulate = Color("b9c9dc")
+		art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		start.add_child(art)
+	start.add_child(HSeparator.new())
+	status = label(start, "Checking for updates…", 17, Color("e8f5ff"))
+	status.custom_minimum_size.y = 66
+
 	progress = ProgressBar.new()
-	progress.custom_minimum_size.y = 20
-	progress.add_theme_stylebox_override("fill", panel_style(Color("1db7d4"), Color("74efff")))
+	progress.custom_minimum_size.y = 18
+	progress.show_percentage = true
+	progress.add_theme_stylebox_override("background", panel_style(Color("0d1a2c"), Color("345573"), false))
+	progress.add_theme_stylebox_override("fill", panel_style(Color("13758e"), Color("50d0eb"), false))
 	progress.hide()
-	stack.add_child(progress)
-	var actions := HBoxContainer.new()
-	actions.add_theme_constant_override("separation", 12)
-	stack.add_child(actions)
-	play = launcher_button(actions, "Play installed", Color("21324b"), Color("637d99"))
+	start.add_child(progress)
+
+	var flexible := Control.new()
+	flexible.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	start.add_child(flexible)
+	play = launcher_button(start, "Play", Color("126484"), Color("5ce9fc"))
 	play.disabled = installed.is_empty()
 	play.pressed.connect(launch_game)
-	update = launcher_button(actions, "Update and play", Color("103b50"), Color("47e8ff"))
-	update.disabled = true
-	update.pressed.connect(apply_update)
-	var panel := PanelContainer.new()
-	panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	panel.add_theme_stylebox_override("panel", panel_style(Color("101e32"), Color("365d79")))
-	stack.add_child(panel)
-	var note_stack := VBoxContainer.new()
-	note_stack.add_theme_constant_override("separation", 6)
-	panel.add_child(note_stack)
-	notes_title = Label.new()
-	notes_title.add_theme_color_override("font_color", Color("47e8ff"))
-	note_stack.add_child(notes_title)
+	update = launcher_button(start, "Retry update", Color("182c45"), Color("577494"))
+	update.hide()
+	update.pressed.connect(check_updates)
+
+	var notes := card(columns, Color("101d31"), Color("34536e"))
+	notes.get_parent().size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	notes_title = label(notes, "PATCH NOTES", 23, Color("5be9fc"), true)
+	notes_title.autowrap_mode = TextServer.AUTOWRAP_OFF
+	notes.add_child(HSeparator.new())
 	notes_body = RichTextLabel.new()
 	notes_body.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	notes_body.add_theme_constant_override("line_separation", 7)
+	notes_body.add_theme_color_override("default_color", Color("e1eef9"))
 	notes_body.focus_mode = Control.FOCUS_ALL
-	notes_body.bbcode_enabled = false
 	notes_body.selection_enabled = true
-	note_stack.add_child(notes_body)
-	show_fallback_notes("Patch notes will appear after the release check.")
+	notes.add_child(notes_body)
+	show_fallback_notes("Checking the release channel…")
 	if not play.disabled:
 		play.grab_focus()
+
+func card(host: Container, fill: Color, border: Color) -> VBoxContainer:
+	var frame := PanelContainer.new()
+	frame.add_theme_stylebox_override("panel", panel_style(fill, border))
+	host.add_child(frame)
+	var content := VBoxContainer.new()
+	content.add_theme_constant_override("separation", 10)
+	frame.add_child(content)
+	return content
+
+func label(host: Container, title: String, size: int, color: Color, heading := false) -> Label:
+	var entry := Label.new()
+	entry.text = title
+	entry.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	entry.add_theme_font_size_override("font_size", size)
+	entry.add_theme_color_override("font_color", color)
+	if heading:
+		entry.add_theme_font_override("font", preload("res://branding/BarlowCondensed-ExtraBoldItalic.ttf"))
+	host.add_child(entry)
+	return entry
+
+func refresh_build_label() -> void:
+	build_label.text = "Installed  ·  %s" % (installed if not installed.is_empty() else "None")
 
 func show_fallback_notes(message: String) -> void:
 	show_notes(installed, bundled_notes if not bundled_notes.is_empty() else message)
@@ -222,12 +296,17 @@ func add_brand_art(host: Container, art: Texture2D, dimensions: Vector2) -> void
 	picture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	host.add_child(picture)
 
-func panel_style(fill: Color, border: Color) -> StyleBoxFlat:
+func panel_style(fill: Color, border: Color, padded := true) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
 	style.bg_color = fill
 	style.border_color = border
 	style.set_border_width_all(1)
 	style.border_width_left = 3
+	if padded:
+		style.content_margin_left = 14
+		style.content_margin_right = 14
+		style.content_margin_top = 10
+		style.content_margin_bottom = 10
 	style.corner_radius_top_right = 8
 	style.corner_radius_bottom_left = 8
 	return style
@@ -254,52 +333,59 @@ func _process(_delta: float) -> void:
 		progress.value = client.download_progress()
 
 func check_updates() -> void:
+	if checking or busy:
+		return
+	checking = true
+	play.disabled = true
+	update.hide()
+	status.text = "Checking for updates…"
 	var manifest: Variant = await client.fetch_manifest()
+	checking = false
 	if manifest == null:
-		show_fallback_notes("Patch notes are unavailable offline.")
-		status.text = "Update server unavailable. You can still play installed."
+		show_fallback_notes("Connect to check for new versions and patch notes.")
+		fail_update("Couldn't reach the update server. Try again when you're online." if installed.is_empty() else
+			"Update server unavailable. Your installed game is ready to play.")
 		return
 	apply_manifest(manifest)
 
 func apply_manifest(info: Variant) -> void:
-	if not info is Dictionary or not info.get("assets", {}) is Dictionary:
-		status.text = "Invalid release manifest."
+	if not info is Dictionary:
+		fail_update("The update server returned an invalid release.")
 		return
 	var tag := String(info.get("tag", ""))
 	if tag == UpdateClient.LEGACY_MIGRATION_TAG:
-		show_fallback_notes("The launcher migration is complete. Game updates are available on the preview channel.")
-		status.text = "Play your installed game or check again when the preview channel is available."
-		return
-	if client.package_entry(info).is_empty():
-		status.text = "This release does not have a valid package for your platform."
+		fail_update("Waiting for the preview release channel.")
 		return
 	if not installed.is_empty() and client.compare_tags(installed, tag):
-		status.text = "%s is newer than the public release." % installed
+		status.text = "%s is ready." % installed
+		play.disabled = false
+		play.grab_focus()
+		return
+	if client.package_entry(info).is_empty():
+		fail_update("The newest release has no valid game package for this platform.")
 		return
 	var latest_notes = info.get("notes", "")
 	if latest_notes is String and not latest_notes.is_empty():
 		show_notes(tag, latest_notes)
 	else:
-		show_fallback_notes("No patch notes were published for this build.")
+		show_fallback_notes("")
 	launcher_update = int(client.launcher_entry(info).get("build", 0)) > LAUNCHER_BUILD
-	if not client.compare_tags(tag, installed) and not launcher_update:
-		status.text = "%s is up to date." % installed
-		if resume_upgrade:
-			launch_game()
-		return
-	next_tag = tag
-	update_manifest = info
-	status.text = "%s is available. Installed: %s." % [tag, installed if not installed.is_empty() else "none"]
-	update.disabled = false
-	if resume_upgrade:
-		resume_upgrade = false
+	if client.compare_tags(tag, installed) or launcher_update:
+		next_tag = tag
+		update_manifest = info
 		apply_update()
+		return
+	status.text = "Ready to play. Your game is up to date."
+	play.disabled = false
+	play.grab_focus()
+	if resume_upgrade:
+		launch_game()
 
 func apply_update() -> void:
 	if busy or next_tag.is_empty():
 		return
 	busy = true
-	update.disabled = true
+	update.hide()
 	play.disabled = true
 	progress.show()
 	progress.value = 0
@@ -307,8 +393,11 @@ func apply_update() -> void:
 	if launcher_update:
 		status.text = "Updating the launcher…"
 		var replacement := await client.stage_launcher(update_manifest)
-		if replacement.is_empty() or OS.create_process(replacement, PackedStringArray(["--", "--replace-launcher"])) <= 0:
-			fail_update("Could not update the launcher. You can still play installed.")
+		var arguments := PackedStringArray(["--", "--replace-launcher"])
+		if not resume_upgrade:
+			arguments.append("--no-autoplay")
+		if replacement.is_empty() or OS.create_process(replacement, arguments) <= 0:
+			fail_update("Couldn't install the launcher update.")
 			return
 		get_tree().quit()
 		return
@@ -317,18 +406,28 @@ func apply_update() -> void:
 		fail_update(error)
 		return
 	installed = next_tag
+	refresh_build_label()
 	busy = false
-	launch_game()
+	progress.hide()
+	play.disabled = false
+	play.grab_focus()
+	status.text = "Ready to play. Your game is up to date."
+	if resume_upgrade:
+		launch_game()
 
 func fail_update(message: String) -> void:
 	busy = false
 	progress.hide()
 	play.disabled = installed.is_empty()
-	update.disabled = false
+	update.show()
+	if play.disabled:
+		update.grab_focus()
+	else:
+		play.grab_focus()
 	status.text = message
 
 func launch_game() -> void:
-	if installed.is_empty():
+	if busy or installed.is_empty():
 		return
 	if not client.start_version(installed):
 		fail_update("The installed game could not launch. Check its file permissions and dependencies.")

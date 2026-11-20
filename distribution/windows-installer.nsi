@@ -1,8 +1,8 @@
 Unicode true
-Name "RIFTCORE Installer 0.2"
-VIProductVersion "0.2.0.0"
+Name "RIFTCORE Installer 0.3"
+VIProductVersion "0.3.0.0"
 VIAddVersionKey /LANG=1033 "ProductName" "RIFTCORE Installer"
-VIAddVersionKey /LANG=1033 "FileVersion" "0.2.0"
+VIAddVersionKey /LANG=1033 "FileVersion" "0.3.0"
 VIAddVersionKey /LANG=1033 "FileDescription" "RIFTCORE Installer and Updater"
 VIAddVersionKey /LANG=1033 "LegalCopyright" "RIFTCORE"
 OutFile "${OUTPUT}"
@@ -20,6 +20,7 @@ SetCompressor /SOLID lzma
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
 !define MUI_FINISHPAGE_RUN "$INSTDIR\RIFTCORE.exe"
+!define MUI_FINISHPAGE_RUN_TEXT "Open RIFTCORE and download the newest build"
 !define MUI_FINISHPAGE_SHOWREADME "$INSTDIR\RIFTCORE.exe"
 !define MUI_FINISHPAGE_SHOWREADME_NOTCHECKED
 !define MUI_FINISHPAGE_SHOWREADME_TEXT "Open Steam's Add a Non-Steam Game dialog"
@@ -39,7 +40,7 @@ FunctionEnd
 Section "RIFTCORE Playtest" Main
   SetShellVarContext current
   SetOutPath "$INSTDIR"
-  File /r "${PAYLOAD_MASK}"
+  File /r /x versions "${PAYLOAD_MASK}"
   FileOpen $0 "$INSTDIR\riftcore.install" w
   FileWrite $0 "RIFTCORE playtest installation"
   FileClose $0

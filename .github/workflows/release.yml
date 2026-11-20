@@ -56,10 +56,12 @@ jobs:
           fi
           tag="$PREVIEW_TAG"
           if [ "$REF_TYPE" = tag ]; then tag="$REF_NAME"; fi
-          python3 distribution/build_release.py --engine release-tools/Godot_v4.7.2-stable_linux.x86_64             --templates release-tools/templates --licenses release-tools --nsis /usr/bin/makensis             --work release-tools/build --out release-tools/artifacts --tag "$tag" --repo "$RELEASE_REPO"
+          bridge=()
+          if [ "$tag" = v6.3.26-preview ]; then bridge+=(--require-legacy-manifest); fi
+          python3 distribution/build_release.py --engine release-tools/Godot_v4.7.2-stable_linux.x86_64             --templates release-tools/templates --licenses release-tools --nsis /usr/bin/makensis             --work release-tools/build --out release-tools/artifacts --tag "$tag" --repo "$RELEASE_REPO" "${bridge[@]}"
       - name: Verify release notes
         run: |
-          python3 -c 'import json, pathlib; p=pathlib.Path("release-tools/artifacts"); assert json.loads((p / "update.json").read_text())["notes"] == (p / "PATCH_NOTES.md").read_text().strip()'
+          python3 -c 'import json, pathlib; p=pathlib.Path("release-tools/artifacts"); assert json.loads(next(p.glob("update*.json")).read_text())["notes"] == (p / "PATCH_NOTES.md").read_text().strip()'
       - name: Preserve build diagnostics
         if: failure()
         uses: actions/upload-artifact@v4
@@ -73,18 +75,22 @@ jobs:
             ./release-tools/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --fixed-fps 60 --script "res://tests/$test.gd" --log-file "$RUNNER_TEMP/$test.log"
             ! grep -E 'SCRIPT ERROR:|^FAIL ' "$RUNNER_TEMP/$test.log"
           done
+      - name: Verify the Launcher 0.3 download and offline fallback
+        run: python3 distribution/verify_launcher.py release-tools/Godot_v4.7.2-stable_linux.x86_64
       - name: Recover an interrupted Linux update
         run: |
           engine="$PWD/release-tools/Godot_v4.7.2-stable_linux.x86_64"
           "$engine" --headless --path "$PWD" --script "$PWD/distribution/verify_update.gd" -- "$PWD/release-tools/artifacts/RIFTCORE-linux-x64.zip" "$RUNNER_TEMP/in-game update QA"
-      - name: Install and smoke-test Linux build
+      - name: Install and smoke-test the Linux launcher
         run: |
           export XDG_DATA_HOME="$(mktemp -d)"
-          ./release-tools/artifacts/RIFTCORE-Linux-x64-Setup.run
-          build="$(find "$XDG_DATA_HOME/riftcore/versions" -name RIFTCORE -type f | head -1)"
-          test -x "$build"
-          "$build" --headless --quit-after 100 --log-file "$RUNNER_TEMP/riftcore-smoke.log"
-          ! grep -E 'SCRIPT ERROR:|Failed to load' "$RUNNER_TEMP/riftcore-smoke.log"
+          ./release-tools/artifacts/RIFTCORE-Linux-x64-Setup.run --no-launch
+          base="$XDG_DATA_HOME/riftcore"
+          test -x "$base/RIFTCORE"
+          test -z "$(find "$base/versions" -type f)"
+          printf '[updates]\nrepository=""\n' > "$base/updates.cfg"
+          "$base/RIFTCORE" --headless --quit-after 100 --log-file "$RUNNER_TEMP/installer-launcher-smoke.log"
+          ! grep -E 'SCRIPT ERROR:|Failed to load' "$RUNNER_TEMP/installer-launcher-smoke.log"
           test -s release-tools/artifacts/RIFTCORE-Windows-x64-Setup.exe
       - name: Play the packaged Linux co-op mission
         run: |
@@ -162,13 +168,12 @@ jobs:
           $setup = Start-Process -FilePath (Join-Path $PWD 'RIFTCORE-Windows-x64-Setup.exe') -ArgumentList '/S' -Wait -PassThru
           if ($setup.ExitCode -ne 0) { exit $setup.ExitCode }
           $installation = Join-Path $env:LOCALAPPDATA 'RIFTCORE'
-          $tag = (Get-Content -Raw update.json | ConvertFrom-Json).tag
-          foreach ($relative in @('RIFTCORE.exe', "versions/$tag/RIFTCORE.exe")) {
-            $binary = Join-Path $installation $relative
-            $log = Join-Path $env:RUNNER_TEMP ('installed-' + $relative.Replace('/', '-') + '.log')
-            $launch = Start-Process -FilePath $binary -ArgumentList @('--headless', '--quit-after', '120', '--log-file', ('"' + $log + '"')) -Wait -PassThru
-            if ($launch.ExitCode -ne 0 -or !(Test-Path -LiteralPath $log) -or (Select-String -LiteralPath $log -Pattern 'SCRIPT ERROR:|Failed to load' -Quiet)) { exit 1 }
-          }
+          $launcher = Join-Path $installation 'RIFTCORE.exe'
+          if (!(Test-Path $launcher) -or (Test-Path (Join-Path $installation 'versions'))) { exit 1 }
+          Set-Content (Join-Path $installation 'updates.cfg') "[updates]`nrepository=`"`""
+          $log = Join-Path $env:RUNNER_TEMP 'installed-launcher.log'
+          $launch = Start-Process -FilePath $launcher -ArgumentList @('--headless', '--quit-after', '120', '--log-file', ('"' + $log + '"')) -Wait -PassThru
+          if ($launch.ExitCode -ne 0 -or !(Test-Path -LiteralPath $log) -or (Select-String -LiteralPath $log -Pattern 'SCRIPT ERROR:|Failed to load' -Quiet)) { exit 1 }
       - name: Start the exported Windows build and check Social
         shell: pwsh
         run: |
@@ -237,8 +242,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
-          title="RIFTCORE ${RELEASE_TAG#v} and Installer 0.2"
-          if [[ "$RELEASE_TAG" =~ ^v([0-9]+\.[0-9]+)\.0-preview$ ]]; then title="RIFTCORE Alpha ${BASH_REMATCH[1]} and Installer 0.2"; fi
+          title="RIFTCORE ${RELEASE_TAG#v} and Launcher 0.3"
+          if [[ "$RELEASE_TAG" =~ ^v([0-9]+\.[0-9]+)\.0-preview$ ]]; then title="RIFTCORE Alpha ${BASH_REMATCH[1]} and Launcher 0.3"; fi
           gh release create --repo "${{ github.repository }}" "$RELEASE_TAG" release-tools/artifacts/* --verify-tag --notes-file release-tools/artifacts/PATCH_NOTES.md --title "$title" --prerelease --latest=false
       - name: Publish tagged release
         if: github.ref_type == 'tag' && !endsWith(github.ref_name, '-preview')

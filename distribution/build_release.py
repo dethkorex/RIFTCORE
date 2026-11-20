@@ -21,6 +21,8 @@ STEAM_RUNTIME = {
     "linux-x64": ["libgodotsteam.linux.template_release.x86_64.so", "libsteam_api.so"],
 }
 LICENSES = ["GODOT_LICENSE.txt", "GODOT_COPYRIGHT.txt"]
+LEGACY_PACKAGE_LIMIT = 512 * 1024 * 1024
+PACKAGE_LIMIT = 1024 * 1024 * 1024
 
 
 @contextlib.contextmanager
@@ -74,11 +76,14 @@ def export(engine: Path, project: Path, preset: str, destination: Path, log: Pat
         raise RuntimeError(f"Export did not produce {destination}")
 
 
-def linux_payload(payload: Path, target: tarfile.TarFile, prefix: str = "") -> None:
+def linux_payload(payload: Path, target: tarfile.TarFile, prefix: str = "", *, include_versions: bool = True) -> None:
     for child in sorted(payload.rglob("*")):
         if not child.is_file():
             continue
-        info = target.gettarinfo(str(child), arcname=prefix + child.relative_to(payload).as_posix())
+        relative = child.relative_to(payload)
+        if not include_versions and relative.parts[0] == "versions":
+            continue
+        info = target.gettarinfo(str(child), arcname=prefix + relative.as_posix())
         info.uid = info.gid = 0
         info.uname = info.gname = ""
         info.mode = 0o755 if child.name in {"RIFTCORE", "start-riftcore", "install.sh"} else 0o644
@@ -91,7 +96,7 @@ def linux_installer(payload: Path, out: Path) -> None:
     with out.open("wb") as dst:
         dst.write(script.rstrip(b"\n") + b"\n")
         with tarfile.open(fileobj=dst, mode="w:gz", compresslevel=6) as tar:
-            linux_payload(payload, tar)
+            linux_payload(payload, tar, include_versions=False)
     out.chmod(0o755)
 
 
@@ -126,6 +131,7 @@ def main() -> None:
     cli.add_argument("--licenses", type=Path, required=True)
     cli.add_argument("--nsis", type=Path, required=True)
     cli.add_argument("--skip-windows-installer", action="store_true")
+    cli.add_argument("--require-legacy-manifest", action="store_true")
     cli.add_argument("--work", type=Path, required=True)
     cli.add_argument("--out", type=Path, required=True)
     cli.add_argument("--tag", default="v0.1.0")
@@ -157,6 +163,7 @@ def main() -> None:
     migration_notes = "Update and play upgrades Launcher 0.1 in place, then opens Launcher 0.2 and checks the playtest channel. Existing saves, game versions and shortcuts are retained."
     migration = {"tag": "v0.4.100", "assets": {}, "notes": migration_notes}
     manifest = {"tag": a.tag, "assets": {}, "launcher": {}, "notes": notes}
+    legacy_manifest = True
     launcher_build = int(re.search(r"const LAUNCHER_BUILD := (\d+)", (launcher / "launcher.gd").read_text(encoding="utf-8"))[1])
     (out / "PATCH_NOTES.md").write_text(notes + "\n", encoding="utf-8")
     with zipfile.ZipFile(out / "RIFTCORE-Steam-Artwork.zip", "w", compression=zipfile.ZIP_DEFLATED) as archive:
@@ -202,10 +209,12 @@ def main() -> None:
                 checksum = hashlib.file_digest(handle, "sha256").hexdigest()
             manifest["assets"][platform] = {"file": game_zip.name, "size": game_zip.stat().st_size, "sha256": checksum}
 
-            # Existing launchers reject packages over 512 MiB. Never publish an
-            # update manifest they cannot install; reduce packaged resources first.
-            if game_zip.stat().st_size > 512 * 1024 * 1024:
-                raise RuntimeError(f"{game_zip.name} exceeds the existing updater's 512 MiB limit.")
+            if game_zip.stat().st_size > PACKAGE_LIMIT:
+                raise RuntimeError(f"{game_zip.name} exceeds the updater's 1 GiB limit.")
+            if game_zip.stat().st_size > LEGACY_PACKAGE_LIMIT:
+                legacy_manifest = False
+                if a.require_legacy_manifest:
+                    raise RuntimeError(f"{game_zip.name} must fit the 0.2 updater for this upgrade.")
             print(f"Packaged {platform}: {game_zip.name}", flush=True)
             if platform == "windows-x64":
                 if not a.skip_windows_installer:
@@ -219,7 +228,12 @@ def main() -> None:
                     linux_payload(payload, tar, "RIFTCORE/")
     (migration_dir / "update.json").write_text(json.dumps(migration, indent=2) + "\n", encoding="utf-8")
     (migration_dir / "PATCH_NOTES.md").write_text(migration_notes + "\n", encoding="utf-8")
-    (out / "update.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    # Launcher 0.2 sees only update.json. Keeping a compatible bridge under
+    # that name lets it upgrade even after a larger release is published.
+    for name in ("update.json", "update-v2.json"):
+        (out / name).unlink(missing_ok=True)
+    name = "update.json" if legacy_manifest else "update-v2.json"
+    (out / name).write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
 
 
 if __name__ == "__main__":

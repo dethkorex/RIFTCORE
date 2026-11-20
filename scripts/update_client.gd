@@ -1,6 +1,8 @@
 extends Node
 
-const MAX_PACKAGE := 512 * 1024 * 1024
+const MAX_PACKAGE := 1024 * 1024 * 1024
+const LEGACY_MANIFEST := "update.json"
+const LARGE_MANIFEST := "update-v2.json"
 const REPO_PATTERN := "^[A-Za-z0-9][A-Za-z0-9-]{0,38}/[A-Za-z0-9_.-]{1,90}$"
 const TAG_PATTERN := "^v[0-9]{1,5}[.][0-9]{1,5}[.][0-9]{1,5}(-preview)?$"
 const LEGACY_MIGRATION_TAG := "v0.4.100"
@@ -15,6 +17,7 @@ var game_filename := "RIFTCORE.exe" if OS.get_name() == "Windows" else "RIFTCORE
 var target_platform := "windows-x64" if OS.get_name() == "Windows" else "linux-x64"
 var transfer: HTTPRequest
 var expected_bytes := 0
+var download_path := ""
 
 func configure_game() -> String:
 	var folder := OS.get_executable_path().get_base_dir()
@@ -69,12 +72,20 @@ func select_release(releases: Variant) -> String:
 		if not release is Dictionary or release.get("draft", false):
 			continue
 		var tag := String(release.get("tag_name", ""))
-		if not is_match(TAG_PATTERN, tag) or not compare_tags(tag, best):
+		if (not preview_channel and tag.ends_with("-preview")) or not is_match(TAG_PATTERN, tag) or not compare_tags(tag, best):
 			continue
-		var assets = release.get("assets", [])
-		if assets is Array and assets.any(func(asset): return asset is Dictionary and asset.get("name", "") == "update.json"):
+		if not manifest_file(release).is_empty():
 			best = tag
 	return best
+
+func manifest_file(release: Dictionary) -> String:
+	var assets: Variant = release.get("assets", [])
+	if not assets is Array:
+		return ""
+	for name in [LARGE_MANIFEST, LEGACY_MANIFEST]:
+		if assets.any(func(asset): return asset is Dictionary and asset.get("name") == name):
+			return name
+	return ""
 
 func get_json(url: String, budget: int, headers := PackedStringArray()) -> Variant:
 	var request := HTTPRequest.new()
@@ -93,15 +104,17 @@ func get_json(url: String, budget: int, headers := PackedStringArray()) -> Varia
 func fetch_manifest() -> Variant:
 	if not is_match(REPO_PATTERN, repo):
 		return null
-	if not preview_channel:
-		return await get_json("https://github.com/%s/releases/latest/download/update.json" % repo, 32768)
 	var releases: Variant = await get_json("https://api.github.com/repos/%s/releases?per_page=20" % repo,
 		1024 * 1024, PackedStringArray(["Accept: application/vnd.github+json"]))
 	var tag := select_release(releases)
-	if tag.is_empty():
-		return null
-	var manifest: Variant = await get_json(release_url(tag, "update.json"), 32768)
-	return manifest if manifest is Dictionary and manifest.get("tag") == tag else null
+	if not tag.is_empty():
+		for release in releases:
+			if release is Dictionary and release.get("tag_name") == tag:
+				var manifest: Variant = await get_json(release_url(tag, manifest_file(release)), 32768)
+				return manifest if manifest is Dictionary and manifest.get("tag") == tag else null
+	if not preview_channel:
+		return await get_json("https://github.com/%s/releases/latest/download/%s" % [repo, LEGACY_MANIFEST], 32768)
+	return null
 
 func release_url(tag: String, file_name: String) -> String:
 	return "https://github.com/%s/releases/download/%s/%s" % [repo, tag, file_name]
@@ -147,6 +160,7 @@ func stage_launcher(info: Dictionary) -> String:
 		return ""
 	var path := folder.path_join(game_filename)
 	if not await download_verified(String(info.tag), entry, path):
+		DirAccess.remove_absolute(folder)
 		return ""
 	if OS.get_name() != "Windows" and FileAccess.set_unix_permissions(path, 493) != OK:
 		return ""
@@ -174,8 +188,9 @@ func install(info: Dictionary) -> String:
 
 func download_verified(tag: String, entry: Dictionary, path: String) -> bool:
 	transfer = HTTPRequest.new()
+	download_path = path
 	transfer.download_file = path
-	transfer.timeout = 900.0
+	transfer.timeout = 2400.0
 	transfer.body_size_limit = MAX_PACKAGE
 	expected_bytes = entry.size
 	add_child(transfer)
@@ -184,11 +199,18 @@ func download_verified(tag: String, entry: Dictionary, path: String) -> bool:
 		response = await transfer.request_completed
 	transfer.queue_free()
 	transfer = null
+	download_path = ""
 	var valid: bool = not response.is_empty() and response[0] == HTTPRequest.RESULT_SUCCESS and response[1] == 200
 	valid = valid and FileAccess.file_exists(path) and FileAccess.get_size(path) == entry.size and FileAccess.get_sha256(path) == entry.sha256
 	if not valid and FileAccess.file_exists(path):
 		DirAccess.remove_absolute(path)
 	return valid
+
+func cancel_download() -> void:
+	if is_instance_valid(transfer):
+		transfer.cancel_request()
+	if not download_path.is_empty() and FileAccess.file_exists(download_path):
+		DirAccess.remove_absolute(download_path)
 
 func prune_versions(current: String) -> void:
 	var versions := install_root.path_join("versions")
