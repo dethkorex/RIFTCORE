@@ -88,6 +88,8 @@ func scale_for_sector(sector: int, act: int, health_scale: float, mode: int) -> 
 	second_act = act == 2
 	var steps := maxi(0, sector - 1)
 	max_health = [40.0, 55.0, 95.0, 60.0, 35.0][variant] * (1.0 + 0.30 * steps) * (1.32 if second_act else 1.0) * health_scale
+	if is_in_group(&"spillway_patrol"):
+		max_health *= .66
 	move_speed = PATROL_SPEEDS[variant] * Difficulty.enemy_speed_scale(sector, mode)
 	health = max_health
 	var extra_levels := enemy_level - Difficulty.recommended_level(sector, Difficulty.NORMAL)
@@ -358,7 +360,8 @@ func damage_on_contact(body: RiftPlayer) -> void:
 	if contact_lock > 0.0 or health <= 0.0:
 		return
 	contact_lock = 0.8
-	body.take_damage(14.0 * sector_damage_scale, global_position)
+	var contact_damage := 7.0 if is_in_group(&"spillway_patrol") else 14.0
+	body.take_damage(contact_damage * sector_damage_scale, global_position)
 
 func prepare_shot() -> void:
 	var origin := global_position + Vector3(direction * 0.66, 0.13, 0.0)
@@ -391,6 +394,8 @@ func fire_at_player() -> void:
 		elif detachment_sector == 3 or patrol_model == 5:
 			shot.speed *= .82
 		shot.damage = (15.0 if variant == Variant.HEAVY else 9.0) * sector_damage_scale
+		if is_in_group(&"spillway_patrol"):
+			shot.damage *= .55
 		var role: int = variant if patrol_model < 0 else mini(patrol_model+1, 7)
 		var style := sector_number if patrol_model < 0 else 0
 		shot.setup(locked_aim.rotated(Vector3.BACK, float(angle)), faction, tint, false, variant == Variant.HEAVY, false, style, role)
@@ -428,6 +433,8 @@ func spawn_pickup(scene: PackedScene, at: Vector3, temporary: bool, anchor: Stat
 	host.add_child.call_deferred(pickup)
 
 func lower_death_limit() -> float:
+	if has_meta("pit_floor_y"):
+		return float(get_meta("pit_floor_y"))
 	var stage := get_parent_node_3d().get_parent_node_3d()
 	return float(stage.get_meta("pit_floor_y", -3.4)) - 0.6 if stage else -4.0
 

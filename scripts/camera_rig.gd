@@ -32,5 +32,6 @@ func snap_to_target() -> void:
 		global_position = target_position()
 
 func target_position() -> Vector3:
-	return Vector3(clampf(target.global_position.x + target.facing * look_ahead, min_x, max_x), maxf(minimum_follow_y, target.global_position.y + 0.35), 0.0)
+	var lead := 6.6 if is_instance_valid(target.rocket_course) else look_ahead
+	return Vector3(clampf(target.global_position.x + target.facing * lead, min_x, max_x), maxf(minimum_follow_y, target.global_position.y + 0.35), 0.0)
 

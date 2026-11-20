@@ -60,8 +60,8 @@ const FIELD_ADVICE := [
 
 const ACT_TWO_ADVICE := [
 	"Step on the lower gallery's pressure plate to open the return shutter. Break the cracked wall beyond it.",
-	"Hold up between vines and jump at the front of each swing. One relay is past the crossing. The ferry leads to the other.",
-	"Hold up at the board beside the beacon. Finish the spillway to activate Relay A. Brake left, crouch under gates, and hold jump after boosts to glide.",
+	"Jump near the front of the swing to reach the high vine. Drop onto the low leaf to line up the last grab. One relay is past the crossing, and the ferry leads to the other.",
+	"Hold up by the rocket board. Hop the floor spikes, crouch through the gates, and hold jump after each boost. The spillway exit activates Relay A.",
 	"Stay clear of the pressure bursts. When the Kraken exposes its core, hit it with Frost Lance.",
 	"Cipher disappears under the sand. Save Tidal Arc for when it comes back up.",
 	"Line up Data Lance as Aerowyrm starts its pass. You've got a better shot before it climbs away.",

@@ -1,8 +1,8 @@
-# RIFTCORE Alpha 6.3.23
+# RIFTCORE Alpha 6.3.24
 
-- A new 95-second opening cinematic introduces Meridian in 2189, the Blackout, Dr. Voss, Dr. Soren, and RX-07’s first mission. It plays once on the first launch of this update and can be skipped.
-- Rewrote the story and dialogue across all 20 acts, including deployment briefings, boss encounters, recovered records, and endings.
-- Added animated dialogue portraits, new expressions for RX-07, and a friendly floating NOVA drone in Operations Station.
-- First-visit tutorials and boss hints stay completed when your operator is rebuilt or you start another run.
+- Frozen Reactor Act II has a new two-minute Rocket Spillway with 21 gaps, floor spikes, overhead gates, and 15 enemy patrols.
+- Rocket board jumps stay close to the track. Boost pads carry you over the widest breaks, and the HUD warns you about the next obstacle.
+- Fire while riding, collect repair pickups along the way, and finish the course to activate Gate Relay A for your squad.
+- Machine Jungle has new ledges and staggered vine heights, with a low landing that sets up the last swing in Act II.
 
 Update through Launcher 0.2 or Settings → Update Game. Windows and Linux builds are available.

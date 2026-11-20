@@ -18,6 +18,8 @@
 
 [ext_resource type="PackedScene" path="res://assets/pickups/health_large.tscn" id="health_large"]
 
+[ext_resource type="PackedScene" path="res://assets/pickups/health_small.tscn" id="spillway_repair"]
+
 [ext_resource type="PackedScene" path="res://assets/neon_factory/checkpoint_beacon.tscn" id="checkpoint_beacon"]
 
 [ext_resource type="PackedScene" path="res://assets/neon_factory/deployment_pad.tscn" id="deployment_pad"]
@@ -778,6 +780,17 @@ position = Vector3(800,0,0)
 script = ExtResource("RocketCourse")
 
 
+[node name="SpillwayRepairIntake" parent="TERRAIN" instance=ExtResource("spillway_repair")]
+position = Vector3(1382, -28.7, 0)
+
+
+[node name="SpillwayRepairCondensers" parent="TERRAIN" instance=ExtResource("spillway_repair")]
+position = Vector3(2219, -56.7, 0)
+
+
+[node name="SpillwayRepairDischarge" parent="TERRAIN" instance=ExtResource("spillway_repair")]
+position = Vector3(2896, -104.5, 0)
+
 [node name="DECOR" type="Node3D" parent="."]
 
 [node name="MidpointCheckpoint" type="Area3D" parent="TERRAIN"]
@@ -981,6 +994,119 @@ position = Vector3(374.12, -2.54, 0)
 patrol_right_limit = 564.837
 detachment_sector = 3
 patrol_model = 2
+
+[node name="SpillwaySkater01" parent="Actors" groups=["level_enemies", "spillway_patrol"] instance=ExtResource("scout")]
+position = Vector3(933, -12.300, 0)
+collision_layer = 2
+metadata/pit_floor_y = -19.500
+patrol_left_limit = 930.20
+patrol_right_limit = 935.80
+
+
+[node name="SpillwaySentry02" parent="Actors" groups=["level_enemies", "spillway_patrol"] instance=ExtResource("turret")]
+position = Vector3(1060, -14.100, 0)
+collision_layer = 2
+metadata/pit_floor_y = -21.300
+planted_override = true
+
+
+[node name="SpillwayWisp03" parent="Actors" groups=["level_enemies", "spillway_patrol"] instance=ExtResource("flyer")]
+position = Vector3(1193, -14.180, 0)
+collision_layer = 2
+metadata/pit_floor_y = -22.500
+patrol_left_limit = 1190.20
+patrol_right_limit = 1195.80
+
+
+[node name="SpillwaySentry04" parent="Actors" groups=["level_enemies", "spillway_patrol"] instance=ExtResource("turret")]
+position = Vector3(1290, -9.300, 0)
+collision_layer = 2
+metadata/pit_floor_y = -16.500
+planted_override = true
+
+
+[node name="SpillwaySkater05" parent="Actors" groups=["level_enemies", "spillway_patrol"] instance=ExtResource("scout")]
+position = Vector3(1416, -29.300, 0)
+collision_layer = 2
+metadata/pit_floor_y = -36.500
+patrol_left_limit = 1413.20
+patrol_right_limit = 1418.80
+
+
+[node name="SpillwayWisp06" parent="Actors" groups=["level_enemies", "spillway_patrol"] instance=ExtResource("flyer")]
+position = Vector3(1643, -22.347, 0)
+collision_layer = 2
+metadata/pit_floor_y = -30.667
+patrol_left_limit = 1640.20
+patrol_right_limit = 1645.80
+
+
+[node name="SpillwaySentry07" parent="Actors" groups=["level_enemies", "spillway_patrol"] instance=ExtResource("turret")]
+position = Vector3(1764, -50.300, 0)
+collision_layer = 2
+metadata/pit_floor_y = -57.500
+planted_override = true
+
+
+[node name="SpillwayWisp08" parent="Actors" groups=["level_enemies", "spillway_patrol"] instance=ExtResource("flyer")]
+position = Vector3(1926, -40.180, 0)
+collision_layer = 2
+metadata/pit_floor_y = -48.500
+patrol_left_limit = 1923.20
+patrol_right_limit = 1928.80
+
+
+[node name="SpillwaySkater09" parent="Actors" groups=["level_enemies", "spillway_patrol"] instance=ExtResource("scout")]
+position = Vector3(2067, -66.300, 0)
+collision_layer = 2
+metadata/pit_floor_y = -73.500
+patrol_left_limit = 2064.20
+patrol_right_limit = 2069.80
+
+
+[node name="SpillwaySentry10" parent="Actors" groups=["level_enemies", "spillway_patrol"] instance=ExtResource("turret")]
+position = Vector3(2179, -58.888, 0)
+collision_layer = 2
+metadata/pit_floor_y = -66.088
+planted_override = true
+
+
+[node name="SpillwaySentry11" parent="Actors" groups=["level_enemies", "spillway_patrol"] instance=ExtResource("turret")]
+position = Vector3(2475, -84.300, 0)
+collision_layer = 2
+metadata/pit_floor_y = -91.500
+planted_override = true
+
+
+[node name="SpillwaySkater12" parent="Actors" groups=["level_enemies", "spillway_patrol"] instance=ExtResource("scout")]
+position = Vector3(2618, -74.300, 0)
+collision_layer = 2
+metadata/pit_floor_y = -81.500
+patrol_left_limit = 2615.20
+patrol_right_limit = 2620.80
+
+
+[node name="SpillwaySentry13" parent="Actors" groups=["level_enemies", "spillway_patrol"] instance=ExtResource("turret")]
+position = Vector3(2842, -109.300, 0)
+collision_layer = 2
+metadata/pit_floor_y = -116.500
+planted_override = true
+
+
+[node name="SpillwayWisp14" parent="Actors" groups=["level_enemies", "spillway_patrol"] instance=ExtResource("flyer")]
+position = Vector3(3086, -117.380, 0)
+collision_layer = 2
+metadata/pit_floor_y = -125.700
+patrol_left_limit = 3083.20
+patrol_right_limit = 3088.80
+
+
+[node name="SpillwaySkater15" parent="Actors" groups=["level_enemies", "spillway_patrol"] instance=ExtResource("scout")]
+position = Vector3(3130, -129.300, 0)
+collision_layer = 2
+metadata/pit_floor_y = -136.500
+patrol_left_limit = 3127.20
+patrol_right_limit = 3132.80
 
 [node name="CameraRig" type="Node3D" parent="."]
 position = Vector3(0, 1.35, 0)
@@ -4831,4 +4957,4 @@ cave_roof = 23.3500
 arena = true
 
 [node name="GateRelay1" type="Marker3D" parent="MARKERS"]
-position = Vector3(2844,-108,0)
+position = Vector3(3264, -130, 0)

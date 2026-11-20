@@ -16,18 +16,21 @@ func _ready() -> void:
 	add_to_group(&"jungle_canopy_route")
 	make_launch_bloom()
 	if practice:
-		make_bough(Vector3(2.8, 1.4, -2.8), Vector3(4.5, 6.35, -0.8), 0.58)
-		hang_vine(Vector3(4.5, 6.35, 0.0), 3.45)
-		make_leaf_deck(Vector3(10.25, 3.40, 0.0), 4.3)
+		make_bough(Vector3(2.5, 1.4, -3.1), Vector3(4.7, 7.15, -0.8), 0.58)
+		hang_vine(Vector3(4.7, 7.15, 0.0), 3.55)
+		make_leaf_deck("LowerNurseryLeaf", Vector3(6.55, 1.65, 0.0), 2.7)
+		make_leaf_deck("NurseryRelayLeaf", Vector3(10.25, 3.40, 0.0), 4.3)
 	else:
 		make_bough(Vector3(1.0, -1.9, -3.9), Vector3(5.3, 7.10, -0.8), 0.78)
-		make_bough(Vector3(5.3, 7.10, -0.8), Vector3(15.3, 8.45, -0.8), 0.56)
-		make_bough(Vector3(15.3, 8.45, -0.8), Vector3(25.3, 9.5, -0.8), 0.46)
-		make_bough(Vector3(32.4, 1.0, -3.1), Vector3(25.3, 9.5, -0.8), 0.43)
+		make_bough(Vector3(5.3, 7.10, -0.8), Vector3(15.8, 9.60, -0.8), 0.55)
+		make_bough(Vector3(15.8, 9.60, -0.8), Vector3(22.6, 6.66, -2.0), 0.45)
+		make_bough(Vector3(21.7, 1.5, -3.0), Vector3(22.7, 3.71, -0.85), 0.42)
+		make_bough(Vector3(32.4, 1.0, -3.1), Vector3(27.15, 9.12, -0.8), 0.48)
 		hang_vine(Vector3(5.3, 7.10, 0.0), 4.0)
-		hang_vine(Vector3(15.3, 8.45, 0.0), 4.15)
-		hang_vine(Vector3(25.3, 9.5, 0.0), 4.0)
-		make_leaf_deck(Vector3(33.7, 5.7, 0.0), 5.0)
+		hang_vine(Vector3(15.8, 9.60, 0.0), 4.0)
+		hang_vine(Vector3(27.15, 9.12, 0.0), 4.4)
+		make_leaf_deck("RootPerch", Vector3(22.7, 3.85, 0.0), 3.0)
+		make_leaf_deck("CanopyLanding", Vector3(33.7, 5.7, 0.0), 5.0)
 		make_mist()
 	make_instructions()
 	set_physics_process(not practice)
@@ -73,8 +76,9 @@ func make_launch_bloom() -> void:
 	var glow := RiftProjectile.add_glow(self, PAD_TINT, 1.65)
 	glow.position.y = 0.55
 
-func make_leaf_deck(at: Vector3, width: float) -> void:
+func make_leaf_deck(deck_name: String, at: Vector3, width: float) -> void:
 	var floor := StaticBody3D.new()
+	floor.name = deck_name
 	floor.position = at
 	floor.add_to_group(&"factory_one_way")
 	add_child(floor)
@@ -126,7 +130,7 @@ func make_instructions() -> void:
 	prompt.pixel_size = 0.0065
 	prompt.modulate = Color("e6ffac")
 	prompt.position = Vector3(-0.25, 2.18, -0.86)
-	prompt.text = "CANOPY LIFT\nHold Up to grab a vine · Jump to release" if practice else "CANOPY ESCAPE\nHold Up to grab · Jump at the forward swing"
+	prompt.text = "CANOPY LIFT\nHold Up to grab a vine · Jump to release" if practice else "CANOPY ESCAPE\nRise to the high vine · Use the low leaf to line up the last grab"
 	add_child(prompt)
 
 func launch_rider(operator: CharacterBody3D) -> void:

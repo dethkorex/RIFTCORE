@@ -232,6 +232,10 @@ func _ready() -> void:
 		slide_pose.set("clips", animation_player)
 		slide_pose.influence = 0.0
 		skeleton.add_child(slide_pose)
+		var board_pose := preload("res://scripts/rocket_board_pose.gd").new()
+		board_pose.actor = self
+		board_pose.influence = 0.0
+		skeleton.add_child(board_pose)
 		if buster_pose:
 			skeleton.move_child(buster_pose, -1)
 		install_suit_meshes(skeleton)
@@ -1294,8 +1298,9 @@ func shoot(charged := false, pose_held := false, suit_shot := false) -> void:
 		restore_energy(-suit_shot_cost())
 	var aim := facing
 	if buster_pose:
-		buster_pose.ladder_direction = aim if is_instance_valid(ladder) else 0.0
-		buster_pose.crouched = low_profile and is_zero_approx(buster_pose.ladder_direction)
+		var climbing := is_instance_valid(ladder)
+		buster_pose.ladder_direction = aim if climbing or is_instance_valid(rocket_course) else 0.0
+		buster_pose.crouched = low_profile and not climbing
 		buster_pose.influence = 1.0 if pose_held else 0.7
 	if health <= 0.0:
 		return
@@ -1305,6 +1310,9 @@ func shoot(charged := false, pose_held := false, suit_shot := false) -> void:
 		if health <= 0.0 or wall_sliding:
 			return
 	var muzzle := cannon_muzzle(aim)
+	if is_instance_valid(rocket_course):
+		# Match the shallow combat lane while the board turns the model across the track.
+		muzzle = Vector3(global_position.x + aim * .74, minf(muzzle.y, global_position.y + .09), global_position.z)
 	if not special.is_empty():
 		launch_reward_weapon(muzzle, aim, charged, special)
 	elif thorn:
@@ -1774,10 +1782,10 @@ func play_ground_locomotion(axis: float, speed: float, top_speed: float) -> void
 
 func update_character_visuals(axis: float) -> void:
 	if is_instance_valid(rocket_course):
-		if model_root:
-			model_root.rotation = Vector3(0,PI*.5,0)
 		if buster_pose:
-			buster_pose.influence = 0.0
+			buster_pose.ladder_direction = facing
+			buster_pose.crouched = low_profile
+			buster_pose.influence = 1.0 if fire_lock > 0.0 or charge_held else 0.0
 		play_character_animation("crouch" if low_profile else "idle")
 		return
 	var bracing := wall_sliding and not grounded() and dash_left <= 0.0 and melee_lock <= 0.0
@@ -1845,7 +1853,8 @@ func defense_rating() -> float:
 	return 1.0 - (1.0 - defense_for_experience(experience)) * (1.0 - armor_resistance) * (1.0 - supply_bonus("defense")) * (1.0 - last_stand)
 
 func take_damage(amount: float, source_position := Vector3.ZERO) -> void:
-	if receive_hit(amount, source_position):
+	# A patrol hit costs health without changing a mounted rider's jump timing.
+	if receive_hit(amount, source_position) and not is_instance_valid(rocket_course):
 		var away := signf(global_position.x - source_position.x)
 		velocity.x = (away if away != 0.0 else -facing) * 5.4 * contact_recoil_scale
 		velocity.y = 2.9 * contact_recoil_scale

@@ -1,11 +1,18 @@
 @tool
 extends Node3D
 
-enum Piece { ICE_PLATFORM, GRIP_PLATFORM, ICICLES, COOLANT_PUMP, ROCKET_BOARD, JUMP_PAD, SPIKE_GATE }
+enum Piece {
+	ICE_PLATFORM, GRIP_PLATFORM, ICICLES, COOLANT_PUMP, ROCKET_BOARD, JUMP_PAD, SPIKE_GATE,
+	SPIKE_RACK, GAP_BEACON,
+}
 
 const ICE := preload("res://assets/campaign/frozen_reactor/kit/ice.tres")
 const SNOW := preload("res://assets/campaign/frozen_reactor/kit/snow.tres")
 const CHAMFER := preload("res://scripts/factory_chamfer.gd")
+const GATE_WIDTH := 3.2
+const GATE_CLEARANCE := 1.94
+const GATE_TOP := 5.35
+const RACK_HEIGHT := 1.02
 @export var piece: Piece
 @export var width := 5.0
 var metal: StandardMaterial3D
@@ -59,7 +66,7 @@ func _ready() -> void:
 			for x in [-.91,.89]:
 				box(self,Vector3(x,.085,0),Vector3(.49,.075,.56),ceramic)
 			box(self,Vector3(.02,.085,0),Vector3(.56,.04,.61),metal)
-			for x in [-.48,.37]:
+			for x in [-.43,.43]:
 				box(self,Vector3(x,.11,0),Vector3(.33,.045,.55),paint(Color("101e2b"),.1))
 				for ridge in 4:
 					box(self,Vector3(x+(ridge-1.5)*.065,.139,0),Vector3(.025,.014,.46),metal)
@@ -101,30 +108,70 @@ func _ready() -> void:
 				var flame := mesh(nozzle,jet,light,Vector3(-1.18,-.055,side*.32))
 				flame.scale = Vector3(3.5,.65,.65)
 		Piece.JUMP_PAD:
-			box(self,Vector3(0,.10,0),Vector3(2.4,.20,3.2),metal)
-			for i in 4:
-				var bar := box(self,Vector3((i-1.5)*.42,.23,0),Vector3(.12,.06,2.5),light)
-				bar.rotation.z = .20
+			box(self, Vector3(0, .075, 0), Vector3(3.1, .15, 3.2), metal)
+			box(self, Vector3(0, .095, 0), Vector3(2.9, .15, 2.66), ceramic)
+			for x in [-.90, 0.0, .90]:
+				for side in [-1, 1]:
+					var chevron := box(self, Vector3(x, .18, side * .46), Vector3(1.11, .04, .13), light)
+					chevron.rotation.y = side * .65
+					box(self, Vector3(x, .09, side * 1.59), Vector3(.48, .11, .12), light)
 		Piece.SPIKE_GATE:
-			box(self,Vector3(0,2.0,-1.8),Vector3(2.8,4.0,.28),metal)
-			box(self,Vector3(0,4.55,0),Vector3(2.8,4.24,3.6),metal)
-			for side in [-1,1]:
-				box(self,Vector3(side*1.21,3.80,1.84),Vector3(.21,2.45,.14),ceramic)
-			for row in 5:
-				box(self,Vector3(0,2.84+row*.39,1.83),Vector3(2.2,.20,.10),paint(Color("274557"),.45))
-			box(self,Vector3(0,2.40,1.85),Vector3(2.35,.16,.15),ceramic)
-			for i in 6:
-				var caution := box(self,Vector3((i-2.5)*.36,2.40,1.94),Vector3(.16,.12,.025),paint(Color("fcb660"),.15))
-				caution.rotation.z = -.34
-			for i in 8:
-				var spike := CylinderMesh.new()
-				spike.top_radius = .12
-				spike.bottom_radius = .005
-				spike.height = .28
-				spike.radial_segments = 8
-				mesh(self,spike,SNOW,Vector3((i-3.5)*.34,2.29,1.90))
-			for side in [-1,1]:
-				box(self,Vector3(side*1.24,2.5,1.84),Vector3(.13,.66,.07),paint(Color("ff9745"),.1,.7))
+			build_pressure_gate()
+		Piece.SPIKE_RACK:
+			build_spike_rack()
+		Piece.GAP_BEACON:
+			build_gap_beacon()
+
+func build_pressure_gate() -> void:
+	var caution := paint(Color("ff994d"), .36, .42)
+	var socket := paint(Color("0c1e2f"), .68)
+	var underside := GATE_CLEARANCE + .62
+	var frame_height := GATE_TOP - underside
+	box(self, Vector3(0, 2.72, -1.92), Vector3(GATE_WIDTH, 5.44, .41), metal)
+	box(self, Vector3(0, underside + frame_height * .5, 0), Vector3(GATE_WIDTH, frame_height, 3.72), metal)
+	box(self, Vector3(0, underside + .13, 1.90), Vector3(GATE_WIDTH-.26, .26, .22), ceramic)
+	box(self, Vector3(0, 3.62, 1.89), Vector3(2.45, 1.42, .20), socket)
+	for row in 4:
+		box(self, Vector3(0, 3.15 + row*.30, 2.01), Vector3(2.03, .12, .11), ceramic)
+	for side in [-1, 1]:
+		box(self, Vector3(side*1.34, 3.74, 1.93), Vector3(.28, 2.35, .30), ceramic)
+		box(self, Vector3(side*1.34, underside + .46, 2.10), Vector3(.13, .51, .06), caution)
+	var tooth := spike_mesh(.62, .15, true)
+	for column in 8:
+		var x := (column - 3.5) * .36
+		var stripe := box(self, Vector3(x, underside + .13, 2.025), Vector3(.15, .16, .04), caution)
+		stripe.rotation.z = -.42
+		for z in [-1.32, 0.0, 1.32]:
+			mesh(self, tooth, ceramic, Vector3(x, GATE_CLEARANCE + .31, z))
+
+func build_spike_rack() -> void:
+	var caution := paint(Color("ff9b46"), .53, .51)
+	box(self, Vector3(0, .08, 0), Vector3(width, .16, 3.48), metal)
+	box(self, Vector3(0, .21, 0), Vector3(width-.10, .15, 3.22), ceramic)
+	var count := maxi(4, roundi(width / .45))
+	var tooth := spike_mesh(RACK_HEIGHT - .23, .17, false)
+	for index in count:
+		var x := ((index + .5) / count - .5) * width
+		for z in [-1.18, -.40, .40, 1.18]:
+			mesh(self, tooth, ceramic, Vector3(x, (RACK_HEIGHT + .23)*.5, z))
+		box(self, Vector3(x, .19, 1.76), Vector3(.26, .14, .09), caution)
+
+func build_gap_beacon() -> void:
+	var amber := paint(Color("ffc27a"), .25, 1.05)
+	box(self, Vector3(-.29, -.15, 0), Vector3(.66, .30, 3.69), metal)
+	box(self, Vector3(-.27, .024, 0), Vector3(.25, .052, 3.45), amber)
+	for side in [-1, 1]:
+		box(self, Vector3(-.30, -.49, side*1.72), Vector3(.42, .65, .24), ceramic)
+		box(self, Vector3(-.08, -.37, side*1.73), Vector3(.054, .23, .13), amber)
+
+func spike_mesh(height: float, radius: float, down: bool) -> CylinderMesh:
+	var spike := CylinderMesh.new()
+	spike.height = height
+	spike.radial_segments = 6
+	spike.rings = 0
+	spike.top_radius = radius if down else .008
+	spike.bottom_radius = .008 if down else radius
+	return spike
 
 static func paint(color: Color, metal: float, glow := 0.0) -> StandardMaterial3D:
 	var surface := StandardMaterial3D.new()

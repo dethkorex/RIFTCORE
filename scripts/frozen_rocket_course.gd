@@ -1,20 +1,30 @@
 extends Node3D
 ## Authored coolant spillway. All movement goes through the rider's CharacterBody.
 const KIT := preload("res://scripts/frozen_kit.gd")
-const LENGTH := 2040.0
+const ROUTE := preload("res://scripts/rocket_spillway_route.gd")
+const LENGTH := ROUTE.LENGTH
 const MAX_SPEED := 20.0
-const HOVER_HEIGHT := .50
-const GATE_CLEARANCE := 2.15
+const HOVER_HEIGHT := .49
+const JUMP_SPEED := 5.35
+const PAD_LAUNCH_SPEED := 7.25
+const MAX_BOOST_HEIGHT := 2.4
+const HELD_ASCENT_GRAVITY := 12.0
+const GLIDE_GRAVITY := 8.0
+const FALL_GRAVITY := 27.0
 const MINIMUM_SECONDS := LENGTH / MAX_SPEED
-const PATH := [Vector2(0,0),Vector2(35,0),Vector2(120,-18),Vector2(190,-18),Vector2(270,-8),Vector2(330,-8),Vector2(420,-32),Vector2(480,-32),Vector2(550,-12),Vector2(620,-12),Vector2(710,-44),Vector2(770,-44),Vector2(850,-26),Vector2(920,-26),Vector2(1010,-58),Vector2(1080,-58),Vector2(1160,-38),Vector2(1225,-38),Vector2(1320,-76),Vector2(1390,-76),Vector2(1470,-48),Vector2(1540,-48),Vector2(1630,-94),Vector2(1700,-94),Vector2(1790,-68),Vector2(1860,-68),Vector2(1950,-108),Vector2(2040,-108)]
-const GAPS := [Vector2(360,386),Vector2(805,833),Vector2(1120,1150),Vector2(1590,1618),Vector2(1810,1844)]
-const GATES := [155.0,305.0,455.0,590.0,745.0,895.0,1050.0,1200.0,1360.0,1510.0,1690.0,1990.0]
-const PADS := [345.0,790.0,1105.0,1575.0,1795.0]
+const PATH := ROUTE.GRADE
+const GAPS := ROUTE.HOP_GAPS + ROUTE.BOOST_GAPS
+const GATES := ROUTE.OVERHEAD
+const SPIKES := ROUTE.SPIKES
+const WARNING_DISTANCE := 36.0
+
 var dock := Vector3(235,1.25,0)
 var return_at := Vector3(243,2.15,0)
 var stage: Node3D
 var boards := {}
 var readout: Label
+var pads: Array[float] = []
+var warnings: Array[Dictionary] = []
 
 func _ready() -> void:
 	stage = get_parent().get_parent()
@@ -47,10 +57,7 @@ func _ready() -> void:
 	readout.hide()
 
 func ground_height(x: float) -> float:
-	for i in range(1,PATH.size()):
-		if x <= PATH[i].x:
-			return lerpf(PATH[i-1].y,PATH[i].y,clampf(inverse_lerp(PATH[i-1].x,PATH[i].x,x),0,1))
-	return PATH[-1].y
+	return ROUTE.surface_at(x)
 
 func in_gap(x: float) -> bool:
 	for gap in GAPS:
@@ -65,6 +72,15 @@ func build_track() -> void:
 	for gap in GAPS:
 		cuts.append(gap.x)
 		cuts.append(gap.y)
+		kit_piece(KIT.Piece.GAP_BEACON, Vector3(gap.x, ground_height(gap.x), 0))
+		var receiving_lip := kit_piece(KIT.Piece.GAP_BEACON, Vector3(gap.y, ground_height(gap.y), 0))
+		receiving_lip.rotation.y = PI
+	for gap in ROUTE.HOP_GAPS:
+		warnings.append({"x": gap.x, "text": "BROKEN DECK  ·  JUMP AT THE EDGE", "color": Color("9deeff")})
+	for gap in ROUTE.BOOST_GAPS:
+		var boost_at: float = gap.x - ROUTE.PAD_OFFSET
+		pads.append(boost_at)
+		warnings.append({"x": boost_at, "text": "BOOST GAP  ·  KEEP SPEED / HOLD JUMP", "color": Color("9deeff")})
 	cuts.sort()
 	for i in range(1,cuts.size()):
 		var a := cuts[i-1]
@@ -109,16 +125,30 @@ func build_track() -> void:
 			var icicles := kit_piece(KIT.Piece.ICICLES,Vector3(x,y+13,-2.5))
 			icicles.scale = Vector3(2.0,2.1,1)
 	for x in GATES:
-		var gate := kit_piece(KIT.Piece.SPIKE_GATE,Vector3(x,ground_height(x),0))
-		var blocker := StaticBody3D.new()
-		blocker.add_to_group(&"frozen_spike_gate")
-		gate.add_child(blocker)
-		KIT.collider(blocker,Vector3(0,GATE_CLEARANCE+2.26,0),Vector3(2.8,4.52,3.6))
-		label(self,"CROUCH",Vector3(x-22,ground_height(x-22)+3,0),Color("ffac62"))
-	for x in PADS:
-		kit_piece(KIT.Piece.JUMP_PAD,Vector3(x,ground_height(x),0))
-		label(self,"HOLD JUMP · THRUST",Vector3(x-22,ground_height(x-22)+3.2,0),Color("8aefff"))
-	label(self,"RELAY A · SPILLWAY EXIT",Vector3(LENGTH-14,ground_height(LENGTH)+3,0),Color("8affbb"))
+		var gate := kit_piece(KIT.Piece.SPIKE_GATE, Vector3(x, ground_height(x), 0))
+		gate.rotation.z = track_pitch(x)
+		var height := KIT.GATE_TOP - KIT.GATE_CLEARANCE
+		add_hazard(gate, KIT.GATE_CLEARANCE + height * .5, Vector3(KIT.GATE_WIDTH, height, 3.6))
+		warnings.append({"x": x, "text": "SPIKE GATE  ·  HOLD CROUCH", "color": Color("ffac62")})
+	for rack in SPIKES:
+		var prop := kit_piece(KIT.Piece.SPIKE_RACK, Vector3(rack.x, ground_height(rack.x), 0), rack.y)
+		prop.rotation.z = track_pitch(rack.x)
+		add_hazard(prop, KIT.RACK_HEIGHT * .5, Vector3(rack.y, KIT.RACK_HEIGHT, 3.5))
+		warnings.append({"x": rack.x, "text": "FLOOR SPIKES  ·  JUMP", "color": Color("ffac62")})
+	for x in pads:
+		var pad := kit_piece(KIT.Piece.JUMP_PAD, Vector3(x, ground_height(x), 0))
+		pad.rotation.z = track_pitch(x)
+	warnings.sort_custom(func(a: Dictionary, b: Dictionary): return a.x < b.x)
+	label(self, "RELAY A  ·  SPILLWAY EXIT", Vector3(LENGTH - 12, ground_height(LENGTH) + 3, 0), Color("8affbb"))
+
+func add_hazard(prop: Node3D, height: float, size: Vector3) -> void:
+	var blocker := StaticBody3D.new()
+	blocker.add_to_group(&"spillway_spikes")
+	prop.add_child(blocker)
+	KIT.collider(blocker, Vector3(0, height, 0), size)
+
+func track_pitch(x: float) -> float:
+	return atan2(ground_height(x + 1.0) - ground_height(x - 1.0), 2.0)
 
 func decorate(parent: Node3D, at: Vector3, size: Vector3, material: Material) -> void:
 	var mesh := KIT.box(parent,at,size,material)
@@ -126,10 +156,12 @@ func decorate(parent: Node3D, at: Vector3, size: Vector3, material: Material) ->
 	mesh.visibility_range_end_margin = 8
 	mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
-func kit_piece(type: int, at: Vector3) -> Node3D:
+func kit_piece(type: int, at: Vector3, span := 0.0) -> Node3D:
 	var prop := KIT.new()
 	prop.piece = type
 	prop.position = at
+	if span > 0.0:
+		prop.width = span
 	add_child(prop)
 	return prop
 
@@ -170,65 +202,87 @@ func relocated(actor: RiftPlayer) -> void:
 		mission.mark_position_reset(actor)
 	var camera := stage.get_node("CameraRig") as SideCameraRig
 	camera.max_x = maxf(camera.max_x,global_position.x+LENGTH+20)
-	camera.minimum_follow_y = -160.0
+	camera.minimum_follow_y = global_position.y + ground_height(LENGTH) - 17.0
 	if camera.target == actor:
 		camera.snap_to_target()
 
 func simulate(actor: RiftPlayer, delta: float) -> void:
 	var local := to_local(actor.global_position)
-	if local.x < -5 or local.x > LENGTH+20:
+	if local.x < -5 or local.x > LENGTH + 20:
 		actor.rocket_course = null
 		return
 	if actor.controls_suspended:
 		actor.velocity = Vector3.ZERO
 		return
 	actor.rocket_seconds += delta
-	var crouch := actor.action_held("crouch") or actor.action_held("crouch_stick") or actor.movement_axis("climb_down","climb_up") < -.4
-	actor.set_crouch(crouch)
+	var crouch := actor.action_held("crouch") or actor.action_held("crouch_stick") or actor.movement_axis("climb_down", "climb_up") < -.4
 	actor.wall_sliding = false
 	actor.dash_left = 0.0
-	var slope := (ground_height(local.x+1)-ground_height(local.x-1))*.5
-	var brake := actor.movement_axis("move_left","move_right") < -.25
-	var acceleration := 1.25-slope*8.5
-	actor.rocket_speed = clampf(actor.rocket_speed + (acceleration- (8.0 if brake else 0.0))*delta,9.0,MAX_SPEED)
-	actor.velocity.x = actor.rocket_speed
-	if local.x>=LENGTH:
-		actor.velocity.x = 0.0
-	var half := actor.standing_capsule.height*.5
-	var feet := local.y-half
-	var on_track := not in_gap(local.x) and feet-ground_height(local.x)<HOVER_HEIGHT+.22 and actor.velocity.y<=maxf(1.0,slope*actor.rocket_speed+.8)
-	var thrust := actor.action_held("jump") and not crouch
-	if thrust and on_track:
-		actor.velocity.y = 7.0
-	elif on_track:
-		var next_ground := ground_height(local.x+actor.velocity.x*delta)
-		actor.velocity.y = clampf((next_ground+half+HOVER_HEIGHT-local.y)/delta,-20.0,20.0)
+	actor.set_crouch(crouch)
+	var ground := ground_height(local.x)
+	var slope := (ground_height(local.x + 1.0) - ground_height(local.x - 1.0)) * .5
+	var previous_floor_speed := (ground - ground_height(local.x - actor.velocity.x * delta)) / delta
+	var brake := actor.movement_axis("move_left", "move_right") < -.25
+	var acceleration := 1.8 - slope * 8.5
+	actor.rocket_speed = clampf(actor.rocket_speed + (acceleration - (8.0 if brake else 0.0)) * delta, 10.0, MAX_SPEED)
+	actor.velocity.x = actor.rocket_speed if local.x < LENGTH else 0.0
+	var half := actor.standing_capsule.height * .5
+	var next_x := local.x + actor.velocity.x * delta
+	var next_ground := ground_height(next_x)
+	var floor_speed := (next_ground - ground) / delta
+	var foot := local.y - half
+	var clearance := foot - ground
+	var lift := actor.velocity.y - previous_floor_speed
+	var on_track := not in_gap(local.x) and clearance >= -.08 and clearance < HOVER_HEIGHT + .11 and lift <= 1.0
+	var glide := actor.action_held("jump") and not crouch
+	if actor.action_pressed("jump") and on_track and not crouch:
+		lift = JUMP_SPEED
+	elif on_track and not in_gap(next_x):
+		lift = clampf((HOVER_HEIGHT - clearance) / delta, -20.0, 20.0)
 	else:
-		actor.velocity.y = clampf(actor.velocity.y + (4.0 if thrust else -28.0)*delta,-32.0,8.0)
-	for pad in PADS:
-		if on_track and absf(local.x-pad)<.55:
-			actor.velocity.y = maxf(actor.velocity.y,8.0)
-	actor.velocity.z = -actor.global_position.z*18.0
+		var gravity := FALL_GRAVITY
+		if glide:
+			gravity = HELD_ASCENT_GRAVITY if lift > 0.0 else GLIDE_GRAVITY
+		lift -= gravity * delta
+	for pad in pads:
+		if local.x <= pad and next_x > pad and clearance >= -.08 and clearance < HOVER_HEIGHT + 1.2:
+			lift = PAD_LAUNCH_SPEED
+	# Keep the jump arc consistent on grades by bounding lift above the deck.
+	var lift_limit := (HOVER_HEIGHT + MAX_BOOST_HEIGHT - clearance) / delta
+	actor.velocity.y = floor_speed + clampf(lift, -32.0, maxf(-32.0, lift_limit))
+	actor.velocity.z = -actor.global_position.z * 18.0
 	actor.facing = 1.0
 	actor.move_and_slide()
 	actor.update_character_visuals(1.0)
+	actor.fire_lock = maxf(0.0, actor.fire_lock - delta)
+	if not actor.local_prediction:
+		actor.update_charge(delta)
+
 	local = to_local(actor.global_position)
-	var lethal := local.y-half < ground_height(local.x)-9.0
-	for index in actor.get_slide_collision_count():
-		var hit := actor.get_slide_collision(index).get_collider()
-		if is_instance_valid(hit) and hit.is_in_group(&"frozen_spike_gate"):
-			lethal = true
-	for x in GATES:
-		if absf(local.x-x)<1.85:
-			var head := local.y-half+(1.05 if actor.low_profile else half*2)
-			lethal = lethal or (head>ground_height(x)+GATE_CLEARANCE and local.y-half<ground_height(x)+GATE_CLEARANCE+4.52)
-	if lethal:
+	if hit_spikes(actor, local, half) or local.y - half < ground_height(local.x) - 9.0:
 		if not actor.local_prediction:
 			actor.rocket_course = null
 			actor.die_in_pit()
 		return
 	if local.x >= LENGTH and on_track and not actor.local_prediction:
 		finish(actor)
+
+func hit_spikes(actor: RiftPlayer, local: Vector3, half: float) -> bool:
+	for index in actor.get_slide_collision_count():
+		var hit := actor.get_slide_collision(index).get_collider()
+		if is_instance_valid(hit) and hit.is_in_group(&"spillway_spikes"):
+			return true
+	var feet := local.y - half
+	var head := feet + (1.05 if actor.low_profile else half * 2)
+	for x in GATES:
+		if absf(local.x - x) < KIT.GATE_WIDTH * .5 + .35:
+			var floor_height := ground_height(local.x)
+			if head > floor_height + KIT.GATE_CLEARANCE and feet < floor_height + KIT.GATE_TOP:
+				return true
+	for rack in SPIKES:
+		if absf(local.x - rack.x) < rack.y * .5 + .35 and feet < ground_height(local.x) + KIT.RACK_HEIGHT:
+			return true
+	return false
 
 func finish(actor: RiftPlayer) -> void:
 	var switches := stage.get_node_or_null("GateRelays")
@@ -246,15 +300,17 @@ func _process(_delta: float) -> void:
 	readout.visible = is_instance_valid(local_actor) and local_actor.rocket_course == self and local_actor.health > 0
 	if readout.visible:
 		var progress := clampf(to_local(local_actor.global_position).x/LENGTH,0,1)*100
-		var instruction := "HOLD JUMP: THRUST   ·   DOWN: CROUCH   ·   LEFT: BRAKE"
+		var instruction := "JUMP: HOP / GLIDE    ·    CROUCH: SLIDE    ·    LEFT: BRAKE    ·    BUSTER: FIRE"
 		var here := to_local(local_actor.global_position).x
-		for gate in GATES:
-			if gate-here>0 and gate-here<30:
-				instruction = "CROUCH GATE AHEAD  ·  HOLD DOWN"
-		for pad in PADS:
-			if pad-here>0 and pad-here<30:
-				instruction = "GAP AHEAD  ·  HOLD JUMP TO THRUST"
-		readout.text = "ROCKET SPILLWAY  ·  %d%%  ·  %.1f m/s  ·  %02d:%02d\n%s" % [progress,local_actor.rocket_speed,int(local_actor.rocket_seconds)/60,int(local_actor.rocket_seconds)%60,instruction]
+		readout.modulate = Color.WHITE
+		for warning in warnings:
+			var distance: float = warning.x - here
+			if distance >= -1.9 and distance <= WARNING_DISTANCE:
+				instruction = "%s   ·   %dm" % [warning.text, ceili(maxf(distance, 0.0))]
+				readout.modulate = warning.color
+				break
+		readout.text = "ROCKET SPILLWAY  ·  %d%%  ·  %.1f m/s  ·  %02d:%02d\n%s" % [progress, local_actor.rocket_speed, int(local_actor.rocket_seconds) / 60, int(local_actor.rocket_seconds) % 60, instruction]
+
 	var live := {}
 	for actor in stage.get_node("Actors").get_children():
 		if not actor is RiftPlayer or actor.rocket_course != self or actor.health<=0:
@@ -264,12 +320,24 @@ func _process(_delta: float) -> void:
 		if not boards.has(key):
 			boards[key] = kit_piece(KIT.Piece.ROCKET_BOARD,Vector3.ZERO)
 		var board: Node3D = boards[key]
-		board.global_position = actor.global_position+Vector3(.15,-actor.standing_capsule.height*.5-.065,0)
 		var x := to_local(actor.global_position).x
 		var hovering := not in_gap(x) and absf(actor.global_position.y-global_position.y-actor.standing_capsule.height*.5-ground_height(x)-HOVER_HEIGHT)<.3
-		board.rotation.z = atan2(ground_height(x+1)-ground_height(x-1),2) if hovering else clampf(actor.velocity.y*.018,-.3,.3)
+		var pitch := track_pitch(x) if hovering else clampf(actor.velocity.y*.018,-.3,.3)
+		var deck_up := Vector3.UP.rotated(Vector3.BACK,pitch)
+		var feet: Vector3 = actor.global_position-Vector3.UP*actor.standing_capsule.height*.5
+		board.global_position = feet-deck_up*.075
+		board.rotation.z = pitch
+		if actor.model_root:
+			actor.model_root.basis = Basis(Vector3.BACK,pitch)*Basis(Vector3.UP,.30)
+			# The grip ridges sit 0.146 m above the board origin.
+			actor.model_root.position = feet-actor.global_position+deck_up*.071
 		board.nozzle.scale.x = 1.5 if actor.velocity.y>.8 else .7
 	for key in boards.keys():
 		if not live.has(key):
+			var former_rider := instance_from_id(key) as RiftPlayer
+			if is_instance_valid(former_rider) and former_rider.model_root and not is_instance_valid(former_rider.rocket_course):
+				former_rider.model_root.position = Vector3.DOWN*former_rider.standing_capsule.height*.5
+				if former_rider.is_physics_processing():
+					former_rider.model_root.rotation.z = 0.0
 			boards[key].queue_free()
 			boards.erase(key)
