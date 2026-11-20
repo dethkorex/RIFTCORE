@@ -1504,6 +1504,11 @@ func set_armor_finish(id: String) -> void:
 			material.set_shader_parameter("artwork", original.albedo_texture)
 			material.set_shader_parameter("armor", Color(colors[1]))
 			material.set_shader_parameter("trim", Color(colors[2]))
+			material.set_shader_parameter("light_color", Color(colors[3]))
+			if original.normal_enabled and original.normal_texture:
+				material.set_shader_parameter("has_normal", true)
+				material.set_shader_parameter("detail_normal", original.normal_texture)
+				material.set_shader_parameter("detail_strength", original.normal_scale)
 			mesh.set_surface_override_material(surface, material)
 
 func equip_sector_weapon(id: String) -> void:

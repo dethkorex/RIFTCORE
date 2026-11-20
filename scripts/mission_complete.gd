@@ -3,6 +3,7 @@ extends RefCounted
 const UI := preload("res://scripts/rift_ui.gd")
 const Materials := preload("res://scripts/fabrication_catalog.gd")
 const Profile := preload("res://scripts/rogue_profile.gd")
+const SkinKit := preload("res://scripts/operator_skins.gd")
 
 static func build(stack: VBoxContainer, sector_name: String, stats: Dictionary, materials: Dictionary,
 		blueprints: Array[String], supplies: Dictionary, bolts: int, challenges_completed: int, deaths: int, ending: String, exit: Callable) -> void:
@@ -89,6 +90,9 @@ static func profile_progress(parent: Control, progress: Dictionary) -> void:
 	meter.value = end if total == start or full else maxi(0, start - floor_xp)
 	if total > start and not full:
 		meter.create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS).tween_property(meter, "value", end, 0.8).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	var finish := String(progress.get("unlocked_finish", ""))
+	if not finish.is_empty():
+		UI.label(parent, "%s unlocked  ·  Equip in Profile → Cosmetics" % SkinKit.label(finish), 17, UI.VIOLET)
 
 static func reward(parent: HBoxContainer, caption: String, text: String, tint: Color) -> void:
 	var tile := UI.equipment_card(tint)

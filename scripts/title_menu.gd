@@ -14,7 +14,6 @@ signal profile_reset_requested
 signal cloud_save_requested
 signal online_setup_finished
 signal username_changed
-signal finish_purchase_requested(id: String)
 
 var active_slot := 0
 var developer_session := false
@@ -97,7 +96,6 @@ const EquipmentBody := preload("res://scripts/equipment_body.gd")
 const EquipmentIcons := preload("res://scripts/equipment_icons.gd")
 
 var equipment_slot := ""
-var party_from_deploy := false
 var layout: VBoxContainer
 var page := "Title"
 const StoryDialogue := preload("res://scripts/story_dialogue.gd")
@@ -245,8 +243,6 @@ func show_page(next: String) -> void:
 			portrait(card(columns))
 		"Sector select":
 			build_sector(columns)
-		"Sector Challenges":
-			select_challenge_sector(selected_sector, scroll_entries(card(columns)))
 		"Sector Loot":
 			archive_sector = selected_sector
 			var intel := card(columns)
@@ -291,7 +287,7 @@ func show_page(next: String) -> void:
 		"Tutorials":
 			build_tutorials(columns)
 		"Challenges":
-			build_challenges(columns)
+			build_challenges(columns, header)
 		"Co-op Setup Guide":
 			CoopSetup.build(card(columns, 1.75), leave_page)
 			portrait(card(columns))
@@ -303,7 +299,9 @@ func show_page(next: String) -> void:
 		if page in ["Create Account", "Sign In", "Offline Setup"]:
 			back_title = "Back to Welcome"
 		if station_panel:
-			back_title = "Back to Deployment" if page in ["Level select", "New run", "Sector Challenges", "Sector Loot"] else "Back to Station"
+			back_title = "Back to Deployment" if page in ["Level select", "New run", "Sector Loot"] else "Back to Station"
+			if page == "Co-op Sectors":
+				back_title = "Back to Party"
 			if page in ["Operators", "Account Settings", "Delete Profile"]:
 				back_title = "Back to Profile"
 			elif page == "Craft Item":
@@ -394,10 +392,13 @@ func build_station_header(header: HBoxContainer) -> void:
 		station_name = "NOVA ARCHIVE"
 	elif page in ["Social", "Whispers", "Party", "Notifications", "Directory Account", "Directory Registration"]:
 		station_name = "SOCIAL"
-	elif page in ["Sector Challenges", "Sector Loot"]:
+	elif page in ["Sector select", "Level select", "Co-op Sectors", "New run", "Sector Loot"]:
 		station_name = "DEPLOY"
 	var heading := UI.label(header, station_name, 25, UI.CYAN)
 	heading.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	if page == "Challenges":
+		heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		return
 	if page == "Upgrades":
 		TalentTree.add_chip(header, "%04d BOLTS" % profile.credits, TalentTree.BOLT, UI.CYAN.darkened(0.22), 16, 27)
 		TalentTree.add_chip(header, "%04d CORE SHARDS" % profile.core_shards, TalentTree.SHARD, UI.VIOLET, 16, 27)
@@ -415,7 +416,6 @@ func open_station(next: String) -> void:
 	focused_item = ""
 	equipment_slot = ""
 	shop_category = "All Items"
-	party_from_deploy = false
 	show()
 	show_page(next)
 	if not is_instance_valid(hub_tip) and RiftSettings.show_hub_tips and HUB_TIPS.has(next) and not RiftSettings.seen_hub_tips.has(next):
@@ -483,10 +483,6 @@ func leave_page() -> void:
 	if page in ["Co-op Setup Guide", "Directory Account", "Directory Registration"]:
 		show_page("Social" if station_panel else "Title")
 		return
-	if page in ["Party", "Social", "Co-op Sectors"] and party_from_deploy:
-		party_from_deploy = false
-		show_page("Sector select")
-		return
 	if page == "Party" and not RiftRelay.pending.is_empty():
 		RiftRelay.leave()
 	if station_panel:
@@ -499,7 +495,7 @@ func leave_page() -> void:
 		if page in ["Learn Blueprint", "Blueprint Details"]:
 			show_page("Storage")
 			return
-		if page in ["Level select", "New run", "Sector Challenges", "Sector Loot"]:
+		if page in ["Level select", "New run", "Sector Loot"]:
 			show_page("Sector select")
 			return
 		station_panel = false
@@ -675,67 +671,109 @@ func describe_profile_save(panel: VBoxContainer, data: Dictionary, source: Strin
 		UI.label(panel, "%d / %d operator slots in use" % [ops.size(), ManualSave.SLOT_COUNT], 17, UI.MUTED)
 
 func build_cosmetics(columns: HBoxContainer) -> void:
-	var finish_model := preload("res://scripts/equipment_display.gd").new()
+	var finish_model := EquipmentDisplay.new()
+	finish_model.neutral_lighting = true
 	card(columns).add_child(finish_model)
-	var list := card(columns, 1.18)
-	UI.label(list, "Operator Finish", 27, UI.CYAN)
-	var choices: Array = [""] + account.unlocked_skins
+	var wardrobe := card(columns, 1.18)
+	UI.label(wardrobe, "Operator Finish", 27, UI.CYAN)
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 8)
-	list.add_child(row)
+	row.add_theme_constant_override("separation", 10)
+	wardrobe.add_child(row)
 	var slot := OptionButton.new()
-	var finish := OptionButton.new()
-	for control in [slot, finish]:
-		control.custom_minimum_size.y = 35
-		UI.style_button(control)
-		row.add_child(control)
+	slot.custom_minimum_size.y = 35
+	UI.style_button(slot)
+	row.add_child(slot)
 	for number in range(1, ManualSave.SLOT_COUNT + 1):
 		if number != active_slot and not ManualSave.read_slot(number):
 			continue
 		slot.add_item("Operator %02d" % number, number)
 		if number == active_slot:
 			slot.select(slot.item_count - 1)
-	for choice in choices:
-		finish.add_item(SkinKit.label(choice))
 	if slot.item_count == 0:
 		slot.add_item("No operator")
 		slot.disabled = true
-		finish.disabled = true
-	var apply_preview := func():
-		var choice: String = account.display_skin(slot.get_selected_id())
-		finish.select(choices.find(choice))
-		finish_model.set_appearance(choice)
-	var finish_status := UI.label(list, "" if not slot.disabled else "Create an operator before assigning a finish.", 16, UI.MUTED)
-	slot.item_selected.connect(func(_index): apply_preview.call())
-	finish.item_selected.connect(func(index: int):
-		if account.select_skin(slot.get_selected_id(), choices[index]) == OK:
-			finish_status.text = "Finish selected."
+	var equipped := UI.label(row, "", 17, UI.MUTED)
+	equipped.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	equipped.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	wardrobe.add_child(HSeparator.new())
+	var options := scroll_entries(wardrobe)
+	UI.make_readable_scroll(options.get_parent() as ScrollContainer)
+	var actions := HBoxContainer.new()
+	actions.add_theme_constant_override("separation", 10)
+	wardrobe.add_child(actions)
+	var previewed := {"id": ""}
+	var equip := UI.button(actions, "Equip Finish", Callable(), true, 38)
+	equip.focus_mode = Control.FOCUS_ALL
+	var status := UI.label(actions, "", 17, UI.MUTED)
+	status.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	status.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	var preview := func(id: String):
+		previewed.id = id
+		finish_model.set_appearance(id)
+		var current: String = account.display_skin(slot.get_selected_id())
+		equipped.text = "Equipped  ·  " + SkinKit.label(current) if not slot.disabled else ""
+		var owned: bool = id.is_empty() or account.unlocked_skins.has(id)
+		equip.disabled = slot.disabled or id == current or not owned
+		status.text = "Preview  ·  " + SkinKit.label(id)
+	equip.pressed.connect(func():
+		var id: String = previewed.id
+		if account.select_skin(slot.get_selected_id(), id) == OK:
+			preview.call(id)
+			status.text = "%s equipped." % SkinKit.label(id)
 		else:
-			finish_status.text = "Could not save the finish."
-		apply_preview.call()
+			status.text = "Could not save the finish."
 	)
+	slot.item_selected.connect(func(_index): preview.call(account.display_skin(slot.get_selected_id())))
+	add_finish_entry(options, "", "Available", preview)
+	UI.label(options, "Expert Finishes", 23, UI.CYAN)
+	for number in range(1, Catalog.SECTORS.size() + 1):
+		var id := SkinKit.expert_finish(number)
+		add_finish_entry(options, id, "Clear both acts of %s on Expert" % Catalog.info(number).title, preview)
+	var suits: Array[String] = []
+	var legacy: Array[String] = []
+	for id: String in account.unlocked_skins:
+		if SkinKit.LEGACY_FINISHES.has(id):
+			legacy.append(id)
+		elif not Catalog.weapon(id).is_empty():
+			suits.append(id)
+	if not suits.is_empty():
+		UI.label(options, "Boss Appearances", 23, UI.CYAN)
+		for id in suits:
+			add_finish_entry(options, id, "Earned on Hard or Expert", preview)
+	if not legacy.is_empty():
+		UI.label(options, "Previously Owned Finishes", 23, UI.CYAN)
+		for id in legacy:
+			add_finish_entry(options, id, "Unlocked", preview)
+	preview.call(account.display_skin(slot.get_selected_id()))
 	if not slot.disabled:
-		apply_preview.call()
-	list.add_child(HSeparator.new())
-	UI.label(list, "Station Finishes", 23, UI.CYAN)
-	if not inventory_status.is_empty():
-		UI.label(list, inventory_status, 17, UI.CYAN)
-	var store := scroll_entries(list)
-	for id in SkinKit.STORE:
-		var item: Array = SkinKit.STORE[id]
-		var item_row := HBoxContainer.new()
-		store.add_child(item_row)
+		slot.grab_focus()
+
+func add_finish_entry(parent: VBoxContainer, id: String, requirement: String, preview: Callable) -> void:
+	var entry := HBoxContainer.new()
+	entry.add_theme_constant_override("separation", 9)
+	parent.add_child(entry)
+	var colors := SkinKit.palette(id)
+	for color_index in [1, 2]:
 		var swatch := ColorRect.new()
-		swatch.color = Color(item[2])
-		swatch.custom_minimum_size = Vector2(20, 18)
+		swatch.color = Color(colors[color_index]) if not colors.is_empty() else Color("344866")
+		swatch.custom_minimum_size = Vector2(12, 24)
 		swatch.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		item_row.add_child(swatch)
-		var preview := UI.button(item_row, item[0], finish_model.set_appearance.bind(id), false, 35)
-		preview.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		var owned: bool = account.unlocked_skins.has(id)
-		var purchase := UI.button(item_row, "Owned" if owned else "%s bolts" % item[3], finish_purchase_requested.emit.bind(id), true, 35)
-		purchase.disabled = owned or profile.credits < item[3]
-		preview.focus_entered.connect(finish_model.set_appearance.bind(id))
+		swatch.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		entry.add_child(swatch)
+	var text := UI.column(entry, 2)
+	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var unlocked: bool = id.is_empty() or account.unlocked_skins.has(id)
+	var pick := UI.button(text, SkinKit.label(id), preview.bind(id), false, 35)
+	pick.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	pick.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	pick.focus_entered.connect(preview.bind(id))
+	var detail := UI.label(text, requirement, 15, UI.MUTED)
+	detail.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pick.tooltip_text = requirement
+	if id.begins_with("variant:"):
+		var badge := UI.label(entry, "Unlocked" if unlocked else "Locked", 15, Color("9de4ba") if unlocked else UI.MUTED)
+		badge.autowrap_mode = TextServer.AUTOWRAP_OFF
+		badge.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 
 func build_player_account(columns: HBoxContainer) -> void:
 	var form := card(columns)
@@ -916,6 +954,7 @@ func build_online_room(columns: HBoxContainer) -> void:
 	relay_room=UI.label(form,"",24,UI.WHITE)
 	relay_room.autowrap_mode=TextServer.AUTOWRAP_OFF
 	relay_deploy = UI.button(form, "Choose Co-op Sector", show_page.bind("Co-op Sectors"), true)
+	relay_deploy.set_meta(&"return_focus", "choose-coop-sector")
 	relay_copy = UI.button(form, "Copy Room Code", func(): DisplayServer.clipboard_set(RiftRelay.connected_room))
 	UI.button(form,"Find Friends",func(): SocialPanel.open_find_friends(self),false,36)
 	var space:=Control.new()
@@ -1362,29 +1401,37 @@ func shop_fact(parent: VBoxContainer, caption: String) -> Label:
 	value.autowrap_mode = TextServer.AUTOWRAP_OFF
 	return value
 
-func build_challenges(columns: HBoxContainer) -> void:
-	var countdown := UI.label(layout, "", 32, UI.VIOLET)
+func build_challenges(columns: HBoxContainer, header: HBoxContainer) -> void:
+	var clock_panel := PanelContainer.new()
+	clock_panel.custom_minimum_size.x = 196
+	clock_panel.add_theme_stylebox_override("panel", UI.frame(Color("241438"), UI.VIOLET))
+	header.add_child(clock_panel)
+	var clock_text := UI.column(clock_panel, 1)
+	UI.label(clock_text, "CHALLENGES RESET IN:", 15, UI.VIOLET).horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var countdown := UI.label(clock_text, "", 29, UI.WHITE)
 	countdown.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	countdown.autowrap_mode = TextServer.AUTOWRAP_OFF
-	layout.move_child(countdown, columns.get_index())
-	var sectors := card(columns, 0.8)
-	UI.label(sectors, "Unlocked sectors", 25, UI.CYAN)
-	var scroll := ScrollContainer.new()
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	scroll.follow_focus = true
-	sectors.add_child(scroll)
-	var list := UI.column(scroll, 8)
-	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var details := scroll_entries(card(columns, 1.65))
-	UI.make_readable_scroll(details.get_parent() as ScrollContainer)
-	var available: int = profile.unlocked_sector if profile else 1
+
+	var sectors := card(columns, .48)
+	UI.label(sectors, "UNLOCKED SECTORS", 25, UI.CYAN)
+	var list := scroll_entries(sectors)
+	UI.make_readable_scroll(list.get_parent() as ScrollContainer)
+	var details := card(columns, 1.52)
+	var available: int = clampi(profile.unlocked_sector, 1, Catalog.SECTORS.size())
 	challenge_sector = clampi(challenge_sector, 1, available)
 	var group := ButtonGroup.new()
 	for number in range(1, available + 1):
-		var label := "%02d   %s" % [number, Catalog.info(number).title]
-		var option := UI.button(list, label, select_challenge_sector.bind(number, details, group))
-		option.custom_minimum_size.x = 205
+		var sector := Catalog.info(number)
+		var option := UI.button(list, "%02d   %s" % [number, sector.title],
+			select_challenge_sector.bind(number, details, group), false, 36)
+		option.custom_minimum_size.y = 52
+		option.icon = sector_panorama(number)
+		option.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		option.expand_icon = true
+		option.add_theme_constant_override("icon_max_width", 61)
+		option.add_theme_font_size_override("font_size", 17)
+		option.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		option.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		option.toggle_mode = true
 		option.button_group = group
 		option.set_pressed_no_signal(number == challenge_sector)
@@ -1399,60 +1446,148 @@ func build_challenges(columns: HBoxContainer) -> void:
 			displayed_day[0] = today
 			select_challenge_sector(challenge_sector, details, group)
 		var left: int = Profile.challenge_seconds_left(clock)
-		countdown.text = "Challenges Reset IN: %02dh %02dm %02ds" % [left / 3600, (left / 60) % 60, left % 60]
+		countdown.text = "%02dh %02dm %02ds" % [left / 3600, (left / 60) % 60, left % 60]
 	var heartbeat := Timer.new()
 	countdown.add_child(heartbeat)
 	heartbeat.timeout.connect(refresh)
 	heartbeat.start(1.0)
 	refresh.call()
 
-func select_challenge_sector(number: int, details: VBoxContainer, group: ButtonGroup = null) -> void:
+func select_challenge_sector(number: int, details: VBoxContainer, group: ButtonGroup) -> void:
 	challenge_sector = number
 	for child in details.get_children():
 		details.remove_child(child)
 		child.queue_free()
-	UI.label(details, Catalog.info(number).title, 30, UI.CYAN)
+	var sector := Catalog.info(number)
+	var banner := Control.new()
+	banner.custom_minimum_size.y = 76
+	details.add_child(banner)
+	var art := TextureRect.new()
+	art.texture = sector_panorama(number)
+	art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	banner.add_child(art)
+	art.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	var cover := GradientTexture2D.new()
+	cover.gradient = Gradient.new()
+	cover.gradient.colors = PackedColorArray([Color("081826"), Color("07132127")])
+	cover.fill_to = Vector2.RIGHT
+	var shade := TextureRect.new()
+	shade.texture = cover
+	shade.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	banner.add_child(shade)
+	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	var banner_title := UI.column(banner, 1)
+	banner_title.position = Vector2(16, 7)
+	UI.label(banner_title, sector.title.to_upper(), 31, UI.CYAN).autowrap_mode = TextServer.AUTOWRAP_OFF
+	UI.label(banner_title, "SECTOR %02d" % number, 16, UI.WHITE).autowrap_mode = TextServer.AUTOWRAP_OFF
+
 	var cycle: Dictionary = profile.challenge_cycle(number)
-	UI.label(details, "%d / 5 cleared  ·  %d bonus Core Shards for completing the set" % [cycle.done.size(), Profile.challenge_set_shards(number)], 17, UI.MUTED)
+	var progress := HBoxContainer.new()
+	progress.add_theme_constant_override("separation", 12)
+	details.add_child(progress)
+	UI.label(progress, "%d / 5 CLEARED" % cycle.done.size(), 19, UI.CYAN).autowrap_mode = TextServer.AUTOWRAP_OFF
+	var segments := HBoxContainer.new()
+	segments.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	progress.add_child(segments)
+	for index in 5:
+		var segment := Panel.new()
+		segment.custom_minimum_size.y = 10
+		segment.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		segment.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		segment.add_theme_stylebox_override("panel", UI.frame(UI.CYAN.darkened(.30) if index < cycle.done.size() else Color("101e32"), Color("5396ba"), 1))
+		segments.add_child(segment)
+	UI.label(progress, "SET BONUS  ·  %d CORE SHARDS" % Profile.challenge_set_shards(number), 17, UI.VIOLET).autowrap_mode = TextServer.AUTOWRAP_OFF
+	var tasks := scroll_entries(details)
+	tasks.add_theme_constant_override("separation", 6)
+	UI.make_readable_scroll(tasks.get_parent() as ScrollContainer)
+	for index in 5:
+		add_challenge_row(tasks, number, index, cycle)
+	for button in group.get_buttons():
+		button.focus_neighbor_right = NodePath()
 	var rewards: Dictionary = profile.challenge_rewards(number, cycle)
-	if group:
-		for button in group.get_buttons():
-			button.focus_neighbor_right = NodePath()
-	if rewards.lives > 0 and not group:
-		UI.label(details, "Rewards ready to claim in Challenges at the station.", 18, UI.VIOLET)
-	elif rewards.lives > 0:
-		var life_reward := "%d %s" % [rewards.lives, "Life" if rewards.lives == 1 else "Lives"]
-		UI.label(details, "%d Bolts  ·  %d Core Shards  ·  %s" % [rewards.credits, rewards.shards, life_reward], 18, UI.VIOLET)
-		var status := UI.label(details, "", 16, UI.MUTED)
-		var claim := UI.button(details, "Claim Rewards", func():
-			var error: int = claim_challenge_rewards.call(number) if claim_challenge_rewards.is_valid() else ERR_UNCONFIGURED
-			if error == OK:
-				show_page("Challenges")
-			else:
-				status.text = "Could not claim your rewards. Try again."
-		, true, 36)
-		var sector_button := group.get_pressed_button()
-		if sector_button:
-			claim.focus_neighbor_left = claim.get_path_to(sector_button)
-			sector_button.focus_neighbor_right = sector_button.get_path_to(claim)
-	for tier in 5:
-		var data: Array = Profile.CHALLENGE_SETS[cycle.set][tier]
-		var done: bool = cycle.done.has(tier)
-		var claimed: bool = cycle.claimed.has(tier)
-		details.add_child(HSeparator.new())
-		var line := HBoxContainer.new()
-		details.add_child(line)
-		var title := UI.label(line, data[0], 20)
-		title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		title.autowrap_mode = TextServer.AUTOWRAP_OFF
-		var status := UI.label(line, "CLAIMED" if claimed else ("READY TO CLAIM" if done else "OPEN"), 17, Color("91f7a1") if done else UI.MUTED)
-		status.autowrap_mode = TextServer.AUTOWRAP_OFF
-		UI.label(details, data[1], 16, UI.MUTED)
-		var amount := Profile.rotated_challenge_credits(number, tier)
-		var shards: int = Profile.challenge_shards(number, tier)
-		UI.label(details, "%d Bolts  ·  %d Core Shards  ·  1 Life" % [amount, shards], 17, Color("ffe28e"))
-	details.add_child(HSeparator.new())
-	UI.label(details, "Banked bonus lives: %d" % profile.reserve_lives, 16, UI.MUTED)
+	var footer := HBoxContainer.new()
+	footer.add_theme_constant_override("separation", 10)
+	details.add_child(footer)
+	var status := UI.label(footer, "Banked bonus lives  ·  %d" % profile.reserve_lives, 16, UI.MUTED)
+	status.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	status.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	if rewards.lives <= 0:
+		return
+	status.text = "Ready to claim  ·  %d Bolts  ·  %d Core Shards  ·  %d %s" % [
+		rewards.credits, rewards.shards, rewards.lives, "Life" if rewards.lives == 1 else "Lives"]
+	var claim := UI.button(footer, "Claim Rewards", func():
+		var error: int = claim_challenge_rewards.call(number) if claim_challenge_rewards.is_valid() else ERR_UNCONFIGURED
+		if error == OK:
+			show_page("Challenges")
+		else:
+			status.text = "Could not claim your rewards. Try again."
+	, true, 36)
+	var sector_button := group.get_pressed_button()
+	if sector_button:
+		claim.focus_neighbor_left = claim.get_path_to(sector_button)
+		sector_button.focus_neighbor_right = sector_button.get_path_to(claim)
+
+func add_challenge_row(parent: VBoxContainer, sector: int, index: int, cycle: Dictionary) -> void:
+	var task: Array = Profile.CHALLENGE_SETS[cycle.set][index]
+	var cleared: bool = cycle.done.has(index)
+	var claimed: bool = cycle.claimed.has(index)
+	var tile := UI.equipment_card(UI.CYAN if not cleared else Color("7fe4a9"))
+	var padding := tile.get_theme_stylebox("panel").duplicate() as StyleBox
+	padding.content_margin_top = 4
+	padding.content_margin_bottom = 4
+	tile.add_theme_stylebox_override("panel", padding)
+	parent.add_child(tile)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	tile.add_child(row)
+	var icons := ["icon_deploy", "icon_save", "icon_shield", "icon_buster", "icon_storage"]
+	var badge := TextureRect.new()
+	badge.texture = load(UI.KIT + icons[index] + ".png") as Texture2D
+	badge.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	badge.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	badge.custom_minimum_size = Vector2(35, 35)
+	row.add_child(badge)
+	var content := UI.column(row, 1)
+	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	UI.label(content, task[0], 21)
+	UI.label(content, task[1], 16, UI.MUTED)
+	var tally := HBoxContainer.new()
+	content.add_child(tally)
+	var completion := ProgressBar.new()
+	completion.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	completion.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	completion.custom_minimum_size.y = 5
+	completion.show_percentage = false
+	completion.max_value = 1
+	completion.value = float(cleared)
+	var track := UI.frame(Color("101d31"), Color("477c9c"), 1)
+	track.content_margin_top = 0
+	track.content_margin_bottom = 0
+	var fill := track.duplicate() as StyleBoxFlat
+	fill.bg_color = UI.CYAN
+	completion.add_theme_stylebox_override("background", track)
+	completion.add_theme_stylebox_override("fill", fill)
+	tally.add_child(completion)
+	var target: int = int(task[3]) if task[2] in ["kills", "materials", "bolts"] else 1
+	UI.label(tally, "%d / %d" % [target if cleared else 0, target], 15, UI.MUTED).autowrap_mode = TextServer.AUTOWRAP_OFF
+	row.add_child(VSeparator.new())
+	var payout := HBoxContainer.new()
+	payout.add_theme_constant_override("separation", 11)
+	row.add_child(payout)
+	payout.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	UI.currency_row(payout, "%d Bolts" % Profile.rotated_challenge_credits(sector, index))
+	UI.currency_row(payout, "%d Core %s" % [Profile.challenge_shards(sector, index),
+		"Shard" if Profile.challenge_shards(sector, index) == 1 else "Shards"], true)
+	UI.label(payout, "+ 1 Life", 16, Color("8ff6ac")).autowrap_mode = TextServer.AUTOWRAP_OFF
+	var state := UI.label(row, "CLAIMED" if claimed else ("REWARD READY" if cleared else "OPEN"), 16,
+		Color("9defb1") if cleared else UI.CYAN)
+	state.custom_minimum_size.x = 78
+	state.autowrap_mode = TextServer.AUTOWRAP_OFF
+	state.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	state.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 
 func purchase_upgrade(id: String) -> void:
 	shop_status = profile.buy(id)
@@ -1463,28 +1598,27 @@ func build_sector(columns: HBoxContainer) -> void:
 	build_level_select(columns)
 
 func build_level_select(columns: HBoxContainer) -> void:
-	var route := card(columns, 1.75)
 	var connected := not RiftRelay.connected_room.is_empty()
 	var cooperative := connected and RiftRelay.can_deploy()
 	var last_sector: int = mini(Catalog.SECTORS.size(), profile.unlocked_sector if profile else 1)
+	var first_deployment := last_sector == 1
+	var route := card(columns, 1.15 if first_deployment else 1.75)
 	selected_sector = clampi(selected_sector, 1, last_sector)
 	UI.label(route, "DEPLOYMENT MAP", 32, UI.CYAN)
-	var actions := HBoxContainer.new()
-	route.add_child(actions)
 	if can_load and not connected:
+		var actions := HBoxContainer.new()
+		route.add_child(actions)
 		UI.button(actions, "Continue Run", func(): load_requested.emit(), true, 36)
 		UI.button(actions, "New Run…", show_page.bind("New run"), false, 36)
-	UI.button(actions, "Manage Group" if connected else "Start a Group", func():
-		party_from_deploy = true
-		show_page("Party")
-	, false, 36)
+	if first_deployment:
+		UI.label(route, "Clear both acts to unlock Machine Jungle.", 17, UI.MUTED)
 	var scroll := ScrollContainer.new()
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.follow_focus = true
 	route.add_child(scroll)
 	var entries := GridContainer.new()
-	entries.columns = 3
+	entries.columns = clampi(last_sector, 1, 3)
 	entries.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	entries.add_theme_constant_override("h_separation", 8)
 	entries.add_theme_constant_override("v_separation", 8)
@@ -1493,7 +1627,7 @@ func build_level_select(columns: HBoxContainer) -> void:
 	for number in range(1, last_sector + 1):
 		var choice := sector_card(entries, number, "Normal  /  Lv. %d" % Difficulty.recommended_level(number, Difficulty.NORMAL))
 		choice.set_meta(&"return_focus", "sector/%d" % number)
-		choice.custom_minimum_size.y = 112
+		choice.custom_minimum_size.y = 255 if first_deployment else 112
 		choice.pressed.connect(func():
 			selected_sector = number
 			show_mission_intel(intel, connected, cooperative)
@@ -1526,12 +1660,9 @@ func show_mission_intel(panel: VBoxContainer, connected: bool, can_deploy: bool)
 	add_stat_group(panel, "ELEMENT", sector.element)
 	add_stat_group(panel, "SUIT REWARD", sector.reward_name)
 	UI.label(panel, Story.briefing(selected_sector), 16, UI.MUTED)
-	var reference := HBoxContainer.new()
-	reference.add_theme_constant_override("separation", 8)
-	panel.add_child(reference)
-	UI.button(reference, "Challenges", show_page.bind("Sector Challenges"), false, 32).set_meta(&"return_focus", "sector-challenges")
 	var loot_unlocked: bool = profile.loot_clears.has(selected_sector)
-	var loot := UI.button(reference, "Loot Intel", show_page.bind("Sector Loot"), false, 32)
+	var loot := UI.button(panel, "Loot Intel", show_page.bind("Sector Loot"), false, 32)
+	loot.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	loot.set_meta(&"return_focus", "sector-loot")
 	loot.disabled = not loot_unlocked
 	loot.tooltip_text = "Extract from this sector to unlock its drop tables." if not loot_unlocked else ""
@@ -1585,6 +1716,12 @@ func show_mission_intel(panel: VBoxContainer, connected: bool, can_deploy: bool)
 	var button := UI.button(panel, "Deploy", func(): sector_requested.emit(selected_sector, selected_difficulty), true)
 	button.name = "Deploy"
 
+func sector_panorama(number: int) -> Texture2D:
+	match number:
+		1: return preload("res://assets/neon_factory/foundry/foundry_panorama.jpg")
+		2: return preload("res://assets/machine_jungle/jungle_panorama.png")
+	return load("res://assets/campaign/%s/panorama.png" % Catalog.info(number).id) as Texture2D
+
 func sector_card(entries: GridContainer, number: int, state: String) -> Button:
 	var sector := Catalog.info(number)
 	var accent := Color(sector.color)
@@ -1596,12 +1733,7 @@ func sector_card(entries: GridContainer, number: int, state: String) -> Button:
 	choice.clip_contents = true
 	choice.tooltip_text = "%s · %s" % [sector.title, state]
 	var art := TextureRect.new()
-	var art_path := "res://assets/campaign/%s/panorama.png" % sector.id
-	if number == 1:
-		art_path = "res://assets/neon_factory/foundry/foundry_panorama.jpg"
-	elif number == 2:
-		art_path = "res://assets/machine_jungle/jungle_panorama.png"
-	art.texture = load(art_path) as Texture2D
+	art.texture = sector_panorama(number)
 	art.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED

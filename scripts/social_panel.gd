@@ -10,6 +10,7 @@ const Codes := preload("res://addons/GD-Sync/Scripts/Enums/Enums.gd")
 
 static func contacts(include_directory := false) -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
+	var recent_by_name := {}
 	for friend in RiftSocial.contacts():
 		friend.key = "steam:" + friend.id
 		friend.chat = int(friend.id)
@@ -21,27 +22,48 @@ static func contacts(include_directory := false) -> Array[Dictionary]:
 		var person: Dictionary = RiftSocial.recent_players[id]
 		var in_party := RiftRelay.party_operators.values().has(id)
 		var key: String = "rift:" + id
-		result.append({"key": key, "id": id, "chat": key, "name": person.name,
+		var teammate := {"key": key, "id": id, "chat": key, "name": person.name,
 			"saved": RiftSocial.rift_friends.has(id), "party": in_party, "playing": in_party, "recent": true,
-			"priority": -1 if in_party else 4, "status": "In your party" if in_party else "Recent teammate"})
+			"priority": -1 if in_party else 4, "status": "In your party" if in_party else "Recent teammate"}
+		result.append(teammate)
+		var name_key := String(person.name).strip_edges().to_lower()
+		if not recent_by_name.has(name_key):
+			recent_by_name[name_key] = []
+		recent_by_name[name_key].append(teammate)
 	if include_directory and RiftRelay.directory.online():
+		var seen_accounts := {}
 		for entry in RiftRelay.directory.friends:
 			var relation := int(entry.get("FriendStatus", 0))
-			if relation == Codes.FRIEND_STATUS.NONE:
+			var username := String(entry.get("Username", "")).strip_edges()
+			var name_key := username.to_lower()
+			if relation == Codes.FRIEND_STATUS.NONE or username.is_empty() or seen_accounts.has(name_key):
 				continue
+			seen_accounts[name_key] = true
 			var online: bool = RiftRelay.directory.is_friend_online(entry)
 			var state := "Online" if online else "Offline"
 			if relation == Codes.FRIEND_STATUS.INCOMING_REQUEST:
 				state = "Friend request"
 			elif relation == Codes.FRIEND_STATUS.WAITING_FOR_REPLY:
 				state = "Request sent"
-			result.append({"key": "directory:" + entry.Username, "id": entry.Username, "name": entry.Username,
-				"directory": true, "relation": relation, "chat": "account:" + entry.Username, "saved": relation == Codes.FRIEND_STATUS.FRIEND,
+			var contact := {"key": "directory:" + username, "id": username, "name": username,
+				"directory": true, "relation": relation, "chat": "account:" + username, "saved": relation == Codes.FRIEND_STATUS.FRIEND,
 				"joinable": online and not RiftRelay.directory.friend_room_code(entry).is_empty(),
-				"party": false, "playing": online, "recent": false, "priority": 0 if online else 2, "status": state})
+				"party": false, "playing": online, "recent": false, "priority": 0 if online else 2, "status": state}
+			# Signed-in teammates share their account username as the lobby alias.
+			# Retain their filters and pin without rendering a second contact card.
+			for teammate: Dictionary in recent_by_name.get(name_key, []):
+				result.erase(teammate)
+				contact.recent = true
+				contact.pinned = contact.get("pinned", false) or RiftSocial.pinned.has(teammate.key)
+				if teammate.party:
+					contact.party = true
+					contact.priority = -1
+					if not online:
+						contact.chat = teammate.chat
+			result.append(contact)
 	result.sort_custom(func(a, b):
-		var a_pin := RiftSocial.pinned.has(a.key)
-		var b_pin := RiftSocial.pinned.has(b.key)
+		var a_pin: bool = a.get("pinned", false) or RiftSocial.pinned.has(a.key)
+		var b_pin: bool = b.get("pinned", false) or RiftSocial.pinned.has(b.key)
 		if a_pin != b_pin:
 			return a_pin
 		if a.priority != b.priority:
@@ -59,7 +81,7 @@ static func watch(owner: Control, notice: Signal, update: Callable) -> void:
 
 static func contact_title(contact: Dictionary) -> String:
 	var unread := int(RiftSocial.unread_whispers.get(contact.chat, 0))
-	var title: String = ("★  " if RiftSocial.pinned.has(contact.key) else "") + contact.name
+	var title: String = ("★  " if contact.get("pinned", false) or RiftSocial.pinned.has(contact.key) else "") + contact.name
 	if contact.party:
 		title += "  ·  In party"
 	elif contact.get("directory", false):
@@ -810,8 +832,6 @@ static func build_invites(menu, columns: HBoxContainer) -> void:
 	var pane: VBoxContainer = menu.card(columns)
 	UI.label(pane, "GAME INVITES", 32, UI.CYAN)
 	var rows: VBoxContainer = menu.scroll_entries(pane)
-	var code_button := UI.button(pane, "Enter Room Code", menu.show_page.bind("Party"), false, 36)
-	code_button.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	var redraw := func():
 		var focus := pane.get_viewport().gui_get_focus_owner()
 		var restore_focus := focus != null and rows.is_ancestor_of(focus)
@@ -841,7 +861,10 @@ static func build_invites(menu, columns: HBoxContainer) -> void:
 			if first_action == null:
 				first_action = reject if join.disabled else join
 		if restore_focus:
-			(first_action if first_action else code_button).grab_focus()
+			if first_action:
+				first_action.grab_focus()
+			elif menu.notifications_tab:
+				menu.notifications_tab.grab_focus()
 	watch(pane, RiftSocial.invites_changed, redraw)
 	watch(pane, RiftRelay.changed, redraw)
 	redraw.call()

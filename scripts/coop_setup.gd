@@ -8,7 +8,7 @@ static func build(parent: VBoxContainer, back: Callable) -> void:
 	UI.label(parent, "Use the same RIFTCORE build", 20, UI.WHITE)
 	UI.label(parent, "Everyone should open the RIFTCORE launcher and install the same available update.", 17, UI.MUTED)
 	UI.label(parent, "Connect with a room code", 20, UI.WHITE)
-	UI.label(parent, "From Social, choose Copy Room Invite and send the code to your friends. They enter it under Invites → Enter Room Code. Up to three friends can join. The host chooses a sector from Deploy. The relay connects the group without port forwarding.", 17, UI.MUTED)
+	UI.label(parent, "Open Social → Party and create a party. Copy the room code to share it with up to three friends. They can enter it on the Party tab. When everyone has joined, the host selects Choose Co-op Sector.", 17, UI.MUTED)
 	UI.label(parent, "Save recent teammates from Friends and send private messages while you're in the same party.", 17, UI.MUTED)
 	if not RiftRelay.available:
 		UI.label(parent, RiftRelay.RELAY_UNAVAILABLE, 16, UI.MUTED)

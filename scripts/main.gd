@@ -927,7 +927,6 @@ func show_main_menu() -> void:
 	menu.cloud_save_requested.connect(restore_cloud_and_play)
 	menu.online_setup_finished.connect(complete_online_setup)
 	menu.username_changed.connect(persist_username)
-	menu.finish_purchase_requested.connect(purchase_finish)
 	if progress_reset_error != OK:
 		menu.show_page("Save Reset Error")
 		return
@@ -1183,30 +1182,6 @@ func complete_online_setup() -> void:
 		menu.show_page("Saves")
 		return
 	menu.open_slot_picker("Load Game")
-
-func purchase_finish(id: String) -> void:
-	var catalog := preload("res://scripts/operator_skins.gd")
-	if not save_session or not menu.station_panel or not catalog.STORE.has(id) or account.unlocked_skins.has(id):
-		return
-	var cost: int = catalog.STORE[id][3]
-	if profile.credits < cost:
-		return
-	profile.credits -= cost
-	if persist_operator_save() != OK:
-		profile.credits += cost
-		menu.inventory_status = "Could not save the purchase."
-	else:
-		account.unlocked_skins.append(id)
-		if account.save() != OK:
-			account.unlocked_skins.erase(id)
-			profile.credits += cost
-			var refund := persist_operator_save()
-			menu.inventory_status = "Could not save the finish. Bolts refunded." if refund == OK else "Purchase interrupted. Save your operator to persist the refund."
-		else:
-			menu.inventory_status = "Unlocked %s for this profile." % catalog.label(id)
-			if is_instance_valid(home_hub):
-				home_hub.set_bank(profile.credits, profile.core_shards, profile.player_level())
-	menu.show_page("Cosmetics")
 
 func current_armor_finish() -> String:
 	return account.display_skin(save_session.slot) if account and save_session else ""

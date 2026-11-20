@@ -124,16 +124,19 @@ func award_clear(sector: int, difficulty: int, result := {}) -> Dictionary:
 			records[key] = seconds
 		track_survival(float(result.get("survival", seconds)), str(result.get("operator", "RX-07")))
 	var before_skins := unlocked_skins.duplicate()
+	var new_finish := ""
 	if sector >= 1 and sector <= SkinKit.Catalog.SECTORS.size() and difficulty >= Difficulty.HARD:
 		var reward: String = SkinKit.Catalog.SECTORS[sector - 1].reward
 		if not unlocked_skins.has(reward):
 			unlocked_skins.append(reward)
 		if difficulty == Difficulty.NIGHTMARE:
-			var variant := "variant:%d" % sector
+			var variant := SkinKit.expert_finish(sector)
 			if not unlocked_skins.has(variant):
 				unlocked_skins.append(variant)
+				new_finish = variant
 	if save() != OK:
 		unlocked_skins = before_skins
+		new_finish = ""
 		experience = previous
 		records = previous_records
 		longest_run = previous_run
@@ -141,7 +144,7 @@ func award_clear(sector: int, difficulty: int, result := {}) -> Dictionary:
 		total_clears -= 1
 		total_kills -= kills
 		push_warning("Could not save completed-sector Player Profile XP.")
-	return {"before": previous, "after": experience}
+	return {"before": previous, "after": experience, "unlocked_finish": new_finish}
 
 func track_survival(seconds: float, operator: String) -> bool:
 	if not is_finite(seconds) or seconds <= longest_run:

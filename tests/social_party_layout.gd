@@ -1,6 +1,11 @@
 extends SceneTree
+
+const Codes := preload("res://addons/GD-Sync/Scripts/Enums/Enums.gd")
+
 class PeerPreview extends Node:
 	var leader:=1
+	func is_active() -> bool: return true
+	func account_is_logged_in() -> bool: return true
 	func get_client_id() -> int: return 1
 	func get_host() -> int: return leader
 	func is_host() -> bool: return leader==1
@@ -68,6 +73,35 @@ func run() -> void:
 	relay.pending="join"
 	menu.refresh_online_room()
 	check(not menu.relay_code.editable and menu.relay_leave.visible,"connecting state offers cancellation and locks code entry")
+	var social := root.get_node("RiftSocial")
+	var previous_teammates: Dictionary = social.recent_players
+	var previous_friends: Array = relay.directory.friends.duplicate()
+	var previous_username: String = relay.directory.username
+	var was_ready: bool = relay.relay_ready
+	relay.relay_ready = true
+	relay.directory.username = "RosterFixture"
+	relay.directory.friends.assign([
+		{"Username": "Kit", "FriendStatus": Codes.FRIEND_STATUS.FRIEND, "Online": false},
+		{"Username": "Pixelz", "FriendStatus": Codes.FRIEND_STATUS.FRIEND, "Online": true},
+	])
+	social.recent_players = {
+		"kit-operator": {"name": "kit"},
+		"pix-operator": {"name": "Pixelz"},
+		"pix-other-device": {"name": "PIXELZ"},
+		"recent-operator": {"name": "Cinder"},
+	}
+	var panel = load("res://scripts/social_panel.gd")
+	var contacts: Array[Dictionary] = panel.contacts(true)
+	for name in ["Kit", "Pixelz"]:
+		var rows := contacts.filter(func(contact: Dictionary): return String(contact.name).nocasecmp_to(name) == 0)
+		check(rows.size() == 1 and rows[0].saved and rows[0].recent
+			and rows[0].directory and rows[0].playing == (name == "Pixelz"), "%s has one account row with correct presence" % name)
+	check(contacts.any(func(contact: Dictionary): return contact.name == "Cinder" and contact.recent),
+		"Unrelated teammates remain in Recent")
+	social.recent_players = previous_teammates
+	relay.directory.friends.assign(previous_friends)
+	relay.directory.username = previous_username
+	relay.relay_ready = was_ready
 	relay.relay=original
 	relay.connected_room=""
 	relay.pending=""

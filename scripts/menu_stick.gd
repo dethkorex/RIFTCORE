@@ -174,6 +174,8 @@ func scroll_ancestor(control: Control) -> ScrollContainer:
 	return ancestor as ScrollContainer
 
 func scroll_region(focused: Control) -> ScrollContainer:
+	if focused.is_in_group(&"operator_preview"):
+		return null
 	var own := scroll_ancestor(focused)
 	if own:
 		return own

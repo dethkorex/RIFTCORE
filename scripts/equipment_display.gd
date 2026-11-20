@@ -5,25 +5,34 @@ const Pad := preload("res://assets/hub/deploy_pad.tscn")
 
 var actor: RiftPlayer
 var compact := false
+var neutral_lighting := false
 var skin := ""
 var customized: Dictionary = {}
+var dragging := false
+var rotation_axis := 0.0
 const SkinKit := preload("res://scripts/operator_skins.gd")
 
 func _ready() -> void:
 	stretch = true
 	custom_minimum_size = Vector2(116, 160) if compact else Vector2(225, 270)
 	size_flags_vertical = Control.SIZE_FILL if compact else Control.SIZE_EXPAND_FILL
-	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	mouse_filter = Control.MOUSE_FILTER_STOP
+	mouse_default_cursor_shape = Control.CURSOR_DRAG
+	focus_mode = Control.FOCUS_ALL
+	add_to_group(&"operator_preview")
+	focus_exited.connect(func(): rotation_axis = 0.0)
 	var view := SubViewport.new()
 	view.own_world_3d = true
 	view.transparent_bg = true
 	view.gui_disable_input = true
 	view.render_target_update_mode = SubViewport.UPDATE_WHEN_VISIBLE
+	if neutral_lighting:
+		view.msaa_3d = Viewport.MSAA_4X
 	add_child(view)
 	var environment := WorldEnvironment.new()
 	environment.environment = Environment.new()
 	environment.environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	environment.environment.ambient_light_color = Color("a7bce6")
+	environment.environment.ambient_light_color = Color("e4ebf8" if neutral_lighting else "a7bce6")
 	environment.environment.ambient_light_energy = 0.75
 	view.add_child(environment)
 	var display_pad := Pad.instantiate() as Node3D
@@ -38,8 +47,8 @@ func _ready() -> void:
 	camera.position = Vector3(0, 1.27, 4.2)
 	camera.look_at(Vector3(0, 1.01, 0))
 	camera.make_current()
-	light(view, Vector3(-1.8, 3.0, 2.3), Color("b9e9ff"), 2.2)
-	light(view, Vector3(1.8, 1.8, -1.3), Color("ec64ff"), 1.85)
+	light(view, Vector3(-1.8, 3.0, 2.3), Color("f9fcff" if neutral_lighting else "b9e9ff"), 1.85 if neutral_lighting else 2.2)
+	light(view, Vector3(1.8, 1.8, -1.3), Color("b8c6df" if neutral_lighting else "ec64ff"), 1.85)
 	actor = PlayerScene.instantiate() as RiftPlayer
 	view.add_child(actor)
 	actor.position.y = 1.01
@@ -47,10 +56,44 @@ func _ready() -> void:
 	actor.collision_mask = 0
 	actor.set_physics_process(false)
 	actor.model_root.rotation.y = -0.37
+	if neutral_lighting:
+		(actor.get_node("CoreLight") as OmniLight3D).light_energy = 0.65
 	set_appearance(skin)
 	actor.play_character_animation("idle", true)
 	if actor.animation_player:
 		actor.animation_player.advance(0.0)
+	if not compact:
+		var hint := preload("res://scripts/rift_ui.gd").label(self, "Drag to rotate  ·  Focus for right stick", 14, Color("96abc2"))
+		hint.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
+		hint.offset_top = -25.0
+		hint.offset_bottom = -5.0
+		hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		focus_entered.connect(func(): hint.modulate = Color("72dcff"))
+		focus_exited.connect(func(): hint.modulate = Color.WHITE)
+
+func _gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		dragging = event.pressed
+		if dragging:
+			grab_focus()
+		accept_event()
+	elif event is InputEventMouseMotion and dragging:
+		dragging = (event.button_mask & MOUSE_BUTTON_MASK_LEFT) != 0
+		if dragging:
+			rotate_operator(event.relative.x * 0.012)
+			accept_event()
+	elif event is InputEventJoypadMotion and event.axis == JOY_AXIS_RIGHT_X:
+		rotation_axis = event.axis_value if absf(event.axis_value) >= .20 else 0.0
+		accept_event()
+
+func _process(delta: float) -> void:
+	if has_focus() and not is_zero_approx(rotation_axis):
+		rotate_operator(rotation_axis * 2.8 * delta)
+
+func rotate_operator(amount: float) -> void:
+	if is_instance_valid(actor):
+		actor.model_root.rotation.y = wrapf(actor.model_root.rotation.y + amount, -PI, PI)
 
 func set_appearance(id: String) -> void:
 	skin = id

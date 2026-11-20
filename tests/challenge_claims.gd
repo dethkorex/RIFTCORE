@@ -46,10 +46,10 @@ func run() -> void:
 	set_meta(&"startup_choice_confirmed", true)
 	root.add_child(game)
 	root.get_node("RiftSettings").show_hub_tips = false
-	game.menu.open_station("Sector Challenges")
+	game.menu.open_station("Sector select")
 	await process_frame
-	check(game.menu.find_children("*", "Button", true, false).all(func(button): return button.text != "Claim Rewards"),
-		"Deploy's challenge preview cannot pay out rewards")
+	check(game.menu.find_children("*", "Button", true, false).all(func(button): return button.text not in ["Challenges", "Claim Rewards"]),
+		"Daily challenges and reward claims live at their own station")
 	game.menu.open_station("Challenges")
 	await process_frame
 	var claim: Button

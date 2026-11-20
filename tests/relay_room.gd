@@ -20,12 +20,21 @@ func run() -> void:
 	root.get_node("RiftSettings").show_hub_tips = false
 	game.open_home_hub()
 	game.home_hub.activate_station()
-	var group := button(game.menu, "Start a Group")
-	failures += int(not check(is_instance_valid(group), "Deploy offers party management"))
-	if not group:
+	failures += int(not check(game.menu.page == "Sector select" and button(game.menu, "Start a Group") == null,
+		"Deployment lists sectors without duplicating party management"))
+	game.menu.leave_page()
+	for station: Dictionary in game.home_hub.STATIONS:
+		if station.page == "Social":
+			game.home_hub.avatar.position.x = station.x
+			break
+	game.home_hub.update_station()
+	game.home_hub.activate_station()
+	var party := button(game.menu, "Party")
+	failures += int(not check(is_instance_valid(party), "Social offers party management"))
+	if not party:
 		quit(failures)
 		return
-	group.pressed.emit()
+	party.pressed.emit()
 	failures += int(not check(game.menu.page == "Party" and game.menu.relay_host.visible, "Party screen offers room controls"))
 	relay.join_room("bad!")
 	failures += int(not check(relay.status.begins_with("Enter the ten-character"), "Invalid join code is rejected locally"))
@@ -36,8 +45,6 @@ func run() -> void:
 		relay.host_room()
 		failures += int(not check(relay.status == relay.RELAY_UNAVAILABLE, "Missing keys produce a clear status"))
 		failures += int(not check(root.get_node_or_null("GDSync") == null, "Unconfigured preview leaves the relay stopped"))
-	game.menu.leave_page()
-	failures += int(not check(game.menu.page == "Sector select", "Back returns from Party to Deploy"))
 	game.menu.leave_page()
 	failures += int(not check(not game.menu.visible and relay.pending.is_empty(), "Back returns to the hub"))
 	game.start_game(false)
