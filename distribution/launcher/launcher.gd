@@ -2,7 +2,7 @@ extends Control
 
 const UpdateClient := preload("res://update_client.gd")
 
-const LAUNCHER_BUILD := 5
+const LAUNCHER_BUILD := 6
 const SteamArtwork := preload("res://steam_artwork.gd")
 
 var client := UpdateClient.new()
@@ -56,7 +56,7 @@ func _ready() -> void:
 	client.repo = repo
 	client.preview_channel = preview_channel
 	installed = client.newest_installed()
-	if not installed.is_empty() and DisplayServer.get_name() != "headless":
+	if DisplayServer.get_name() != "headless":
 		SteamArtwork.apply.call_deferred(install_root)
 	var notes_path := install_root.path_join("PATCH_NOTES.md")
 	if installed == config.get_value("updates", "bundled_notes_tag", "") and FileAccess.file_exists(notes_path):
@@ -198,13 +198,16 @@ func build_ui() -> void:
 		art.texture = splash
 		art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-		art.custom_minimum_size.y = 132
+		art.custom_minimum_size.y = 108
 		art.modulate = Color("b9c9dc")
 		art.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		start.add_child(art)
+	var description := FileAccess.get_file_as_string("res://branding/DESCRIPTION.txt").strip_edges()
+	if not description.is_empty():
+		label(start, description, 15, Color("b3ccdf"))
 	start.add_child(HSeparator.new())
 	status = label(start, "Checking for updates…", 17, Color("e8f5ff"))
-	status.custom_minimum_size.y = 66
+	status.custom_minimum_size.y = 56
 
 	progress = ProgressBar.new()
 	progress.custom_minimum_size.y = 18
@@ -273,7 +276,7 @@ func show_notes(tag: String, notes: String) -> void:
 		notes_body.add_text("No patch notes were published for this build.")
 		return
 	for line in notes.split("\n"):
-		if line.begins_with("# "):
+		if line.is_empty() or line.begins_with("# "):
 			continue
 		if line.begins_with("## "):
 			notes_body.push_bold()

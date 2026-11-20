@@ -27,7 +27,7 @@ def main() -> None:
         with zipfile.ZipFile(archive, "w") as package:
             for name in (executable, "RIFTCORE.pck", "GODOT_LICENSE.txt", "GODOT_COPYRIGHT.txt"):
                 package.writestr(name, "Launcher verification fixture")
-        manifest = {"tag": "v6.3.26-preview", "assets": {platform: {
+        manifest = {"tag": "v6.3.27-preview", "assets": {platform: {
             "file": archive.name, "size": archive.stat().st_size, "sha256": hashlib.sha256(archive.read_bytes()).hexdigest(),
         }}, "notes": (dist.parent / "CHANGELOG.md").read_text(encoding="utf-8")}
         (root / "fixture.json").write_text(json.dumps(manifest), encoding="utf-8")

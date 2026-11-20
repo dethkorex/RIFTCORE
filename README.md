@@ -10,7 +10,7 @@ If you already use Launcher 0.2, open your existing RIFTCORE shortcut and choose
 
 Updates verify the package SHA-256 and retain your saves. For an offline install, the game ZIPs include the standalone game and the Arch portable archive includes both the launcher and the game.
 
-The game and launcher fill in missing library artwork for existing RIFTCORE non-Steam shortcuts. Restart Steam to refresh the artwork if needed. The Steam artwork ZIP also includes the game description.
+The game and launcher fill in missing library artwork for existing RIFTCORE non-Steam shortcuts. Restart Steam to refresh the artwork if needed. The launcher displays the description and latest patch notes when opened from Steam. The Steam artwork ZIP also includes the description.
 
 | Action | Keyboard | Controller |
 | --- | --- | --- |

@@ -3,7 +3,7 @@ extends SceneTree
 const Launcher := preload("res://launcher.gd")
 const Client := preload("res://update_client.gd")
 const START := "v6.3.25-preview"
-const BRIDGE := "v6.3.26-preview"
+const BRIDGE := "v6.3.27-preview"
 const LARGE := "v6.4.0-preview"
 
 class TestClient extends "res://update_client.gd":
@@ -63,11 +63,15 @@ func run() -> void:
 	if DisplayServer.get_name() != "headless":
 		await RenderingServer.frame_post_draw
 		check(root.size.x >= 700 and first.size.x >= 700, "Launcher layout fills its window")
+		check(first.play.get_global_rect().end.y <= first.size.y - 10.0, "The Play button stays visible under the description")
 		root.get_texture().get_image().save_png(args[0].path_join("launcher.png"))
 	first.queue_free()
 	await process_frame
 	var offline := create_launcher(null, "")
 	check(offline.installed == BRIDGE and not offline.play.disabled and offline.update.visible, "Offline startup offers Play and Retry")
+	if DisplayServer.get_name() != "headless":
+		await RenderingServer.frame_post_draw
+		check(offline.update.get_global_rect().end.y <= offline.size.y - 10.0, "The Retry update button stays visible offline")
 	offline.queue_free()
 	await process_frame
 	manifest.tag = LARGE

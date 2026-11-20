@@ -57,7 +57,7 @@ jobs:
           tag="$PREVIEW_TAG"
           if [ "$REF_TYPE" = tag ]; then tag="$REF_NAME"; fi
           bridge=()
-          if [ "$tag" = v6.3.26-preview ]; then bridge+=(--require-legacy-manifest); fi
+          case "$tag" in v6.3.26-preview|v6.3.27-preview) bridge+=(--require-legacy-manifest) ;; esac
           python3 distribution/build_release.py --engine release-tools/Godot_v4.7.2-stable_linux.x86_64             --templates release-tools/templates --licenses release-tools --nsis /usr/bin/makensis             --work release-tools/build --out release-tools/artifacts --tag "$tag" --repo "$RELEASE_REPO" "${bridge[@]}"
       - name: Verify release notes
         run: |
