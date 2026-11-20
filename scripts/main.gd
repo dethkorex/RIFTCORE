@@ -629,7 +629,7 @@ func verify_canopy_coop_crossing(operator: RiftPlayer, mission: Node) -> bool:
 	var route := mission.stage.find_child("CanopyTraverse", true, false) as Node3D
 	if not route:
 		return false
-	var start := route.global_position + Vector3(-2.0, 0.90, 0.0)
+	var start := route.global_position + Vector3(-1.45, 0.89, 0.0)
 	var approach := "CanopyTraverse%d" % mission.act
 	if mission.host:
 		if not await wait_for_relay(func(): return RiftRelay.relay.lobby_get_data("coop_approach_ready", "") == approach, 10.0):
@@ -644,30 +644,60 @@ func verify_canopy_coop_crossing(operator: RiftPlayer, mission: Node) -> bool:
 		RiftRelay.relay.lobby_set_data("coop_approach_ready", approach)
 	if not await wait_for_relay(func(): return operator.global_position.distance_to(start) < 0.95 and operator.grounded(), 10.0):
 		return false
-	Input.action_press("move_right")
-	Input.action_press("climb_up")
-	var completed := true
-	for vine in route.get_children():
-		if not vine.is_in_group(&"jungle_swing"):
-			continue
-		if not await wait_for_relay(func(): return operator.jungle_vine == vine and operator.jungle_swing_time >= 0.89, 4.0):
-			completed = false
-			break
-		Input.action_press("jump")
+	var vines: Array[Node3D] = []
+	for child in route.get_children():
+		if child is Node3D and child.is_in_group(&"jungle_swing"):
+			vines.append(child)
+	var end := Vector2(10.25, 4.25) if mission.act == 1 else Vector2(33.7, 6.55)
+	var released: Dictionary = {}
+	var perch := route.get_node_or_null("RootPerch") as Node3D
+	var used_perch := false
+	var crossed := false
+	for tick in 630:
 		await get_tree().physics_frame
-		await get_tree().physics_frame
-		Input.action_release("jump")
-	Input.action_release("climb_up")
-	var end := route.global_position + (Vector3(10.25, 4.28, 0.0) if mission.act == 1 else Vector3(33.7, 6.58, 0.0))
-	for tick in 150:
-		if operator.global_position.x >= end.x - 0.90:
+		var point := route.to_local(operator.global_position)
+		var next_vine := released.size()
+		var target_x := end.x
+		var grabbing := next_vine < vines.size()
+		if grabbing:
+			var grip := route.to_local(vines[next_vine].hang_at(0.0))
+			target_x = grip.x
+		if perch and next_vine == 2 and not used_perch:
+			target_x = perch.position.x
+			grabbing = false
+			if operator.grounded() and absf(point.x - target_x) < 1.25 and absf(point.y - perch.position.y - 0.85) < 0.28:
+				used_perch = true
+				grabbing = true
+				Input.action_press("jump")
+		var travel := clampf((target_x - point.x) * 0.8, -1.0, 1.0)
+		var holding := operator.jungle_vine
+		if is_instance_valid(holding) and vines.has(holding) and not released.has(holding):
+			if operator.jungle_swing_time < 0.65:
+				Input.action_release("jump")
+			elif holding.angle_at(operator.jungle_swing_time) > 0.76:
+				released[holding] = true
+				Input.action_press("jump")
+				travel = 1.0
+		elif perch and next_vine == 2 and not used_perch:
+			Input.action_release("jump")
+		Input.action_release("move_left" if travel >= 0.0 else "move_right")
+		if absf(travel) > 0.01:
+			Input.action_press("move_right" if travel > 0.0 else "move_left", absf(travel))
+		else:
 			Input.action_release("move_right")
-		if operator.global_position.distance_to(end) < 2.15 and operator.grounded():
+		if grabbing:
+			Input.action_press("climb_up")
+		else:
+			Input.action_release("climb_up")
+		var relay: Node3D = mission.gate_relays.terminals[0]
+		if released.size() == vines.size() and (not perch or used_perch) and operator.grounded() and mission.gate_relays.is_near(operator, relay):
+			crossed = true
 			break
-		await get_tree().physics_frame
-	Input.action_release("move_right")
-	var crossed := completed and operator.grounded() and operator.global_position.distance_to(end) < 2.15
-	print("JUNGLE CANOPY CROSSING ACT ", mission.act, " ", crossed, " at ", operator.global_position)
+		if operator.health <= 0.0 or point.y < -4.5:
+			break
+	for action in ["move_left", "move_right", "climb_up", "jump"]:
+		Input.action_release(action)
+	print("JUNGLE CANOPY CROSSING ACT ", mission.act, " ", crossed, " at ", operator.global_position, " vines=", released.size(), " perch=", used_perch)
 	return crossed
 
 
