@@ -134,6 +134,7 @@ var sector_seconds := 0.0
 var chat_open := false
 var window_input_blocked := false
 var security_defeated := 0
+var act_one_kills := 0
 var lives_lost := 0
 var extracted_results: Dictionary = {}
 var party_results: Dictionary[int, Array] = {}
@@ -442,7 +443,9 @@ func load_stage(packed: PackedScene = null) -> void:
 			operator.fell_into_pit.connect(respawn_operator.bind(operator,true))
 			operator.died.connect(respawn_operator.bind(operator))
 			operator.projectile_deflected.connect(func(id: int): peer.call_func(receive_deflection, act, id))
-		operator.set_armor_finish(String(peer.player_get_data(roster[index], "armor_finish", "")))
+		var frame := String(peer.player_get_data(roster[index], "operator_frame", ""))
+		var finish := String(peer.player_get_data(roster[index], "armor_finish", ""))
+		operator.set_operator_appearance(frame, finish)
 		operators.append(operator)
 		var plate := Label3D.new()
 		plate.position.y = 1.48
@@ -752,6 +755,7 @@ func on_boss_defeated() -> void:
 			restore_operator.call_deferred(operator, gate.global_position + Vector3(3.0, 1.0, 0.0))
 	award_team_experience((35 if act == 1 else 80) + sector * 8)
 	if act == 2:
+		grant_main_boss_life()
 		create_boss_cache()
 		var reward: String = Catalog.info(sector).reward
 		var first_unlock := not active_weapon_ids.has(reward)
@@ -764,6 +768,10 @@ func on_boss_defeated() -> void:
 			peer.call_func(receive_suit_reveal, act, reward)
 			play_suit_reveal.call_deferred(reward)
 	update_doors()
+
+func grant_main_boss_life() -> void:
+	if local_profile.grant_first_boss_life(sector, persist_reserves) and is_instance_valid(personal_hud):
+		personal_hud.announce("+1 BONUS LIFE  /  FIRST BOSS DEFEAT", Color("8ff6ac"), 32)
 
 func receive_suit_reveal(remote_act: int, reward: String) -> void:
 	if not host and remote_act == act and act == 2 and reward == Catalog.info(sector).reward and peer.get_sender_id() == peer.get_host() and not suit_reveal_playing:
@@ -1085,8 +1093,10 @@ func change_act(next: int) -> void:
 		else:
 			relay_owner.leave("Act II could not load. Check your installation and try again.")
 		return
-	if act == 1 and operators[local_index].health > 0.0:
-		challenges_completed += local_profile.record_challenges(sector, {"act": 1}, persist_challenges)
+	if act == 1:
+		act_one_kills = security_defeated
+		if operators[local_index].health > 0.0:
+			challenges_completed += local_profile.record_challenges(sector, {"act": 1, "mode": mode, "act_kills": act_one_kills}, persist_challenges)
 	act = next
 	load_stage(packed)
 	loading.begin()
@@ -1566,6 +1576,7 @@ func broadcast_state(reliable_operators := false) -> void:
 		boss_state.append([])
 	var pressure := stage.get_node_or_null("TERRAIN/PressureBreach")
 	boss_state.append(pressure.snapshot() if pressure else [])
+	boss_state.append(security_defeated)
 	if is_instance_valid(boss):
 		boss_state[0] = boss.global_position
 		boss_state[1] = boss.rotation
@@ -1596,6 +1607,8 @@ func receive_state(remote_act: int, security: PackedFloat32Array, arena: Array, 
 	if host or changing_act or remote_act != act or not outcome.is_empty() or peer.get_sender_id() != peer.get_host() or sequence <= latest_state or security.size() != enemies.size() * 6:
 		return
 	latest_state = sequence
+	if arena.size() > 20:
+		security_defeated = int(arena[20])
 	if arena.size() > 17:
 		gate_relays.set_active(int(arena[17]))
 	if arena.size() > 18 and is_instance_valid(lava_escape):
@@ -1632,6 +1645,8 @@ func receive_state(remote_act: int, security: PackedFloat32Array, arena: Array, 
 		boss_started = arena[3]
 	if act == 2 and arena[4] and not cache_opened and not boss_defeated and not is_instance_valid(boss_cache):
 		create_boss_cache()
+	if act == 2 and arena[4] and not boss_defeated:
+		grant_main_boss_life()
 	boss_defeated = arena[4]
 	if is_instance_valid(boss) and not boss_intro_active:
 		var was_visible := boss.visible
@@ -1916,6 +1931,11 @@ func _process(delta: float) -> void:
 	stats.text = "Security %d left  ·  %d blueprints" % [security_left, blueprints]
 	update_personal_hud(operators[local_index])
 
+func remote_reserves_for(index: int) -> int:
+	if index == local_index:
+		return local_profile.reserve_lives
+	return remote_players[roster[index]].profile.reserve_lives
+
 func challenge_results(index := 0) -> Dictionary:
 	if not extracted_results.is_empty() or not host:
 		return extracted_results
@@ -1930,8 +1950,9 @@ func challenge_results(index := 0) -> Dictionary:
 			continue
 		health = minf(health, 100.0 * operator.health / operator.max_health)
 		energy = minf(energy, 100.0 * operator.energy / operator.max_energy)
-	return {"act": 1, "clear": 1, "clean": int(lives_lost == 0), "kills": security_defeated,
+	return {"act": 1, "act_kills": act_one_kills, "mode": mode, "clear": 1, "clean": int(lives_lost == 0), "kills": security_defeated,
 		"materials": count, "bolts": ledger.bolts, "time": sector_seconds, "health": health, "energy": energy,
+		"lives": operators[index].lives + remote_reserves_for(index),
 		"recovered": ledger.materials.duplicate(), "supplies": ledger.supplies.duplicate(),
 		"weapons": operators[index].run_weapon_ids.duplicate(), "equipped": operators[index].equipped_suit()}
 
@@ -2054,6 +2075,9 @@ func finish_mission(success: bool, xp: int, bolts: int, blueprints: Array, exhau
 		var extraction_dialogue: Array = Story.hard_unlock(sector) if new_hard_unlock else []
 		if not profile_xp_progress.is_empty():
 			preload("res://scripts/mission_complete.gd").profile_progress(rewards_status.get_parent(), profile_xp_progress)
+			var points := int(profile_xp_progress.get("gamer_points", 0))
+			if points > 0:
+				UI.label(rewards_status.get_parent(), "ACHIEVEMENT UNLOCKED  ·  +%d GAMER SCORE" % points, 17, UI.VIOLET)
 		rewards_status.text = "Recovered items sent to Storage. Save at the System pad to keep your rewards."
 		if extracted_results.get("banked_shards", 0) > 0:
 			rewards_status.text += "\nExtraction · +%d Core Shards." % extracted_results.banked_shards

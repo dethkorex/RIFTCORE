@@ -21,11 +21,13 @@ func run() -> void:
 	profile.reserve_lives = 6
 	var starting_shards: int = profile.core_shards
 	check(session.save_slot() == OK, "Scratch operator saved")
-	check(profile.record_challenges(1, {"act": 1}, session.persist_challenge_progress) == 1,
-		"Entering Act II unlocks a reward")
+	check(profile.record_challenges(1, {"act": 1, "act_kills": 5}, session.persist_challenge_progress) == 0,
+		"Reaching Act II without the required security defeats does not clear the challenge")
+	check(profile.record_challenges(1, {"act": 1, "act_kills": 6}, session.persist_challenge_progress) == 1,
+		"Reaching Act II after six security defeats unlocks a reward")
 	check(profile.credits == 200 and profile.core_shards == starting_shards and profile.reserve_lives == 6,
 		"Challenge completion never pays automatically")
-	check(profile.record_challenges(1, {"act": 1}) == 0, "Repeating the objective does not increase the payout")
+	check(profile.record_challenges(1, {"act": 1, "act_kills": 6}) == 0, "Repeating the objective does not increase the payout")
 	var restored = saves.new(1)
 	check(restored.load_slot() and restored.profile.challenge_cycle(1).done == [0],
 		"Ready-to-claim progress survives a reload before extraction")
@@ -64,13 +66,17 @@ func run() -> void:
 			"The selected sector links directly to the claim button for controller navigation")
 		claim.pressed.emit()
 	check(profile.credits == 200 + before.credits and profile.core_shards == starting_shards + before.shards
-		and profile.reserve_lives == 7, "Claim adds Bolts, Core Shards, and an extra life")
-	check(restored.load_slot() and restored.profile.reserve_lives == 7 and restored.profile.credits == profile.credits
+		and profile.reserve_lives == 6, "Ordinary claims add Bolts and Core Shards but no bonus life")
+	check(restored.load_slot() and restored.profile.reserve_lives == 6 and restored.profile.credits == profile.credits
 		and restored.profile.claim_challenge_rewards(1) == ERR_DOES_NOT_EXIST, "Claim and its wallet are persisted together")
 
-	var payout: int = profile.record_challenges(3, {"act": 1, "clear": 1, "clean": 1, "kills": 10, "materials": 5})
+	var run := {"act": 1, "act_kills": 6, "clear": 1, "clean": 1, "kills": 18, "materials": 10, "mode": Difficulty.NORMAL}
+	check(profile.record_challenges(3, run) == 3, "Normal runs earn base goals without Hard-only rewards")
+	check(profile.challenge_rewards(3, profile.challenge_cycle(3)).lives == 0, "Normal goals never grant lives")
+	run.mode = Difficulty.HARD
+	var payout: int = profile.record_challenges(3, run)
 	var set_reward: Dictionary = profile.challenge_rewards(3, profile.challenge_cycle(3))
-	check(payout == 5 and set_reward.shards == 7 + profile.challenge_set_shards(3),
+	check(payout == 2 and set_reward.lives == 1 and set_reward.shards == 7 + profile.challenge_set_shards(3),
 		"Completing the set adds its reduced shard bonus once")
 	check(Difficulty.extraction_shards(1, Difficulty.NORMAL) == 2 and Difficulty.extraction_shards(10, Difficulty.NIGHTMARE) == 6,
 		"Base shard rewards scale by sector and difficulty")
@@ -80,6 +86,12 @@ func run() -> void:
 		catalog.spark_cell.energy == 25 and catalog.field_pack.hp >= 20 and catalog.guard_film.duration == 24,
 		"Starter supplies give better recovery and longer buffs at lower prices")
 
+	check(not profile.grant_first_boss_life(2, func(): return ERR_CANT_CREATE) and profile.reserve_lives == 6,
+		"Failed first-boss save does not grant a life")
+	check(profile.grant_first_boss_life(2, session.persist_reserve_lives) and profile.reserve_lives == 7,
+		"First main boss defeat banks one bonus life")
+	check(restored.load_slot() and not restored.profile.grant_first_boss_life(2) and restored.profile.reserve_lives == 7,
+		"Reloading and repeating a main boss cannot grant the same life")
 	game.start_game(false, 1)
 	await process_frame
 	check(game.player.lives == 3 and game.factory_hud.lives == 10, "Solo HUD displays starting and bonus lives as one total")
@@ -93,14 +105,18 @@ func run() -> void:
 	await create_timer(1.4, true).timeout
 	var shards_before_extraction: int = profile.core_shards
 	var bolts_before_extraction: int = profile.credits
+	profile.challenge_cycles.erase(1)
+	game.mission_stats.kills = 12
+	game.mission_stats["act_kills"] = 6
 	game.act = 2
 	game.boss_defeated = true
 	game.player.global_position = game.game_root.get_node("MARKERS/RoomExit").global_position
 	game._process(0.0)
 	check(game.sector_complete and profile.core_shards == shards_before_extraction + 2 and
 		profile.credits == bolts_before_extraction + 160, "Extraction awards the reduced mission payout only")
-	check(profile.challenge_rewards(1, profile.challenge_cycle(1)).lives > 0 and profile.reserve_lives == 6,
-		"Extraction leaves newly completed challenge rewards waiting at the station")
+	var pending: Dictionary = profile.challenge_rewards(1, profile.challenge_cycle(1))
+	check(pending.credits > 0 and pending.lives == 0 and profile.reserve_lives == 7,
+		"Extraction banks the first boss life and leaves ordinary challenge rewards ready to claim")
 	paused = false
 	game.queue_free()
 	await process_frame

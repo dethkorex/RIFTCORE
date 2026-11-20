@@ -30,11 +30,11 @@ var blueprint_visuals: Dictionary = {}
 var blueprint_requests: Dictionary = {}
 var avatar: RiftPlayer
 var initial_finish := ""
+var initial_frame := ""
 var partners: Dictionary = {}
 var local_online_label: Label3D
 var station_sync := 0.0
 var camera: Camera3D
-var prompt: Label3D
 var current_station := -1
 var pad_prompt := not Input.get_connected_joypads().is_empty()
 var panel_open := false
@@ -75,15 +75,12 @@ func _ready() -> void:
 	avatar = AVATAR.instantiate() as RiftPlayer
 	add_child(avatar)
 	avatar.position = Vector3(0, 1.11, 0)
-	avatar.set_armor_finish(initial_finish)
+	avatar.set_operator_appearance(initial_frame, initial_finish)
 	avatar.set_physics_process(false)
 	avatar.collision_layer = 0
 	avatar.collision_mask = 0
 	avatar.model_root.rotation.y = 0.28
 	avatar.play_character_animation("idle", true)
-	prompt = label_in_space(avatar, "", Vector3(0, 1.22, 0.25), 36, Color.WHITE)
-	prompt.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	prompt.no_depth_test = true
 	local_online_label = label_in_space(avatar, "", Vector3(0, 0.96, 0), 27, Color("91edff"))
 	local_online_label.pixel_size *= UI.COOP_NAME_SCALE
 	local_online_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
@@ -344,7 +341,9 @@ func update_partner(id: int, x: float, facing: float, animation: String, display
 		partners[id] = {"actor": partner, "label": partner_label, "microphone": microphone}
 	var entry: Dictionary = partners[id]
 	if is_instance_valid(RiftRelay.relay) and not RiftRelay.connected_room.is_empty():
-		entry.actor.set_armor_finish(String(RiftRelay.relay.player_get_data(id, "armor_finish", "")))
+		var frame := String(RiftRelay.relay.player_get_data(id, "operator_frame", ""))
+		var finish := String(RiftRelay.relay.player_get_data(id, "armor_finish", ""))
+		entry.actor.set_operator_appearance(frame, finish)
 	entry.label.text = display_name
 	entry.label.modulate = UI.operator_tint(id, RiftRelay.relay.get_host(), RiftRelay.relay.lobby_get_all_clients())
 	entry.x = x
@@ -374,13 +373,10 @@ func update_station() -> void:
 	if nearest != current_station and nearest >= 0:
 		RiftAudio.play_effect(&"menu_move")
 	current_station = nearest
-	prompt.visible = nearest >= 0 and not panel_open and not reconstructing and not has_dialogue()
-	station_notice.visible = prompt.visible
+	station_notice.visible = nearest >= 0 and not panel_open and not reconstructing and not has_dialogue()
 	if nearest >= 0:
-		prompt.text = STATIONS[nearest].name.to_upper()
-		prompt.modulate = STATIONS[nearest].color.lerp(Color.WHITE, 0.32)
 		station_notice.text = "%s   /   %s INTERACT" % [STATIONS[nearest].name.to_upper(), interact_hint()]
-		station_notice.add_theme_color_override("font_color", prompt.modulate)
+		station_notice.add_theme_color_override("font_color", STATIONS[nearest].color.lerp(Color.WHITE, 0.32))
 
 func interact_hint() -> String:
 	if pad_prompt and not Input.get_connected_joypads().is_empty():

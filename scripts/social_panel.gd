@@ -10,7 +10,6 @@ const Codes := preload("res://addons/GD-Sync/Scripts/Enums/Enums.gd")
 
 static func contacts(include_directory := false) -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
-	var recent_by_name := {}
 	for friend in RiftSocial.contacts():
 		friend.key = "steam:" + friend.id
 		friend.chat = int(friend.id)
@@ -26,10 +25,6 @@ static func contacts(include_directory := false) -> Array[Dictionary]:
 			"saved": RiftSocial.rift_friends.has(id), "party": in_party, "playing": in_party, "recent": true,
 			"priority": -1 if in_party else 4, "status": "In your party" if in_party else "Recent teammate"}
 		result.append(teammate)
-		var name_key := String(person.name).strip_edges().to_lower()
-		if not recent_by_name.has(name_key):
-			recent_by_name[name_key] = []
-		recent_by_name[name_key].append(teammate)
 	if include_directory and RiftRelay.directory.online():
 		var seen_accounts := {}
 		for entry in RiftRelay.directory.friends:
@@ -49,17 +44,18 @@ static func contacts(include_directory := false) -> Array[Dictionary]:
 				"directory": true, "relation": relation, "chat": "account:" + username, "saved": relation == Codes.FRIEND_STATUS.FRIEND,
 				"joinable": online and not RiftRelay.directory.friend_room_code(entry).is_empty(),
 				"party": false, "playing": online, "recent": false, "priority": 0 if online else 2, "status": state}
-			# Signed-in teammates share their account username as the lobby alias.
-			# Retain their filters and pin without rendering a second contact card.
-			for teammate: Dictionary in recent_by_name.get(name_key, []):
-				result.erase(teammate)
-				contact.recent = true
-				contact.pinned = contact.get("pinned", false) or RiftSocial.pinned.has(teammate.key)
-				if teammate.party:
-					contact.party = true
-					contact.priority = -1
-					if not online:
-						contact.chat = teammate.chat
+			if contact.saved:
+				for alias in result.duplicate():
+					if String(alias.name).strip_edges().nocasecmp_to(username) != 0:
+						continue
+					result.erase(alias)
+					contact.recent = contact.recent or alias.recent
+					contact.pinned = contact.get("pinned", false) or RiftSocial.pinned.has(alias.key)
+					if alias.party:
+						contact.party = true
+						contact.priority = -1
+						if not online:
+							contact.chat = alias.chat
 			result.append(contact)
 	result.sort_custom(func(a, b):
 		var a_pin: bool = a.get("pinned", false) or RiftSocial.pinned.has(a.key)
@@ -110,6 +106,10 @@ static func message_contacts() -> Array[Dictionary]:
 		var persona: String = RiftSocial.steam.getFriendPersonaName(id)
 		if not persona.is_empty() and persona != "[unknown]":
 			name = persona
+		if rows.any(func(contact):
+			return contact.get("directory", false) and contact.saved and String(contact.name).nocasecmp_to(name.strip_edges()) == 0
+		):
+			continue
 		rows.append({"key": "steam:" + str(id), "chat": id, "id": str(id), "name": name, "status": "Steam conversation", "party": false, "playing": false, "recent": false, "saved": false})
 	return rows
 
@@ -154,6 +154,7 @@ static func build_friends(menu, columns: HBoxContainer) -> void:
 	UI.button(tools, "Setup Guide", menu.show_page.bind("Co-op Setup Guide"), false, 34)
 	var name := UI.label(details, "Choose a friend", 32, UI.CYAN)
 	var status := UI.label(details, "", 16, UI.MUTED)
+	var score := UI.label(details, "", 18, UI.VIOLET)
 	details.add_child(HSeparator.new())
 	var actions := UI.column(details, 8)
 	var note := UI.label(details, "", 16, UI.CYAN)
@@ -174,6 +175,8 @@ static func build_friends(menu, columns: HBoxContainer) -> void:
 		actions.add_child(primary)
 		name.text = contact.get("name", "Choose a friend")
 		status.text = contact.get("status", "Use Find Friends to add someone by username.")
+		score.visible = contact.get("directory", false) and contact.get("saved", false)
+		score.text = "%d GAMER SCORE" % RiftRelay.directory.friend_gamer_score(String(contact.get("name", "")))
 		if contact.get("directory", false) and contact.get("saved", false):
 			status.text = "●  " + String(contact.status)
 			status.add_theme_color_override("font_color", Color("62ea98") if contact.playing else Color("ff687e"))
@@ -853,7 +856,7 @@ static func build_invites(menu, columns: HBoxContainer) -> void:
 			var join := UI.button(row, "Join Game", func():
 				if RiftRelay.can_receive_invite():
 					RiftSocial.remove_invite(code)
-					RiftRelay.join_room(code)
+					RiftRelay.join_room(code, String(record.get("password", "")))
 					menu.show_page("Party")
 			, false, 36)
 			join.disabled = not RiftRelay.can_receive_invite()

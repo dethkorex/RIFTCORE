@@ -119,6 +119,7 @@ func _ready() -> void:
 		or get_tree().has_group(&"interactive_dialogue"))
 	add_child(pointer)
 	RiftRelay.invite_received.connect(show_friend_invite)
+	RiftRelay.directory.gamer_score_changed.connect(sync_achievement_finishes)
 	RiftRelay.directory.friend_request_received.connect(show_friend_request)
 	var arguments := OS.get_cmdline_user_args()
 	if "--coop-stress" in arguments:
@@ -186,8 +187,8 @@ func show_friend_request(sender: String) -> void:
 		if is_instance_valid(layer):
 			layer.queue_free())
 
-func show_friend_invite(display_name: String, code: String) -> void:
-	RiftSocial.record_invite(display_name, code)
+func show_friend_invite(display_name: String, code: String, password: String) -> void:
+	RiftSocial.record_invite(display_name, code, password)
 	if is_instance_valid(invite_overlay):
 		invite_overlay.queue_free()
 	var layer := CanvasLayer.new()
@@ -218,7 +219,7 @@ func show_friend_invite(display_name: String, code: String) -> void:
 				if not is_instance_valid(home_hub):
 					return
 				RiftSocial.remove_invite(code)
-				RiftRelay.join_room(code)
+				RiftRelay.join_room(code, password)
 				layer.queue_free()
 		, true, 35).focus_mode = Control.FOCUS_NONE
 		UI.button(buttons, "Dismiss", func():
@@ -995,6 +996,7 @@ func start_coop_mission(is_host: bool, number: int) -> void:
 	RiftAudio.play_music(true, number)
 
 func bank_coop_rewards(xp: int, bolts: int, blueprints: Array, number: int) -> void:
+	profile.grant_first_boss_life(number, save_session.persist_reserve_lives if save_session else Callable())
 	profile.record_sector_clear(number, RiftRelay.mission_mode)
 	var results: Dictionary = coop_mission.challenge_results()
 	coop_mission.challenges_completed += profile.record_challenges(number, results)
@@ -1004,7 +1006,7 @@ func bank_coop_rewards(xp: int, bolts: int, blueprints: Array, number: int) -> v
 	var supplies: Dictionary = results.get("supplies", {}).duplicate()
 	var packs := int(profile.apply_resupply_contract(supplies))
 	profile.deposit_supplies(supplies)
-	coop_mission.profile_xp_progress = award_profile_clear(number, RiftRelay.mission_mode, coop_mission.sector_seconds, int(results.get("kills", 0)), true)
+	coop_mission.profile_xp_progress = award_profile_clear(number, RiftRelay.mission_mode, coop_mission.sector_seconds, int(results.get("kills", 0)), true, results)
 	profile.credits += bolts
 	var shards := Difficulty.extraction_shards(number, RiftRelay.mission_mode) + int(profile.talent_bonus("shard_reclaimer"))
 	profile.core_shards += shards
@@ -1134,6 +1136,7 @@ func refresh_recovery_menu() -> void:
 
 func refresh_menu_save() -> void:
 	menu.profile = profile
+	menu.persist_frame_purchase = persist_operator_save
 	menu.active_slot = save_session.slot if save_session else 0
 	menu.developer_session = checkpoint_path != SAVE_PATH
 	var save := read_checkpoint()
@@ -1181,10 +1184,22 @@ func complete_online_setup() -> void:
 	if cloud.conflict:
 		menu.show_page("Saves")
 		return
+	sync_achievement_finishes()
 	menu.open_slot_picker("Load Game")
+
+func sync_achievement_finishes() -> void:
+	var directory := RiftRelay.directory
+	if not account or not directory.online() or not directory.progress.checked_release or directory.progress.conflict:
+		return
+	directory.gamer_score.use_account(directory.username)
+	account.restore_achievement_finishes(directory.gamer_score.earned)
+	directory.register_gamer_finishes(account.unlocked_skins)
 
 func current_armor_finish() -> String:
 	return account.display_skin(save_session.slot) if account and save_session else ""
+
+func current_operator_frame() -> String:
+	return account.display_frame(save_session.slot) if account and save_session else ""
 
 func persist_username() -> void:
 	RiftRelay.local_name = RiftRelay.directory.username
@@ -1202,6 +1217,7 @@ func restore_cloud_and_play() -> void:
 	account = PlayerAccount.new()
 	account.restore()
 	menu.account = account
+	sync_achievement_finishes()
 	refresh_menu_save()
 	menu.open_slot_picker("Load Game")
 
@@ -1239,6 +1255,8 @@ func select_save_slot(number: int, fresh: bool, operator_name := "") -> void:
 	RiftSettings.remember_operator_name(profile.operator_name)
 	get_tree().set_meta(&"riftcore_save_session", selected)
 	if account:
+		if fresh:
+			account.operator_frames.erase(number)
 		account.last_operator = number
 		account.save()
 	var play_prologue := fresh and DisplayServer.get_name() != "headless"
@@ -1295,6 +1313,8 @@ func reset_player_profile() -> void:
 	menu.show_page("Set up Player Profile")
 
 func clear_deleted_operator(slot: int) -> void:
+	if account and account.operator_frames.erase(slot):
+		account.save()
 	if save_session and save_session.slot == slot:
 		save_session = null
 		profile = ManualSave.Profile.new()
@@ -1376,7 +1396,7 @@ func open_home_hub() -> void:
 	if account:
 		if RiftSettings.startup_mode == "online":
 			RiftRelay.directory.configure.call_deferred(account.display_name)
-	RiftRelay.publish_armor_finish(current_armor_finish())
+	RiftRelay.publish_operator_appearance(current_operator_frame(), current_armor_finish())
 	RiftRelay.unlocked_sector = profile.unlocked_sector
 	RiftRelay.set_difficulty_unlocks(profile.normal_clears.keys(), profile.nightmare_unlocked())
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
@@ -1389,6 +1409,7 @@ func open_home_hub() -> void:
 	home_hub = HOME_HUB.instantiate() as Node3D
 	home_hub.profile = profile
 	home_hub.initial_finish = current_armor_finish()
+	home_hub.initial_frame = current_operator_frame()
 	home_hub.persist_blueprint_trade = persist_blueprint_trade
 	add_child(home_hub)
 	home_hub.set_bank(profile.credits, profile.core_shards, profile.player_level())
@@ -1432,8 +1453,10 @@ func persist_blueprint_trade() -> Error:
 
 func close_station_panel() -> void:
 	if is_instance_valid(home_hub):
-		home_hub.avatar.set_armor_finish(current_armor_finish())
-		RiftRelay.publish_armor_finish(current_armor_finish())
+		var frame := current_operator_frame()
+		var finish := current_armor_finish()
+		home_hub.avatar.set_operator_appearance(frame, finish)
+		RiftRelay.publish_operator_appearance(frame, finish)
 	menu.process_mode = Node.PROCESS_MODE_DISABLED
 	if is_instance_valid(home_hub):
 		if save_session and save_session.owns_slot and menu.page in ["Shop", "Gear", "Storage", "Fabrication", "Upgrades", "Craft Item", "Learn Blueprint", "Blueprint Details"]:
@@ -1770,7 +1793,7 @@ func build_level() -> void:
 	var combat_scale := Difficulty.combat_scale(sector, mission_difficulty)
 	actors_root.set_meta("opponent_health_scale", combat_scale)
 	actors_root.set_meta("mission_difficulty", mission_difficulty)
-	player.set_armor_finish(current_armor_finish())
+	player.set_operator_appearance(current_operator_frame(), current_armor_finish())
 	player.damage_taken_scale = combat_scale
 	player.experience = 0
 	player.quick_profile = profile
@@ -1872,7 +1895,11 @@ func bind_boss_signals() -> void:
 			minion.queue_free()
 		var message := "MINIBOSS DOWN  /  ACT 2 OPEN"
 		var reveal := false
+		var bonus_life := false
 		if act == 2:
+			bonus_life = profile.grant_first_boss_life(sector, save_session.persist_reserve_lives if save_session else Callable())
+			if bonus_life:
+				factory_hud.lives = player.lives + profile.reserve_lives
 			if sector <= Story.MEMORIES.size() and not profile.memories.has(sector):
 				profile.memories.append(sector)
 			var reward: String = info.reward
@@ -1888,6 +1915,8 @@ func bind_boss_signals() -> void:
 			reveal_suit.call_deferred(info)
 		else:
 			factory_hud.announce(message.to_upper(), Color(info.color))
+		if bonus_life:
+			factory_hud.announce("+1 BONUS LIFE  /  FIRST BOSS DEFEAT", Color("8ff6ac"))
 		factory_hud.exit_task = Story.objective(sector, act, true, Miniboss.TITLES[sector - 1])
 		var barrier := game_root.get_node("ExitBarrier") as StaticBody3D
 		barrier.get_node("CollisionShape3D").set_deferred("disabled", true)
@@ -2024,13 +2053,16 @@ func save_checkpoint(manual_combat_snapshot := false) -> void:
 	if error != OK:
 		push_warning("Could not save Riftcore checkpoint: %s" % error_string(error))
 
-func award_profile_clear(number: int, difficulty: int, seconds := 0.0, kills := 0, online := false) -> Dictionary:
+func award_profile_clear(number: int, difficulty: int, seconds := 0.0, kills := 0, online := false, conditions := {}) -> Dictionary:
 	profile.survival_seconds += maxf(0.0, seconds)
 	if account:
-		var progress := account.award_clear(number, difficulty, {
-			"seconds": seconds, "kills": kills, "online": online,
-			"operator": profile.operator_name, "survival": profile.survival_seconds})
+		var run := conditions.duplicate()
+		run.merge({"seconds": seconds, "kills": kills, "online": online,
+			"operator": profile.operator_name, "survival": profile.survival_seconds}, true)
+		var progress := account.award_clear(number, difficulty, run)
 		profile.player_xp = account.experience
+		run["finish_achievements"] = account.unlocked_skins
+		progress["gamer_points"] = RiftRelay.directory.record_gamer_score(number, difficulty, run)
 		return progress
 	var before: int = profile.player_xp
 	profile.award_player_xp(PlayerAccount.clear_reward(number, difficulty))
@@ -2244,12 +2276,20 @@ func _process(delta: float) -> void:
 			advance_to_act_two.call_deferred()
 		return
 	sector_complete = true
-	var profile_progress := award_profile_clear(sector, mission_difficulty, mission_stats.seconds, mission_stats.kills)
+	var salvaged := 0
+	for amount in player.salvage.values():
+		salvaged += int(amount)
+	var profile_progress := award_profile_clear(sector, mission_difficulty, mission_stats.seconds, mission_stats.kills, false, {
+		"clean": sector_deaths == 0, "health": player.health / player.max_health * 100.0,
+		"energy": player.energy / player.max_energy * 100.0, "materials": salvaged,
+		"bolts": player.credits, "lives": player.lives + profile.reserve_lives
+	})
 	mission_stats.player_xp = int(profile_progress.after) - int(profile_progress.before)
 	mission_stats.profile_progress = profile_progress
 	var replay := sector <= run_cleared_through
 	run_cleared_through = maxi(run_cleared_through, sector)
 	var bonus := 160 + 25 * (sector - 1)
+	profile.grant_first_boss_life(sector, save_session.persist_reserve_lives if save_session else Callable())
 	var hard_unlocked: bool = profile.record_sector_clear(sector, mission_difficulty)
 	var recovered := player.salvage.duplicate()
 	profile.apply_recovery_crew(sector, recovered)
@@ -2276,7 +2316,7 @@ func _process(delta: float) -> void:
 	for quantity in recovered.values():
 		material_count += int(quantity)
 	var challenges_completed: int = profile.record_challenges(sector, {
-		"act": 1,
+		"act": 1, "act_kills": mission_stats.get("act_kills", 0), "mode": mission_difficulty,
 		"clear": 1, "clean": int(sector_deaths == 0), "kills": mission_stats.kills,
 		"materials": material_count, "bolts": player.credits, "time": mission_stats.seconds,
 		"health": player.health / player.max_health * 100.0,
@@ -2319,6 +2359,8 @@ func _process(delta: float) -> void:
 	get_tree().paused = true
 	var stack := overlay()
 	stack.get_parent().custom_minimum_size.x = 1050
+	mission_stats["operator_frame"] = player.operator_frame
+	mission_stats["armor_finish"] = player.armor_finish
 	preload("res://scripts/mission_complete.gd").build(
 		stack, Catalog.info(sector).title, mission_stats, recovered, recovered_blueprints, recovered_supplies,
 		player.credits + bonus, challenges_completed, sector_deaths,
@@ -2372,6 +2414,7 @@ func advance_to_act_two() -> void:
 	save.set_value("checkpoint", "salvage", player.salvage)
 	save.set_value("checkpoint", "blueprints", player.recovered_blueprints)
 	save.set_value("checkpoint", "recovered_supplies", player.recovered_supplies.duplicate())
+	mission_stats["act_kills"] = mission_stats.kills
 	save.set_value("checkpoint", "mission_stats", mission_stats)
 	save.set_value("checkpoint", "lives", player.lives)
 	save.set_value("checkpoint", "sector_deaths", sector_deaths)
@@ -2383,7 +2426,7 @@ func advance_to_act_two() -> void:
 		await cancel_act_transition(loading, "SAVE FAILED  /  RE-ENTER THE GATE")
 		return
 	var persist := save_session.persist_challenge_progress if save_session else Callable()
-	var challenges_completed: int = profile.record_challenges(sector, {"act": 1}, persist)
+	var challenges_completed: int = profile.record_challenges(sector, {"act": 1, "mode": mission_difficulty, "act_kills": mission_stats.kills}, persist)
 	var previous := game_root
 	remove_child(previous)
 	previous.queue_free()

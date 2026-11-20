@@ -1,8 +1,10 @@
-# RIFTCORE Alpha 6.3.29
+# RIFTCORE Alpha 6.3.30
 
-- The new six-scene opening follows the fall of Meridian, Soren’s guardian uprising, and RX-07’s rescue of the convoy. Start a new operator to see it.
-- Opening dialogue uses larger text that reveals letter by letter. Use Next to read at your own pace, or skip straight to the station.
-- NOVA materializes beside RX-07 for hub conversations and fades away when they end.
-- Older launchers can be refreshed from the title screen under Settings → Update Game while keeping the same desktop or Steam shortcut. The new launcher removes its old executable after it starts successfully.
+- Choose five new operator frames in Cosmetics. Unlock them with Bolts and rotate the model with the mouse or controller.
+- Earn ten milestone finishes and ten Expert sector finishes. All 20 finishes work across every frame.
+- Track achievements and Gamer Score in your profile and see your friends' scores.
+- Host public, friends-only, or invite-only parties and browse open public lobbies. Duplicate friend entries have been cleaned up.
+- Daily challenges now offer tougher objectives. Earn a bonus life from the hardest challenge and the first defeat of each main sector boss.
+- RX-07 runs across the loading screen, hub interaction labels are cleaner, and combat animation and navigation improvements are included.
 
-Windows and Linux builds are available through the RIFTCORE Launcher.
+Co-op players should update together. Windows and Linux players can update through the RIFTCORE Launcher.

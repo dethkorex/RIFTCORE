@@ -7,6 +7,7 @@ var actor: RiftPlayer
 var compact := false
 var neutral_lighting := false
 var skin := ""
+var frame := ""
 var customized: Dictionary = {}
 var dragging := false
 var rotation_axis := 0.0
@@ -101,10 +102,10 @@ func set_appearance(id: String) -> void:
 		return
 	if not SkinKit.palette(id).is_empty():
 		actor.equip_sector_weapon("")
-		actor.set_armor_finish(id)
+		actor.set_operator_appearance(frame, id)
 		customized = actor.armor_materials
 		return
-	actor.set_armor_finish("")
+	actor.set_operator_appearance(frame, "")
 	customized = actor.armor_materials
 	if not id.is_empty() and not actor.run_weapon_ids.has(id):
 		actor.run_weapon_ids.append(id)

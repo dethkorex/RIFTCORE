@@ -1,17 +1,50 @@
 extends RefCounted
 
+const OperatorFrames := preload("res://scripts/operator_frames.gd")
+
 signal quick_changed
 
 const Catalog := preload("res://scripts/sector_catalog.gd")
 const Difficulty := preload("res://scripts/mission_difficulty.gd")
 const LEGACY_CHALLENGE_COUNT := 3
 const SECONDS_PER_DAY := 86400
+const CHALLENGE_VERSION := 2
 const CHALLENGE_SETS := [
-	[["Gatebreaker", "Enter Act II", "act", 1], ["Sector Clear", "Extract from the sector", "clear", 1], ["Clean Run", "Extract without losing a life", "clean", 1], ["Security Sweep", "Defeat 10 security units before extraction", "kills", 10], ["Salvage Run", "Extract with 5 recovered materials", "materials", 5]],
-	[["First Breach", "Enter Act II", "act", 1], ["Extraction Ready", "Extract from the sector", "clear", 1], ["Health Reserve", "Extract with at least 60% HP", "health", 60], ["Credit Runner", "Collect 50 bolts before extraction", "bolts", 50], ["Quick Response", "Extract within 15 minutes", "time", 900]],
-	[["Frontline", "Enter Act II", "act", 1], ["Finish the Job", "Extract from the sector", "clear", 1], ["Power Reserve", "Extract with at least 60% energy", "energy", 60], ["Salvage Specialist", "Extract with 8 recovered materials", "materials", 8], ["Sweep Team", "Defeat 8 security units before extraction", "kills", 8]],
-	[["Breach and Advance", "Enter Act II", "act", 1], ["Return to Station", "Extract from the sector", "clear", 1], ["No Casualties", "Extract without losing a life", "clean", 1], ["On the Clock", "Extract within 20 minutes", "time", 1200], ["Full Power", "Extract with at least 75% energy", "energy", 75]],
-	[["Make an Opening", "Enter Act II", "act", 1], ["Homebound", "Extract from the sector", "clear", 1], ["Intact Chassis", "Extract with at least 75% HP", "health", 75], ["Bolts on Board", "Collect 35 bolts before extraction", "bolts", 35], ["Clear the Route", "Defeat 12 security units before extraction", "kills", 12]],
+	[
+		["Gatebreaker", "Reach Act II after defeating 6 security units.", "act", 1, 0, {"act_kills": 6}],
+		["Clear the Route", "Extract after defeating 12 security units.", "kills", 12, 0],
+		["Salvage Run", "Extract with at least 10 recovered materials.", "materials", 10, 0],
+		["Security Sweep", "Extract on Hard or Expert after defeating 17 security units.", "kills", 17, 1],
+		["No Casualties", "Extract on Hard or Expert with no lives lost and 18 security defeats.", "clean", 1, 1, {"kills": 18}],
+	],
+	[
+		["First Breach", "Reach Act II after defeating 7 security units.", "act", 1, 0, {"act_kills": 7}],
+		["Credit Runner", "Extract after collecting at least 140 Bolts.", "bolts", 140, 0],
+		["Health Reserve", "Extract with at least 90% health.", "health", 90, 0],
+		["Quick Response", "Extract on Hard or Expert within 13 minutes.", "time", 780, 1],
+		["Perfect Extraction", "Extract on Hard or Expert with no lives lost and at least 95% health.", "clean", 1, 1, {"health": 95}],
+	],
+	[
+		["Frontline", "Reach Act II after defeating 8 security units.", "act", 1, 0, {"act_kills": 8}],
+		["Salvage Specialist", "Extract with at least 12 recovered materials.", "materials", 12, 0],
+		["Power Reserve", "Extract with at least 85% energy.", "energy", 85, 0],
+		["Sweep Team", "Extract on Hard or Expert after defeating 18 security units.", "kills", 18, 1],
+		["Heavy Haul", "Extract on Hard or Expert with no lives lost, 10 materials and 12 security defeats.", "clean", 1, 1, {"materials": 10, "kills": 12}],
+	],
+	[
+		["Breach and Advance", "Reach Act II after defeating 6 security units.", "act", 1, 0, {"act_kills": 6}],
+		["On the Clock", "Extract within 10 minutes.", "time", 600, 0],
+		["Intact Chassis", "Extract with at least 85% health and 80% energy.", "health", 85, 0, {"energy": 80}],
+		["Sweep and Recover", "Extract on Hard or Expert with 14 security defeats and 8 recovered materials.", "kills", 14, 1, {"materials": 8}],
+		["Under Pressure", "Extract on Hard or Expert within 10 minutes with no lives lost.", "time", 600, 1, {"clean": 1}],
+	],
+	[
+		["Make an Opening", "Reach Act II after defeating 7 security units.", "act", 1, 0, {"act_kills": 7}],
+		["Bolts on Board", "Extract after collecting at least 160 Bolts.", "bolts", 160, 0],
+		["Clean Run", "Extract with no lives lost and 14 security defeats.", "clean", 1, 0, {"kills": 14}],
+		["Full Power", "Extract on Hard or Expert with at least 90% energy.", "energy", 90, 1],
+		["Lasting Charge", "Extract on Hard or Expert with no lives lost, 85% energy and 15 security defeats.", "clean", 1, 1, {"energy": 85, "kills": 15}],
+	],
 ]
 
 const UPGRADES := [
@@ -163,6 +196,7 @@ var survival_seconds := 0.0
 var player_xp := 0
 var cosmetic := "Standard"
 var credits := 0
+var owned_frames: Array = []
 var owned: Dictionary = {}
 var unlocked_sector := 1
 var completed_challenges: Dictionary = {}
@@ -171,6 +205,7 @@ var loot_clears: Dictionary = {}
 var normal_clears: Dictionary = {}
 var hard_clears: Dictionary = {}
 var reserve_lives := 0
+var first_main_bosses: Array = []
 var gear := {}
 var manual_only := false
 var operator_level := 1
@@ -311,8 +346,10 @@ func decode_from(data: ConfigFile) -> void:
 	var skin := String(data.get_value("profile", "cosmetic", "Standard"))
 	cosmetic = skin if operator_level >= cosmetic_level(skin) else "Standard"
 	credits = maxi(0, int(data.get_value("profile", "credits", 0)))
+	owned_frames = data.get_value("wardrobe", "owned_frames", [])
 	unlocked_sector = clampi(int(data.get_value("profile", "unlocked_sector", 1)), 1, Catalog.SECTORS.size())
 	reserve_lives = maxi(0, int(data.get_value("profile", "reserve_lives", 0)))
+	first_main_bosses = data.get_value("profile", "first_main_bosses", [])
 	completed_challenges.clear()
 	var cycles: Variant = data.get_value("challenge_cycles", "sectors", {})
 	challenge_cycles = cycles if cycles is Dictionary else {}
@@ -379,6 +416,7 @@ func encode_into(data: ConfigFile) -> void:
 	for ending in endings:
 		data.set_value("archive", ending, true)
 	data.set_value("profile", "credits", credits)
+	data.set_value("wardrobe", "owned_frames", owned_frames)
 	data.set_value("profile", "player_xp", player_xp)
 	data.set_value("profile", "operator_name", operator_name)
 	data.set_value("profile", "survival_seconds", survival_seconds)
@@ -387,6 +425,7 @@ func encode_into(data: ConfigFile) -> void:
 	data.set_value("profile", "core_shards", core_shards)
 	data.set_value("profile", "unlocked_sector", unlocked_sector)
 	data.set_value("profile", "reserve_lives", reserve_lives)
+	data.set_value("profile", "first_main_bosses", first_main_bosses)
 	for id in owned:
 		data.set_value("upgrades", id, rank(id))
 	for id in completed_challenges:
@@ -548,24 +587,17 @@ func challenge_cycle(sector: int, clock := Time.get_datetime_dict_from_system())
 	var cycle: Dictionary = challenge_cycles.get(sector, {})
 	var today := challenge_day(clock)
 	if cycle.is_empty():
-		var done: Array = []
-		for tier in LEGACY_CHALLENGE_COUNT:
-			if completed_challenges.has(challenge_key(sector, tier)):
-				done.append(tier)
-		cycle = {"set": 0, "done": done, "claimed": done.duplicate(), "day": today}
+		cycle = {"version": CHALLENGE_VERSION, "set": 0, "done": [], "claimed": [], "day": today}
 		challenge_cycles[sector] = cycle
-	# Older saves paid as soon as a task was marked done.
+		return cycle
 	if not cycle.has("claimed"):
 		cycle["claimed"] = cycle.done.duplicate()
-	if not cycle.has("day"):
-		# Keep an existing save's progress until its first midnight on this version.
-		cycle["day"] = today
-		cycle.erase("reset_at")
-	elif today > int(cycle.day):
+	if int(cycle.get("version", 0)) != CHALLENGE_VERSION or today > int(cycle.get("day", today)):
 		var picker := RandomNumberGenerator.new()
 		picker.seed = hash([today, sector, operator_name])
 		var next := posmod(int(cycle.set) + picker.randi_range(1, CHALLENGE_SETS.size() - 1), CHALLENGE_SETS.size())
-		cycle = {"set": next, "done": [], "claimed": [], "day": today, "carryover": challenge_rewards(sector, cycle)}
+		cycle = {"version": CHALLENGE_VERSION, "set": next, "done": [], "claimed": [],
+			"day": today, "carryover": challenge_rewards(sector, cycle)}
 		challenge_cycles[sector] = cycle
 	return cycle
 
@@ -574,6 +606,9 @@ static func challenge_day(clock := Time.get_datetime_dict_from_system()) -> int:
 
 static func challenge_seconds_left(clock := Time.get_datetime_dict_from_system()) -> int:
 	return SECONDS_PER_DAY - clock.hour * 3600 - clock.minute * 60 - clock.second
+
+static func challenge_life(index: int) -> int:
+	return int(index == 4)
 
 static func challenge_shards(_sector: int, tier: int) -> int:
 	return 1 if tier < 3 else 2
@@ -592,7 +627,7 @@ func challenge_rewards(sector: int, cycle: Dictionary) -> Dictionary:
 		if cycle.done.has(index) and not cycle.claimed.has(index):
 			reward.credits += rotated_challenge_credits(sector, index)
 			reward.shards += challenge_shards(sector, index)
-			reward.lives += 1
+			reward.lives += challenge_life(index) if int(cycle.get("version", 0)) == CHALLENGE_VERSION else 1
 	if cycle.done.size() == 5 and cycle.claimed.size() < 5:
 		reward.shards += challenge_set_shards(sector)
 	return reward
@@ -604,12 +639,14 @@ func record_challenges(sector: int, results: Dictionary, persist := Callable()) 
 		if cycle.done.has(index):
 			continue
 		var task: Array = CHALLENGE_SETS[cycle.set][index]
-		if not results.has(task[2]):
+		if results.get("mode", Difficulty.NORMAL) < task[4]:
 			continue
-		var value: float = results[task[2]]
-		if not is_finite(value):
+		if task[2] != "act" and results.get("clear", 0) != 1:
 			continue
-		if (value <= task[3] if task[2] == "time" else value >= task[3]):
+		if not meets_challenge_target(results, task[2], task[3]):
+			continue
+		var conditions: Dictionary = task[5] if task.size() > 5 else {}
+		if conditions.keys().all(func(metric): return meets_challenge_target(results, metric, conditions[metric])):
 			cycle.done.append(index)
 	var earned: int = cycle.done.size() - previous.size()
 	if earned == 0:
@@ -621,12 +658,18 @@ func record_challenges(sector: int, results: Dictionary, persist := Callable()) 
 		return 0
 	return earned
 
+static func meets_challenge_target(results: Dictionary, metric: String, threshold: float) -> bool:
+	if not results.has(metric):
+		return false
+	var value := float(results[metric])
+	return is_finite(value) and (value > 0.0 and value <= threshold if metric == "time" else value >= threshold)
+
 func claim_challenge_rewards(sector: int, persist := Callable()) -> Error:
 	if sector < 1 or sector > unlocked_sector:
 		return ERR_INVALID_PARAMETER
 	var cycle := challenge_cycle(sector)
 	var reward := challenge_rewards(sector, cycle)
-	if reward.lives == 0:
+	if reward.credits == 0 and reward.shards == 0 and reward.lives == 0:
 		return ERR_DOES_NOT_EXIST
 	var previous := cycle.duplicate(true)
 	cycle.claimed = cycle.done.duplicate()
@@ -641,6 +684,19 @@ func claim_challenge_rewards(sector: int, persist := Callable()) -> Error:
 		core_shards -= reward.shards
 		reserve_lives -= reward.lives
 	return error
+
+func grant_first_boss_life(sector: int, persist := Callable()) -> bool:
+	if sector < 1 or sector > Catalog.SECTORS.size() or sector in first_main_bosses 			or loot_clears.has(sector) or hard_clears.get(sector, false) or normal_clears.get(sector, false):
+		return false
+	first_main_bosses.append(sector)
+	reserve_lives += 1
+	var error: int = persist.call() if persist.is_valid() else save()
+	if error != OK:
+		first_main_bosses.erase(sector)
+		reserve_lives -= 1
+		push_warning("Could not save the first main boss reward: %s" % error_string(error))
+		return false
+	return true
 
 func unlock_sector(sector: int) -> void:
 	var next := clampi(sector, 1, Catalog.SECTORS.size())
@@ -797,6 +853,22 @@ func supply_price(id: String) -> int:
 
 static func sold_at_shop(id: String) -> bool:
 	return stock.has(id) and stock[id].get("material", "") not in ["core", "legendary"]
+
+func buy_frame(id: String, persist: Callable) -> String:
+	var price := int(OperatorFrames.PRICES.get(id, 0))
+	if price <= 0 or not OperatorFrames.available(id) or not persist.is_valid():
+		return "Frame unavailable."
+	if id in owned_frames:
+		return "Frame already owned."
+	if credits < price:
+		return "Not enough Bolts."
+	credits -= price
+	owned_frames.append(id)
+	if persist.call() != OK:
+		credits += price
+		owned_frames.erase(id)
+		return "Could not save the purchase."
+	return "%s unlocked." % OperatorFrames.label(id)
 
 func buy_supply(id: String, bundles := 1) -> String:
 	if not sold_at_shop(id) or bundles < 1:

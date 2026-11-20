@@ -83,6 +83,7 @@ func invalidate_defeated_run() -> Error:
 	data.set_value("story", "shop_announced_through", profile.shop_announced_through)
 	data.set_value("profile", "core_shards", profile.core_shards)
 	data.set_value("profile", "reserve_lives", profile.reserve_lives)
+	data.set_value("profile", "first_main_bosses", profile.first_main_bosses)
 	data.set_value("inventory", "stock", profile.inventory)
 	data.set_value("inventory", "carried_materials", profile.carried_materials)
 	data.set_value("inventory", "stored_supplies", profile.stored_supplies)
@@ -121,6 +122,7 @@ func persist_reserve_lives() -> Error:
 	if not data:
 		return ERR_FILE_NOT_FOUND
 	data.set_value("profile", "reserve_lives", profile.reserve_lives)
+	data.set_value("profile", "first_main_bosses", profile.first_main_bosses)
 	return write_slot(data)
 
 func persist_blueprint_trade() -> Error:

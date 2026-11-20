@@ -16,6 +16,8 @@ static func build(stack: VBoxContainer, sector_name: String, stats: Dictionary, 
 	var display := preload("res://scripts/equipment_display.gd").new()
 	display.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	display.size_flags_stretch_ratio = 0.55
+	display.frame = String(stats.get("operator_frame", ""))
+	display.skin = String(stats.get("armor_finish", ""))
 	body.add_child(display)
 	var results := UI.column(body, 10)
 	results.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -43,6 +45,9 @@ static func build(stack: VBoxContainer, sector_name: String, stats: Dictionary, 
 		UI.label(rows, entry[1], 16, UI.CYAN).autowrap_mode = TextServer.AUTOWRAP_OFF
 	if stats.has("profile_progress"):
 		profile_progress(results, stats.profile_progress)
+		var points := int(stats.profile_progress.get("gamer_points", 0))
+		if points > 0:
+			UI.label(results, "ACHIEVEMENT UNLOCKED  ·  +%d GAMER SCORE" % points, 17, UI.VIOLET)
 	UI.label(results, "EXTRACTION REWARDS", 24, UI.CYAN)
 	var scroll := ScrollContainer.new()
 	scroll.custom_minimum_size.y = 117

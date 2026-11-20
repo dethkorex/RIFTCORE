@@ -39,6 +39,14 @@ var relay_room: Label
 var relay_roster: VBoxContainer
 var relay_members: Label
 var relay_roster_key := ""
+var relay_access: OptionButton
+var relay_host_form: Control
+var relay_squad: Control
+var relay_browser: Control
+var relay_lobbies: VBoxContainer
+var relay_refresh: Button
+var relay_browse_note: Label
+var relay_browser_key := ""
 
 var can_load := false
 var saved_sector := 1
@@ -49,6 +57,8 @@ var saved_experience := 0
 var at_sector_start := false
 var run_unlocks: Array = []
 var profile
+var persist_frame_purchase: Callable
+var wallet_bolts: Label
 var shop_status := ""
 var shop_category := "All Items"
 var enhancement_focus := ""
@@ -83,6 +93,7 @@ const EquipmentDisplay := preload("res://scripts/equipment_display.gd")
 const EquipmentStats := preload("res://scripts/equipment_stats.gd")
 const UI := preload("res://scripts/rift_ui.gd")
 const SkinKit := preload("res://scripts/operator_skins.gd")
+const Frames := preload("res://scripts/operator_frames.gd")
 const Catalog := preload("res://scripts/sector_catalog.gd")
 const Difficulty := preload("res://scripts/mission_difficulty.gd")
 const Blueprints := preload("res://scripts/blueprint_catalog.gd")
@@ -278,6 +289,8 @@ func show_page(next: String) -> void:
 			SocialPanel.build_account_settings(self, columns)
 		"Cosmetics":
 			build_cosmetics(columns)
+		"Achievements":
+			build_achievements(columns)
 		"Notifications":
 			SocialPanel.build_notifications(self, columns)
 		"Party":
@@ -363,8 +376,8 @@ func station_tabs() -> Dictionary:
 		return {"Save Game": "Save Game", "Settings": "Settings"}
 	if page in ["Gear", "Storage"]:
 		return {"Gear": "Gear", "Storage": "Storage"}
-	if page in ["Player Profile", "Cosmetics"]:
-		return {"Player Profile": "Profile", "Cosmetics": "Cosmetics"}
+	if page in ["Player Profile", "Cosmetics", "Achievements"]:
+		return {"Player Profile": "Profile", "Cosmetics": "Cosmetics", "Achievements": "Achievements"}
 	if page in ["Collection", "Tutorials"]:
 		return {"Collection": "NOVA Archive", "Tutorials": "Tutorials"}
 	if page in ["Social", "Party", "Notifications"]:
@@ -386,7 +399,7 @@ func build_station_header(header: HBoxContainer) -> void:
 		station_name = "OPERATOR"
 	elif page in ["Save Game", "Settings"]:
 		station_name = "SYSTEM"
-	elif page in ["Player Profile", "Delete Profile", "Operators", "Delete Operator", "Account Settings", "Cosmetics"]:
+	elif page in ["Player Profile", "Delete Profile", "Operators", "Delete Operator", "Account Settings", "Cosmetics", "Achievements"]:
 		station_name = "PROFILE"
 	elif page in ["Collection", "Tutorials"]:
 		station_name = "NOVA ARCHIVE"
@@ -404,7 +417,7 @@ func build_station_header(header: HBoxContainer) -> void:
 		TalentTree.add_chip(header, "%04d CORE SHARDS" % profile.core_shards, TalentTree.SHARD, UI.VIOLET, 16, 27)
 		return
 	var wallet := UI.column(header, 2)
-	UI.currency_row(wallet, "%04d BOLTS" % profile.credits)
+	wallet_bolts = UI.currency_row(wallet, "%04d BOLTS" % profile.credits)
 	wallet.add_child(HSeparator.new())
 	UI.currency_row(wallet, "%04d CORE SHARDS" % profile.core_shards, true)
 
@@ -515,7 +528,10 @@ func card(parent: Container, ratio := 1.0) -> VBoxContainer:
 	return UI.card(parent, ratio)
 
 func portrait(parent: VBoxContainer) -> void:
-	var hero := preload("res://scripts/equipment_display.gd").new()
+	var hero := EquipmentDisplay.new()
+	if account and active_slot > 0:
+		hero.frame = account.display_frame(active_slot)
+		hero.skin = account.display_skin(active_slot)
 	parent.add_child(hero)
 
 func add_menu_art(dimmed: bool) -> void:
@@ -675,7 +691,7 @@ func build_cosmetics(columns: HBoxContainer) -> void:
 	finish_model.neutral_lighting = true
 	card(columns).add_child(finish_model)
 	var wardrobe := card(columns, 1.18)
-	UI.label(wardrobe, "Operator Finish", 27, UI.CYAN)
+	UI.label(wardrobe, "Operator Appearance", 27, UI.CYAN)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 10)
 	wardrobe.add_child(row)
@@ -692,9 +708,19 @@ func build_cosmetics(columns: HBoxContainer) -> void:
 	if slot.item_count == 0:
 		slot.add_item("No operator")
 		slot.disabled = true
-	var equipped := UI.label(row, "", 17, UI.MUTED)
-	equipped.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	equipped.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	var frame_picker := OptionButton.new()
+	frame_picker.custom_minimum_size.y = 35
+	UI.style_button(frame_picker)
+	row.add_child(frame_picker)
+	var frames: Array[String] = []
+	for id: String in Frames.NAMES:
+		if Frames.available(id):
+			frames.append(id)
+			frame_picker.add_item(Frames.label(id))
+	frame_picker.visible = frames.size() > 1
+	frame_picker.select(maxi(0, frames.find(account.display_frame(slot.get_selected_id()))))
+	var equipped := UI.label(wardrobe, "", 17, UI.MUTED)
+	var frame_access := UI.label(wardrobe, "", 17, UI.MUTED)
 	wardrobe.add_child(HSeparator.new())
 	var options := scroll_entries(wardrobe)
 	UI.make_readable_scroll(options.get_parent() as ScrollContainer)
@@ -702,29 +728,60 @@ func build_cosmetics(columns: HBoxContainer) -> void:
 	actions.add_theme_constant_override("separation", 10)
 	wardrobe.add_child(actions)
 	var previewed := {"id": ""}
-	var equip := UI.button(actions, "Equip Finish", Callable(), true, 38)
+	var equip := UI.button(actions, "Equip Appearance" if frames.size() > 1 else "Equip Finish", Callable(), true, 38)
 	equip.focus_mode = Control.FOCUS_ALL
+	var purchase := UI.button(actions, "", Callable(), true, 38)
 	var status := UI.label(actions, "", 17, UI.MUTED)
 	status.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	status.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	var preview := func(id: String):
 		previewed.id = id
+		finish_model.frame = frames[frame_picker.selected]
 		finish_model.set_appearance(id)
+		var current_frame: String = account.display_frame(slot.get_selected_id())
 		var current: String = account.display_skin(slot.get_selected_id())
-		equipped.text = "Equipped  ·  " + SkinKit.label(current) if not slot.disabled else ""
-		var owned: bool = id.is_empty() or account.unlocked_skins.has(id)
-		equip.disabled = slot.disabled or id == current or not owned
-		status.text = "Preview  ·  " + SkinKit.label(id)
+		equipped.text = "Equipped  ·  %s / %s" % [Frames.label(current_frame), finish_label(current)] if not slot.disabled else ""
+		var selected_slot := slot.get_selected_id()
+		var frame_id: String = finish_model.frame
+		var owns_frame := Frames.owned(frame_id, ManualSave.read_slot(selected_slot))
+		var price := int(Frames.PRICES.get(frame_id, 0))
+		var active := selected_slot == active_slot and profile != null and persist_frame_purchase.is_valid()
+		var owns_finish: bool = id.is_empty() or account.unlocked_skins.has(id)
+		purchase.visible = not slot.disabled and not owns_frame
+		purchase.text = "Unlock for %d Bolts" % price
+		purchase.disabled = not active or int(profile.credits) < price
+		equip.disabled = slot.disabled or not owns_frame or not owns_finish or (id == current and frame_id == current_frame)
+		frame_access.text = "Frame owned" if owns_frame else "%d Bolts to unlock" % price
+		if not owns_frame and not active:
+			frame_access.text += " · Load this operator to purchase"
+		status.text = "Preview  ·  " + finish_label(id)
+	purchase.pressed.connect(func():
+		if purchase.disabled:
+			return
+		var message: String = profile.buy_frame(frames[frame_picker.selected], persist_frame_purchase)
+		if is_instance_valid(wallet_bolts):
+			wallet_bolts.text = "%04d BOLTS" % profile.credits
+		preview.call(previewed.id)
+		status.text = message
+	)
 	equip.pressed.connect(func():
 		var id: String = previewed.id
-		if account.select_skin(slot.get_selected_id(), id) == OK:
+		if account.select_appearance(slot.get_selected_id(), frames[frame_picker.selected], id) == OK:
 			preview.call(id)
-			status.text = "%s equipped." % SkinKit.label(id)
+			status.text = "Appearance saved."
 		else:
-			status.text = "Could not save the finish."
+			status.text = "Could not save the appearance."
 	)
-	slot.item_selected.connect(func(_index): preview.call(account.display_skin(slot.get_selected_id())))
+	frame_picker.item_selected.connect(func(_index): preview.call(previewed.id))
+	slot.item_selected.connect(func(_index):
+		frame_picker.select(maxi(0, frames.find(account.display_frame(slot.get_selected_id()))))
+		preview.call(account.display_skin(slot.get_selected_id()))
+	)
 	add_finish_entry(options, "", "Available", preview)
+	UI.label(options, "Milestone Finishes", 23, UI.CYAN)
+	for number in range(1, SkinKit.FIELD_VARIANTS.size() + 1):
+		var id := SkinKit.field_finish(number)
+		add_finish_entry(options, id, SkinKit.palette(id)[5], preview)
 	UI.label(options, "Expert Finishes", 23, UI.CYAN)
 	for number in range(1, Catalog.SECTORS.size() + 1):
 		var id := SkinKit.expert_finish(number)
@@ -748,6 +805,9 @@ func build_cosmetics(columns: HBoxContainer) -> void:
 	if not slot.disabled:
 		slot.grab_focus()
 
+func finish_label(id: String) -> String:
+	return "Default Finish" if id.is_empty() else SkinKit.label(id)
+
 func add_finish_entry(parent: VBoxContainer, id: String, requirement: String, preview: Callable) -> void:
 	var entry := HBoxContainer.new()
 	entry.add_theme_constant_override("separation", 9)
@@ -763,17 +823,51 @@ func add_finish_entry(parent: VBoxContainer, id: String, requirement: String, pr
 	var text := UI.column(entry, 2)
 	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var unlocked: bool = id.is_empty() or account.unlocked_skins.has(id)
-	var pick := UI.button(text, SkinKit.label(id), preview.bind(id), false, 35)
+	var pick := UI.button(text, finish_label(id), preview.bind(id), false, 35)
 	pick.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	pick.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	pick.focus_entered.connect(preview.bind(id))
 	var detail := UI.label(text, requirement, 15, UI.MUTED)
 	detail.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	pick.tooltip_text = requirement
-	if id.begins_with("variant:"):
+	if not SkinKit.finish_achievement(id).is_empty():
 		var badge := UI.label(entry, "Unlocked" if unlocked else "Locked", 15, Color("9de4ba") if unlocked else UI.MUTED)
 		badge.autowrap_mode = TextServer.AUTOWRAP_OFF
 		badge.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+
+func build_achievements(columns: HBoxContainer) -> void:
+	var ledger = RiftRelay.directory.gamer_score
+	var pane := card(columns)
+	var header := HBoxContainer.new()
+	pane.add_child(header)
+	var title := UI.label(header, "ACHIEVEMENTS", 28, UI.CYAN)
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var score := UI.label(header, "", 23, UI.VIOLET)
+	var rows := scroll_entries(pane)
+	var rebuild := func():
+		for child in rows.get_children():
+			rows.remove_child(child)
+			child.queue_free()
+		var online := RiftRelay.directory.online()
+		score.text = "%d GAMER SCORE" % ledger.score() if online else ""
+		if not online:
+			UI.label(rows, "Sign in to earn account achievements and share your score with friends.", 19, UI.MUTED)
+		for id in ledger.achievement_catalog:
+			var record: Array = ledger.achievement_catalog[id]
+			var earned: bool = (online and ledger.earned.has(id)) or (account != null and account.unlocked_skins.has(id))
+			var tile := UI.equipment_card(UI.CYAN if earned else UI.MUTED)
+			rows.add_child(tile)
+			var row := HBoxContainer.new()
+			tile.add_child(row)
+			var copy := UI.column(row, 2)
+			copy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			UI.label(copy, record[0], 21, UI.WHITE)
+			UI.label(copy, record[2], 17, UI.MUTED)
+			var status := UI.label(row, "%d G  ·  %s" % [record[1], "EARNED" if earned else "LOCKED"], 17, UI.CYAN if earned else UI.MUTED)
+			status.autowrap_mode = TextServer.AUTOWRAP_OFF
+			status.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	SocialPanel.watch(pane, RiftRelay.directory.changed, rebuild)
+	rebuild.call()
 
 func build_player_account(columns: HBoxContainer) -> void:
 	var form := card(columns)
@@ -927,11 +1021,21 @@ func update_social_tabs() -> void:
 func build_online_room(columns: HBoxContainer) -> void:
 	var form := card(columns,0.9)
 	UI.label(form, "PARTY", 30, UI.CYAN).autowrap_mode=TextServer.AUTOWRAP_OFF
-	UI.label(form, "Create a party, invite friends, or join with a room code.", 17, UI.MUTED)
 	relay_status = UI.label(form, "", 18, UI.CYAN)
 	relay_status.size_flags_horizontal=Control.SIZE_EXPAND_FILL
 	form.add_child(HSeparator.new())
-	relay_host = UI.button(form, "Create Party", RiftRelay.host_room, true)
+	relay_host_form = UI.column(form, 8)
+	UI.label(relay_host_form, "HOST A LOBBY", 17, UI.MUTED)
+	relay_access = OptionButton.new()
+	relay_host_form.add_child(relay_access)
+	UI.style_button(relay_access)
+	for access: String in RiftRelay.PARTY_ACCESS:
+		relay_access.add_item(RiftRelay.PARTY_ACCESS[access])
+		relay_access.set_item_metadata(relay_access.item_count - 1, access)
+	relay_access.select(0)
+	relay_host = UI.button(relay_host_form, "Host Lobby", func():
+		RiftRelay.host_room(String(relay_access.get_selected_metadata()))
+	, true)
 	relay_rejoin = UI.button(form, "Rejoin Party", RiftRelay.rejoin_party, true)
 	relay_join_form=UI.column(form,8)
 	UI.label(relay_join_form,"JOIN WITH A CODE",16,UI.MUTED).autowrap_mode=TextServer.AUTOWRAP_OFF
@@ -950,24 +1054,46 @@ func build_online_room(columns: HBoxContainer) -> void:
 		relay_code.grab_focus()
 		relay_code.caret_column = relay_code.text.length()
 	)
-	relay_join = UI.button(join_row, "Join Party", func(): RiftRelay.join_room(relay_code.text))
+	relay_join = UI.button(join_row, "Join Lobby", func(): RiftRelay.join_room(relay_code.text))
 	relay_room=UI.label(form,"",24,UI.WHITE)
 	relay_room.autowrap_mode=TextServer.AUTOWRAP_OFF
 	relay_deploy = UI.button(form, "Choose Co-op Sector", show_page.bind("Co-op Sectors"), true)
 	relay_deploy.set_meta(&"return_focus", "choose-coop-sector")
 	relay_copy = UI.button(form, "Copy Room Code", func(): DisplayServer.clipboard_set(RiftRelay.connected_room))
-	UI.button(form,"Find Friends",func(): SocialPanel.open_find_friends(self),false,36)
+	UI.button(form, "Friends", show_page.bind("Social"), false, 36)
 	var space:=Control.new()
 	space.size_flags_vertical=Control.SIZE_EXPAND_FILL
 	form.add_child(space)
 	relay_leave = UI.button(form, "Leave Party", func(): RiftRelay.leave())
-	var squad:=card(columns,1.1)
+	var right := card(columns, 1.1)
+	relay_browser = UI.column(right, 9)
+	relay_browser.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	var browser_header := HBoxContainer.new()
+	relay_browser.add_child(browser_header)
+	var heading := UI.label(browser_header, "OPEN LOBBIES", 26, UI.CYAN)
+	heading.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	relay_refresh = UI.button(browser_header, "Refresh", RiftRelay.browse_rooms, false, 34)
+	relay_browse_note = UI.label(relay_browser, "", 16, UI.MUTED)
+	relay_lobbies = scroll_entries(relay_browser)
+	relay_browser_key = "!"
+	var squad := UI.column(right, 8)
+	relay_squad = squad
+	relay_squad.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	relay_members=UI.label(squad,"SQUAD  /  0 OF 4",26,UI.CYAN)
 	relay_members.autowrap_mode=TextServer.AUTOWRAP_OFF
 	UI.label(squad,"The party leader selects the sector. Everyone keeps their own operator.",16,UI.MUTED)
 	relay_roster=scroll_entries(squad)
 	relay_roster_key=""
 	refresh_online_room()
+	if RiftRelay.connected_room.is_empty():
+		RiftRelay.browse_rooms()
+	var browser_timer := Timer.new()
+	right.add_child(browser_timer)
+	browser_timer.timeout.connect(func():
+		if RiftRelay.connected_room.is_empty() and RiftRelay.pending.is_empty():
+			RiftRelay.browse_rooms()
+	)
+	browser_timer.start(12.0)
 	if relay_rejoin.visible:
 		relay_rejoin.grab_focus()
 	elif not relay_host.disabled:
@@ -981,7 +1107,13 @@ func refresh_online_room() -> void:
 		return
 	var joined := not RiftRelay.connected_room.is_empty()
 	var requesting := not RiftRelay.pending.is_empty()
-	relay_host.visible=not joined and not requesting
+	relay_host_form.visible = not joined and not requesting
+	relay_host.visible = relay_host_form.visible
+	relay_browser.visible = not joined
+	relay_squad.visible = joined
+	relay_refresh.disabled = not RiftRelay.available or RiftRelay.browsing_rooms or requesting
+	relay_browse_note.text = RiftRelay.lobby_browse_status if RiftRelay.available else RiftRelay.RELAY_UNAVAILABLE
+	refresh_lobby_list(requesting)
 	relay_join_form.visible=not joined
 	relay_host.disabled = not RiftRelay.available or joined or requesting
 	relay_join.disabled = relay_host.disabled
@@ -989,9 +1121,10 @@ func refresh_online_room() -> void:
 	relay_paste.disabled = relay_join.disabled
 	relay_code.editable = not joined and not requesting
 	relay_deploy.visible = RiftRelay.can_deploy()
-	relay_copy.visible = joined
-	relay_room.visible=joined
-	relay_room.text="ROOM CODE  /  "+RiftRelay.connected_room
+	relay_copy.visible = joined and RiftRelay.room_password.is_empty()
+	relay_room.visible = joined
+	var access: String = RiftRelay.PARTY_ACCESS.get(RiftRelay.room_access, "Room Code")
+	relay_room.text = access.to_upper() if not RiftRelay.room_password.is_empty() else "%s  /  %s" % [access.to_upper(), RiftRelay.connected_room]
 	relay_leave.visible = joined or requesting
 	relay_leave.text = "Leave Party" if joined else "Cancel Connection"
 	relay_status.text = RiftRelay.status
@@ -1000,10 +1133,37 @@ func refresh_online_room() -> void:
 	# Presence updates must not pull focus away while a user types a room code.
 	if focused and focused.is_visible_in_tree() and (not focused is BaseButton or not focused.disabled): return
 	if relay_deploy.visible: relay_deploy.grab_focus()
-	elif joined: relay_copy.grab_focus()
+	elif joined and relay_copy.visible: relay_copy.grab_focus()
+	elif joined: relay_leave.grab_focus()
 	elif requesting: relay_leave.grab_focus()
 	elif relay_rejoin.visible: relay_rejoin.grab_focus()
 	elif not relay_host.disabled: relay_host.grab_focus()
+
+func refresh_lobby_list(requesting: bool) -> void:
+	var key := str([RiftRelay.public_rooms, requesting])
+	if key == relay_browser_key:
+		return
+	relay_browser_key = key
+	var focused := get_viewport().gui_get_focus_owner()
+	var restore_focus := focused != null and relay_lobbies.is_ancestor_of(focused)
+	for child in relay_lobbies.get_children():
+		relay_lobbies.remove_child(child)
+		child.queue_free()
+	var first: Button
+	for room in RiftRelay.public_rooms:
+		var row := HBoxContainer.new()
+		relay_lobbies.add_child(row)
+		var host := UI.label(row, "%s  ·  %d/%d" % [room.host, room.players, room.limit], 20, UI.WHITE)
+		host.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var join := UI.button(row, "Join", RiftRelay.join_room.bind(room.code), true, 34)
+		join.disabled = requesting
+		if not first:
+			first = join
+	if restore_focus:
+		if first and not first.disabled:
+			first.grab_focus()
+		elif not relay_refresh.disabled:
+			relay_refresh.grab_focus()
 
 func refresh_party_members() -> void:
 	var members: Array=[]
@@ -1065,6 +1225,7 @@ func build_save_slots(columns: HBoxContainer) -> void:
 			var model := EquipmentDisplay.new()
 			model.compact = true
 			model.skin = account.display_skin(number) if account else ""
+			model.frame = account.display_frame(number) if account else ""
 			operator_card.add_child(model)
 			UI.label(operator_card, operator_name(saved), 25)
 			UI.label(operator_card, operator_facts(saved)[2], 17, UI.MUTED)
@@ -1514,10 +1675,11 @@ func select_challenge_sector(number: int, details: VBoxContainer, group: ButtonG
 	var status := UI.label(footer, "Banked bonus lives  ·  %d" % profile.reserve_lives, 16, UI.MUTED)
 	status.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	status.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	if rewards.lives <= 0:
+	if rewards.credits == 0 and rewards.shards == 0 and rewards.lives == 0:
 		return
-	status.text = "Ready to claim  ·  %d Bolts  ·  %d Core Shards  ·  %d %s" % [
-		rewards.credits, rewards.shards, rewards.lives, "Life" if rewards.lives == 1 else "Lives"]
+	status.text = "Ready to claim  ·  %d Bolts  ·  %d Core Shards" % [rewards.credits, rewards.shards]
+	if rewards.lives > 0:
+		status.text += "  ·  +%d %s" % [rewards.lives, "Life" if rewards.lives == 1 else "Lives"]
 	var claim := UI.button(footer, "Claim Rewards", func():
 		var error: int = claim_challenge_rewards.call(number) if claim_challenge_rewards.is_valid() else ERR_UNCONFIGURED
 		if error == OK:
@@ -1581,7 +1743,8 @@ func add_challenge_row(parent: VBoxContainer, sector: int, index: int, cycle: Di
 	UI.currency_row(payout, "%d Bolts" % Profile.rotated_challenge_credits(sector, index))
 	UI.currency_row(payout, "%d Core %s" % [Profile.challenge_shards(sector, index),
 		"Shard" if Profile.challenge_shards(sector, index) == 1 else "Shards"], true)
-	UI.label(payout, "+ 1 Life", 16, Color("8ff6ac")).autowrap_mode = TextServer.AUTOWRAP_OFF
+	if Profile.challenge_life(index) > 0:
+		UI.label(payout, "+1 Life", 16, Color("8ff6ac")).autowrap_mode = TextServer.AUTOWRAP_OFF
 	var state := UI.label(row, "CLAIMED" if claimed else ("REWARD READY" if cleared else "OPEN"), 16,
 		Color("9defb1") if cleared else UI.CYAN)
 	state.custom_minimum_size.x = 78

@@ -9,7 +9,7 @@ signal guest_joined
 signal mission_returned
 signal mission_disconnected(message: String)
 signal party_rejoin_offered
-signal invite_received(display_name: String, code: String)
+signal invite_received(display_name: String, code: String, password: String)
 signal party_chat_changed
 
 const Profile := preload("res://scripts/rogue_profile.gd")
@@ -24,6 +24,8 @@ const CodeLength := 10
 const ROOM_PREFIX := "riftcore-coop-v17-"
 const Difficulty := preload("res://scripts/mission_difficulty.gd")
 const MAX_PLAYERS := 4
+const PARTY_ACCESS := {"public": "Public", "friends": "Friends Only", "invite": "Invite Only"}
+const ACCESS_TAG := "RiftcoreAccess"
 const PARTY_CHAT_INTERVAL := 150
 const PARTY_CHAT_BURST := 4.0
 const RELAY_UNAVAILABLE := "Online rooms are unavailable. Solo play is available."
@@ -33,6 +35,15 @@ var connected_room := ""
 var pending := ""
 var room_code := ""
 var room_size := 0
+var room_access := "public"
+var room_password := ""
+var previous_room_password := ""
+var pending_access := ""
+var pending_password := ""
+var public_rooms: Array[Dictionary] = []
+var browsing_rooms := false
+var lobby_browse_status := ""
+var browse_generation := 0
 var available := false
 var pending_invite := 0
 var directory_invite := ""
@@ -54,6 +65,7 @@ var nightmare_unlocked := false
 var steam_invite_lobbies: Dictionary = {}
 var local_name := "RX-07"
 var local_armor_finish := ""
+var local_operator_frame := ""
 var unlocked_sector := 1
 
 var blueprint_drops: Dictionary = {}
@@ -108,7 +120,10 @@ func _initialize_client() -> void:
 		relay_ready = true
 		relay_starting = false
 		_request_room()
+		if browsing_rooms:
+			relay.get_public_lobbies()
 	)
+	relay.lobbies_received.connect(_public_rooms_received)
 	relay.connection_failed.connect(_connection_failed)
 	relay.disconnected.connect(_disconnected)
 	relay.lobby_created.connect(_join_created_room)
@@ -152,44 +167,101 @@ func _finish_account_session(clear_whispers: bool) -> void:
 		directory.whispers.clear_cloud()
 	directory.unpublish_presence()
 
-func host_room() -> void:
+func browse_rooms() -> void:
+	if not available or browsing_rooms:
+		return
+	browsing_rooms = true
+	lobby_browse_status = "Searching for open lobbies…"
+	browse_generation += 1
+	var generation := browse_generation
+	changed.emit()
+	ensure_relay()
+	if relay_ready:
+		relay.get_public_lobbies()
+	get_tree().create_timer(12.0).timeout.connect(func():
+		if browsing_rooms and generation == browse_generation:
+			_finish_browse("The relay did not return a lobby list. Try Refresh.")
+	)
+
+func _public_rooms_received(rows: Array) -> void:
+	if not browsing_rooms:
+		return
+	var matches: Array[Dictionary] = []
+	var seen := {}
+	for info in rows:
+		if not info is Dictionary or not info.get("Open", true) or info.get("HasPassword", false):
+			continue
+		var name := String(info.get("Name", ""))
+		var max_players := int(info.get("PlayerLimit", MAX_PLAYERS))
+		var players := int(info.get("PlayerCount", 0))
+		var code := name.trim_prefix(ROOM_PREFIX)
+		var tags: Variant = info.get("Tags", {})
+		if not name.begins_with(ROOM_PREFIX) or not valid_code(code) or seen.has(code) or code == connected_room:
+			continue
+		if players < 1 or players >= max_players or not tags is Dictionary or tags.get(ACCESS_TAG, "public") != "public":
+			continue
+		seen[code] = true
+		var host := String(tags.get("RiftcoreHost", info.get("Host", ""))).strip_edges()
+		matches.append({"code": code, "host": Profile.clean_operator_name(host), "players": players, "limit": max_players})
+	matches.sort_custom(func(a, b): return a.host.nocasecmp_to(b.host) < 0)
+	public_rooms = matches
+	_finish_browse("No public lobbies have open seats." if matches.is_empty() else "")
+
+func _finish_browse(message: String) -> void:
+	browsing_rooms = false
+	lobby_browse_status = message
+	changed.emit()
+
+func host_room(access := "public") -> void:
 	if not pending.is_empty() or not connected_room.is_empty():
+		return
+	if not PARTY_ACCESS.has(access) and access != "code":
+		return
+	if access in ["friends", "invite"] and not directory.online():
+		_update("Sign in to host a restricted party.")
 		return
 	var code := ""
 	for byte in Crypto.new().generate_random_bytes(CodeLength):
 		code += Codes[byte % Codes.length()]
-	_open("host", code)
+	pending_access = access
+	var password := Crypto.new().generate_random_bytes(8).hex_encode() if access in ["friends", "invite"] else ""
+	_open("host", code, password)
 
-func publish_armor_finish(id: String) -> void:
-	local_armor_finish = id
+func publish_operator_appearance(frame: String, finish: String) -> void:
+	local_operator_frame = frame
+	local_armor_finish = finish
 	if is_instance_valid(relay) and not connected_room.is_empty():
-		relay.player_set_data("armor_finish", id)
+		relay.player_set_data("operator_frame", frame)
+		relay.player_set_data("armor_finish", finish)
 
 func copy_invite_code() -> void:
 	if not can_copy_invite_code():
 		return
 	if connected_room.is_empty():
 		copy_on_join = true
-		host_room()
+		host_room("code")
 	else:
 		DisplayServer.clipboard_set(connected_room)
 		_update("Room code copied. Send it to your friend.")
 
 func can_copy_invite_code() -> bool:
+	return can_invite_to_party() and room_password.is_empty()
+
+func can_invite_to_party() -> bool:
 	return available and pending.is_empty() and not mission_active and room_size < MAX_PLAYERS and (connected_room.is_empty() or relay.is_host())
 
 func can_invite_friend() -> bool:
 	return can_copy_invite_code() and pending_invite == 0 and directory_invite.is_empty() and RiftSocial.ready_to_query
 
 func can_invite_directory_friend() -> bool:
-	return directory.online() and can_copy_invite_code() and directory_invite.is_empty() and pending_invite == 0
+	return directory.online() and can_invite_to_party() and directory_invite.is_empty() and pending_invite == 0
 
 func invite_directory_friend(name: String) -> void:
 	if not can_invite_directory_friend():
 		return
 	directory_invite = name
 	if connected_room.is_empty():
-		host_room()
+		host_room("invite")
 	else:
 		_send_directory_invite.call_deferred()
 
@@ -204,14 +276,14 @@ func _send_directory_invite() -> void:
 	directory_invite = ""
 	_update("Invite sent to %s." % friend if result == 0 else directory.response_message("Could not send the invite", result))
 
-func join_room(entered_code: String) -> void:
+func join_room(entered_code: String, password := "") -> void:
 	if not pending.is_empty() or not connected_room.is_empty():
 		return
 	var code := entered_code.strip_edges().to_upper().replace("-", "").replace(" ", "")
 	if not valid_code(code):
 		_update("Enter the ten-character room code.")
 		return
-	_open("join", code)
+	_open("join", code, password)
 
 func can_rejoin_party() -> bool:
 	return available and not previous_room.is_empty() and can_receive_invite()
@@ -220,12 +292,14 @@ func rejoin_party() -> void:
 	if recovery.active():
 		recovery.start_rejoin()
 	elif can_rejoin_party():
-		_open("rejoin_party", previous_room)
+		_open("rejoin_party", previous_room, previous_room_password)
 
 func is_rejoining_mission() -> bool:
 	return pending in ["rejoin_mission", "recreate_mission"]
 
 func joinable_room() -> String:
+	if room_access == "invite" or (room_access == "friends" and not relay.is_host()):
+		return ""
 	return connected_room if pending.is_empty() and not mission_active and room_size < MAX_PLAYERS else ""
 
 func join_directory_friend(name: String) -> void:
@@ -233,18 +307,21 @@ func join_directory_friend(name: String) -> void:
 		return
 	checking_friend_room = true
 	_update("Checking %s’s party…" % name)
-	var code: String = await directory.lookup_open_room(name)
-	if code.is_empty() and can_receive_invite() and directory.online():
+	var entry: Dictionary = await directory.lookup_open_room(name)
+	if entry.is_empty() and can_receive_invite() and directory.online():
 		await get_tree().create_timer(0.5).timeout
 		if can_receive_invite() and directory.online():
-			code = await directory.lookup_open_room(name)
+			entry = await directory.lookup_open_room(name)
 	checking_friend_room = false
 	if not can_receive_invite():
 		return
-	if code.is_empty():
+	if entry.is_empty():
 		_update("%s’s party is no longer open." % name)
 		return
-	join_room(code)
+	if entry.get("access") == "friends":
+		directory.request_friends_party(name, entry.code)
+	else:
+		join_room(entry.code)
 
 func listen_for_steam_invites() -> void:
 	if RiftSocial.ready_to_query and available:
@@ -282,14 +359,14 @@ func _receive_invite_lobby_data(success: int, lobby: int, member: int) -> void:
 		return
 	var code := name.trim_prefix(ROOM_PREFIX)
 	if valid_code(code):
-		invite_received.emit(Profile.clean_operator_name(steam.getFriendPersonaName(inviter)), code)
+		invite_received.emit(Profile.clean_operator_name(steam.getFriendPersonaName(inviter)), code, "")
 
 func invite_friend(steam_id: int) -> void:
 	if not can_invite_friend() or not RiftSocial.can_whisper(steam_id):
 		return
 	pending_invite = steam_id
 	if connected_room.is_empty():
-		host_room()
+		host_room("code")
 	else:
 		_send_pending_invite.call_deferred()
 
@@ -316,13 +393,14 @@ func valid_code(code: String) -> bool:
 			return false
 	return true
 
-func _open(operation: String, code: String) -> void:
+func _open(operation: String, code: String, password := "") -> void:
 	if not available:
 		_update(RELAY_UNAVAILABLE)
 		return
 	_initialize_client()
 	room_code = code
 	pending = operation
+	pending_password = password
 	_update("Connecting to the online relay…")
 	request_timeout.start()
 	if relay_ready:
@@ -340,22 +418,24 @@ func _request_room() -> void:
 	match pending:
 		"host":
 			_update("Creating your room…")
-			relay.lobby_create(_room_name(), "", false, MAX_PLAYERS)
+			relay.lobby_create(_room_name(), pending_password, pending_access == "public", MAX_PLAYERS,
+				{ACCESS_TAG: pending_access, "RiftcoreHost": local_name})
 		"join":
-			_update("Joining your friend’s room…")
-			relay.lobby_join(_room_name())
+			_update("Joining the party…")
+			relay.lobby_join(_room_name(), pending_password)
 		"rejoin_party":
 			_update("Rejoining your party…")
-			relay.lobby_join(_room_name())
+			relay.lobby_join(_room_name(), pending_password)
 		"rejoin_mission":
 			_update("Rejoining your mission…")
 			relay.lobby_join(_room_name(), recovery.password)
 		"recreate_mission":
-			relay.lobby_create(_room_name(), recovery.password, false, MAX_PLAYERS)
+			relay.lobby_create(_room_name(), recovery.password, room_access == "public", MAX_PLAYERS,
+				{ACCESS_TAG: room_access, "RiftcoreHost": local_name})
 
 func _join_created_room(lobby_name: String) -> void:
 	if pending == "host" and lobby_name == _room_name():
-		relay.lobby_join(lobby_name)
+		relay.lobby_join(lobby_name, pending_password)
 	elif pending == "recreate_mission" and lobby_name == _room_name():
 		relay.lobby_join(lobby_name, recovery.password)
 
@@ -379,11 +459,19 @@ func _room_joined(lobby_name: String) -> void:
 	var joined_as_guest := pending in ["join", "rejoin_party"]
 	var rejoining := is_rejoining_mission()
 	connected_room = room_code
+	directory.clear_friends_party_request()
+	if not rejoining:
+		room_access = pending_access if pending == "host" else String(relay.lobby_get_tag(ACCESS_TAG, "public"))
+		room_password = pending_password
 	previous_room = ""
+	previous_room_password = ""
+	pending_access = ""
+	pending_password = ""
 	pending = ""
 	voice.publish_preference()
 	relay.player_set_data("operator_name", local_name)
 	relay.player_set_data("armor_finish", local_armor_finish)
+	relay.player_set_data("operator_frame", local_operator_frame)
 	_publish_difficulty_unlocks()
 	if joined_as_guest:
 		guest_joined.emit.call_deferred()
@@ -411,11 +499,15 @@ func _room_failed(lobby_name: String, error: int) -> void:
 			rejoin_attempt_failed("The mission room is still unavailable. Retrying…")
 		return
 	var message := "Could not create a room. Try again." if pending == "host" else "Could not join this room. Check the code and make sure both players are on the same game version."
+	if error == RelayEnums.LOBBY_JOIN_ERROR.INCORRECT_PASSWORD and pending != "host":
+		message = "This party requires a friend connection or a current invite."
 	leave("%s (GD Sync code %d)" % [message, error], false)
 
 func _connection_failed(error: int) -> void:
 	relay_starting = false
 	relay_ready = false
+	if browsing_rooms:
+		_finish_browse("Could not reach the lobby browser. Try Refresh.")
 	if pending.is_empty():
 		return
 	if is_rejoining_mission():
@@ -454,6 +546,7 @@ func _disconnected() -> void:
 	if not pending.is_empty() or not connected_room.is_empty():
 		if not connected_room.is_empty():
 			previous_room = connected_room
+			previous_room_password = room_password
 		relay._session_controller.lobby_left()
 		relay._request_processor.clear_for_server_switch()
 		leave("Lost the connection to the online relay.", false)
@@ -654,13 +747,17 @@ func _receive_partner_position(x: float, facing: float, animation: String, displ
 func return_to_station() -> void:
 	if mission_active and not recovery.active() and relay.is_host():
 		relay.call_func(_receive_return)
-		relay.lobby_change_password("")
-		relay._session_controller.lobby_password = ""
-		relay.lobby_open()
+		_restore_party_access()
 		_finish_return()
+
+func _restore_party_access() -> void:
+	relay.lobby_change_password(room_password)
+	relay._session_controller.lobby_password = room_password
+	relay.lobby_open()
 
 func _receive_return() -> void:
 	if mission_active and relay.get_sender_id() == relay.get_host():
+		relay._session_controller.lobby_password = room_password
 		_finish_return()
 
 func _finish_return() -> void:
@@ -697,6 +794,8 @@ func _host_changed(is_host: bool, _host_id: int) -> void:
 		recovery.begin()
 		# When the relay promotes a guest, keep the original room open to the reserved seats.
 		relay.lobby_change_password(recovery.password)
+	else:
+		relay.lobby_set_tag("RiftcoreHost", local_name)
 	relay.lobby_open()
 	relay._data_controller.schedule_friend_status()
 	changed.emit()
@@ -704,21 +803,21 @@ func _host_changed(is_host: bool, _host_id: int) -> void:
 func _receive_abandon() -> void:
 	if mission_active and mission_roster.has(relay.get_sender_id()):
 		if relay.is_host() and not connected_room.is_empty():
-			relay.lobby_change_password("")
-			relay._session_controller.lobby_password = ""
-			relay.lobby_open()
+			_restore_party_access()
 		_finish_return()
 
 func leave(message := "Create a room or enter a friend’s room code.", deliberate := true) -> void:
+	directory.clear_friends_party_request()
 	voice.reset()
 	_clear_blueprint_drops()
 	var was_in_mission := mission_active
 	if deliberate:
 		previous_room = ""
+		previous_room_password = ""
 		if was_in_mission and not connected_room.is_empty() and relay.is_active():
 			relay.call_func(_receive_abandon)
 			if relay.is_host():
-				relay.lobby_change_password("")
+				_restore_party_access()
 	recovery.clear()
 	recovery.changed.emit()
 	mission_active = false
@@ -727,6 +826,10 @@ func leave(message := "Create a room or enter a friend’s room code.", delibera
 	var disconnect := not pending.is_empty() or was_joined
 	pending = ""
 	connected_room = ""
+	pending_access = ""
+	pending_password = ""
+	room_access = "public"
+	room_password = ""
 	pending_invite = 0
 	directory_invite = ""
 	copy_on_join = false

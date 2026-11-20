@@ -44,7 +44,7 @@ func run() -> void:
 	await frames(15)
 	var hub = game.home_hub
 	var menu = game.menu
-	check(hub.pads.size() == 8 and hub.prompt.visible and hub.current_station == 3, "Hub opens at the Deploy bay")
+	check(hub.pads.size() == 8 and hub.station_notice.visible and hub.current_station == 3, "Hub opens at the Deploy bay")
 	for index in hub.pads.size():
 		var pad: Dictionary = hub.pads[index]
 		var ring := pad.beam.get_parent().get_node_or_null("StandingRing") as MeshInstance3D

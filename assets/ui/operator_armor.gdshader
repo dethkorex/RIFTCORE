@@ -4,6 +4,9 @@ render_mode specular_schlick_ggx;
 uniform sampler2D artwork : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D detail_normal : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform bool has_normal = false;
+uniform sampler2D surface_detail : filter_linear_mipmap_anisotropic, repeat_enable;
+uniform bool has_surface_detail = false;
+uniform vec4 roughness_channels = vec4(0.0, 1.0, 0.0, 0.0);
 uniform float detail_strength = 1.0;
 uniform vec4 armor : source_color;
 uniform vec4 trim : source_color;
@@ -25,7 +28,12 @@ void fragment() {
 	ALBEDO = mix(painted, light_color.rgb * 0.72, lit);
 	EMISSION = light_color.rgb * lit * 0.74;
 	METALLIC = mix(0.16, 0.48, max(outer_panel * 0.54, inset_panel));
-	ROUGHNESS = mix(0.63, 0.31, max(outer_panel * 0.85, inset_panel));
+	float paint_roughness = mix(0.63, 0.31, max(outer_panel * 0.85, inset_panel));
+	if (has_surface_detail) {
+		float original_roughness = dot(texture(surface_detail, UV), roughness_channels);
+		paint_roughness = mix(paint_roughness, clamp(original_roughness, 0.22, 0.82), 0.38);
+	}
+	ROUGHNESS = paint_roughness;
 	if (has_normal) {
 		NORMAL_MAP = texture(detail_normal, UV).rgb;
 		NORMAL_MAP_DEPTH = detail_strength;

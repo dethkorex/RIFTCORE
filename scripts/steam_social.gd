@@ -79,10 +79,10 @@ func toggle_pin(contact: String) -> bool:
 	pinned = previous
 	return false
 
-func record_invite(display_name: String, code: String) -> void:
+func record_invite(display_name: String, code: String, password := "") -> void:
 	if invites.size() >= 8 and not invites.has(code):
 		invites.erase(invites.keys()[0])
-	var ticket := {"name": display_name, "at": Time.get_ticks_msec()}
+	var ticket := {"name": display_name, "at": Time.get_ticks_msec(), "password": password}
 	invites[code] = ticket
 	invites_changed.emit()
 	get_tree().create_timer(180.0).timeout.connect(func():

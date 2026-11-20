@@ -7,13 +7,15 @@ const MIN_LOADING_TIME := 6.0
 const INTRO_SOUND := preload("res://assets/audio/dfg_intro.ogg")
 const AMBIENT := preload("res://assets/audio/dfg_ambient.ogg")
 const ART := preload("res://assets/ui/riftcore_title_art.png")
-const PORTRAIT := preload("res://assets/ui/rx07_menu.png")
+const OPERATOR_MODEL := "res://assets/models/mecha_main/RiftcoreMechaUAL.glb"
 
 @onready var video: VideoStreamPlayer = $Video
 var wordmark: Label
 var loading_panel: CenterContainer
 var bar: ProgressBar
 var percent: Label
+var operator_view: SubViewport
+var runner_ready := false
 var loading := false
 var elapsed := 0.0
 var displayed_progress := 0.0
@@ -38,6 +40,7 @@ func _ready() -> void:
 	wordmark.add_theme_constant_override("outline_size", 13)
 	wordmark.modulate.a = 0.0
 	build_loading_panel()
+	ResourceLoader.load_threaded_request(OPERATOR_MODEL, "PackedScene")
 	impact_audio = create_audio(INTRO_SOUND, &"SFX", -10.0)
 	var bed := AMBIENT.duplicate() as AudioStreamOggVorbis
 	bed.loop = true
@@ -88,13 +91,17 @@ func build_loading_panel() -> void:
 	var portrait_panel := PanelContainer.new()
 	portrait_panel.add_theme_stylebox_override("panel", UI.frame(Color("071d30"), UI.CYAN, 2))
 	row.add_child(portrait_panel)
-	var image := TextureRect.new()
-	image.texture = PORTRAIT
-	image.custom_minimum_size = Vector2(176, 224)
-	image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	image.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	image.modulate = Color("80e7ff")
-	portrait_panel.add_child(image)
+	var runner := SubViewportContainer.new()
+	runner.custom_minimum_size = Vector2(310, 285)
+	runner.stretch = true
+	runner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	portrait_panel.add_child(runner)
+	operator_view = SubViewport.new()
+	operator_view.own_world_3d = true
+	operator_view.transparent_bg = true
+	operator_view.msaa_3d = Viewport.MSAA_4X
+	operator_view.render_target_update_mode = SubViewport.UPDATE_WHEN_VISIBLE
+	runner.add_child(operator_view)
 	var column := VBoxContainer.new()
 	column.custom_minimum_size.x = 455
 	column.add_theme_constant_override("separation", 12)
@@ -122,6 +129,8 @@ func _process(delta: float) -> void:
 		wordmark.modulate.a = smoothstep(1.16, 1.59, video.stream_position) * (1.0 - smoothstep(2.60, 3.05, video.stream_position))
 		return
 	elapsed += delta
+	if not runner_ready and ResourceLoader.load_threaded_get_status(OPERATOR_MODEL) == ResourceLoader.THREAD_LOAD_LOADED:
+		build_loading_runner()
 	if not game:
 		var stage: Array = []
 		var state := ResourceLoader.load_threaded_get_status(GAME_SCENE, stage)
@@ -150,6 +159,54 @@ func _process(delta: float) -> void:
 		percent.text = "100%"
 		await create_tween().tween_property(ambiance, "volume_db", -50.0, 0.38).finished
 		get_tree().change_scene_to_packed(game)
+
+func build_loading_runner() -> void:
+	runner_ready = true
+	var model_scene := ResourceLoader.load_threaded_get(OPERATOR_MODEL) as PackedScene
+	if not model_scene:
+		return
+	var model := model_scene.instantiate() as Node3D
+	operator_view.add_child(model)
+	model.rotation.y = deg_to_rad(73.0)
+	var camera := Camera3D.new()
+	camera.projection = Camera3D.PROJECTION_ORTHOGONAL
+	camera.size = 2.13
+	camera.keep_aspect = Camera3D.KEEP_HEIGHT
+	operator_view.add_child(camera)
+	camera.position = Vector3(-0.10, 1.13, 4.1)
+	camera.look_at(Vector3(-0.10, 0.94, 0.0))
+	camera.make_current()
+	var world := WorldEnvironment.new()
+	world.environment = Environment.new()
+	world.environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	world.environment.ambient_light_color = Color("aecbfa")
+	world.environment.ambient_light_energy = 0.85
+	operator_view.add_child(world)
+	var light := DirectionalLight3D.new()
+	light.rotation_degrees = Vector3(-30.0, -25.0, 0.0)
+	light.light_energy = 1.6
+	operator_view.add_child(light)
+	var animator := model.find_child("AnimationPlayer", true, false) as AnimationPlayer
+	if not animator or not animator.has_animation(&"run"):
+		return
+	var run := animator.get_animation(&"run").duplicate() as Animation
+	run.loop_mode = Animation.LOOP_LINEAR
+	var idle := animator.get_animation(&"idle")
+	for index in run.get_track_count():
+		var path := run.track_get_path(index)
+		if run.track_get_type(index) != Animation.TYPE_POSITION_3D or not String(path).ends_with(":mixamorig_Hips"):
+			continue
+		var idle_track := idle.find_track(path, Animation.TYPE_POSITION_3D)
+		if idle_track < 0:
+			continue
+		var neutral: Vector3 = idle.track_get_key_value(idle_track, 0)
+		for key in run.track_get_key_count(index):
+			var pose: Vector3 = run.track_get_key_value(index, key)
+			run.track_set_key_value(index, key, Vector3(neutral.x, pose.y, neutral.z))
+	var library := AnimationLibrary.new()
+	library.add_animation(&"run", run)
+	animator.add_animation_library(&"loading", library)
+	animator.play(&"loading/run")
 
 func _input(event: InputEvent) -> void:
 	if not loading and is_instance_valid(wordmark) and (event.is_action_pressed("ui_accept") or event.is_action_pressed("ui_cancel") or (event is InputEventMouseButton and event.pressed)):

@@ -72,9 +72,13 @@ var magma_active := false
 var run_weapon_ids: Array = []
 var special_weapon := ""
 var base_suit_meshes: Array[MeshInstance3D] = []
+var standard_frame_meshes: Array[MeshInstance3D] = []
+var alternate_frame_mesh: MeshInstance3D
+var operator_frame := ""
 var armor_materials: Dictionary = {}
 var armor_finish := ""
 const SkinKit := preload("res://scripts/operator_skins.gd")
+const Frames := preload("res://scripts/operator_frames.gd")
 const Paint := preload("res://assets/ui/operator_armor.gdshader")
 var fire_suit_mesh: MeshInstance3D
 var nature_suit_mesh: MeshInstance3D
@@ -260,6 +264,7 @@ func install_suit_meshes(skeleton: Skeleton3D) -> void:
 		var mesh := object as MeshInstance3D
 		if mesh.skin:
 			base_suit_meshes.append(mesh)
+	standard_frame_meshes = base_suit_meshes.duplicate()
 	fire_suit_mesh = attach_suit_mesh(skeleton, preload("res://assets/models/mecha_main/RiftcoreFireRigged.glb"))
 	nature_suit_mesh = attach_suit_mesh(skeleton, preload("res://assets/models/mecha_main/RiftcoreNatureRigged.glb"))
 	reward_suit_meshes["magma_breaker"] = fire_suit_mesh
@@ -1509,7 +1514,42 @@ func set_armor_finish(id: String) -> void:
 				material.set_shader_parameter("has_normal", true)
 				material.set_shader_parameter("detail_normal", original.normal_texture)
 				material.set_shader_parameter("detail_strength", original.normal_scale)
+			if original.roughness_texture:
+				var channels := [Vector4(1, 0, 0, 0), Vector4(0, 1, 0, 0), Vector4(0, 0, 1, 0),
+					Vector4(0, 0, 0, 1), Vector4(0.333, 0.333, 0.333, 0)]
+				material.set_shader_parameter("has_surface_detail", true)
+				material.set_shader_parameter("surface_detail", original.roughness_texture)
+				material.set_shader_parameter("roughness_channels", channels[original.roughness_texture_channel])
 			mesh.set_surface_override_material(surface, material)
+
+func set_operator_appearance(frame: String, finish: String) -> void:
+	if frame != operator_frame and not Frames.available(frame):
+		frame = ""
+	if frame != operator_frame and is_instance_valid(muzzle_skeleton):
+		var model := Frames.load_model(frame)
+		var replacement := attach_suit_mesh(muzzle_skeleton, model) if model else null
+		if not frame.is_empty() and not is_instance_valid(replacement):
+			frame = ""
+		set_armor_finish("")
+		for mesh in base_suit_meshes:
+			mesh.hide()
+		if is_instance_valid(alternate_frame_mesh):
+			alternate_frame_mesh.queue_free()
+		alternate_frame_mesh = replacement
+		operator_frame = frame
+		base_suit_meshes = standard_frame_meshes.duplicate()
+		if is_instance_valid(replacement):
+			base_suit_meshes.assign([replacement])
+		refresh_suit_meshes(reward_suit_meshes.get(equipped_suit()) as MeshInstance3D)
+	set_armor_finish(finish)
+
+func refresh_suit_meshes(selected: MeshInstance3D) -> void:
+	for mesh in base_suit_meshes:
+		mesh.visible = selected == null
+	for mesh in reward_suit_meshes.values():
+		if is_instance_valid(mesh):
+			mesh.visible = mesh == selected
+	refresh_suit_overlay()
 
 func equip_sector_weapon(id: String) -> void:
 	if not id.is_empty() and id not in run_weapon_ids:
@@ -1532,11 +1572,7 @@ func equip_sector_weapon(id: String) -> void:
 		reward_coating = ShaderMaterial.new()
 		reward_coating.shader = preload("res://assets/ui/reward_armor.gdshader")
 		reward_coating.set_shader_parameter("suit_color", tint)
-	for mesh in base_suit_meshes:
-		mesh.visible = selected == null
-	for mesh in reward_suit_meshes.values():
-		mesh.visible = mesh == selected
-	refresh_suit_overlay()
+	refresh_suit_meshes(selected)
 	if is_instance_valid(muzzle_skeleton):
 		var rim: Vector3 = SUIT_MUZZLES.get(id, STANDARD_MUZZLE)
 		muzzle_offset = muzzle_skeleton.get_bone_global_rest(muzzle_bone).affine_inverse() * rim

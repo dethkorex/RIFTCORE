@@ -3,6 +3,7 @@ extends RefCounted
 const ManualSave := preload("res://scripts/manual_save_session.gd")
 const Profile := ManualSave.Profile
 const SkinKit := preload("res://scripts/operator_skins.gd")
+const Frames := preload("res://scripts/operator_frames.gd")
 const Difficulty := preload("res://scripts/mission_difficulty.gd")
 
 const PATH := "user://riftcore_player_profile.cfg"
@@ -18,6 +19,7 @@ var longest_run := 0.0
 var longest_operator := ""
 var unlocked_skins: Array = []
 var operator_skins: Dictionary = {}
+var operator_frames: Dictionary = {}
 
 func restore() -> void:
 	var data := ConfigFile.new()
@@ -32,6 +34,7 @@ func restore() -> void:
 		longest_operator = str(data.get_value("records", "longest_operator", ""))
 		unlocked_skins = data.get_value("wardrobe", "unlocked", [])
 		operator_skins = data.get_value("wardrobe", "selections", {})
+		operator_frames = data.get_value("wardrobe", "frames", {})
 		return
 	var previous_name := RiftSettings.last_operator_name
 	for index in range(1, ManualSave.SLOT_COUNT + 1):
@@ -62,6 +65,7 @@ func clear_progress() -> void:
 	longest_run = 0.0
 	longest_operator = ""
 	operator_skins.clear()
+	operator_frames.clear()
 	unlocked_skins.clear()
 
 func save() -> Error:
@@ -76,6 +80,7 @@ func save() -> Error:
 	data.set_value("records", "longest_operator", longest_operator)
 	data.set_value("wardrobe", "unlocked", unlocked_skins)
 	data.set_value("wardrobe", "selections", operator_skins)
+	data.set_value("wardrobe", "frames", operator_frames)
 	var target := ProjectSettings.globalize_path(path)
 	var temporary := target + ".tmp"
 	var error := data.save(temporary)
@@ -124,6 +129,13 @@ func award_clear(sector: int, difficulty: int, result := {}) -> Dictionary:
 			records[key] = seconds
 		track_survival(float(result.get("survival", seconds)), str(result.get("operator", "RX-07")))
 	var before_skins := unlocked_skins.duplicate()
+	var completed_sectors := {}
+	for key in records:
+		completed_sectors[String(key).get_slice(":", 0)] = true
+	completed_sectors[str(sector)] = true
+	for id in SkinKit.clear_finish_awards(result, total_clears, completed_sectors.size()):
+		if not unlocked_skins.has(id):
+			unlocked_skins.append(id)
 	var new_finish := ""
 	if sector >= 1 and sector <= SkinKit.Catalog.SECTORS.size() and difficulty >= Difficulty.HARD:
 		var reward: String = SkinKit.Catalog.SECTORS[sector - 1].reward
@@ -153,16 +165,37 @@ func track_survival(seconds: float, operator: String) -> bool:
 	longest_operator = operator
 	return true
 
+func restore_achievement_finishes(earned: Array) -> void:
+	var before := unlocked_skins.duplicate()
+	for id in earned:
+		if id is String and not unlocked_skins.has(id) and not SkinKit.finish_achievement(id).is_empty():
+			unlocked_skins.append(id)
+	if before != unlocked_skins and save() != OK:
+		unlocked_skins = before
+		push_warning("Could not restore achievement finishes.")
+
 func display_skin(slot: int) -> String:
 	var choice := String(operator_skins.get(slot, ""))
 	return choice if unlocked_skins.has(choice) else ""
 
 func select_skin(slot: int, choice: String) -> Error:
-	if slot < 1 or slot > ManualSave.SLOT_COUNT or (not choice.is_empty() and not unlocked_skins.has(choice)):
+	return select_appearance(slot, display_frame(slot), choice)
+
+func display_frame(slot: int) -> String:
+	var choice := String(operator_frames.get(slot, ""))
+	return choice if Frames.available(choice) and Frames.owned(choice, ManualSave.read_slot(slot)) else ""
+
+func select_appearance(slot: int, frame: String, choice: String) -> Error:
+	if slot < 1 or slot > ManualSave.SLOT_COUNT or not Frames.available(frame) \
+			or not Frames.owned(frame, ManualSave.read_slot(slot)) \
+			or (not choice.is_empty() and not unlocked_skins.has(choice)):
 		return ERR_INVALID_PARAMETER
-	var previous := display_skin(slot)
+	var previous_frame := String(operator_frames.get(slot, ""))
+	var previous_finish := String(operator_skins.get(slot, ""))
+	operator_frames[slot] = frame
 	operator_skins[slot] = choice
 	var error := save()
 	if error != OK:
-		operator_skins[slot] = previous
+		operator_frames[slot] = previous_frame
+		operator_skins[slot] = previous_finish
 	return error
