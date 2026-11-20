@@ -1,5 +1,9 @@
 extends CanvasLayer
 
+signal line_started(index: int)
+
+var was_skipped := false
+
 const Story := preload("res://scripts/rift_story.gd")
 const NOVA_DRONE := preload("res://assets/hub/nova_drone.glb")
 const NOVA_EFFECT := preload("res://assets/ui/nova_transmission.gdshader")
@@ -147,10 +151,12 @@ func play(lines: Array, finish_label: String, automatic := false, boss_name := "
 			create_tween().tween_property(portrait_image, "modulate:a", 1.0, 0.19)
 		reader.voice_pitch = 0.77 if boss else PITCHES.get(character, 1.0)
 		reader.next.text = finish_label + "  ›" if index == lines.size() - 1 else "Next  ›"
+		line_started.emit(index)
 		await reader.show_line(line[1], automatic)
 		if guidance and (reader.skipped or index == lines.size() - 1 or lines[index + 1][0] != Story.GUIDE):
 			await dismiss_nova()
 		if reader.skipped:
+			was_skipped = true
 			break
 	hide()
 	set_speaking(false)

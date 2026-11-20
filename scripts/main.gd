@@ -1267,6 +1267,7 @@ func select_save_slot(number: int, fresh: bool, operator_name := "") -> void:
 		account.last_operator = number
 		account.save()
 	var play_prologue := fresh and DisplayServer.get_name() != "headless"
+	var show_arrival := false
 	if play_prologue:
 		menu.hide()
 		menu.process_mode = Node.PROCESS_MODE_DISABLED
@@ -1277,12 +1278,13 @@ func select_save_slot(number: int, fresh: bool, operator_name := "") -> void:
 		var was_paused := music.stream_paused
 		music.stream_paused = true
 		await prologue.play()
+		show_arrival = not prologue.skipped
 		music.stream_paused = was_paused
 		remove_child(prologue)
 		prologue.queue_free()
 	open_home_hub()
 	if fresh:
-		home_hub.materialize_operator("arrival" if play_prologue else "")
+		home_hub.materialize_operator("arrival" if show_arrival else "")
 
 func reset_player_profile() -> void:
 	if not account or account.display_name.is_empty() or is_instance_valid(coop_mission):

@@ -202,7 +202,7 @@ def main() -> None:
             shutil.copy2(ROOT / "addons/godotsteam/license.md", version / "GODOTSTEAM_LICENSE.md")
             migration["assets"][platform] = package_legacy_migration(migration_dir, payload, version, platform, binary)
             game_zip = out / f"RIFTCORE-{platform}.zip"
-            with zipfile.ZipFile(game_zip, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=5) as archive:
+            with zipfile.ZipFile(game_zip, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=7) as archive:
                 for name in [binary, "RIFTCORE.pck", *LICENSES, "GODOTSTEAM_LICENSE.md", *STEAM_RUNTIME[platform]]:
                     archive.write(version / name, arcname=name)
             with game_zip.open("rb") as handle:

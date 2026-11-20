@@ -13,6 +13,7 @@ const OFFICIAL_REPO := "dethkorex/RIFTCORE"
 var install_root := ""
 var repo := ""
 var preview_channel := false
+var versioned_install := false
 var game_filename := "RIFTCORE.exe" if OS.get_name() == "Windows" else "RIFTCORE"
 var target_platform := "windows-x64" if OS.get_name() == "Windows" else "linux-x64"
 var transfer: HTTPRequest
@@ -21,7 +22,8 @@ var download_path := ""
 
 func configure_game() -> String:
 	var folder := OS.get_executable_path().get_base_dir()
-	install_root = folder.get_base_dir().get_base_dir() if folder.get_base_dir().get_file() == "versions" and is_match(TAG_PATTERN, folder.get_file()) else folder
+	versioned_install = folder.get_base_dir().get_file() == "versions" and is_match(TAG_PATTERN, folder.get_file())
+	install_root = folder.get_base_dir().get_base_dir() if versioned_install else folder
 	var release: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://assets/update_channel.json")) if FileAccess.file_exists("res://assets/update_channel.json") else {}
 	if not release is Dictionary:
 		release = {}
@@ -150,6 +152,16 @@ func launcher_entry(info: Dictionary) -> Dictionary:
 	if build < 1 or entry.get("file") != name or bytes < 1 or bytes > MAX_PACKAGE or not is_match(HASH_PATTERN, hash):
 		return {}
 	return {"file": name, "build": build, "size": bytes, "sha256": hash}
+
+func launcher_needs_repair(info: Dictionary) -> bool:
+	var entry := launcher_entry(info)
+	if entry.is_empty() or repo != OFFICIAL_REPO or not versioned_install:
+		return false
+	var root := DirAccess.open(install_root)
+	if root == null or not root.file_exists("updates.cfg") or not root.file_exists(game_filename) or root.is_link(game_filename):
+		return false
+	var launcher := install_root.path_join(game_filename)
+	return FileAccess.get_size(launcher) != entry.size or FileAccess.get_sha256(launcher) != entry.sha256
 
 func stage_launcher(info: Dictionary) -> String:
 	var entry := launcher_entry(info)

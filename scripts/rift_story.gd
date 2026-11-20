@@ -7,7 +7,35 @@ enum Mood { NEUTRAL, CONCERNED, RESOLUTE, WRY }
 const GUIDE := "NOVA_GUIDE"
 const TUTORIAL_TITLE := "Field Tutorial"
 
-const INTRO := "Meridian, Earth, 2189. When the Riftcore fractured, Director Soren kept the Nexus alive by cutting power to the districts. He called it a temporary sacrifice. Dr. Mara Voss built RX-07 to carry power between failing districts until they could share the load again. When Voss vanished during the evacuation, she left her little relay drone NOVA a trail through Meridian's industrial sectors. It starts with a stolen shipment at Ember Foundry."
+const INTRO := "Meridian, Earth, 2189. The Riftcore is failing. Director Soren seizes the district power systems and sends his guardians to enforce the shutdown. Dr. Mara Voss and RX-07 get an evacuation convoy through a collapsing floodgate. When RX-07 wakes without his memories, NOVA helps him track down Voss and recover the controls the city crews need."
+
+const OPENING := [
+	[
+		["NOVA", "Meridian. Earth. Year 2189. Our entire city depended on one power source... the Riftcore."],
+		["NOVA", "Then one day, it began to fail."],
+	],
+	[
+		["VOSS", "We can still save them! Let the district crews share the power!"],
+		["SOREN", "And risk losing the Nexus? No. The core must survive. Whatever the cost."],
+		["VOSS", "There are people in those districts, Soren!"],
+		["SOREN", "Then they should understand what's at stake."],
+	],
+	[
+		["NOVA", "Soren had designed the city's guardian robots to protect its people. Now he turned those machines against them."],
+		["SOREN", "All guardian units. Nexus command now overrides civilian authority. Secure the district power systems. Eliminate anyone who interferes."],
+	],
+	[
+		["VOSS", "If Soren won't save Meridian... we will."],
+		["VOSS", "RX-07. You were built to carry the power that no other machine can handle."],
+		["NOVA", "And you've got me to keep you out of trouble."],
+		["RX-07", "Then let's get to work."],
+	],
+	[
+		["VOSS", "RX! Your core can't take any more!"],
+		["RX-07", "Get them through!"],
+		["NOVA", "RX saved the convoy. But the overload erased his memories. And Dr. Voss disappeared beyond Meridian."],
+	],
+]
 
 const BRIEFINGS := [
 	"Three shelter generators left Ember Foundry on paper. I checked the loading bays. The crates never left. Somebody signed them over to the Nexus.",
@@ -116,11 +144,16 @@ const STANDARD_ENDING := "The Architect's lock is broken. RX-07 held the damaged
 const SECRET_ENDING := "The nine handover records let the crews take the Riftcore's load together. No sector had to go dark for another to stay lit. Voss's convoy is coming home to a city the districts run again."
 
 const ARRIVAL := [
-	["NOVA", "RX? Your core's steady. Try opening your hand. Last time I saw you, it was still holding the floodgate."],
-	["RX-07", "I remember the boats. The sound stopped all at once. Did Voss make it?", Mood.CONCERNED],
-	["NOVA", "I got one packet from her. Three shelter generators were diverted from Ember Foundry. She sent the manifest right before her transmitter cut out."],
-	["RX-07", "Then start there. Give the shelter crews our channel. If the power shifts, I need to hear it from them.", Mood.RESOLUTE],
-	["NOVA", "Already listening. One of them wants me to tell you the lights have been out for two nights. We can start with those."],
+	["NOVA", "RX? RX! You're awake!"],
+	["RX-07", "NOVA... Where's Dr. Voss?", Mood.CONCERNED],
+	["NOVA", "Her last signal disappeared outside the city. But she left us a way to save Meridian."],
+	["RX-07", "What do we need to do?", Mood.CONCERNED],
+	["NOVA", "Soren's guardian robots have locked away the original controls for all nine districts. Defeat them and recover those backups, and the repair crews can restore the power."],
+	["RX-07", "And Soren?", Mood.NEUTRAL],
+	["NOVA", "The Architect controls the final lock at the Nexus. Take it down, and Soren loses control of the city."],
+	["RX-07", "Nine guardians. One Architect.", Mood.RESOLUTE],
+	["SOREN", "Voss built you to save a city that cannot be saved."],
+	["RX-07", "Watch me.", Mood.RESOLUTE],
 ]
 
 const RECONSTRUCTION := [

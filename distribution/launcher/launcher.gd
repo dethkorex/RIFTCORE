@@ -2,7 +2,7 @@ extends Control
 
 const UpdateClient := preload("res://update_client.gd")
 
-const LAUNCHER_BUILD := 6
+const LAUNCHER_BUILD := 7
 const SteamArtwork := preload("res://steam_artwork.gd")
 
 var client := UpdateClient.new()

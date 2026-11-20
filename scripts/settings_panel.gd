@@ -29,6 +29,7 @@ var update_status: Label
 var patch_notes: RichTextLabel
 var progress: ProgressBar
 var installing := false
+var launcher_repair := false
 
 func _ready() -> void:
 	add_theme_constant_override("separation", 8)
@@ -445,6 +446,8 @@ func _process(_delta: float) -> void:
 func check_updates() -> void:
 	check_button.disabled = true
 	install_button.disabled = true
+	launcher_repair = false
+	install_button.text = "Install and Restart"
 	update_status.text = "Checking for updates…"
 	var release: Variant = await updater.fetch_manifest()
 	check_button.disabled = false
@@ -454,13 +457,19 @@ func check_updates() -> void:
 	manifest = release
 	var tag: String = manifest.tag
 	patch_notes.text = String(manifest.get("notes", "No patch notes published."))
-	if not updater.compare_tags(tag, current_version):
+	var game_update: bool = updater.compare_tags(tag, current_version)
+	launcher_repair = updater.launcher_needs_repair(manifest)
+	if not game_update and not launcher_repair:
 		update_status.text = "This build is up to date."
 		return
 	if not can_restart:
-		update_status.text = "%s is available. Save your progress and return to Title → Settings to install." % tag
+		update_status.text = "An update is available. Save your progress and return to Title → Settings to install."
 		return
-	update_status.text = "%s is available. Installing restarts the game." % tag
+	if launcher_repair:
+		install_button.text = "Update Launcher and Restart"
+		update_status.text = "The latest launcher is available for your existing shortcut."
+	else:
+		update_status.text = "%s is available. Installing restarts the game." % tag
 	install_button.disabled = false
 
 func install_update() -> void:
@@ -471,13 +480,22 @@ func install_update() -> void:
 	check_button.disabled = true
 	progress.value = 0
 	progress.show()
-	update_status.text = "Downloading and verifying %s…" % manifest.tag
-	var error: String = await updater.install(manifest)
-	if error.is_empty():
-		if updater.start_version(manifest.tag):
+	var error: String
+	if launcher_repair:
+		update_status.text = "Downloading and verifying the launcher…"
+		var replacement: String = await updater.stage_launcher(manifest)
+		if not replacement.is_empty() and OS.create_process(replacement, PackedStringArray(["--", "--replace-launcher"]), false) > 0:
 			RiftRelay.quit_game()
 			return
-		error = "The update was installed, but it could not restart. Reopen RIFTCORE."
+		error = "Couldn't update the launcher. Try again when you're online."
+	else:
+		update_status.text = "Downloading and verifying %s…" % manifest.tag
+		error = await updater.install(manifest)
+		if error.is_empty():
+			if updater.start_version(manifest.tag):
+				RiftRelay.quit_game()
+				return
+			error = "The update was installed, but it could not restart. Reopen RIFTCORE."
 	installing = false
 	progress.hide()
 	update_status.text = error

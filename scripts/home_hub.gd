@@ -44,6 +44,8 @@ var story: CanvasLayer
 var nova: Node3D
 var nova_iris: Node3D
 var nova_hover_time := 0.0
+var nova_hover_height := 0.0
+var nova_transitioning := false
 const Story := preload("res://scripts/rift_story.gd")
 const StoryDialogue := preload("res://scripts/story_dialogue.gd")
 var pads: Array[Dictionary] = []
@@ -67,7 +69,7 @@ func _ready() -> void:
 		build_pad(station)
 	nova = NOVA_DRONE.instantiate() as Node3D
 	nova.name = "NOVA"
-	nova.position = Vector3(-1.46, 1.92, -0.23)
+	nova.hide()
 	add_child(nova)
 	nova_iris = nova.find_child("Iris", true, false) as Node3D
 	avatar = AVATAR.instantiate() as RiftPlayer
@@ -143,15 +145,54 @@ func materialize_operator(sequence := "") -> void:
 	avatar.play_character_animation("land", true)
 	await get_tree().create_timer(0.26).timeout
 	avatar.play_character_animation("idle", true)
-	if not sequence.is_empty():
-		await play_station_story(Story.ARRIVAL if sequence == "arrival" else Story.RECONSTRUCTION)
+	if sequence == "arrival":
+		await play_opening_arrival()
+	elif sequence == "reconstruction":
+		await play_station_story(Story.RECONSTRUCTION)
 	await create_tween().tween_property(camera, "position", opening, 0.42).finished
 	reconstructing = false
 	update_station()
 	announce_shop_restock()
 
+func play_opening_arrival() -> void:
+	await fade_nova(true)
+	story = StoryDialogue.new()
+	add_child(story)
+	var board := CanvasLayer.new()
+	board.layer = 37
+	add_child(board)
+	var display := PanelContainer.new()
+	display.add_theme_stylebox_override("panel", hud_frame(Vector2(22, 10)))
+	board.add_child(display)
+	display.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+	display.position += Vector2(-170, 113)
+	var information := UI.column(display, 2)
+	UI.label(information, "MISSION 01 / EMBER FOUNDRY", 24, UI.CYAN)
+	display.hide()
+	story.line_started.connect(func(index: int):
+		if index == 8:
+			display.show()
+			display.modulate.a = 0.0
+			var signal_sweep := create_tween()
+			signal_sweep.tween_property(display, "modulate:a", 1.0, 0.20)
+			signal_sweep.tween_property(display, "modulate:a", 0.62, 0.17)
+			signal_sweep.tween_property(display, "modulate:a", 1.0, 0.24)
+			RiftAudio.play_effect(&"checkpoint")
+	)
+	await story.play(Story.ARRIVAL, "Continue")
+	var skipped: bool = story.was_skipped
+	story.queue_free()
+	board.queue_free()
+	await fade_nova(false)
+	if not skipped:
+		var title = load("res://scripts/campaign_prologue.gd").new()
+		title.name = "OpeningTitle"
+		add_child(title)
+		await title.play_title()
+		title.queue_free()
+
 func has_dialogue() -> bool:
-	return is_instance_valid(story) and story.visible and not story.is_queued_for_deletion()
+	return nova_transitioning or (is_instance_valid(story) and story.visible and not story.is_queued_for_deletion())
 
 func announce_shop_restock() -> void:
 	if not profile or panel_open or reconstructing or has_dialogue() or DisplayServer.get_name() == "headless":
@@ -168,12 +209,52 @@ func announce_shop_restock() -> void:
 func play_station_story(lines: Array, finish_label := "Back to Station") -> void:
 	if DisplayServer.get_name() == "headless":
 		return
+	await fade_nova(true)
 	story = StoryDialogue.new()
 	add_child(story)
 	update_station()
 	await story.play(lines, finish_label)
 	story.queue_free()
+	await fade_nova(false)
 	update_station()
+
+func fade_nova(appearing: bool) -> void:
+	nova_transitioning = true
+	if appearing:
+		var side := 1.0 if avatar.position.x < -17.0 else -1.0
+		nova_hover_height = avatar.position.y + 0.81
+		nova.position = Vector3(avatar.position.x + side * 1.46, nova_hover_height, 0.1)
+		nova_hover_time = 0.0
+		nova.show()
+
+	var pulse_mesh := TorusMesh.new()
+	pulse_mesh.inner_radius = 0.38
+	pulse_mesh.outer_radius = 0.41
+	pulse_mesh.rings = 32
+	pulse_mesh.ring_segments = 8
+	var glow := paint(Color("67ebff"), 2.0)
+	glow.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	glow.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	glow.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	var pulse := part(self, pulse_mesh, nova.position, glow)
+	pulse.rotation.x = deg_to_rad(24.0)
+	pulse.scale = Vector3.ONE * 0.35
+	pulse.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var duration := 0.46 if appearing else 0.32
+	var meshes := nova.find_children("*", "MeshInstance3D", true, false)
+	var fade := func(weight: float):
+		nova.scale = Vector3.ONE * lerpf(0.46, 1.0, weight)
+		for mesh: MeshInstance3D in meshes:
+			mesh.transparency = 1.0 - weight
+	fade.call(0.0 if appearing else 1.0)
+	var effect := create_tween().set_parallel().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	effect.tween_method(fade, 0.0 if appearing else 1.0, 1.0 if appearing else 0.0, duration)
+	effect.tween_property(pulse, "scale", Vector3.ONE * 1.9, duration)
+	effect.tween_property(pulse, "transparency", 1.0, duration)
+	await effect.finished
+	pulse.queue_free()
+	nova.visible = appearing
+	nova_transitioning = false
 
 var chat_open := false
 
@@ -200,13 +281,14 @@ func _physics_process(delta: float) -> void:
 	update_station()
 
 func _process(delta: float) -> void:
-	nova_hover_time += delta
-	nova.position.y = 1.92 + sin(nova_hover_time * 2.6) * 0.085
-	nova.rotation.y = lerpf(nova.rotation.y, clampf((avatar.position.x - nova.position.x) * 0.19, -0.48, 0.48), minf(1.0, delta * 4.0))
-	nova.rotation.z = sin(nova_hover_time * 2.6 + 1.2) * 0.10
-	if nova_iris:
-		var blink := maxf(0.0, 1.0 - absf(fposmod(nova_hover_time, 5.1) - 4.76) / 0.12)
-		nova_iris.scale.y = 1.0 - blink * 0.89
+	if nova.visible:
+		nova_hover_time += delta
+		nova.position.y = nova_hover_height + sin(nova_hover_time * 2.6) * 0.085
+		nova.rotation.y = lerpf(nova.rotation.y, clampf((avatar.position.x - nova.position.x) * 0.19, -0.48, 0.48), minf(1.0, delta * 4.0))
+		nova.rotation.z = sin(nova_hover_time * 2.6 + 1.2) * 0.10
+		if nova_iris:
+			var blink := maxf(0.0, 1.0 - absf(fposmod(nova_hover_time, 5.1) - 4.76) / 0.12)
+			nova_iris.scale.y = 1.0 - blink * 0.89
 	for id: int in partners:
 		var entry: Dictionary = partners[id]
 		var partner: RiftPlayer = entry.actor

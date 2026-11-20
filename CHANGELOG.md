@@ -1,7 +1,8 @@
-# RIFTCORE Alpha 6.3.27
+# RIFTCORE Alpha 6.3.28
 
-- Open your RIFTCORE shortcut from Steam to see the game description and current patch notes in Launcher 0.3.
-- Launcher 0.3 fills missing artwork for matching Steam shortcuts on first launch. It keeps artwork you already added. Restart Steam if it still shows the old images.
-- Launcher 0.3 downloads the newest game build automatically. The Windows and Linux installers include the launcher and download the game when it opens.
+- The new six-scene opening follows the fall of Meridian, Soren’s guardian uprising, and RX-07’s rescue of the convoy. Start a new operator to see it.
+- Opening dialogue uses larger text that reveals letter by letter. Use Next to read at your own pace, or skip straight to the station.
+- NOVA materializes beside RX-07 for hub conversations and fades away when they end.
+- Older launchers can be refreshed from the title screen under Settings → Update Game while keeping the same desktop or Steam shortcut.
 
-Existing Launcher 0.2 users can upgrade through Update and Play. Your shortcut and saves carry over.
+Windows and Linux builds are available through the RIFTCORE Launcher.
