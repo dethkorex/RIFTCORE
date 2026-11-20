@@ -8,6 +8,17 @@ var low: Dictionary[int, Quaternion] = {}
 var crouched := false
 var ladder_direction := 0.0
 var water_direction := Vector3.ZERO
+var recoil_time := 0.0
+var recoil_duration := 0.0
+var recoil_strength := 0.0
+
+func recoil(charged: bool) -> void:
+	recoil_time = 0.0
+	recoil_duration = 0.19 if charged else 0.105
+	recoil_strength = 0.21 if charged else 0.11
+
+func has_recoil() -> bool:
+	return recoil_time < recoil_duration
 
 func load_poses(animator: AnimationPlayer) -> void:
 	standing = sample_pose(animator, &"shoot")
@@ -33,7 +44,7 @@ func sample_pose(animator: AnimationPlayer, clip: StringName) -> Dictionary[int,
 			result[index] = animation.rotation_track_interpolate(track, animation.length * 0.35)
 	return result
 
-func _process_modification_with_delta(_delta: float) -> void:
+func _process_modification_with_delta(delta: float) -> void:
 	var skeleton := get_skeleton()
 	var pose := low if crouched and not low.is_empty() else standing
 	for index in pose:
@@ -48,6 +59,14 @@ func _process_modification_with_delta(_delta: float) -> void:
 		var toward_elbow := skeleton.get_bone_global_pose(muzzle_bone).origin - skeleton.get_bone_global_pose(arm).origin
 		if toward_elbow.length_squared() > 0.000001:
 			turn_bone(skeleton, arm, Quaternion(toward_elbow.normalized(), target))
+	if has_recoil():
+		recoil_time = minf(recoil_time + delta, recoil_duration)
+		var recovery := 1.0 - recoil_time / recoil_duration
+		var kick := recoil_strength * recovery * recovery
+		target = (target + Vector3.UP * kick).normalized()
+		var shoulder := skeleton.find_bone("mixamorig_RightShoulder")
+		if shoulder >= 0:
+			turn_bone(skeleton, shoulder, Quaternion(Vector3.RIGHT, -kick * 0.63))
 	var forearm := skeleton.get_bone_global_pose(muzzle_bone)
 	var barrel := (forearm.basis * muzzle_offset).normalized()
 	if not barrel.is_zero_approx():

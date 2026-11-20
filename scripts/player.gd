@@ -143,8 +143,12 @@ var combo_hit_at := 0.0
 var combo_hit := false
 var combo_facing := 1.0
 var combo_duration := 0.0
+const SABER_CLIPS := preload("res://assets/animations/rx07_saber_combo.res")
 const SWING_CLIPS := [&"saber_cut", &"saber_return", &"slash_finisher"]
-const SWING_DURATIONS := [0.29, 0.28, 0.37]
+const SWING_DURATIONS := [0.35, 0.34, 0.49]
+const SWING_IMPACT := [0.52, 0.49, 0.56]
+const SWEEP_START := [0.35, 0.32, 0.43]
+const SWEEP_END := 0.78
 const SABER_CHARGE_TIME := 0.52
 var saber_hold := -1.0
 var saber_primed := false
@@ -230,7 +234,6 @@ func _ready() -> void:
 		climb_pose.influence = 0.0
 		skeleton.add_child(climb_pose)
 		slide_pose = preload("res://scripts/ground_slide_pose.gd").new()
-		slide_pose.set("clips", animation_player)
 		slide_pose.influence = 0.0
 		skeleton.add_child(slide_pose)
 		var swim_pose := preload("res://scripts/swim_pose.gd").new()
@@ -1324,6 +1327,7 @@ func shoot(charged := false, pose_held := false, suit_shot := false) -> void:
 	if health <= 0.0:
 		return
 	if buster_pose:
+		buster_pose.recoil_time = buster_pose.recoil_duration
 		buster_pose.influence = 1.0
 		await buster_pose.modification_processed
 		if health <= 0.0 or wall_sliding:
@@ -1344,6 +1348,8 @@ func shoot(charged := false, pose_held := false, suit_shot := false) -> void:
 	else:
 		var power := (34.0 * level_damage_scale()) if magma else (buster_power() * (4.0 if charged else 1.0))
 		launch_buster(muzzle, Vector3(aim, 0, 0), charged, magma, power, Color.TRANSPARENT, "magma_breaker" if magma else "")
+	if not uses_suit and buster_pose:
+		buster_pose.recoil(charged)
 	if uses_suit:
 		RiftProjectile.suit_flash(showcase_projectiles if showcase else get_parent(), muzzle, Color(Catalog.weapon(suit).color), charged)
 	RiftAudio.play_effect(&"buster_charged" if charged else &"buster")
@@ -1546,19 +1552,16 @@ func equip_sector_weapon(id: String) -> void:
 	weapon_changed.emit(String(info.get("reward_name", "Buster Cannon")).to_upper())
 
 func build_combat_clips() -> void:
-	if not animation_player.has_animation(&"slash") or not animation_player.has_animation_library(&""):
+	if not animation_player.has_animation_library(&""):
 		return
 	var library := animation_player.get_animation_library(&"")
 	if library.has_animation(SWING_CLIPS[0]):
 		return
-	var source := library.get_animation(&"slash")
-	var stance := library.get_animation(&"idle")
-	library.add_animation(SWING_CLIPS[0], sample_combat_pose(source, [0.0, 0.25, 0.49, 0.76, 1.0], [0.03, 0.19, 0.52, 0.83, 0.95], 0.06, false, stance))
-	library.add_animation(SWING_CLIPS[1], sample_combat_pose(source, [0.0, 0.25, 0.46, 0.76, 1.0], [0.91, 0.78, 0.51, 0.27, 0.11], -0.10, false, stance))
-	library.add_animation(SWING_CLIPS[2], sample_combat_pose(source, [0.0, 0.28, 0.49, 0.75, 1.0], [0.10, 0.20, 0.60, 0.88, 0.98], 0.22, false, stance))
+	for clip in SWING_CLIPS:
+		library.add_animation(clip, SABER_CLIPS.get_animation(clip))
 	var crouch := library.get_animation(&"crouch")
 	if crouch:
-		var slide := sample_combat_pose(crouch, [0.0, 0.16, 0.67, 1.0], [0.64, 0.82, 0.85, 0.80], 0.0, true)
+		var slide := sample_combat_pose(crouch, [0.0, 0.16, 0.67, 1.0], [0.64, 0.82, 0.85, 0.80], true)
 		slide.loop_mode = Animation.LOOP_LINEAR
 		library.add_animation(&"slide", slide)
 
@@ -1566,11 +1569,11 @@ func build_wall_slide_clip() -> void:
 	var library := animation_player.get_animation_library(&"")
 	if library == null or library.has_animation(&"wall_slide") or not library.has_animation(&"idle"):
 		return
-	var brace := sample_combat_pose(library.get_animation(&"idle"), [0.0, 1.0], [0.0, 0.0], 0.0)
+	var brace := sample_combat_pose(library.get_animation(&"idle"), [0.0, 1.0], [0.0, 0.0])
 	brace.loop_mode = Animation.LOOP_LINEAR
 	library.add_animation(&"wall_slide", brace)
 
-func sample_combat_pose(source: Animation, stops: Array, poses: Array, accent: float, slide := false, stance: Animation = null) -> Animation:
+func sample_combat_pose(source: Animation, stops: Array, poses: Array, slide := false) -> Animation:
 	var clip := source.duplicate() as Animation
 	clip.loop_mode = Animation.LOOP_NONE
 	for track in clip.get_track_count():
@@ -1578,8 +1581,6 @@ func sample_combat_pose(source: Animation, stops: Array, poses: Array, accent: f
 		if kind not in [Animation.TYPE_ROTATION_3D, Animation.TYPE_POSITION_3D, Animation.TYPE_SCALE_3D]:
 			continue
 		var path := String(clip.track_get_path(track))
-		var lower := stance != null and (path.ends_with("_Hips") or path.contains("Leg") or path.contains("Foot") or path.contains("ToeBase"))
-		var planted := stance.find_track(clip.track_get_path(track), kind) if lower else -1
 		while clip.track_get_key_count(track) > 0:
 			clip.track_remove_key(track, 0)
 		for sample in stops.size():
@@ -1587,8 +1588,7 @@ func sample_combat_pose(source: Animation, stops: Array, poses: Array, accent: f
 			var key_time: float = clip.length * stops[sample]
 			match kind:
 				Animation.TYPE_ROTATION_3D:
-					var pose := stance.rotation_track_interpolate(planted, 0.0) if planted >= 0 else source.rotation_track_interpolate(track, at)
-					var weight := sin(PI * float(stops[sample]))
+					var pose := source.rotation_track_interpolate(track, at)
 					var offset := 0.0
 					if slide:
 						if path.ends_with("_Spine") or path.ends_with("_Spine1"):
@@ -1598,11 +1598,9 @@ func sample_combat_pose(source: Animation, stops: Array, poses: Array, accent: f
 						elif path.ends_with("_RightUpLeg"):
 							offset = -0.17
 						pose = pose * Quaternion(Vector3.RIGHT, offset)
-					elif path.ends_with("_LeftArm") or path.ends_with("_Spine2"):
-						pose = pose * Quaternion(Vector3.BACK, accent * weight * (0.35 if path.ends_with("_Spine2") else 1.0))
 					clip.rotation_track_insert_key(track, key_time, pose.normalized())
 				Animation.TYPE_POSITION_3D:
-					clip.position_track_insert_key(track, key_time, stance.position_track_interpolate(planted, 0.0) if planted >= 0 else source.position_track_interpolate(track, at))
+					clip.position_track_insert_key(track, key_time, source.position_track_interpolate(track, at))
 				Animation.TYPE_SCALE_3D:
 					clip.scale_track_insert_key(track, key_time, source.scale_track_interpolate(track, at))
 	return clip
@@ -1641,9 +1639,9 @@ func update_melee(delta: float) -> void:
 		if released_tap and combo_step + combo_queued < 3:
 			combo_queued += 1
 		combo_time += delta
-		if not combo_trail and combo_time >= combo_hit_at - 0.045:
+		if not combo_trail and combo_time >= combo_duration * SWEEP_START[combo_step - 1]:
 			combo_trail = true
-			emit_saber_trail(combo_duration - combo_time, combo_step == 3)
+			emit_saber_trail(combo_duration * SWEEP_END - combo_time, combo_step == 3)
 		if not combo_hit and combo_time >= combo_hit_at:
 			combo_hit = true
 			if combo_wave:
@@ -1669,7 +1667,7 @@ func perform_melee(step := 1, charged := false) -> void:
 	combo_step = step
 	combo_duration = SWING_DURATIONS[step - 1]
 	combo_time = 0.0
-	combo_hit_at = combo_duration * [0.49, 0.46, 0.49][step - 1]
+	combo_hit_at = combo_duration * SWING_IMPACT[step - 1]
 	combo_hit = false
 	combo_trail = false
 	combo_wave = charged
@@ -1677,6 +1675,9 @@ func perform_melee(step := 1, charged := false) -> void:
 	combo_hot = magma_active
 	melee_lock = combo_duration
 	cancel_charge()
+	if buster_pose:
+		buster_pose.recoil_time = buster_pose.recoil_duration
+		buster_pose.influence = 0.0
 	var clip: StringName = SWING_CLIPS[step - 1]
 	if animation_player and animation_player.has_animation(clip):
 		play_character_animation(String(clip), true)
@@ -1713,7 +1714,9 @@ func reflect_saber_pose(clip: String, held_time: float) -> void:
 		present_saber_charge(held_time, step >= 0)
 		if step >= 0 and clip != current_animation:
 			combo_hot = magma_active
-			PACK_VFX.blade_trail(sword_pivot, SWING_DURATIONS[step] * .60, saber_tint(), step == 2)
+			await get_tree().create_timer(SWING_DURATIONS[step] * SWEEP_START[step], false).timeout
+			if current_animation == clip and is_instance_valid(sword_pivot) and sword_pivot.visible:
+				PACK_VFX.blade_trail(sword_pivot, SWING_DURATIONS[step] * (SWEEP_END - SWEEP_START[step]), saber_tint(), step == 2)
 
 func launch_saber_wave() -> void:
 	var aim := combo_facing
@@ -1836,7 +1839,7 @@ func update_character_visuals(axis: float) -> void:
 		buster_pose.ladder_direction = 0.0
 		buster_pose.water_direction=Vector3.RIGHT*facing if in_water else Vector3.ZERO
 		buster_pose.crouched = low_profile
-		var aiming := not bracing and not swinging and displayed_saber_charge < 0.10 and not (ground_dash and dash_left > 0.0) and (charge_held or is_instance_valid(charge_orb) or fire_lock > 0.0)
+		var aiming: bool = not bracing and not swinging and displayed_saber_charge < 0.10 and not (ground_dash and dash_left > 0.0) and (charge_held or is_instance_valid(charge_orb) or fire_lock > 0.0 or buster_pose.has_recoil())
 		buster_pose.influence = 0.0 if bracing else move_toward(buster_pose.influence, 1.0 if aiming else 0.0, 0.30)
 	if is_instance_valid(charge_orb):
 		charge_orb.global_position = cannon_muzzle(facing)

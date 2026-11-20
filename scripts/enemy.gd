@@ -105,6 +105,7 @@ func _ready() -> void:
 	move_speed = PATROL_SPEEDS[variant]
 	super._ready()
 	ledge_probe.exclude = [get_rid()]
+	ledge_probe.collision_mask = 1
 	patrol_center = global_position.x
 	home_height = global_position.y
 	build_visuals()
@@ -253,14 +254,22 @@ func _physics_process(delta: float) -> void:
 				fire_at_player()
 		elif stagger_left <= 0.0 and tracking and shot_clock <= 0.0 and absf(distance) > 1.45:
 			prepare_shot()
-	if not tracking and absf(global_position.x - patrol_center) > 4.0:
-		direction = -signf(global_position.x - patrol_center)
+	if not is_instance_valid(target) or target.health <= 0.0:
+		shot_windup = 0.0
+	if not tracking:
+		var left_edge := maxf(patrol_center - 4.0, patrol_left_limit)
+		var right_edge := minf(patrol_center + 4.0, patrol_right_limit)
+		if direction > 0.0 and global_position.x >= right_edge - .02:
+			direction = -1.0
+		elif direction < 0.0 and global_position.x <= left_edge + .02:
+			direction = 1.0
 	var move_factor := 1.0
 	if maneuver_time > 0.0:
 		move_factor = -0.68 if patrol_model in [0, 5] else 1.78 if variant == Variant.QUAD else 1.0
 	velocity.x = 0.0 if planted_override or shot_windup > 0.0 else direction * move_speed * move_factor
-	if is_on_floor() and variant != Variant.TURRET:
-		var ledge := global_position + Vector3(direction * 0.75, 0.0, 0.0)
+	var travel := signf(velocity.x)
+	if is_on_floor() and not is_zero_approx(travel) and variant != Variant.FLYER:
+		var ledge := global_position + Vector3(travel * 0.75, 0.0, 0.0)
 		var target_rid := target.get_rid() if is_instance_valid(target) else RID()
 		if target_rid != ledge_target:
 			ledge_probe.exclude = [get_rid(), target_rid] if target_rid.is_valid() else [get_rid()]
@@ -289,13 +298,7 @@ func _physics_process(delta: float) -> void:
 		refresh_defense()
 		robot.rotation.y = lerp_angle(robot.rotation.y, direction * PI * 0.5, 1.0 - exp(-14.0 * delta))
 		robot.rotation.z = direction * (attack_time * 0.32 if attack_time > 0.0 else clampf(velocity.x * -0.025, -0.09, 0.09))
-		var striding := is_on_floor() and stagger_left <= 0.0 and absf(velocity.x) > 0.28
-		gait_phase = fposmod(gait_phase + (absf(velocity.x) * 4.8 * delta if striding else 0.0), TAU)
-		for i in range(gait_joints.size()):
-			var diagonal := (i in [0, 3]) if gait_joints.size() == 4 else i == 0
-			var flex := sin(gait_phase + (0.0 if diagonal else PI)) * 0.34 if striding else 0.0
-			gait_joints[i].rotation.x = lerpf(gait_joints[i].rotation.x, flex, 0.47)
-		robot.position.y = lerpf(robot.position.y, absf(sin(gait_phase)) * 0.04 if striding else 0.0, 0.34)
+		present_patrol_motion(get_real_velocity().x if is_on_floor() and stagger_left <= 0.0 else 0.0, delta)
 	if global_position.y < lower_death_limit():
 		take_damage(max_health)
 		return
@@ -309,6 +312,19 @@ func _physics_process(delta: float) -> void:
 		if support and contact.get_normal().y > 0.62:
 			last_support = support
 			last_ground_local = support.to_local(contact.get_position() + Vector3.UP * 0.42)
+
+func present_patrol_motion(speed: float, delta: float) -> void:
+	if not robot or variant in [Variant.TURRET, Variant.FLYER]:
+		return
+	var striding := absf(speed) > 0.28
+	if striding:
+		gait_phase = fposmod(gait_phase + absf(speed) * 4.8 * delta, TAU)
+	var blend := 1.0 - exp(-27.0 * delta)
+	for i in gait_joints.size():
+		var diagonal := (i in [0, 3]) if gait_joints.size() == 4 else i == 0
+		var flex := sin(gait_phase + (0.0 if diagonal else PI)) * 0.34 if striding else 0.0
+		gait_joints[i].rotation.x = lerpf(gait_joints[i].rotation.x, flex, blend)
+	robot.position.y = lerpf(robot.position.y, absf(sin(gait_phase)) * 0.04 if striding else 0.0, blend)
 
 func refresh_defense() -> void:
 	if defense_marker:

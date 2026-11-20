@@ -1845,8 +1845,10 @@ func _process(delta: float) -> void:
 					if enemy.health != enemy_health[index]:
 						enemy.health = enemy_health[index]
 						enemy.health_changed.emit(enemy.health, enemy.max_health)
-			if enemy.visible and not enemy.global_position.is_equal_approx(enemy_targets[index]):
+			if enemy.visible:
+				var prior_x: float = enemy.global_position.x
 				enemy.global_position = enemy.global_position.lerp(enemy_targets[index], blend)
+				enemy.present_patrol_motion((enemy.global_position.x - prior_x) / maxf(delta, .001), delta)
 		presented_world = latest_state
 	for actor in operators:
 		preload("res://scripts/coop_corpse.gd").present(actor)

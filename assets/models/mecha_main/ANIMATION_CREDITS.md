@@ -3,3 +3,5 @@
 Idle, walk, jog, jump start, fall, landing, crouch, and the mirrored left-hand sword attack are retargeted from the Standard edition of [Quaternius Universal Animation Library](https://quaternius.com/packs/universalanimationlibrary.html) (CC0). The standing buster and dash use custom RX-07 clips. Crouch-fire adds a custom right-arm aim to the library's crouch pose. Forge Titan's punch uses the reach sampled from the pack's Punch Cross clip to drive its rigid fist joint.
 
 The editable rig and animation tracks are in `RiftcoreMechaUAL.blend`. Godot uses `RiftcoreMechaUAL.glb`. To preview an individual clip in Blender, unmute its track in the NLA Editor.
+
+The active saber combo uses `Sword_Regular_A`, `Sword_Regular_B`, and `Sword_Regular_C` from [Quaternius Universal Animation Library 2 Standard](https://quaternius.itch.io/universal-animation-library-2) (CC0). Riftcore mirrors and retargets these full-body clips onto RX-07 and retimes their strikes to the gameplay combo. Both Standard packs include their original Godot files and license in `assets/animations/quaternius`.

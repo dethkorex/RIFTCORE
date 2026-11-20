@@ -2,6 +2,8 @@ class_name RiftProjectile
 extends Area3D
 
 const HALO := preload("res://assets/pickups/pickup_halo.gdshader")
+const BUSTER_PLASMA := preload("res://assets/vfx/buster_plasma.gdshader")
+const BUSTER_PULSE := preload("res://assets/vfx/buster_pulse.gdshader")
 const PACK_VFX := preload("res://scripts/pack_combat_vfx.gd")
 const ATTACK_FX := preload("res://scripts/attack_fx.gd")
 static var paint_cache: Dictionary = {}
@@ -88,6 +90,8 @@ func setup(dir: Vector3, faction: String, tint: Color = Color.CYAN, drill := fal
 
 	elif not weapon_id.is_empty():
 		build_suit_projectile(hot)
+	elif faction == "player":
+		build_buster_projectile()
 	else:
 		var caliber := 2.35 if charged else 1.0
 		var narrow := 0.14 * caliber
@@ -116,6 +120,47 @@ func setup(dir: Vector3, faction: String, tint: Color = Color.CYAN, drill := fal
 	body_entered.connect(_on_body_entered)
 	if owner_faction == "player":
 		area_entered.connect(_on_guard_entered)
+
+func build_buster_projectile() -> void:
+	var scale_factor := 2.25 if is_charged else 1.0
+	var core := part(skin, cached_mesh("Orb"), plasma_paint(palette), Vector3(0, 0, .045 * scale_factor),
+		Vector3(.16, .16, .32) * scale_factor)
+	core.name = "PlasmaCore"
+	var wake := add_glow(skin, palette, .86 * scale_factor)
+	wake.name = "PlasmaWake"
+	wake.position.z = -.28 * scale_factor
+	wake.scale = Vector3(1.75, .54, 1.0)
+	var collar_paint := ShaderMaterial.new()
+	collar_paint.shader = BUSTER_PULSE
+	collar_paint.set_shader_parameter("ion_color", palette.lerp(Color.WHITE, .24))
+	var collar := part(skin, cached_mesh("Ring"), collar_paint,
+		Vector3(0, 0, -.05 * scale_factor), Vector3.ONE * .34 * scale_factor)
+	collar.name = "PulseCollar"
+	collar.rotation.x = PI * .5
+
+	var flash := Node3D.new()
+	flash.name = "BusterDischarge"
+	get_parent().add_child(flash)
+	flash.global_transform = Transform3D(skin.global_basis, global_position)
+	var glow := add_glow(flash, palette.lerp(Color.WHITE, .38), .82 * scale_factor)
+	var flare_paint := collar_paint.duplicate() as ShaderMaterial
+	var flare := part(flash, cached_mesh("Ring"), flare_paint, Vector3.ZERO, Vector3.ONE * .22 * scale_factor)
+	flare.rotation.x = PI * .5
+	var time := .15 if is_charged else .085
+	var pulse := flash.create_tween().set_parallel().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	pulse.tween_property(flare, "scale", Vector3.ONE * .39 * scale_factor, time)
+	pulse.tween_method(func(value: float): flare_paint.set_shader_parameter("intensity", value), .72, 0.0, time)
+	pulse.tween_property(glow, "scale", Vector3.ONE * .16, time)
+	pulse.chain().tween_callback(flash.queue_free)
+
+static func plasma_paint(tint: Color) -> ShaderMaterial:
+	var key := "buster:" + tint.to_html()
+	if not paint_cache.has(key):
+		var material := ShaderMaterial.new()
+		material.shader = BUSTER_PLASMA
+		material.set_shader_parameter("plasma", tint)
+		paint_cache[key] = material
+	return paint_cache[key]
 
 func _on_guard_entered(area: Area3D) -> void:
 	if area.is_in_group(&"enemy_guard_field") and area.visible:
