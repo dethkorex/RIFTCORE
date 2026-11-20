@@ -7,6 +7,8 @@ const UI := preload("res://scripts/rift_ui.gd")
 const PauseMenu := preload("res://scripts/coop_pause_menu.gd")
 const AVATAR := preload("res://scenes/actors/riftcore_player.tscn")
 const WINDOW := preload("res://assets/hub/orbital_view.png")
+const STATION_PLATFORM := preload("res://assets/hub/station_platform.glb")
+const DEPLOYMENT_PLATFORM := preload("res://assets/hub/deployment_platform.glb")
 const STATIONS := [
 	{"x": -18.0, "name": "System", "page": "Save Game", "color": Color("9cbbff"), "prop": "settings_terminal"},
 	{"x": -13.5, "name": "Profile", "page": "Player Profile", "color": Color("b6a3ff"), "prop": "save_terminal"},
@@ -420,38 +422,34 @@ func build_pad(station: Dictionary) -> void:
 	add_child(at)
 	at.position.x = station.x
 	var deployment: bool = station.page == "Sector select"
-	var terminal := place_asset(station.prop, Vector3(station.x, 0, 0 if deployment else -1.84))
-	if station.name == "System":
-		terminal.set("caption", "SYSTEM / SAVE")
-	elif station.name == "Workshop":
-		terminal.set("caption", "WORKSHOP")
-		terminal.set("accent", station.color)
-	elif station.name in ["Social", "Profile", "Operator"]:
-		terminal.set("caption", station.name.to_upper())
-		terminal.set("icon", "icon_person")
-		terminal.set("accent", station.color)
+	if not deployment:
+		var terminal := place_asset(station.prop, Vector3(station.x, 0, -1.84))
+		if station.name == "System":
+			terminal.set("caption", "SYSTEM / SAVE")
+		elif station.name == "Workshop":
+			terminal.set("caption", "WORKSHOP")
+			terminal.set("accent", station.color)
+		elif station.name in ["Social", "Profile", "Operator"]:
+			terminal.set("caption", station.name.to_upper())
+			terminal.set("icon", "icon_person")
+			terminal.set("accent", station.color)
 	var tint: Color = station.color
 	var glow := paint(tint, 0.37)
-	var footing := CylinderMesh.new()
-	footing.top_radius = 0.98
-	footing.bottom_radius = 1.08
-	footing.height = 0.15
-	footing.radial_segments = 8
-	if not deployment:
-		part(at, footing, Vector3(0, 0.057, 0), frame)
-	var plate := CylinderMesh.new()
-	plate.top_radius = 0.82
-	plate.bottom_radius = 0.82
-	plate.height = 0.035
-	plate.radial_segments = 24
-	if not deployment:
-		part(at, plate, Vector3(0, 0.14, 0), metal)
+	var platform := (DEPLOYMENT_PLATFORM if deployment else STATION_PLATFORM).instantiate() as Node3D
+	at.add_child(platform)
+	var guides := platform.find_child("LightGuides", true, false) as MeshInstance3D
+	guides.material_override = glow
+	if deployment:
+		var outer := TorusMesh.new()
+		outer.inner_radius = 1.03
+		outer.outer_radius = 1.10
+		part(at, outer, Vector3(0, 0.253, 0), glow)
+		label_in_space(at, "DEPLOY", Vector3(0, 0.15, 1.665), 41, tint.lerp(Color.WHITE, 0.44))
 	var ring := TorusMesh.new()
 	ring.inner_radius = 0.74
 	ring.outer_radius = 0.85
-	part(at, ring, Vector3(0, 0.252 if deployment else 0.157, 0), glow)
-	for side in [-1.0, 1.0]:
-		box(at, Vector3(side * 0.65, 0.125, 0.68), Vector3(0.29, 0.08, 0.11), glow)
+	var deck_height := 0.252 if deployment else 0.157
+	part(at, ring, Vector3(0, deck_height, 0), glow).name = "StandingRing"
 	var beacon := CylinderMesh.new()
 	beacon.top_radius = 0.97
 	beacon.bottom_radius = 0.69

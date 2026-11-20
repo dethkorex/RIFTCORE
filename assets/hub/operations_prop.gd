@@ -3,6 +3,7 @@ extends Node3D
 
 const Chamfer := preload("res://scripts/factory_chamfer.gd")
 const Face := preload("res://assets/ui/fonts/BarlowCondensed-ExtraBoldItalic.ttf")
+const BRUSHED_FINISH := preload("res://assets/neon_factory/interiors/bulkhead_Brushed gunmetal • roughness.png")
 const IconDirectory := "res://assets/ui/riftcore_kit/"
 
 @export_enum("Terminal", "Deploy", "Window", "Deck", "Banner") var kind := 0:
@@ -57,7 +58,14 @@ func build() -> void:
 	steel = finish(Color("4c5e7a"), 0.0, 0.73)
 	lit = finish(accent, 1.45, 0.12)
 	match kind:
-		0: terminal()
+		0:
+			# Local triplanar mapping follows the bevels on the original UV-less casings.
+			for casing: StandardMaterial3D in [alloy, steel]:
+				casing.roughness_texture = BRUSHED_FINISH
+				casing.roughness = 0.86
+				casing.uv1_triplanar = true
+				casing.uv1_scale = Vector3.ONE * 1.5
+			terminal()
 		1: deploy()
 		2: window_frame()
 		3: deck()
@@ -127,11 +135,11 @@ func terminal() -> void:
 		plate(Vector3(side * 1.28, 1.49, 0.335), Vector3(0.12, 0.46, 0.035), lit, 0.01)
 		strut(Vector3(side * 1.35, 1.6, 0), Vector3(side * 0.96, 2.12, 0), 0.31, steel)
 		plate(Vector3(side * 1.31, 0.19, 0.15), Vector3(0.44, 0.29, 0.7), steel)
-	plate(Vector3(0, 2.01, 0.19), Vector3(2.91, 0.51, 0.52), steel, 0.13)
-	plate(Vector3(0, 2.02, 0.476), Vector3(2.55, 0.33, 0.055), dark, 0.02)
-	plate(Vector3(0, 1.83, 0.49), Vector3(2.35, 0.029, 0.025), lit, 0.01)
-	badge(Vector3(-1.04, 2.02, 0.525), icon, 0.24)
-	sign_text(Vector3(0.13, 2.02, 0.52), caption, 36)
+	plate(Vector3(0, 2.01, 0.19), Vector3(3.10, 0.59, 0.52), steel, 0.13)
+	plate(Vector3(0, 2.02, 0.476), Vector3(2.76, 0.42, 0.055), dark, 0.02)
+	plate(Vector3(0, 1.79, 0.49), Vector3(2.57, 0.029, 0.025), lit, 0.01)
+	badge(Vector3(-1.17, 2.02, 0.525), icon, 0.26)
+	sign_text(Vector3(0.13, 2.02, 0.52), caption, 45)
 	match layout:
 		1:
 			for row in range(3):
@@ -205,12 +213,12 @@ func deck() -> void:
 		strut(Vector3(edge * 2.09, -0.42, 2.1), Vector3(edge * 1.13, -1.14, 2.1), 0.18, alloy)
 
 func banner() -> void:
-	plate(Vector3.ZERO, Vector3(4.6, 0.87, 0.26), steel, 0.15)
-	plate(Vector3(0, 0.02, 0.16), Vector3(4.29, 0.61, 0.08), dark)
+	plate(Vector3.ZERO, Vector3(4.84, 0.96, 0.26), steel, 0.15)
+	plate(Vector3(0, 0.02, 0.16), Vector3(4.54, 0.73, 0.08), dark)
 	var mark := Sprite3D.new()
 	mark.texture = preload("res://assets/ui/riftcore-wordmark.svg")
-	mark.pixel_size = 3.14 / mark.texture.get_width()
+	mark.pixel_size = 3.32 / mark.texture.get_width()
 	mark.position = Vector3(0, 0.13, 0.22)
 	geometry.add_child(mark)
-	sign_text(Vector3(0, -0.23, 0.22), caption, 35)
-	plate(Vector3(0, -0.40, 0.20), Vector3(2.93, 0.045, 0.06), lit, 0.01)
+	sign_text(Vector3(0, -0.24, 0.22), caption, 41)
+	plate(Vector3(0, -0.45, 0.20), Vector3(2.93, 0.045, 0.06), lit, 0.01)

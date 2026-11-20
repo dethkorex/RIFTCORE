@@ -45,6 +45,13 @@ func run() -> void:
 	var hub = game.home_hub
 	var menu = game.menu
 	check(hub.pads.size() == 8 and hub.prompt.visible and hub.current_station == 3, "Hub opens at the Deploy bay")
+	for index in hub.pads.size():
+		var pad: Dictionary = hub.pads[index]
+		var ring := pad.beam.get_parent().get_node_or_null("StandingRing") as MeshInstance3D
+		var occupied: bool = index == hub.current_station
+		check(is_instance_valid(ring) and ring.mesh is TorusMesh and ring.is_visible_in_tree()
+			and pad.beam.visible == occupied and pad.pulse.visible == occupied,
+			"%s has a visible standing ring and the correct occupancy effects" % hub.STATIONS[index].name)
 	check(hub.get_node("OperationsBanner/Geometry").get_child_count() > 4, "Modular signage builds")
 	if DisplayServer.get_name() != "headless" and not OS.get_cmdline_user_args().is_empty():
 		await RenderingServer.frame_post_draw
