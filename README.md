@@ -4,11 +4,13 @@ A 3D side-scrolling roguelike platformer inspired by Mega Man X. The campaign ha
 
 ## Play
 
-Get [RIFTCORE Alpha 6.1 with Installer 0.2](https://github.com/dethkorex/RIFTCORE/releases/tag/v6.1.0-preview). In the game, open Settings → Update Game to check for future releases. Choose `RIFTCORE-Windows-x64-Setup.exe` for Windows or `RIFTCORE-Linux-x64-Setup.run` for Linux. These include the game runtime; players do not need Godot. On Linux, run `chmod +x RIFTCORE-Linux-x64-Setup.run` and then `./RIFTCORE-Linux-x64-Setup.run`.
+Get the newest preview from [RIFTCORE Releases](https://github.com/dethkorex/RIFTCORE/releases). Choose `RIFTCORE-Windows-x64-Setup.exe` for Windows or `RIFTCORE-Linux-x64-Setup.run` for Linux. On Linux, run `chmod +x RIFTCORE-Linux-x64-Setup.run` and then `./RIFTCORE-Linux-x64-Setup.run`. With Launcher 0.3, setup installs the launcher, which downloads the newest build when it opens.
 
-The game and launcher automatically fill missing library artwork for existing RIFTCORE non-Steam shortcuts. A normal Steam restart may be needed to refresh the library. The Steam artwork ZIP also includes the game description.
+If you already use Launcher 0.2, open your existing RIFTCORE shortcut and choose **Update and Play** once. Launcher 0.3 checks for updates and starts downloading automatically when you open it. Once the build is verified, choose **Play**. If you're offline, **Play** opens the installed build. You can also check for game updates from Settings → Update Game.
 
-The installed launcher checks GitHub Releases. When an update is available, select **Update and play**. **Play installed** works offline. Updates verify the package SHA-256 and install next to the prior version, leaving user data in its normal Godot directory. The ZIP downloads are standalone portable games without the launcher.
+Updates verify the package SHA-256 and retain your saves. For an offline install, the game ZIPs include the standalone game and the Arch portable archive includes both the launcher and the game.
+
+The game and launcher fill in missing library artwork for existing RIFTCORE non-Steam shortcuts. Restart Steam to refresh the artwork if needed. The Steam artwork ZIP also includes the game description.
 
 | Action | Keyboard | Controller |
 | --- | --- | --- |
