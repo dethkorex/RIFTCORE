@@ -12,7 +12,7 @@ const DROP_HEIGHT := 7.0
 const DROP_TIME := 0.76
 const CHARGE_TIME := 1.85
 
-func play(rig: SideCameraRig, boss: Combatant, floor_y: float, title: String, tint: Color, sector: int, act: int, readout: HUD, online := false) -> void:
+func play(rig: SideCameraRig, boss: Combatant, floor_y: float, title: String, tint: Color, sector: int, act: int, readout: HUD, online := false, combat_target: Node3D = null) -> void:
 	var camera := rig.get_node("Camera3D") as Camera3D
 	var gameplay_camera := camera.transform
 	var landing := boss.global_position
@@ -131,6 +131,16 @@ func play(rig: SideCameraRig, boss: Combatant, floor_y: float, title: String, ti
 		jungle.finish_cinematic()
 	elif armor and armor.has_method("finish_cinematic"):
 		armor.finish_cinematic()
+	var opponent := combat_target if is_instance_valid(combat_target) else rig.target
+	if is_instance_valid(opponent) and armor:
+		var separation := opponent.global_position.x - boss.global_position.x
+		if absf(separation) > 0.01:
+			boss.set("facing", signf(separation))
+		var direction := float(boss.get("facing"))
+		if armor.has_method("face_immediately"):
+			armor.call("face_immediately", direction)
+		else:
+			armor.rotation.y = direction * Combatant.BOSS_SIDE_YAW
 	boss.collision_layer = original_layer
 	var target := rig.target
 	var position := target.global_position if is_instance_valid(target) else landing
@@ -188,9 +198,9 @@ func play_dialogue(camera: Camera3D, boss: Combatant, head: Vector3, height: flo
 			boss.show_intro_target(false)
 		camera.transform = boss_shot
 	elif online and not hint.is_empty():
-		await get_tree().create_timer(StoryDialogue.playback_seconds([["NOVA", hint]]), false).timeout
+		await get_tree().create_timer(StoryDialogue.playback_seconds([[Story.GUIDE, hint]]), false).timeout
 	var exchange := Story.boss_exchange(sector, act)
-	if not RiftSettings.claim_story_beat("arena_story_" + beat):
+	if not RiftSettings.claim_story_beat("arena_story_v3_" + beat):
 		# Players may have different tutorial histories. Keep the online intro duration shared.
 		if online:
 			await get_tree().create_timer(StoryDialogue.playback_seconds(exchange), false).timeout
@@ -206,7 +216,7 @@ func play_nova_hint(hint: String, online: bool) -> void:
 	var guide := StoryDialogue.new()
 	guide.add_to_group(&"boss_dialogue")
 	add_child(guide)
-	await guide.play([["NOVA", hint]], "Continue", online, "", null, Color.WHITE, online)
+	await guide.play([[Story.GUIDE, hint]], "Continue", online, "", null, Color.WHITE, online)
 	guide.queue_free()
 
 func clear_drop_height(boss: CollisionObject3D, bounds: AABB, floor_y: float) -> float:

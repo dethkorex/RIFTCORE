@@ -4,11 +4,7 @@ signal quick_changed
 
 const Catalog := preload("res://scripts/sector_catalog.gd")
 const Difficulty := preload("res://scripts/mission_difficulty.gd")
-const CHALLENGES := [
-	{"name": "Gatebreaker", "objective": "Defeat the Act 1 miniboss and enter Act 2.", "credits": 120, "step": 15},
-	{"name": "Sector Clear", "objective": "Defeat the Act 2 boss and reach extraction.", "credits": 240, "step": 25},
-	{"name": "Clean Run", "objective": "Clear both acts in the same run without losing a life.", "credits": 420, "step": 35},
-]
+const LEGACY_CHALLENGE_COUNT := 3
 const SECONDS_PER_DAY := 86400
 const CHALLENGE_SETS := [
 	[["Gatebreaker", "Enter Act II", "act", 1], ["Sector Clear", "Extract from the sector", "clear", 1], ["Clean Run", "Extract without losing a life", "clean", 1], ["Security Sweep", "Defeat 10 security units before extraction", "kills", 10], ["Salvage Run", "Extract with 5 recovered materials", "materials", 5]],
@@ -75,7 +71,7 @@ const UPGRADES := [
 	{"id": "recovery_crew", "branch": "Scavenger", "tier": 3, "name": "Recovery Crew", "icon": "arm",
 		"prices": [100, 180, 270], "levels": [15, 23, 32], "values": [2, 4, 7], "effect": "Extract with %d extra sector materials."},
 	{"id": "shard_reclaimer", "branch": "Scavenger", "tier": 3, "name": "Shard Reclaimer", "icon": "talent_shard",
-		"prices": [130, 205, 320], "levels": [15, 23, 32], "values": [2, 3, 5], "effect": "Bank %d bonus Core Shards on successful extraction."},
+		"prices": [130, 205, 320], "levels": [15, 23, 32], "values": [1, 2, 3], "effect": "Bank %d bonus Core Shards on successful extraction."},
 	{"id": "resupply_contract", "branch": "Scavenger", "tier": 3, "name": "Resupply Contract", "icon": "talent_case",
 		"prices": [110, 180, 270], "levels": [15, 23, 32], "values": [1, 2, 3], "effect": "Send %d bonus Resupply Packs to Storage on extraction."},
 	{"id": "archive_mastery", "branch": "Scavenger", "tier": 4, "name": "Archive Mastery", "icon": "talent_decoder",
@@ -338,7 +334,7 @@ func decode_from(data: ConfigFile) -> void:
 		if not loot_clears.has(number):
 			loot_clears[number] = 0
 	for sector in range(1, Catalog.SECTORS.size() + 1):
-		for tier in range(CHALLENGES.size()):
+		for tier in range(LEGACY_CHALLENGE_COUNT):
 			var id := challenge_key(sector, tier)
 			if bool(data.get_value("challenges", id, false)):
 				completed_challenges[id] = true
@@ -519,9 +515,6 @@ func lose_equipped_gear() -> void:
 static func challenge_key(sector: int, tier: int) -> String:
 	return "%d_%d" % [sector, tier + 1]
 
-static func challenge_credits(sector: int, tier: int) -> int:
-	return CHALLENGES[tier].credits + (sector - 1) * CHALLENGES[tier].step
-
 func record_sector_clear(sector: int, mode: int) -> bool:
 	loot_clears[sector] = maxi(int(loot_clears.get(sector, 0)), mode)
 	if mode == Difficulty.NORMAL and not hard_unlocked(sector):
@@ -556,12 +549,15 @@ func challenge_cycle(sector: int, clock := Time.get_datetime_dict_from_system())
 	var today := challenge_day(clock)
 	if cycle.is_empty():
 		var done: Array = []
-		for tier in CHALLENGES.size():
+		for tier in LEGACY_CHALLENGE_COUNT:
 			if completed_challenges.has(challenge_key(sector, tier)):
 				done.append(tier)
-		cycle = {"set": 0, "done": done, "day": today}
+		cycle = {"set": 0, "done": done, "claimed": done.duplicate(), "day": today}
 		challenge_cycles[sector] = cycle
-	elif not cycle.has("day"):
+	# Older saves paid as soon as a task was marked done.
+	if not cycle.has("claimed"):
+		cycle["claimed"] = cycle.done.duplicate()
+	if not cycle.has("day"):
 		# Keep an existing save's progress until its first midnight on this version.
 		cycle["day"] = today
 		cycle.erase("reset_at")
@@ -569,7 +565,7 @@ func challenge_cycle(sector: int, clock := Time.get_datetime_dict_from_system())
 		var picker := RandomNumberGenerator.new()
 		picker.seed = hash([today, sector, operator_name])
 		var next := posmod(int(cycle.set) + picker.randi_range(1, CHALLENGE_SETS.size() - 1), CHALLENGE_SETS.size())
-		cycle = {"set": next, "done": [], "day": today}
+		cycle = {"set": next, "done": [], "claimed": [], "day": today, "carryover": challenge_rewards(sector, cycle)}
 		challenge_cycles[sector] = cycle
 	return cycle
 
@@ -579,21 +575,31 @@ static func challenge_day(clock := Time.get_datetime_dict_from_system()) -> int:
 static func challenge_seconds_left(clock := Time.get_datetime_dict_from_system()) -> int:
 	return SECONDS_PER_DAY - clock.hour * 3600 - clock.minute * 60 - clock.second
 
-static func challenge_shards(sector: int, tier: int) -> int:
-	return 4 + sector * 2 + tier * 2
+static func challenge_shards(_sector: int, tier: int) -> int:
+	return 1 if tier < 3 else 2
 
 static func challenge_set_shards(sector: int) -> int:
-	return 12 + sector * 3
+	return 3 + (sector - 1) / 3
 
 static func rotated_challenge_credits(sector: int, index: int) -> int:
 	return 120 + index * 35 + (sector - 1) * 18
 
-func record_challenges(sector: int, results: Dictionary) -> Dictionary:
+func challenge_rewards(sector: int, cycle: Dictionary) -> Dictionary:
+	var carryover: Dictionary = cycle.get("carryover", {})
+	var reward := {"credits": int(carryover.get("credits", 0)), "shards": int(carryover.get("shards", 0)),
+		"lives": int(carryover.get("lives", 0))}
+	for index in 5:
+		if cycle.done.has(index) and not cycle.claimed.has(index):
+			reward.credits += rotated_challenge_credits(sector, index)
+			reward.shards += challenge_shards(sector, index)
+			reward.lives += 1
+	if cycle.done.size() == 5 and cycle.claimed.size() < 5:
+		reward.shards += challenge_set_shards(sector)
+	return reward
+
+func record_challenges(sector: int, results: Dictionary, persist := Callable()) -> int:
 	var cycle := challenge_cycle(sector)
-	var before := cycle.duplicate(true)
-	var payment := 0
-	var shards := 0
-	var earned := 0
+	var previous: Array = cycle.done.duplicate()
 	for index in 5:
 		if cycle.done.has(index):
 			continue
@@ -601,25 +607,40 @@ func record_challenges(sector: int, results: Dictionary) -> Dictionary:
 		if not results.has(task[2]):
 			continue
 		var value: float = results[task[2]]
+		if not is_finite(value):
+			continue
 		if (value <= task[3] if task[2] == "time" else value >= task[3]):
 			cycle.done.append(index)
-			payment += rotated_challenge_credits(sector, index)
-			shards += challenge_shards(sector, index)
-			earned += 1
+	var earned: int = cycle.done.size() - previous.size()
 	if earned == 0:
-		return {}
-	if cycle.done.size() == 5:
-		shards += challenge_set_shards(sector)
-	credits += payment
-	reserve_lives += earned
-	core_shards += shards
-	if save() != OK:
-		challenge_cycles[sector] = before
-		credits -= payment
-		reserve_lives -= earned
-		core_shards -= shards
-		return {}
-	return {"credits": payment, "shards": shards, "lives": earned}
+		return 0
+	var error: int = persist.call() if persist.is_valid() else save()
+	if error != OK:
+		cycle.done = previous
+		push_warning("Could not save challenge progress: %s" % error_string(error))
+		return 0
+	return earned
+
+func claim_challenge_rewards(sector: int, persist := Callable()) -> Error:
+	if sector < 1 or sector > unlocked_sector:
+		return ERR_INVALID_PARAMETER
+	var cycle := challenge_cycle(sector)
+	var reward := challenge_rewards(sector, cycle)
+	if reward.lives == 0:
+		return ERR_DOES_NOT_EXIST
+	var previous := cycle.duplicate(true)
+	cycle.claimed = cycle.done.duplicate()
+	cycle.erase("carryover")
+	credits += reward.credits
+	core_shards += reward.shards
+	reserve_lives += reward.lives
+	var error: int = persist.call() if persist.is_valid() else save()
+	if error != OK:
+		challenge_cycles[sector] = previous
+		credits -= reward.credits
+		core_shards -= reward.shards
+		reserve_lives -= reward.lives
+	return error
 
 func unlock_sector(sector: int) -> void:
 	var next := clampi(sector, 1, Catalog.SECTORS.size())
@@ -631,42 +652,14 @@ func unlock_sector(sector: int) -> void:
 		unlocked_sector = previous
 		push_warning("Could not save the unlocked sector.")
 
-func complete_challenges(sector: int, tiers: Array[int]) -> Dictionary:
-	var earned: Array[String] = []
-	var payment := 0
-	for tier in tiers:
-		var id := challenge_key(sector, tier)
-		if completed_challenges.has(id):
-			continue
-		earned.append(id)
-		completed_challenges[id] = true
-		payment += challenge_credits(sector, tier)
-	if earned.is_empty():
-		return {}
-	var previous_sector := unlocked_sector
-	unlocked_sector = maxi(unlocked_sector, sector)
-	credits += payment
-	var shards := earned.size() * (3 + sector)
-	core_shards += shards
-	reserve_lives += earned.size()
-	if save() != OK:
-		credits -= payment
-		core_shards -= shards
-		reserve_lives -= earned.size()
-		unlocked_sector = previous_sector
-		for id in earned:
-			completed_challenges.erase(id)
-		push_warning("Could not save challenge rewards.")
-		return {}
-	return {"credits": payment, "shards": shards, "lives": earned.size()}
-
-func use_reserve_life() -> bool:
-	if reserve_lives <= 0:
+func spend_reserve_lives(amount: int, persist := Callable()) -> bool:
+	if amount < 1 or reserve_lives < amount:
 		return false
-	reserve_lives -= 1
-	if save() == OK:
+	reserve_lives -= amount
+	var error: int = persist.call() if persist.is_valid() else save()
+	if error == OK:
 		return true
-	reserve_lives += 1
+	reserve_lives += amount
 	return false
 
 func deposit(amount: int) -> Error:

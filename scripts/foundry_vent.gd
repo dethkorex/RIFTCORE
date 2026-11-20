@@ -11,6 +11,8 @@ const Nozzle := preload("res://assets/neon_factory/foundry/flame_nozzle.glb")
 @export var nozzle_width := 1.62
 @export var purge_relay: NodePath
 @onready var relief_valve := get_node_or_null(purge_relay) if not purge_relay.is_empty() else null
+var bypass_lamp: MeshInstance3D
+var bypass_open := false
 var phase_time: Callable
 var authority := true
 var phase := 0.0
@@ -25,6 +27,14 @@ func _ready() -> void:
 	if Engine.is_editor_hint():
 		set_physics_process(false)
 		return
+	if relief_valve:
+		var lens := CylinderMesh.new()
+		lens.top_radius = 0.12
+		lens.bottom_radius = 0.15
+		lens.height = 0.11
+		lens.radial_segments = 12
+		lens.rings = 1
+		bypass_lamp = RiftProjectile.part(self, lens, RiftProjectile.light_paint(Color("ef8137"), .54), Vector3(.58, .24, .48), Vector3.ONE)
 	add_to_group(&"factory_interior_trap")
 	collision_layer = 0
 	collision_mask = 1
@@ -43,8 +53,13 @@ func _physics_process(delta: float) -> void:
 	phase += delta
 	var time: float = phase_time.call() if phase_time.is_valid() else phase
 	var at := fposmod(time + offset, period)
-	if relief_valve and relief_valve.shown_power == 1:
-		at = -1.0
+	if bypass_lamp:
+		var open: bool = relief_valve.shown_power == 1
+		if open != bypass_open:
+			bypass_open = open
+			bypass_lamp.material_override = RiftProjectile.light_paint(Color("68e8c1") if open else Color("ef8137"), .54)
+		if open:
+			at = -1.0
 	var camera := get_viewport().get_camera_3d()
 	var nearby := false
 	if camera:

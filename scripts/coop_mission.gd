@@ -54,6 +54,12 @@ var remote_players: Dictionary = {}
 var sector := 1
 var act := 1
 var local_profile
+var persist_challenges: Callable
+var persist_reserves: Callable
+var challenges_completed := 0
+var reported_reserves_used: Dictionary = {}
+var persisted_reserves_used := 0
+var guest_reserves := 0
 var relay_owner: Node
 var stage: Node3D
 var boss: Combatant
@@ -210,7 +216,9 @@ func _ready() -> void:
 	build_hud()
 	show_field_briefing.call_deferred()
 	if not host:
-		peer.call_func_on(peer.get_host(), receive_loadout, local_profile.gear, local_profile.owned, local_profile.quick_slots,
+		var loadout: Dictionary = local_profile.owned.duplicate()
+		loadout["mission_bonus_lives"] = local_profile.reserve_lives
+		peer.call_func_on(peer.get_host(), receive_loadout, local_profile.gear, loadout, local_profile.quick_slots,
 			starting_xp, starting_weapons, starting_suit)
 
 func rebind_roster(rejoined: Array) -> void:
@@ -251,6 +259,7 @@ func receive_loadout(gear: Dictionary, upgrades: Dictionary, quick: Array, xp: i
 		return
 	remote.loaded = true
 	var loadout = remote.profile
+	loadout.reserve_lives = clampi(int(upgrades.get("mission_bonus_lives", 0)), 0, 2147483647)
 	apply_quick_config(loadout, quick)
 	var slots := {}
 	for id in gear:
@@ -472,7 +481,7 @@ func load_stage(packed: PackedScene = null) -> void:
 	arena_door = CampaignDoor.new(gate)
 	arena_door.reset()
 	gate_relays = GateRelays.new()
-	gate_relays.install(stage, Color(info.color), sector not in [2,3])
+	gate_relays.install(stage, Color(info.color))
 	exit_marker = stage.get_node("MARKERS/RoomExit")
 	boss = actors.get_node(info.boss_node) as Combatant
 	boss_position = boss.position
@@ -567,7 +576,16 @@ func respawn_operator(operator: RiftPlayer, pit := false) -> void:
 	if operator.has_meta("coop_down") or not outcome.is_empty() or changing_act:
 		return
 	operator.set_meta("coop_down", true)
-	operator.lives = maxi(0,operator.lives-1)
+	operator.lives = maxi(0, operator.lives - 1)
+	if operator.lives == 0 and operator.quick_profile:
+		var index := operators.find(operator)
+		var persist := persist_reserves if index == local_index else Callable()
+		if operator.quick_profile.spend_reserve_lives(1, persist):
+			operator.lives = 1
+			if index != local_index:
+				reported_reserves_used[index] = int(reported_reserves_used.get(index, 0)) + 1
+				if is_instance_valid(peer):
+					broadcast_state.call_deferred(true)
 	lives_lost += 1
 	operator.health = 0.0
 	operator.rocket_course=null
@@ -762,11 +780,8 @@ func play_suit_reveal(reward: String) -> void:
 		actor.unlock_sector_weapon(reward)
 		var flash := SuitReveal.new()
 		stage.add_child(flash)
-		var floor_at := actor.global_position - Vector3.UP * (actor.standing_capsule.height * 0.5)
-		camera.set_process(false)
-		await flash.play(actor, camera, personal_hud.get_parent(), Catalog.info(sector), floor_at, true)
+		await flash.play(actor, camera, personal_hud.get_parent(), Catalog.info(sector))
 		flash.queue_free()
-		camera.set_process(true)
 	if until.time_left > 0.0:
 		await until.timeout
 	suit_reveal_playing = false
@@ -1029,7 +1044,7 @@ func play_boss_intro(track: int) -> void:
 	var cinematic := BossIntro.new()
 	boss.add_child(cinematic)
 	var title: String = Miniboss.TITLES[sector - 1] if act == 1 else Catalog.info(sector).boss
-	await cinematic.play(camera, boss, gate.global_position.y, title, Color(Catalog.info(sector).color), sector, act, personal_hud, true)
+	await cinematic.play(camera, boss, gate.global_position.y, title, Color(Catalog.info(sector).color), sector, act, personal_hud, true, nearest_operator(boss.global_position) if host else null)
 	cinematic.queue_free()
 	boss_intro_active = false
 	for index in operators.size():
@@ -1070,6 +1085,8 @@ func change_act(next: int) -> void:
 		else:
 			relay_owner.leave("Act II could not load. Check your installation and try again.")
 		return
+	if act == 1 and operators[local_index].health > 0.0:
+		challenges_completed += local_profile.record_challenges(sector, {"act": 1}, persist_challenges)
 	act = next
 	load_stage(packed)
 	loading.begin()
@@ -1108,12 +1125,15 @@ func set_module(index: int, id: String) -> void:
 		operators[index].run_module = id
 
 func show_field_briefing() -> void:
-	if DisplayServer.get_name() == "headless" or not RiftSettings.claim_deployment_briefing(local_profile, sector, act):
+	if DisplayServer.get_name() == "headless":
+		return
+	var lines := RiftSettings.deployment_dialogue(local_profile, sector, act)
+	if lines.is_empty():
 		return
 	var dialogue := StoryDialogue.new()
 	field_briefing = dialogue
 	stage.add_child(dialogue)
-	await dialogue.play(Story.deployment(sector, act), "", true)
+	await dialogue.play(lines, "", true)
 	if field_briefing == dialogue:
 		field_briefing = null
 	dialogue.queue_free()
@@ -1160,6 +1180,7 @@ func build_hud() -> void:
 	pause_menu.profile = local_profile
 	pause_menu.quick_edited = send_quick_config
 	pause_menu.operator = func(): return operators[local_index]
+	pause_menu.life_total = available_lives
 	pause_menu.dismissed.connect(func(): resume_controls_pending = true)
 	pause_menu.leave_requested.connect(func(): exit_requested.emit())
 	add_child(pause_menu)
@@ -1266,12 +1287,21 @@ func set_local_controls_suspended(suspended: bool) -> void:
 		released.clear()
 		send_input(true)
 
+func available_lives(operator: RiftPlayer) -> int:
+	var banked: int = local_profile.reserve_lives if host else guest_reserves
+	return operator.lives + banked
+
+func record_guest_lives_spent(total: int) -> void:
+	var spent := total - persisted_reserves_used
+	if spent > 0 and local_profile.spend_reserve_lives(spent, persist_reserves):
+		persisted_reserves_used = total
+
 func update_personal_hud(operator: RiftPlayer) -> void:
 	personal_hud.health = clampf(operator.health / operator.max_health, 0.0, 1.0)
 	personal_hud.energy = clampf(operator.energy / operator.max_energy, 0.0, 1.0)
 	personal_hud.health_capacity = operator.max_health
 	personal_hud.energy_capacity = operator.max_energy
-	personal_hud.lives = operator.lives
+	personal_hud.lives = available_lives(operator)
 	personal_hud.credits = int(personal_rewards[local_index].bolts) if host else personal_bolts
 	personal_hud.core_shards = local_profile.core_shards
 	personal_hud.set_run_time(sector_seconds)
@@ -1363,7 +1393,7 @@ func resume_controls() -> void:
 
 func reconcile_local_movement(delta: float) -> void:
 	var local := operators[local_index]
-	if local.health <= 0.0 or snapshot_age > MAX_CORRECTION_SNAPSHOT_AGE or correction.length_squared() <= 0.0025:
+	if local.suit_showcase_active or local.health <= 0.0 or snapshot_age > MAX_CORRECTION_SNAPSHOT_AGE or correction.length_squared() <= 0.0025:
 		blocked_correction_time = 0.0
 		return
 	var step := (correction * (1.0 - exp(-9.0 * delta))).limit_length(MAX_CORRECTION_SPEED * delta)
@@ -1532,6 +1562,10 @@ func broadcast_state(reliable_operators := false) -> void:
 	boss_state.append(gate_relays.active)
 	if is_instance_valid(lava_escape):
 		boss_state.append(lava_escape.snapshot())
+	else:
+		boss_state.append([])
+	var pressure := stage.get_node_or_null("TERRAIN/PressureBreach")
+	boss_state.append(pressure.snapshot() if pressure else [])
 	if is_instance_valid(boss):
 		boss_state[0] = boss.global_position
 		boss_state[1] = boss.rotation
@@ -1542,6 +1576,8 @@ func broadcast_state(reliable_operators := false) -> void:
 			boss_state[13] = boss.jungle_snapshot()
 		elif sector == 3:
 			boss_state[13] = boss.frozen_snapshot()
+		else:
+			boss_state[13] = [boss.facing, boss.armor.rotation.y]
 	state_sequence += 1
 	for index in range(1, roster.size()):
 		var snapshot := players.duplicate()
@@ -1549,6 +1585,7 @@ func broadcast_state(reliable_operators := false) -> void:
 			if other != index:
 				snapshot[other] = players[other].slice(0, 11) + [players[other][16], players[other][17], players[other].slice(20, 23)]
 		var totals := [personal_rewards[index].bolts, operators[index].recovered_blueprints.size(), sector_seconds, remote_players[roster[index]].input, operators[index].get_meta(&"coop_position_revision", 0)]
+		totals.append_array([reported_reserves_used.get(index, 0), remote_players[roster[index]].profile.reserve_lives])
 		if reliable_operators:
 			peer.call_func_on(roster[index], receive_operators, act, snapshot, state_sequence, totals)
 		else:
@@ -1563,6 +1600,9 @@ func receive_state(remote_act: int, security: PackedFloat32Array, arena: Array, 
 		gate_relays.set_active(int(arena[17]))
 	if arena.size() > 18 and is_instance_valid(lava_escape):
 		lava_escape.apply_snapshot(arena[18])
+	if arena.size()>19 and not arena[19].is_empty():
+		var pressure := stage.get_node_or_null("TERRAIN/PressureBreach")
+		if pressure: pressure.apply_snapshot(arena[19])
 	if arena.size() > 16:
 		reboot_used = arena[16][0]
 		reboot_from = arena[16][1]
@@ -1580,6 +1620,9 @@ func receive_state(remote_act: int, security: PackedFloat32Array, arena: Array, 
 				boss.apply_jungle_snapshot(arena[13])
 			elif sector == 3:
 				boss.apply_frozen_snapshot(arena[13])
+			elif sector >= 4 and arena[13].size() == 2:
+				boss.facing = arena[13][0]
+				boss.armor.rotation.y = arena[13][1]
 		if last_boss_health != boss.health:
 			last_boss_health = boss.health
 			boss.health_changed.emit(boss.health, boss.max_health)
@@ -1660,6 +1703,9 @@ func receive_operators(remote_act: int, players: Array, sequence: int, rewards: 
 		return
 	personal_bolts = int(rewards[0])
 	blueprint_count = int(rewards[1])
+	if rewards.size() > 6:
+		record_guest_lives_spent(int(rewards[5]))
+		guest_reserves = int(rewards[6])
 	if rewards.size() > 2 and is_finite(float(rewards[2])):
 		sector_seconds = maxf(sector_seconds, float(rewards[2]))
 	latest_operators = sequence
@@ -1699,13 +1745,14 @@ func receive_operators(remote_act: int, players: Array, sequence: int, rewards: 
 		correction.x=clampf(local_data[0].x-local.global_position.x,-3.0,3.0)
 	apply_operator_state(local, local_data, true)
 	local.supplies = local_data[15].duplicate()
-	local.fire_lock = local_data[11]
-	local.charge_held = local_data[12] and not local.controls_suspended
-	local.present_charge(float(local_data[16]) if local_data.size() > 16 and local.charge_held else 0.0, local.energy >= local.charged_shot_cost())
-	local.melee_lock = local_data[13]
-	local.reflect_saber_pose(local_data[4], float(local_data[17]) if local_data.size() > 17 else -1.0)
-	if local.melee_lock > 0.0:
-		local.play_character_animation(local_data[4])
+	if not local.suit_showcase_active:
+		local.fire_lock = local_data[11]
+		local.charge_held = local_data[12] and not local.controls_suspended
+		local.present_charge(float(local_data[16]) if local_data.size() > 16 and local.charge_held else 0.0, local.energy >= local.charged_shot_cost())
+		local.melee_lock = local_data[13]
+		local.reflect_saber_pose(local_data[4], float(local_data[17]) if local_data.size() > 17 else -1.0)
+		if local.melee_lock > 0.0:
+			local.play_character_animation(local_data[4])
 	if local_data[14].size() == 4 and int(local_data[18]) == quick_revision:
 		local.recovered_supplies.assign(local_data[19])
 		for slot in 4:
@@ -1941,10 +1988,13 @@ func receive_deflection(remote_act: int, shot_id: int) -> void:
 
 func send_party_result(index: int) -> void:
 	var result := party_results[index]
-	peer.call_func_on(roster[index], receive_outcome, result[0], result[1], result[2], result[3], result[4], result[5])
+	var summary: Dictionary = result[5].duplicate()
+	summary["bonus_lives_used"] = reported_reserves_used.get(index, 0)
+	peer.call_func_on(roster[index], receive_outcome, result[0], result[1], result[2], result[3], result[4], summary)
 
 func receive_outcome(success: bool, xp: int, bolts: int, blueprints: Array, duration: float, results := {}) -> void:
 	if outcome.is_empty() and not host and peer.get_sender_id() == peer.get_host():
+		record_guest_lives_spent(int(results.get("bonus_lives_used", 0)))
 		extracted_results = results
 		sector_seconds = duration
 		finish_mission(success, xp, bolts, blueprints, results.get("operator_wiped", false), results.get("party_wiped", false))
@@ -2003,8 +2053,10 @@ func finish_mission(success: bool, xp: int, bolts: int, blueprints: Array, exhau
 		if not profile_xp_progress.is_empty():
 			preload("res://scripts/mission_complete.gd").profile_progress(rewards_status.get_parent(), profile_xp_progress)
 		rewards_status.text = "Recovered items sent to Storage. Save at the System pad to keep your rewards."
-		if extracted_results.get("talent_shards", 0) > 0:
-			rewards_status.text += "\nShard Reclaimer · +%d Core Shards." % extracted_results.talent_shards
+		if extracted_results.get("banked_shards", 0) > 0:
+			rewards_status.text += "\nExtraction · +%d Core Shards." % extracted_results.banked_shards
+		if challenges_completed > 0:
+			rewards_status.text += "\nClaim your challenge rewards in Challenges at the station."
 		if extracted_results.get("talent_packs", 0) > 0:
 			rewards_status.text += "\nResupply Contract · +%d Resupply Packs." % extracted_results.talent_packs
 		if not extracted_results.get("talent_blueprints", []).is_empty():

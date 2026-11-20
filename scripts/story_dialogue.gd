@@ -1,5 +1,10 @@
 extends CanvasLayer
 
+const Story := preload("res://scripts/rift_story.gd")
+const NOVA_DRONE := preload("res://assets/hub/nova_drone.glb")
+const NOVA_EFFECT := preload("res://assets/ui/nova_transmission.gdshader")
+const NOVA_FADE_TIME := 0.36
+
 const UI := preload("res://scripts/rift_ui.gd")
 const Reader := preload("res://scripts/dialogue_typewriter.gd")
 const NOVA := preload("res://assets/ui/nova_portrait.png")
@@ -16,14 +21,22 @@ var disable_tips: Callable
 var portrait_image: TextureRect
 var portrait_style: StyleBoxFlat
 var meter: HBoxContainer
+var nova_image: TextureRect
+var nova_view: SubViewport
+var nova_model: Node3D
+var nova_material: ShaderMaterial
+var nova_fade: Tween
 var accent := UI.CYAN
 var speaking := false
 var elapsed := 0.0
 
 static func playback_seconds(lines: Array) -> float:
 	var total := 0.0
-	for line in lines:
+	for index in lines.size():
+		var line: Array = lines[index]
 		total += Reader.automatic_seconds(line[1])
+		if line[0] == Story.GUIDE and (index == lines.size() - 1 or lines[index + 1][0] != Story.GUIDE):
+			total += NOVA_FADE_TIME
 	return total
 
 func play(lines: Array, finish_label: String, automatic := false, boss_name := "", boss_portrait: Texture2D = null, boss_tint := Color.WHITE, hold_timing := false) -> void:
@@ -53,23 +66,21 @@ func play(lines: Array, finish_label: String, automatic := false, boss_name := "
 
 	var page := PanelContainer.new()
 	page.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var paper := UI.frame(Color("eff4fa"), Color("607896"), 4)
-	paper.corner_radius_top_left = 12
-	paper.corner_radius_top_right = 12
-	paper.corner_radius_bottom_left = 12
-	paper.corner_radius_bottom_right = 12
-	paper.content_margin_left = 24
-	paper.content_margin_right = 22
-	paper.content_margin_top = 12
-	paper.content_margin_bottom = 11
-	paper.shadow_color = Color("030710b0")
-	paper.shadow_size = 9
-	page.add_theme_stylebox_override("panel", paper)
+	var panel_style := UI.frame(Color("0c182c"), UI.CYAN, 4)
+	panel_style.border_width_top = 2
+	panel_style.content_margin_left = 24
+	panel_style.content_margin_right = 22
+	panel_style.content_margin_top = 14
+	panel_style.content_margin_bottom = 13
+	panel_style.shadow_color = Color("030710d8")
+	panel_style.shadow_size = 9
+	page.add_theme_stylebox_override("panel", panel_style)
 	row.add_child(page)
 	var content := UI.column(page, 6)
-	var speaker := UI.label(content, "", 25, Color("163456"))
+	var speaker := UI.label(content, "", 25, UI.CYAN)
 	speaker.name = "Speaker"
-	var speech := UI.label(content, "", 24, Color("13233a"))
+	speaker.autowrap_mode = TextServer.AUTOWRAP_OFF
+	var speech := UI.label(content, "", 24, UI.WHITE)
 	speech.name = "Speech"
 	speech.add_theme_font_override("font", BODY_FONT)
 	speech.add_theme_constant_override("line_spacing", 5)
@@ -110,14 +121,16 @@ func play(lines: Array, finish_label: String, automatic := false, boss_name := "
 	var time_remaining := get_tree().create_timer(playback_seconds(lines), false) if hold_timing else null
 	for index in lines.size():
 		var line: Array = lines[index]
-		var character: String = line[0]
+		var guidance: bool = line[0] == Story.GUIDE
+		var character: String = "NOVA" if guidance else line[0]
 		var boss := character == "BOSS"
 		accent = boss_tint if boss else TINTS.get(character, UI.CYAN)
 		var nameplate: String = boss_name if boss else NAMES.get(character, character)
-		speaker.text = nameplate if tutorial_title.is_empty() else nameplate + "   /   " + tutorial_title
-		paper.border_color = accent.darkened(0.45)
-		speaker.modulate = Color.WHITE
-		speaker.add_theme_color_override("font_color", accent.darkened(0.68))
+		var heading := Story.TUTORIAL_TITLE if guidance and tutorial_title.is_empty() else tutorial_title
+		speaker.text = nameplate if heading.is_empty() else nameplate + "   /   " + heading
+		panel_style.bg_color = Color("0c182c").lerp(accent, 0.05)
+		panel_style.border_color = accent.darkened(0.25)
+		speaker.add_theme_color_override("font_color", accent.lightened(0.16))
 		var expression := clampi(int(line[2]), 0, operator_portraits.size() - 1) if line.size() > 2 else 0
 		var next_image: Texture2D = operator_portraits[expression]
 		if boss:
@@ -126,6 +139,8 @@ func play(lines: Array, finish_label: String, automatic := false, boss_name := "
 			next_image = NOVA
 		elif scientist_portraits.has(character):
 			next_image = scientist_portraits[character]
+		if guidance and not nova_image.visible:
+			show_nova()
 		if portrait_image.texture != next_image:
 			portrait_image.texture = next_image
 			portrait_image.modulate.a = 0.30
@@ -133,6 +148,8 @@ func play(lines: Array, finish_label: String, automatic := false, boss_name := "
 		reader.voice_pitch = 0.77 if boss else PITCHES.get(character, 1.0)
 		reader.next.text = finish_label + "  ›" if index == lines.size() - 1 else "Next  ›"
 		await reader.show_line(line[1], automatic)
+		if guidance and (reader.skipped or index == lines.size() - 1 or lines[index + 1][0] != Story.GUIDE):
+			await dismiss_nova()
 		if reader.skipped:
 			break
 	hide()
@@ -177,6 +194,15 @@ func build_portrait(row: HBoxContainer) -> void:
 	portrait_image.offset_top = -4
 	portrait_image.offset_bottom = 4
 
+	nova_image = TextureRect.new()
+	nova_image.name = "NovaHologram"
+	nova_image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	nova_image.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	nova_image.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	aperture.add_child(nova_image)
+	nova_image.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	nova_image.hide()
+
 	var border := Panel.new()
 	border.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card.add_child(border)
@@ -203,16 +229,66 @@ func build_portrait(row: HBoxContainer) -> void:
 		segment.custom_minimum_size.x = 4
 		meter.add_child(segment)
 
+func show_nova() -> void:
+	if not nova_view:
+		nova_view = SubViewport.new()
+		nova_view.size = Vector2i(256, 256)
+		nova_view.transparent_bg = true
+		nova_view.own_world_3d = true
+		nova_view.msaa_3d = Viewport.MSAA_2X
+		add_child(nova_view)
+		nova_model = NOVA_DRONE.instantiate() as Node3D
+		nova_view.add_child(nova_model)
+		var camera := Camera3D.new()
+		nova_view.add_child(camera)
+		camera.projection = Camera3D.PROJECTION_ORTHOGONAL
+		camera.size = 1.45
+		camera.position = Vector3(0.0, 0.13, 2.2)
+		camera.look_at(Vector3.ZERO)
+		camera.make_current()
+		var light := DirectionalLight3D.new()
+		nova_view.add_child(light)
+		light.rotation_degrees = Vector3(-28, 30, 0)
+		light.light_energy = 1.4
+		nova_material = ShaderMaterial.new()
+		nova_material.shader = NOVA_EFFECT
+		nova_image.material = nova_material
+		nova_image.texture = nova_view.get_texture()
+	nova_view.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	nova_image.show()
+	portrait_image.hide()
+	nova_fade = create_tween()
+	nova_fade.tween_method(set_nova_signal, 0.0, 1.0, 0.26).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+
+func dismiss_nova() -> void:
+	if nova_fade and nova_fade.is_running():
+		nova_fade.kill()
+	var strength: float = nova_material.get_shader_parameter("strength")
+	nova_fade = create_tween()
+	nova_fade.tween_method(set_nova_signal, strength, 0.0, NOVA_FADE_TIME)
+	await nova_fade.finished
+	nova_image.hide()
+	nova_view.render_target_update_mode = SubViewport.UPDATE_DISABLED
+	portrait_image.show()
+
+func set_nova_signal(strength: float) -> void:
+	nova_material.set_shader_parameter("strength", strength)
+	nova_image.scale = Vector2.ONE * lerpf(0.9, 1.0, strength)
+	nova_image.pivot_offset = nova_image.size * 0.5
+
 func set_speaking(active: bool) -> void:
 	speaking = active
 	elapsed = 0.0
 	if not is_instance_valid(portrait_image):
 		return
-	set_process(active)
+	set_process(active or (is_instance_valid(nova_model) and nova_image.visible))
 	update_portrait()
 
 func _process(delta: float) -> void:
 	elapsed += delta
+	if is_instance_valid(nova_model) and nova_image.visible:
+		nova_model.position.y = sin(elapsed * 4.2) * 0.044
+		nova_model.rotation.y = sin(elapsed * 2.4) * 0.16
 	update_portrait()
 
 func update_portrait() -> void:

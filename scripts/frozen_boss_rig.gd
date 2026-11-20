@@ -92,13 +92,17 @@ func play(name: String) -> void:
 	animation.speed_scale = 1.0
 	animation.play(name,.18)
 
+func face_immediately(direction: float) -> void:
+	intent[0] = direction
+	rotation.y = direction * Combatant.BOSS_SIDE_YAW
+
 func set_combat_pose(facing: float, speed: float, attack: String) -> void:
 	intent = [facing,speed,attack]
 
 func _process(delta: float) -> void:
 	if cinematic or not is_visible_in_tree() or not animation:
 		return
-	rotation.y = lerp_angle(rotation.y,float(intent[0])*1.03,1.0-exp(-delta*12))
+	rotation.y = lerpf(rotation.y,float(intent[0])*Combatant.BOSS_SIDE_YAW,1.0-exp(-delta*12))
 	var attack: String = intent[2]
 	if not attack.is_empty():
 		play("slash" if attack in ["charge","ice_burst","signature"] else "shoot")

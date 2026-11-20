@@ -31,16 +31,17 @@ var warning_finish: ShaderMaterial
 var warning_light: OmniLight3D
 var next_hit_by_body: Dictionary = {}
 var phase_time: Callable
+var damage_volume: CollisionShape3D
 
 func _ready() -> void:
 	collision_layer = 0
 	collision_mask = 1
 	clock = offset
 	var shape := BoxShape3D.new()
-	shape.size = dimensions
-	var collision := CollisionShape3D.new()
-	collision.shape = shape
-	add_child(collision)
+	shape.size = Vector3(dimensions.x * 0.89, 0.49, 1.5) if kind == Kind.PRESS else dimensions
+	damage_volume = CollisionShape3D.new()
+	damage_volume.shape = shape
+	add_child(damage_volume)
 	effect = Node3D.new()
 	effect.name = "HazardEffect"
 	effect.position.y = -dimensions.y * 0.5
@@ -264,6 +265,8 @@ func update_visuals(phase: float, live: bool) -> void:
 			draw_arcs()
 	if kind == Kind.PRESS:
 		effect.position.y = lerpf(dimensions.y * 0.67, -dimensions.y * 0.22, smoothstep(0.51, 0.67, phase) * (1.0 - smoothstep(0.90, 1.0, phase)))
+		# The jaw and its teeth occupy the moving face, not the whole guide column.
+		damage_volume.position.y = effect.position.y - 0.045
 
 func _physics_process(delta: float) -> void:
 	if Engine.is_editor_hint():

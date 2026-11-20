@@ -1,0 +1,75 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://assets/campaign/frozen_reactor/kit/ice_platform.tscn" id="Ice"]
+[ext_resource type="PackedScene" path="res://assets/campaign/frozen_reactor/kit/grip_platform.tscn" id="Steel"]
+
+[node name="CoolantSwitchback" type="Node3D"]
+
+[node name="FrostEntry" parent="." instance=ExtResource("Ice")]
+drop_through = false
+position = Vector3(4.65, 0, 0)
+width = 9.30000
+
+[node name="BrakeStrip" parent="." instance=ExtResource("Steel")]
+drop_through = false
+position = Vector3(10.9, 0, 0)
+width = 3.20000
+
+[node name="IceChute" parent="." instance=ExtResource("Ice")]
+drop_through = false
+position = Vector3(15.25, -0.65, 0)
+rotation = Vector3(0, 0, -0.23210384)
+width = 5.65155
+
+[node name="LaunchIce" parent="." instance=ExtResource("Ice")]
+drop_through = false
+position = Vector3(21.9, -1.3, 0)
+width = 7.80000
+
+[node name="SkatingStraight" parent="." instance=ExtResource("Ice")]
+drop_through = false
+position = Vector3(36.65, -2.45, 0)
+width = 11.3
+
+[node name="Runout" parent="." instance=ExtResource("Ice")]
+drop_through = false
+position = Vector3(55.6, -1, 0)
+width = 10.80000
+
+[node name="DrainApron" parent="." instance=ExtResource("Steel")]
+drop_through = false
+position = Vector3(66.525, -1.15, 0)
+rotation = Vector3(0, 0, -0.02714265)
+width = 11.05407
+
+[node name="ServicePerch" parent="." instance=ExtResource("Steel")]
+position = Vector3(8, 2.42, 0)
+width = 2.60000
+
+[node name="ServiceLanding" parent="." instance=ExtResource("Steel")]
+position = Vector3(14.5, 3.14, 0)
+width = 6.4
+
+[node name="InspectionDeck" parent="." instance=ExtResource("Steel")]
+position = Vector3(23.425, 4.2, 0)
+width = 6.15
+
+[node name="ArchiveStep" parent="." instance=ExtResource("Steel")]
+position = Vector3(3.9, 4.4, 0)
+width = 3.0
+
+[node name="ArchiveTurn" parent="." instance=ExtResource("Steel")]
+position = Vector3(11.45, 6.65, 0)
+width = 6.1
+
+[node name="ValveDeck" parent="." instance=ExtResource("Steel")]
+position = Vector3(32.90, 2.8, 0)
+width = 7.0
+
+[node name="TransferDeck" parent="." instance=ExtResource("Steel")]
+position = Vector3(42.05, 4.3, 0)
+width = 5.9
+
+[node name="Downstep" parent="." instance=ExtResource("Steel")]
+position = Vector3(50.65, 2.9, 0)
+width = 3.50000

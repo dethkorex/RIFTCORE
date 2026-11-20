@@ -1,0 +1,126 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://assets/campaign/machine_jungle/caverns/traverse_ledge.glb" id="Deck"]
+
+[ext_resource type="PackedScene" path="res://assets/campaign/machine_jungle/caverns/chamber_landmark.glb" id="Landmark"]
+
+[ext_resource type="Script" path="res://scripts/cavern_envelope.gd" id="Shell"]
+
+[ext_resource type="Texture2D" path="res://assets/campaign/machine_jungle/surfaces/sector_wall.jpg" id="Rock"]
+
+[ext_resource type="Script" path="res://scripts/biome_zone.gd" id="Zone"]
+
+[ext_resource type="Script" path="res://scripts/breakable_barricade.gd" id="Break"]
+
+[sub_resource type="BoxShape3D" id="Step00"]
+size = Vector3(4, 0.46, 3.2)
+
+[sub_resource type="BoxShape3D" id="Step01"]
+size = Vector3(4.5, 0.46, 3.2)
+
+[sub_resource type="BoxShape3D" id="Step02"]
+size = Vector3(5, 0.46, 3.2)
+
+[sub_resource type="BoxShape3D" id="Step03"]
+size = Vector3(4, 0.46, 3.2)
+
+[sub_resource type="BoxShape3D" id="Fork00"]
+size = Vector3(3.8, 0.46, 3.2)
+
+[sub_resource type="BoxShape3D" id="Fork01"]
+size = Vector3(4.6, 0.46, 3.2)
+
+[node name="Hollow Nursery" type="Node3D" groups=["authored_cavern"]]
+metadata/branch_from = 2
+metadata/chamber = "Hollow Nursery"
+
+[node name="Step00" type="StaticBody3D" parent="." groups=["factory_one_way", "factory_drop_through"]]
+position = Vector3(2, 0, 0)
+
+[node name="Deck" parent="Step00" instance=ExtResource("Deck")]
+scale = Vector3(1.0, 1, 1)
+
+[node name="Collider" type="CollisionShape3D" parent="Step00"]
+position = Vector3(0, -0.23, 0)
+shape = SubResource("Step00")
+
+[node name="Step01" type="StaticBody3D" parent="." groups=["factory_one_way", "factory_drop_through"]]
+position = Vector3(8.0, -1.8, 0)
+
+[node name="Deck" parent="Step01" instance=ExtResource("Deck")]
+scale = Vector3(1.125, 1, 1)
+
+[node name="Collider" type="CollisionShape3D" parent="Step01"]
+position = Vector3(0, -0.23, 0)
+shape = SubResource("Step01")
+
+[node name="Step02" type="StaticBody3D" parent="." groups=["factory_one_way", "factory_drop_through"]]
+position = Vector3(16.0, 0.15, 0)
+
+[node name="Deck" parent="Step02" instance=ExtResource("Deck")]
+scale = Vector3(1.25, 1, 1)
+
+[node name="Collider" type="CollisionShape3D" parent="Step02"]
+position = Vector3(0, -0.23, 0)
+shape = SubResource("Step02")
+
+[node name="Step03" type="StaticBody3D" parent="." groups=["factory_one_way", "factory_drop_through"]]
+position = Vector3(22.0, 0.0, 0)
+
+[node name="Deck" parent="Step03" instance=ExtResource("Deck")]
+scale = Vector3(1.0, 1, 1)
+
+[node name="Collider" type="CollisionShape3D" parent="Step03"]
+position = Vector3(0, -0.23, 0)
+shape = SubResource("Step03")
+
+[node name="Fork00" type="StaticBody3D" parent="." groups=["factory_one_way", "factory_drop_through"]]
+position = Vector3(12.0, 2.33, 0)
+
+[node name="Deck" parent="Fork00" instance=ExtResource("Deck")]
+scale = Vector3(0.95, 1, 1)
+
+[node name="Collider" type="CollisionShape3D" parent="Fork00"]
+position = Vector3(0, -0.23, 0)
+shape = SubResource("Fork00")
+
+[node name="Fork01" type="StaticBody3D" parent="." groups=["factory_one_way", "factory_drop_through"]]
+position = Vector3(6.0, 4.2, 0)
+
+[node name="Deck" parent="Fork01" instance=ExtResource("Deck")]
+scale = Vector3(1.15, 1, 1)
+
+[node name="Collider" type="CollisionShape3D" parent="Fork01"]
+position = Vector3(0, -0.23, 0)
+shape = SubResource("Fork01")
+
+[node name="Cavern" type="Node3D" parent="."]
+script = ExtResource("Shell")
+rock = ExtResource("Rock")
+ceiling = PackedVector2Array(0.0, 8.737, 2.9, 8.792, 5.8, 9.033, 8.7, 9.653, 11.6, 9.431, 14.5, 8.369, 17.4, 6.842, 20.3, 5.793)
+lower_edge = -10.8
+
+[node name="Machinery" parent="." instance=ExtResource("Landmark")]
+position = Vector3(16.0, 0.65, -2.85)
+scale = Vector3(0.78, 0.78, 0.78)
+
+[node name="Worklight" type="OmniLight3D" parent="."]
+position = Vector3(16.0, 3.15, 1.6)
+light_color = Color(0.5, 0.9, 0.24, 1)
+light_energy = 1.65
+omni_range = 11
+
+[node name="CrossingDevice" type="Area3D" parent="."]
+position = Vector3(17.25, 0.825, 0)
+script = ExtResource("Zone")
+kind = 7
+dimensions = Vector3(2.0, 1.35, 2.4)
+tint = Color(0.5, 0.9, 0.24, 1)
+period = 4.6
+offset = 0.37
+burnable_spore_pod = true
+
+[node name="FracturedBarricade" type="StaticBody3D" parent="."]
+position = Vector3(7.83, 4.2, 0)
+script = ExtResource("Break")
+accent = Color(0.5, 0.9, 0.24, 1)

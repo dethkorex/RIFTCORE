@@ -11,7 +11,7 @@
 [ext_resource type="PackedScene" path="res://assets/neon_factory/foundry/powered_bridge.tscn" id="Bridge"]
 [ext_resource type="PackedScene" path="res://assets/neon_factory/foundry/power_coupler.tscn" id="Relay"]
 [ext_resource type="Script" path="res://scripts/cargo_carrier.gd" id="Supply"]
-[ext_resource type="PackedScene" path="res://assets/neon_factory/foundry/salvage_chest.glb" id="Chest"]
+[ext_resource type="PackedScene" path="res://assets/campaign/neon_factory/salvage_cache.glb" id="Chest"]
 [ext_resource type="Script" path="res://scripts/factory_interior_relay.gd" id="RelayCode"]
 [ext_resource type="Script" path="res://scripts/factory_salvage_chest.gd" id="ChestCode"]
 [ext_resource type="Script" path="res://scripts/foundry_vent.gd" id="Hazard"]
@@ -46,6 +46,20 @@
 [ext_resource type="PackedScene" path="res://assets/neon_factory/foundry/lava_escape_shaft.tscn" id="LavaEscape"]
 
 [ext_resource type="Script" path="res://scripts/foundry_quench_lock.gd" id="QuenchLock"]
+
+[ext_resource type="PackedScene" path="res://assets/neon_factory/foundry/retaining_deck.tscn" id="Foundation"]
+
+[ext_resource type="PackedScene" path="res://assets/neon_factory/foundry/plated_interior_shell.tscn" id="Plating"]
+
+[ext_resource type="PackedScene" path="res://assets/neon_factory/factory_light_fixture.tscn" id="ServiceLamp"]
+
+[ext_resource type="PackedScene" path="res://assets/neon_factory/foundry/quench_grotto.tscn" id="Arch"]
+
+[ext_resource type="PackedScene" path="res://assets/neon_factory/foundry/titan_casting_hall_assembly.tscn" id="PitKit"]
+
+[ext_resource type="PackedScene" path="res://assets/neon_factory/foundry/casting_runner.tscn" id="BossPort"]
+
+[ext_resource type="PackedScene" path="res://assets/neon_factory/foundry/spillway_feed.tscn" id="PurgeFeed"]
 
 [sub_resource type="Environment" id="Interior"]
 background_mode = 1
@@ -97,81 +111,46 @@ position = Vector3(457.0000, 0.6000, 0.0000)
 scale = Vector3(1.0000, 1.0000, 1.0000)
 
 [node name="TurnbackIngress01" parent="TERRAIN" instance=ExtResource("Floor")]
-position = Vector3(460.6000, 0.6000, 0.0000)
-scale = Vector3(0.2000, 1.0000, 1.0000)
-
-[node name="TurnbackIngressStep00" parent="TERRAIN" instance=ExtResource("Floor")]
-position = Vector3(462.5000, 1.6200, 0.0000)
-scale = Vector3(0.4333, 1.0000, 1.0000)
-
-[node name="TurnbackIngressStepRamp" parent="TERRAIN" instance=ExtResource("Floor")]
-position = Vector3(465.0500, 1.1100, 0.0000)
-rotation = Vector3(0.0000, 0.0000, -0.3874)
-scale = Vector3(0.4500, 1.0000, 1.0000)
+position = Vector3(461.35, 0.75, 0)
+scale = Vector3(0.571667, 0.70, 1)
 
 [node name="TurnbackIngressLane00" parent="TERRAIN" instance=ExtResource("Floor")]
-position = Vector3(469.3000, 0.6000, 0.0000)
-scale = Vector3(1.0000, 1.0000, 1.0000)
+position = Vector3(466.85, 0.6, 0)
+scale = Vector3(0.616667, 0.70, 1)
 
-[node name="TurnbackIngressLane01" parent="TERRAIN" instance=ExtResource("Floor")]
-position = Vector3(472.6125, 0.6000, 0.0000)
-scale = Vector3(0.1042, 1.0000, 1.0000)
-
-[node name="TurnbackIngressLaneGradeIn0" parent="TERRAIN" instance=ExtResource("Floor")]
-position = Vector3(474.4500, 1.1600, 0.0000)
-rotation = Vector3(0.0000, 0.0000, 0.3519)
-scale = Vector3(0.5415, 1.0000, 1.0000)
-
-[node name="TurnbackIngressLaneBench000" parent="TERRAIN" instance=ExtResource("Floor")]
-position = Vector3(477.0000, 1.7200, 0.0000)
-scale = Vector3(0.3417, 1.0000, 1.0000)
-
-[node name="TurnbackIngressLaneGradeOut0" parent="TERRAIN" instance=ExtResource("Floor")]
-position = Vector3(479.1250, 1.1600, 0.0000)
-rotation = Vector3(0.0000, 0.0000, -0.4709)
-scale = Vector3(0.4114, 1.0000, 1.0000)
-
-[node name="TurnbackIngressLaneRejoin00" parent="TERRAIN" instance=ExtResource("Floor")]
-position = Vector3(483.2250, 0.6000, 0.0000)
-scale = Vector3(1.0000, 1.0000, 1.0000)
-
-[node name="TurnbackIngressLaneRejoin01" parent="TERRAIN" instance=ExtResource("Floor")]
-position = Vector3(486.5375, 0.6000, 0.0000)
-scale = Vector3(0.1042, 1.0000, 1.0000)
-
-[node name="TurnbackLowerExitHeader" parent="TERRAIN" instance=ExtResource("Wall")]
+[node name="TurnbackLowerExitHeader" parent="TERRAIN" groups=["no_wall_kick"] instance=ExtResource("Wall")]
 position = Vector3(492.3800, -2.6000, 0.0000)
 scale = Vector3(1.0000, 1.9750, 1.0000)
 
-[node name="TurnbackCeiling00" parent="TERRAIN" instance=ExtResource("Floor")]
+[node name="TurnbackCeiling00" parent="TERRAIN" groups=["no_wall_kick"] instance=ExtResource("Floor")]
 position = Vector3(457.0000, 12.15, 0)
 scale = Vector3(1.0000, 1.0000, 1.0000)
 
-[node name="TurnbackCeiling01" parent="TERRAIN" instance=ExtResource("Floor")]
+[node name="TurnbackCeiling01" parent="TERRAIN" groups=["no_wall_kick"] instance=ExtResource("Floor")]
 position = Vector3(463.0000, 12.15, 0)
 scale = Vector3(1.0000, 1.0000, 1.0000)
 
-[node name="TurnbackCeiling02" parent="TERRAIN" instance=ExtResource("Floor")]
+[node name="TurnbackCeiling02" parent="TERRAIN" groups=["no_wall_kick"] instance=ExtResource("Floor")]
 position = Vector3(469.0000, 12.15, 0)
 scale = Vector3(1.0000, 1.0000, 1.0000)
 
-[node name="TurnbackCeiling03" parent="TERRAIN" instance=ExtResource("Floor")]
+[node name="TurnbackCeiling03" parent="TERRAIN" groups=["no_wall_kick"] instance=ExtResource("Floor")]
 position = Vector3(475.0000, 12.15, 0)
 scale = Vector3(1.0000, 1.0000, 1.0000)
 
-[node name="TurnbackCeiling04" parent="TERRAIN" instance=ExtResource("Floor")]
+[node name="TurnbackCeiling04" parent="TERRAIN" groups=["no_wall_kick"] instance=ExtResource("Floor")]
 position = Vector3(481.0000, 12.15, 0)
 scale = Vector3(1.0000, 1.0000, 1.0000)
 
-[node name="TurnbackCeiling05" parent="TERRAIN" instance=ExtResource("Floor")]
+[node name="TurnbackCeiling05" parent="TERRAIN" groups=["no_wall_kick"] instance=ExtResource("Floor")]
 position = Vector3(487.0000, 12.15, 0)
 scale = Vector3(1.0000, 1.0000, 1.0000)
 
-[node name="TurnbackCeiling06" parent="TERRAIN" instance=ExtResource("Floor")]
+[node name="TurnbackCeiling06" parent="TERRAIN" groups=["no_wall_kick"] instance=ExtResource("Floor")]
 position = Vector3(491.4000, 12.15, 0)
 scale = Vector3(0.4667, 1.0000, 1.0000)
 
-[node name="TurnbackCeilingButtress" parent="TERRAIN" instance=ExtResource("Wall")]
+[node name="TurnbackCeilingButtress" parent="TERRAIN" groups=["no_wall_kick"] instance=ExtResource("Wall")]
 position = Vector3(492.3800, 17.575, 0.0000)
 scale = Vector3(1.0000, 3.8000, 1.0000)
 
@@ -183,14 +162,6 @@ scale = Vector3(1.0000, -1.0000, 1.0000)
 position = Vector3(468.6000, -4.6000, 0.0000)
 scale = Vector3(1.0000, 1.0000, 1.0000)
 
-[node name="TurnbackReturnGallery01" parent="TERRAIN" instance=ExtResource("Floor")]
-position = Vector3(474.6000, -4.6000, 0.0000)
-scale = Vector3(1.0000, 1.0000, 1.0000)
-
-[node name="TurnbackReturnGallery02" parent="TERRAIN" instance=ExtResource("Floor")]
-position = Vector3(480.6000, -4.6000, 0.0000)
-scale = Vector3(1.0000, 1.0000, 1.0000)
-
 [node name="TurnbackReturnGallery03" parent="TERRAIN" instance=ExtResource("Floor")]
 position = Vector3(486.6000, -4.6000, 0.0000)
 scale = Vector3(1.0000, 1.0000, 1.0000)
@@ -200,7 +171,7 @@ position = Vector3(490.8200, -4.6000, 0.0000)
 scale = Vector3(0.4067, 1.0000, 1.0000)
 
 [node name="TurnbackFlare" type="Area3D" parent="TERRAIN"]
-position = Vector3(475.6320, -4.6000, 0.0000)
+position = Vector3(490.25, -10.1, 0)
 script = ExtResource("Hazard")
 collision_layer = 0
 flame_height = 3.55
@@ -208,16 +179,17 @@ nozzle_width = 1.9
 damage = 28.0
 period = 3.23
 offset = 1.15
+purge_relay = NodePath("../ValveHoistCoupler")
 
-[node name="TurnbackBasementLanding00" parent="TERRAIN" instance=ExtResource("Floor")]
+[node name="TurnbackBasementLanding00" parent="TERRAIN" instance=ExtResource("Foundation")]
 position = Vector3(464.0000, -10.1000, 0.0000)
 scale = Vector3(1.0000, 1.0000, 1.0000)
 
-[node name="TurnbackBasementLanding01" parent="TERRAIN" instance=ExtResource("Floor")]
+[node name="TurnbackBasementLanding01" parent="TERRAIN" instance=ExtResource("Foundation")]
 position = Vector3(470.0000, -10.1000, 0.0000)
 scale = Vector3(1.0000, 1.0000, 1.0000)
 
-[node name="TurnbackBasementLanding02" parent="TERRAIN" instance=ExtResource("Floor")]
+[node name="TurnbackBasementLanding02" parent="TERRAIN" instance=ExtResource("Foundation")]
 position = Vector3(474.9050, -10.1000, 0.0000)
 scale = Vector3(0.6350, 1.0000, 1.0000)
 
@@ -228,15 +200,15 @@ molten_visual = true
 width = 5.100000000000023
 tint = Color(1, 0.49, 0.19, 1)
 
-[node name="TurnbackBasementExit00" parent="TERRAIN" instance=ExtResource("Floor")]
+[node name="TurnbackBasementExit00" parent="TERRAIN" instance=ExtResource("Foundation")]
 position = Vector3(484.9100, -10.1000, 0.0000)
 scale = Vector3(1.0000, 1.0000, 1.0000)
 
-[node name="TurnbackBasementExit01" parent="TERRAIN" instance=ExtResource("Floor")]
+[node name="TurnbackBasementExit01" parent="TERRAIN" instance=ExtResource("Foundation")]
 position = Vector3(490.9100, -10.1000, 0.0000)
 scale = Vector3(1.0000, 1.0000, 1.0000)
 
-[node name="TurnbackBasementExit02" parent="TERRAIN" instance=ExtResource("Floor")]
+[node name="TurnbackBasementExit02" parent="TERRAIN" instance=ExtResource("Foundation")]
 position = Vector3(495.8550, -10.1000, 0.0000)
 scale = Vector3(0.6483, 1.0000, 1.0000)
 
@@ -877,40 +849,40 @@ position = Vector3(261.0000, 13.6500, -3.2800)
 [node name="HighWall1_045" parent="DECOR" instance=ExtResource("Cave")]
 position = Vector3(261.0000, 21.6500, -3.2800)
 
-[node name="Rear046" parent="DECOR" instance=ExtResource("Lining")]
+[node name="Rear046" parent="DECOR" instance=ExtResource("Plating")]
 position = Vector3(267.0000, -2.3500, -3.2800)
 
-[node name="RearUpper046" parent="DECOR" instance=ExtResource("Lining")]
+[node name="RearUpper046" parent="DECOR" instance=ExtResource("Plating")]
 position = Vector3(267.0000, 5.6500, -3.2800)
 
-[node name="HighWall0_046" parent="DECOR" instance=ExtResource("Lining")]
+[node name="HighWall0_046" parent="DECOR" instance=ExtResource("Plating")]
 position = Vector3(267.0000, 13.6500, -3.2800)
 
-[node name="HighWall1_046" parent="DECOR" instance=ExtResource("Lining")]
+[node name="HighWall1_046" parent="DECOR" instance=ExtResource("Plating")]
 position = Vector3(267.0000, 21.6500, -3.2800)
 
-[node name="Rear047" parent="DECOR" instance=ExtResource("Lining")]
+[node name="Rear047" parent="DECOR" instance=ExtResource("Plating")]
 position = Vector3(273.0000, -2.3500, -3.2800)
 
-[node name="RearUpper047" parent="DECOR" instance=ExtResource("Lining")]
+[node name="RearUpper047" parent="DECOR" instance=ExtResource("Plating")]
 position = Vector3(273.0000, 5.6500, -3.2800)
 
-[node name="HighWall0_047" parent="DECOR" instance=ExtResource("Lining")]
+[node name="HighWall0_047" parent="DECOR" instance=ExtResource("Plating")]
 position = Vector3(273.0000, 13.6500, -3.2800)
 
-[node name="HighWall1_047" parent="DECOR" instance=ExtResource("Lining")]
+[node name="HighWall1_047" parent="DECOR" instance=ExtResource("Plating")]
 position = Vector3(273.0000, 21.6500, -3.2800)
 
-[node name="Rear048" parent="DECOR" instance=ExtResource("Lining")]
+[node name="Rear048" parent="DECOR" instance=ExtResource("Plating")]
 position = Vector3(279.0000, -2.3500, -3.6000)
 
-[node name="RearUpper048" parent="DECOR" instance=ExtResource("Lining")]
+[node name="RearUpper048" parent="DECOR" instance=ExtResource("Plating")]
 position = Vector3(279.0000, 5.6500, -3.6000)
 
-[node name="HighWall0_048" parent="DECOR" instance=ExtResource("Lining")]
+[node name="HighWall0_048" parent="DECOR" instance=ExtResource("Plating")]
 position = Vector3(279.0000, 13.6500, -3.6000)
 
-[node name="HighWall1_048" parent="DECOR" instance=ExtResource("Lining")]
+[node name="HighWall1_048" parent="DECOR" instance=ExtResource("Plating")]
 position = Vector3(279.0000, 21.6500, -3.6000)
 
 [node name="BayLight48" type="OmniLight3D" parent="DECOR"]
@@ -919,31 +891,31 @@ light_color = Color(1, 0.55, 0.24, 1)
 light_energy = 1.60
 omni_range = 9.0
 
-[node name="Rear049" parent="DECOR" instance=ExtResource("Lining")]
+[node name="Rear049" parent="DECOR" instance=ExtResource("Plating")]
 position = Vector3(285.0000, -2.3500, -3.2800)
 
-[node name="RearUpper049" parent="DECOR" instance=ExtResource("Lining")]
+[node name="RearUpper049" parent="DECOR" instance=ExtResource("Plating")]
 position = Vector3(285.0000, 5.6500, -3.2800)
 
-[node name="HighWall0_049" parent="DECOR" instance=ExtResource("Lining")]
+[node name="HighWall0_049" parent="DECOR" instance=ExtResource("Plating")]
 position = Vector3(285.0000, 13.6500, -3.2800)
 
-[node name="HighWall1_049" parent="DECOR" instance=ExtResource("Lining")]
+[node name="HighWall1_049" parent="DECOR" instance=ExtResource("Plating")]
 position = Vector3(285.0000, 21.6500, -3.2800)
 
-[node name="Rear050" parent="DECOR" instance=ExtResource("Lining")]
+[node name="Rear050" parent="DECOR" instance=ExtResource("Plating")]
 position = Vector3(291.0000, -2.3500, -3.2800)
 
-[node name="RearUpper050" parent="DECOR" instance=ExtResource("Lining")]
+[node name="RearUpper050" parent="DECOR" instance=ExtResource("Plating")]
 position = Vector3(291.0000, 5.6500, -3.2800)
 
 [node name="PressureBank050" parent="DECOR" instance=ExtResource("PressureBank")]
 position = Vector3(291.0000, 0.1000, -2.8600)
 
-[node name="HighWall0_050" parent="DECOR" instance=ExtResource("Lining")]
+[node name="HighWall0_050" parent="DECOR" instance=ExtResource("Plating")]
 position = Vector3(291.0000, 13.6500, -3.2800)
 
-[node name="HighWall1_050" parent="DECOR" instance=ExtResource("Lining")]
+[node name="HighWall1_050" parent="DECOR" instance=ExtResource("Plating")]
 position = Vector3(291.0000, 21.6500, -3.2800)
 
 [node name="Rear051" parent="DECOR" instance=ExtResource("Lining")]
@@ -1042,71 +1014,11 @@ position = Vector3(333.0000, 13.6500, -3.2800)
 [node name="HighWall1_057" parent="DECOR" instance=ExtResource("Cave")]
 position = Vector3(333.0000, 21.6500, -3.2800)
 
-[node name="Rear058" parent="DECOR" instance=ExtResource("Cave")]
-position = Vector3(339.0000, -2.3500, -3.2800)
-
-[node name="RearUpper058" parent="DECOR" instance=ExtResource("Cave")]
-position = Vector3(339.0000, 5.6500, -3.2800)
-
-[node name="HighWall0_058" parent="DECOR" instance=ExtResource("Cave")]
-position = Vector3(339.0000, 13.6500, -3.2800)
-
-[node name="HighWall1_058" parent="DECOR" instance=ExtResource("Cave")]
-position = Vector3(339.0000, 21.6500, -3.2800)
-
-[node name="Rear059" parent="DECOR" instance=ExtResource("Cave")]
-position = Vector3(345.0000, -2.3500, -3.2800)
-
-[node name="RearUpper059" parent="DECOR" instance=ExtResource("Cave")]
-position = Vector3(345.0000, 5.6500, -3.2800)
-
-[node name="HighWall0_059" parent="DECOR" instance=ExtResource("Cave")]
-position = Vector3(345.0000, 13.6500, -3.2800)
-
-[node name="HighWall1_059" parent="DECOR" instance=ExtResource("Cave")]
-position = Vector3(345.0000, 21.6500, -3.2800)
-
-[node name="Rear060" parent="DECOR" instance=ExtResource("Cave")]
-position = Vector3(351.0000, -2.3500, -3.2800)
-
-[node name="RearUpper060" parent="DECOR" instance=ExtResource("Cave")]
-position = Vector3(351.0000, 5.6500, -3.2800)
-
-[node name="HighWall0_060" parent="DECOR" instance=ExtResource("Cave")]
-position = Vector3(351.0000, 13.6500, -3.2800)
-
-[node name="HighWall1_060" parent="DECOR" instance=ExtResource("Cave")]
-position = Vector3(351.0000, 21.6500, -3.2800)
-
 [node name="BayLight60" type="OmniLight3D" parent="DECOR"]
 position = Vector3(351.0000, 4.2000, -1.3500)
 light_color = Color(1, 0.39, 0.17, 1)
 light_energy = 1.60
 omni_range = 9.0
-
-[node name="Rear061" parent="DECOR" instance=ExtResource("Cave")]
-position = Vector3(357.0000, -2.3500, -3.2800)
-
-[node name="RearUpper061" parent="DECOR" instance=ExtResource("Cave")]
-position = Vector3(357.0000, 5.6500, -3.2800)
-
-[node name="HighWall0_061" parent="DECOR" instance=ExtResource("Cave")]
-position = Vector3(357.0000, 13.6500, -3.2800)
-
-[node name="HighWall1_061" parent="DECOR" instance=ExtResource("Cave")]
-position = Vector3(357.0000, 21.6500, -3.2800)
-
-[node name="Rear062" parent="DECOR" instance=ExtResource("Cave")]
-position = Vector3(363.0000, -2.3500, -3.2800)
-
-[node name="RearUpper062" parent="DECOR" instance=ExtResource("Cave")]
-position = Vector3(363.0000, 5.6500, -3.2800)
-
-[node name="HighWall0_062" parent="DECOR" instance=ExtResource("Cave")]
-position = Vector3(363.0000, 13.6500, -3.2800)
-
-[node name="HighWall1_062" parent="DECOR" instance=ExtResource("Cave")]
-position = Vector3(363.0000, 21.6500, -3.2800)
 
 [node name="Rear063" parent="DECOR" instance=ExtResource("Cave")]
 position = Vector3(369.0000, -2.3500, -3.2800)
@@ -1177,28 +1089,28 @@ position = Vector3(393.0000, 13.6500, -3.2800)
 [node name="HighWall1_067" parent="DECOR" instance=ExtResource("Lining")]
 position = Vector3(393.0000, 21.6500, -3.2800)
 
-[node name="Rear079" parent="DECOR" instance=ExtResource("Lining")]
+[node name="Rear079" parent="DECOR" instance=ExtResource("Plating")]
 position = Vector3(465.0000, -2.3500, -3.2800)
 
-[node name="RearUpper079" parent="DECOR" instance=ExtResource("Lining")]
+[node name="RearUpper079" parent="DECOR" instance=ExtResource("Plating")]
 position = Vector3(465.0000, 5.6500, -3.2800)
 
-[node name="HighWall0_079" parent="DECOR" instance=ExtResource("Lining")]
+[node name="HighWall0_079" parent="DECOR" instance=ExtResource("Plating")]
 position = Vector3(465.0000, 13.6500, -3.2800)
 
-[node name="HighWall1_079" parent="DECOR" instance=ExtResource("Lining")]
+[node name="HighWall1_079" parent="DECOR" instance=ExtResource("Plating")]
 position = Vector3(465.0000, 21.6500, -3.2800)
 
-[node name="Rear080" parent="DECOR" instance=ExtResource("Lining")]
+[node name="Rear080" parent="DECOR" instance=ExtResource("Plating")]
 position = Vector3(471.0000, -2.3500, -3.6000)
 
-[node name="RearUpper080" parent="DECOR" instance=ExtResource("Lining")]
+[node name="RearUpper080" parent="DECOR" instance=ExtResource("Plating")]
 position = Vector3(471.0000, 5.6500, -3.6000)
 
-[node name="HighWall0_080" parent="DECOR" instance=ExtResource("Lining")]
+[node name="HighWall0_080" parent="DECOR" instance=ExtResource("Plating")]
 position = Vector3(471.0000, 13.6500, -3.6000)
 
-[node name="HighWall1_080" parent="DECOR" instance=ExtResource("Lining")]
+[node name="HighWall1_080" parent="DECOR" instance=ExtResource("Plating")]
 position = Vector3(471.0000, 21.6500, -3.6000)
 
 [node name="BayLight80" type="OmniLight3D" parent="DECOR"]
@@ -1207,40 +1119,40 @@ light_color = Color(1, 0.55, 0.24, 1)
 light_energy = 1.60
 omni_range = 9.0
 
-[node name="Rear081" parent="DECOR" instance=ExtResource("Lining")]
+[node name="Rear081" parent="DECOR" instance=ExtResource("Plating")]
 position = Vector3(477.0000, -2.3500, -3.2800)
 
-[node name="RearUpper081" parent="DECOR" instance=ExtResource("Lining")]
+[node name="RearUpper081" parent="DECOR" instance=ExtResource("Plating")]
 position = Vector3(477.0000, 5.6500, -3.2800)
 
-[node name="HighWall0_081" parent="DECOR" instance=ExtResource("Lining")]
+[node name="HighWall0_081" parent="DECOR" instance=ExtResource("Plating")]
 position = Vector3(477.0000, 13.6500, -3.2800)
 
-[node name="HighWall1_081" parent="DECOR" instance=ExtResource("Lining")]
+[node name="HighWall1_081" parent="DECOR" instance=ExtResource("Plating")]
 position = Vector3(477.0000, 21.6500, -3.2800)
 
-[node name="Rear082" parent="DECOR" instance=ExtResource("Lining")]
+[node name="Rear082" parent="DECOR" instance=ExtResource("Plating")]
 position = Vector3(483.0000, -2.3500, -3.2800)
 
-[node name="RearUpper082" parent="DECOR" instance=ExtResource("Lining")]
+[node name="RearUpper082" parent="DECOR" instance=ExtResource("Plating")]
 position = Vector3(483.0000, 5.6500, -3.2800)
 
-[node name="HighWall0_082" parent="DECOR" instance=ExtResource("Lining")]
+[node name="HighWall0_082" parent="DECOR" instance=ExtResource("Plating")]
 position = Vector3(483.0000, 13.6500, -3.2800)
 
-[node name="HighWall1_082" parent="DECOR" instance=ExtResource("Lining")]
+[node name="HighWall1_082" parent="DECOR" instance=ExtResource("Plating")]
 position = Vector3(483.0000, 21.6500, -3.2800)
 
-[node name="Rear083" parent="DECOR" instance=ExtResource("Lining")]
+[node name="Rear083" parent="DECOR" instance=ExtResource("Plating")]
 position = Vector3(489.0000, -2.3500, -3.2800)
 
-[node name="RearUpper083" parent="DECOR" instance=ExtResource("Lining")]
+[node name="RearUpper083" parent="DECOR" instance=ExtResource("Plating")]
 position = Vector3(489.0000, 5.6500, -3.2800)
 
-[node name="HighWall0_083" parent="DECOR" instance=ExtResource("Lining")]
+[node name="HighWall0_083" parent="DECOR" instance=ExtResource("Plating")]
 position = Vector3(489.0000, 13.6500, -3.2800)
 
-[node name="HighWall1_083" parent="DECOR" instance=ExtResource("Lining")]
+[node name="HighWall1_083" parent="DECOR" instance=ExtResource("Plating")]
 position = Vector3(489.0000, 21.6500, -3.2800)
 
 [node name="Rear084" parent="DECOR" instance=ExtResource("Lining")]
@@ -1354,116 +1266,26 @@ position = Vector3(537.0000, 13.6500, -3.2800)
 [node name="HighWall1_091" parent="DECOR" instance=ExtResource("Lining")]
 position = Vector3(537.0000, 21.6500, -3.2800)
 
-[node name="Rear092" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(543.0000, -2.3500, -3.2800)
-
-[node name="RearUpper092" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(543.0000, 6.9000, -3.2800)
-
-[node name="PressureBank092" parent="DECOR" instance=ExtResource("PressureBank")]
-position = Vector3(543.0000, 0.1000, -2.8600)
-
-[node name="HighWall0_092" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(543.0000, 14.9000, -3.2800)
-
 [node name="HighWall1_092" parent="DECOR" instance=ExtResource("Lining")]
 position = Vector3(543.0000, 22.9000, -3.2800)
-
-[node name="BayLight92" type="OmniLight3D" parent="DECOR"]
-position = Vector3(543.0000, 4.2000, -1.3500)
-light_color = Color(1, 0.55, 0.24, 1)
-light_energy = 1.60
-omni_range = 9.0
-
-[node name="Rear093" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(549.0000, -2.3500, -3.2800)
-
-[node name="RearUpper093" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(549.0000, 6.9000, -3.2800)
-
-[node name="HighWall0_093" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(549.0000, 14.9000, -3.2800)
 
 [node name="HighWall1_093" parent="DECOR" instance=ExtResource("Lining")]
 position = Vector3(549.0000, 22.9000, -3.2800)
 
-[node name="Rear094" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(555.0000, -2.3500, -3.2800)
-
-[node name="RearUpper094" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(555.0000, 6.9000, -3.2800)
-
-[node name="HighWall0_094" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(555.0000, 14.9000, -3.2800)
-
 [node name="HighWall1_094" parent="DECOR" instance=ExtResource("Lining")]
 position = Vector3(555.0000, 22.9000, -3.2800)
-
-[node name="Rear095" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(561.0000, -2.3500, -3.2800)
-
-[node name="RearUpper095" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(561.0000, 6.9000, -3.2800)
-
-[node name="HighWall0_095" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(561.0000, 14.9000, -3.2800)
 
 [node name="HighWall1_095" parent="DECOR" instance=ExtResource("Lining")]
 position = Vector3(561.0000, 22.9000, -3.2800)
 
-[node name="Rear096" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(567.0000, -2.3500, -3.6000)
-
-[node name="RearUpper096" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(567.0000, 6.9000, -3.6000)
-
-[node name="HighWall0_096" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(567.0000, 14.9000, -3.6000)
-
 [node name="HighWall1_096" parent="DECOR" instance=ExtResource("Lining")]
 position = Vector3(567.0000, 22.9000, -3.6000)
-
-[node name="BayLight96" type="OmniLight3D" parent="DECOR"]
-position = Vector3(567.0000, 4.2000, -1.3500)
-light_color = Color(1, 0.55, 0.24, 1)
-light_energy = 1.60
-omni_range = 9.0
-
-[node name="Rear097" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(573.0000, -2.3500, -3.2800)
-
-[node name="RearUpper097" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(573.0000, 6.9000, -3.2800)
-
-[node name="HighWall0_097" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(573.0000, 14.9000, -3.2800)
 
 [node name="HighWall1_097" parent="DECOR" instance=ExtResource("Lining")]
 position = Vector3(573.0000, 22.9000, -3.2800)
 
-[node name="Rear098" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(579.0000, -2.3500, -3.2800)
-
-[node name="RearUpper098" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(579.0000, 6.9000, -3.2800)
-
-[node name="HighWall0_098" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(579.0000, 14.9000, -3.2800)
-
 [node name="HighWall1_098" parent="DECOR" instance=ExtResource("Lining")]
 position = Vector3(579.0000, 22.9000, -3.2800)
-
-[node name="Rear099" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(585.0000, -2.3500, -3.2800)
-
-[node name="RearUpper099" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(585.0000, 6.9000, -3.2800)
-
-[node name="PressureBank099" parent="DECOR" instance=ExtResource("PressureBank")]
-position = Vector3(585.0000, 0.1000, -2.8600)
-
-[node name="HighWall0_099" parent="DECOR" instance=ExtResource("Lining")]
-position = Vector3(585.0000, 14.9000, -3.2800)
 
 [node name="HighWall1_099" parent="DECOR" instance=ExtResource("Lining")]
 position = Vector3(585.0000, 22.9000, -3.2800)
@@ -1838,15 +1660,15 @@ scale = Vector3(2.0000, 0.1100, 1.2000)
 position = Vector3(534.0000, 21.6000, -2.6500)
 scale = Vector3(2.0000, 0.1100, 1.2000)
 
-[node name="SmelterIntake00" parent="TERRAIN" instance=ExtResource("Floor")]
+[node name="SmelterIntake00" parent="TERRAIN" instance=ExtResource("Foundation")]
 position = Vector3(-11.0000, 0.0000, 0.0000)
 scale = Vector3(1.0000, 1.0000, 1.0000)
 
-[node name="SmelterIntake01" parent="TERRAIN" instance=ExtResource("Floor")]
+[node name="SmelterIntake01" parent="TERRAIN" instance=ExtResource("Foundation")]
 position = Vector3(-5.0000, 0.0000, 0.0000)
 scale = Vector3(1.0000, 1.0000, 1.0000)
 
-[node name="SmelterIntake02" parent="TERRAIN" instance=ExtResource("Floor")]
+[node name="SmelterIntake02" parent="TERRAIN" instance=ExtResource("Foundation")]
 position = Vector3(0.2000, 0.0000, 0.0000)
 scale = Vector3(0.7333, 1.0000, 1.0000)
 
@@ -1864,7 +1686,7 @@ scale = Vector3(0.4894, 1.0000, 1.0000)
 position = Vector3(10.0750, 0.0000, 0.0000)
 scale = Vector3(0.6417, 1.0000, 1.0000)
 
-[node name="OverfeedPier" parent="TERRAIN" instance=ExtResource("Floor")]
+[node name="OverfeedPier" parent="TERRAIN" instance=ExtResource("Foundation")]
 position = Vector3(20.1250, 0.6000, 0.0000)
 scale = Vector3(0.6250, 1.0000, 1.0000)
 
@@ -1885,11 +1707,11 @@ position = Vector3(35.0000, -0.6750, 0.0000)
 rotation = Vector3(0.0000, 0.0000, -0.1342)
 scale = Vector3(1.6818, 1.0000, 1.0000)
 
-[node name="CoolingDeckLowerWest00" parent="TERRAIN" instance=ExtResource("Floor")]
+[node name="CoolingDeckLowerWest00" parent="TERRAIN" instance=ExtResource("Foundation")]
 position = Vector3(43.0000, -1.3500, 0.0000)
 scale = Vector3(1.0000, 1.0000, 1.0000)
 
-[node name="CoolingDeckLowerWest01" parent="TERRAIN" instance=ExtResource("Floor")]
+[node name="CoolingDeckLowerWest01" parent="TERRAIN" instance=ExtResource("Foundation")]
 position = Vector3(47.5000, -1.3500, 0.0000)
 scale = Vector3(0.5000, 1.0000, 1.0000)
 
@@ -1900,11 +1722,11 @@ molten_visual = true
 width = 4.25
 tint = Color(1, 0.49, 0.19, 1)
 
-[node name="CoolingDeckLowerEast00" parent="TERRAIN" instance=ExtResource("Floor")]
+[node name="CoolingDeckLowerEast00" parent="TERRAIN" instance=ExtResource("Foundation")]
 position = Vector3(56.2500, -1.3500, 0.0000)
 scale = Vector3(1.0000, 1.0000, 1.0000)
 
-[node name="CoolingDeckLowerEast01" parent="TERRAIN" instance=ExtResource("Floor")]
+[node name="CoolingDeckLowerEast01" parent="TERRAIN" instance=ExtResource("Foundation")]
 position = Vector3(59.7375, -1.3500, 0.0000)
 scale = Vector3(0.1625, 1.0000, 1.0000)
 
@@ -1922,11 +1744,11 @@ position = Vector3(65.6500, -1.6750, 0.0000)
 rotation = Vector3(0.0000, 0.0000, 0.2321)
 scale = Vector3(0.4710, 1.0000, 1.0000)
 
-[node name="CoolingDeckLowerEastRejoin00" parent="TERRAIN" instance=ExtResource("Floor")]
+[node name="CoolingDeckLowerEastRejoin00" parent="TERRAIN" instance=ExtResource("Foundation")]
 position = Vector3(70.0250, -1.3500, 0.0000)
 scale = Vector3(1.0000, 1.0000, 1.0000)
 
-[node name="CoolingDeckLowerEastRejoin01" parent="TERRAIN" instance=ExtResource("Floor")]
+[node name="CoolingDeckLowerEastRejoin01" parent="TERRAIN" instance=ExtResource("Foundation")]
 position = Vector3(73.5125, -1.3500, 0.0000)
 scale = Vector3(0.1625, 1.0000, 1.0000)
 
@@ -1944,23 +1766,23 @@ position = Vector3(41.5000, 3.1500, 0.0000)
 scale = Vector3(1.5000, 1.0000, 1.0000)
 
 [node name="CoolingDeckUpperSpan00" parent="TERRAIN" instance=ExtResource("Grate") groups=["factory_drop_through"]]
-position = Vector3(53.0000, 3.5500, 0.0000)
-scale = Vector3(1.0000, 1.0000, 1.0000)
+position = Vector3(51.35, 4.45, 0)
+scale = Vector3(0.708333, 0.70, 1)
 
 [node name="CoolingDeckUpperSpan01" parent="TERRAIN" instance=ExtResource("Grate") groups=["factory_drop_through"]]
-position = Vector3(59.0000, 3.5500, 0.0000)
-scale = Vector3(1.0000, 1.0000, 1.0000)
+position = Vector3(58.15, 6.05, 0)
+scale = Vector3(0.591667, 0.70, 1)
 
 [node name="CoolingDeckUpperSpan02" parent="TERRAIN" instance=ExtResource("Grate") groups=["factory_drop_through"]]
-position = Vector3(65.0000, 3.5500, 0.0000)
-scale = Vector3(1.0000, 1.0000, 1.0000)
+position = Vector3(66.8, 5.25, 0)
+scale = Vector3(0.858333, 0.70, 1)
 
 [node name="CoolingDeckUpperEast" parent="TERRAIN" instance=ExtResource("Floor") groups=["factory_drop_through"]]
 position = Vector3(76.0000, 2.7000, 0.0000)
 scale = Vector3(1.3333, 1.0000, 1.0000)
 
 [node name="CoolingDeckUpperCache" type="Area3D" parent="TERRAIN" groups=["factory_salvage_chest"]]
-position = Vector3(65.0000, 3.5500, 0.0000)
+position = Vector3(67.95, 5.25, 0)
 script = ExtResource("ChestCode")
 collision_layer = 0
 materials = 5
@@ -2083,31 +1905,31 @@ scale = Vector3(3.6946, 1.0000, 1.0000)
 position = Vector3(193.5000, 0.0000, 0.0000)
 scale = Vector3(0.8333, 1.0000, 1.0000)
 
-[node name="SlagBasementWestSump00" parent="TERRAIN" instance=ExtResource("Floor")]
+[node name="SlagBasementWestSump00" parent="TERRAIN" instance=ExtResource("Foundation")]
 position = Vector3(163.0000, -8.5000, 0.0000)
 scale = Vector3(1.0000, 1.0000, 1.0000)
 
-[node name="SlagBasementWestSump01" parent="TERRAIN" instance=ExtResource("Floor")]
+[node name="SlagBasementWestSump01" parent="TERRAIN" instance=ExtResource("Foundation")]
 position = Vector3(169.0000, -8.5000, 0.0000)
 scale = Vector3(1.0000, 1.0000, 1.0000)
 
-[node name="SlagBasementWestSump02" parent="TERRAIN" instance=ExtResource("Floor")]
+[node name="SlagBasementWestSump02" parent="TERRAIN" instance=ExtResource("Foundation")]
 position = Vector3(175.0000, -8.5000, 0.0000)
 scale = Vector3(1.0000, 1.0000, 1.0000)
 
-[node name="SlagBasementWestSump03" parent="TERRAIN" instance=ExtResource("Floor")]
+[node name="SlagBasementWestSump03" parent="TERRAIN" instance=ExtResource("Foundation")]
 position = Vector3(181.0000, -8.5000, 0.0000)
 scale = Vector3(1.0000, 1.0000, 1.0000)
 
-[node name="SlagBasementWestSump04" parent="TERRAIN" instance=ExtResource("Floor")]
+[node name="SlagBasementWestSump04" parent="TERRAIN" instance=ExtResource("Foundation")]
 position = Vector3(184.7000, -8.5000, 0.0000)
 scale = Vector3(0.2333, 1.0000, 1.0000)
 
-[node name="SlagBasementSumpIsland" parent="TERRAIN" instance=ExtResource("Floor")]
+[node name="SlagBasementSumpIsland" parent="TERRAIN" instance=ExtResource("Foundation")]
 position = Vector3(193.0500, -7.8000, 0.0000)
 scale = Vector3(0.8833, 1.0000, 1.0000)
 
-[node name="SlagBasementEastSump00" parent="TERRAIN" instance=ExtResource("Floor")]
+[node name="SlagBasementEastSump00" parent="TERRAIN" instance=ExtResource("Foundation")]
 position = Vector3(204.4, -8.5, 0)
 scale = Vector3(1.53333, 1, 1)
 
@@ -2418,18 +2240,18 @@ position = Vector3(264.65, 4.96, 0)
 scale = Vector3(0.483333, 0.16, 1)
 
 [node name="FuelLineUpperWest" parent="TERRAIN" instance=ExtResource("Grate")]
-position = Vector3(270.75, 6.25, 0)
-scale = Vector3(1.083333, 0.45, 1)
+position = Vector3(270.6, 6.45, 0)
+scale = Vector3(1.08333, 0.45, 1)
 
 [node name="FuelLineUpperEast" parent="TERRAIN" instance=ExtResource("Floor") groups=["factory_drop_through"]]
-position = Vector3(284, 5.85, 0)
-scale = Vector3(2, 0.45, 1)
+position = Vector3(282.8, 6.9, 0)
+scale = Vector3(1.83333, 0.45, 1)
 
 [node name="FuelLineServiceSupply" parent="TERRAIN" instance=ExtResource("repair")]
 position = Vector3(279.0000, 3.3500, 0.0000)
 
 [node name="FuelLineUpperCache" type="Area3D" parent="TERRAIN" groups=["factory_salvage_chest"]]
-position = Vector3(280.2, 5.85, 0)
+position = Vector3(280.2, 6.9, 0)
 script = ExtResource("ChestCode")
 collision_layer = 0
 materials = 6
@@ -2604,11 +2426,11 @@ position = Vector3(367.0000, -0.6750, 0.0000)
 rotation = Vector3(0.0000, 0.0000, -0.1342)
 scale = Vector3(1.6818, 1.0000, 1.0000)
 
-[node name="RefineryLowerWest00" parent="TERRAIN" instance=ExtResource("Floor")]
+[node name="RefineryLowerWest00" parent="TERRAIN" instance=ExtResource("Foundation")]
 position = Vector3(375.0000, -1.3500, 0.0000)
 scale = Vector3(1.0000, 1.0000, 1.0000)
 
-[node name="RefineryLowerWest01" parent="TERRAIN" instance=ExtResource("Floor")]
+[node name="RefineryLowerWest01" parent="TERRAIN" instance=ExtResource("Foundation")]
 position = Vector3(379.5000, -1.3500, 0.0000)
 scale = Vector3(0.5000, 1.0000, 1.0000)
 
@@ -2619,11 +2441,11 @@ molten_visual = true
 width = 4.25
 tint = Color(1, 0.49, 0.19, 1)
 
-[node name="RefineryLowerEast00" parent="TERRAIN" instance=ExtResource("Floor")]
+[node name="RefineryLowerEast00" parent="TERRAIN" instance=ExtResource("Foundation")]
 position = Vector3(388.2500, -1.3500, 0.0000)
 scale = Vector3(1.0000, 1.0000, 1.0000)
 
-[node name="RefineryLowerEast01" parent="TERRAIN" instance=ExtResource("Floor")]
+[node name="RefineryLowerEast01" parent="TERRAIN" instance=ExtResource("Foundation")]
 position = Vector3(393.6250, -1.3500, 0.0000)
 scale = Vector3(0.7917, 1.0000, 1.0000)
 
@@ -2668,7 +2490,7 @@ position = Vector3(0.0000, 0.0000, 0.0000)
 [node name="RefineryLowerSupply" parent="TERRAIN" instance=ExtResource("energy")]
 position = Vector3(383.0000, -0.9500, 0.0000)
 
-[node name="SmelterExit00" parent="TERRAIN" instance=ExtResource("Floor")]
+[node name="SmelterExit00" parent="TERRAIN" instance=ExtResource("Foundation")]
 position = Vector3(405.400000, 0.000000, 0)
 rotation = Vector3(0, 0, 0.000000)
 scale = Vector3(0.133333, 1, 1)
@@ -2738,7 +2560,7 @@ period = 3.8
 offset = 1.35
 purge_relay = NodePath("../SlagFerryRelay")
 
-[node name="SlagBridgeLanding" parent="TERRAIN" instance=ExtResource("Floor")]
+[node name="SlagBridgeLanding" parent="TERRAIN" instance=ExtResource("Foundation")]
 position = Vector3(427.6, 0, 0)
 scale = Vector3(1.266667, 1, 1)
 
@@ -2768,7 +2590,7 @@ width = 5.65
 shot_height = 6.05
 tint = Color(1, 0.49, 0.19, 1)
 
-[node name="SlagVentIsland" parent="TERRAIN" instance=ExtResource("Floor")]
+[node name="SlagVentIsland" parent="TERRAIN" instance=ExtResource("Foundation")]
 position = Vector3(450.325, 0.6, 0)
 scale = Vector3(1.225, 1, 1)
 
@@ -2989,7 +2811,7 @@ patrol_model = 0
 patrol_right_limit = 527.0
 
 [node name="Security11" type="CharacterBody3D" parent="Actors" groups=["level_enemies", "damageable_enemies"]]
-position = Vector3(286.0000, 6.1500, 0.0000)
+position = Vector3(276.95, 4.3, 0)
 script = ExtResource("enemy")
 variant = 0
 detachment_sector = 1
@@ -3021,7 +2843,7 @@ patrol_model = -1
 patrol_right_limit = 527.0
 
 [node name="Reinforcement01" type="CharacterBody3D" parent="Actors" groups=["level_enemies", "damageable_enemies"]]
-position = Vector3(412, 5.03, 0)
+position = Vector3(404.5, 0.95, 0)
 script = ExtResource("enemy")
 variant = 0
 detachment_sector = 1
@@ -3048,47 +2870,47 @@ scale = Vector3(1.0000, 1.0000, 1.0000)
 position = Vector3(532.0000, 0.0000, 0.0000)
 scale = Vector3(1.0000, 1.0000, 1.0000)
 
-[node name="ArmorFloor02" parent="TERRAIN" instance=ExtResource("Floor")]
+[node name="ArmorFloor02" parent="TERRAIN" instance=ExtResource("Foundation")]
 position = Vector3(538.0000, 0.0000, 0.0000)
 scale = Vector3(1.0000, 1.0000, 1.0000)
 
-[node name="ArmorFloor03" parent="TERRAIN" instance=ExtResource("Floor")]
+[node name="ArmorFloor03" parent="TERRAIN" instance=ExtResource("Foundation")]
 position = Vector3(544.0000, 0.0000, 0.0000)
 scale = Vector3(1.0000, 1.0000, 1.0000)
 
-[node name="ArmorFloor04" parent="TERRAIN" instance=ExtResource("Floor")]
+[node name="ArmorFloor04" parent="TERRAIN" instance=ExtResource("Foundation")]
 position = Vector3(550.0000, 0.0000, 0.0000)
 scale = Vector3(1.0000, 1.0000, 1.0000)
 
-[node name="ArmorFloor05" parent="TERRAIN" instance=ExtResource("Floor")]
+[node name="ArmorFloor05" parent="TERRAIN" instance=ExtResource("Foundation")]
 position = Vector3(556.0000, 0.0000, 0.0000)
 scale = Vector3(1.0000, 1.0000, 1.0000)
 
-[node name="ArmorFloor06" parent="TERRAIN" instance=ExtResource("Floor")]
+[node name="ArmorFloor06" parent="TERRAIN" instance=ExtResource("Foundation")]
 position = Vector3(562.0000, 0.0000, 0.0000)
 scale = Vector3(1.0000, 1.0000, 1.0000)
 
-[node name="ArmorFloor07" parent="TERRAIN" instance=ExtResource("Floor")]
+[node name="ArmorFloor07" parent="TERRAIN" instance=ExtResource("Foundation")]
 position = Vector3(568.0000, 0.0000, 0.0000)
 scale = Vector3(1.0000, 1.0000, 1.0000)
 
-[node name="ArmorFloor08" parent="TERRAIN" instance=ExtResource("Floor")]
+[node name="ArmorFloor08" parent="TERRAIN" instance=ExtResource("Foundation")]
 position = Vector3(574.0000, 0.0000, 0.0000)
 scale = Vector3(1.0000, 1.0000, 1.0000)
 
-[node name="ArmorFloor09" parent="TERRAIN" instance=ExtResource("Floor")]
+[node name="ArmorFloor09" parent="TERRAIN" instance=ExtResource("Foundation")]
 position = Vector3(580.0000, 0.0000, 0.0000)
 scale = Vector3(1.0000, 1.0000, 1.0000)
 
-[node name="ArmorFloor10" parent="TERRAIN" instance=ExtResource("Floor")]
+[node name="ArmorFloor10" parent="TERRAIN" instance=ExtResource("Foundation")]
 position = Vector3(586.0000, 0.0000, 0.0000)
 scale = Vector3(1.0000, 1.0000, 1.0000)
 
-[node name="ArmorFloor11" parent="TERRAIN" instance=ExtResource("Floor")]
+[node name="ArmorFloor11" parent="TERRAIN" instance=ExtResource("Foundation")]
 position = Vector3(592.0000, 0.0000, 0.0000)
 scale = Vector3(1.0000, 1.0000, 1.0000)
 
-[node name="ArmorFloor12" parent="TERRAIN" instance=ExtResource("Floor")]
+[node name="ArmorFloor12" parent="TERRAIN" instance=ExtResource("Foundation")]
 position = Vector3(595.5000, 0.0000, 0.0000)
 scale = Vector3(0.1667, 1.0000, 1.0000)
 
@@ -3177,18 +2999,6 @@ position = Vector3(0.0000, 0.0000, 0.7500)
 [node name="RepairBayHeal" parent="TERRAIN" instance=ExtResource("repair")]
 position = Vector3(535.4000, 0.4000, 0.0000)
 
-[node name="FurnaceBackplate0" parent="DECOR" instance=ExtResource("PressureBank")]
-position = Vector3(548.0000, 0.0000, -2.6500)
-scale = Vector3(1.1000, 1.1500, 0.9000)
-
-[node name="FurnaceBackplate1" parent="DECOR" instance=ExtResource("PressureBank")]
-position = Vector3(561.0000, 0.0000, -2.6500)
-scale = Vector3(1.1000, 1.1500, 0.9000)
-
-[node name="FurnaceBackplate2" parent="DECOR" instance=ExtResource("PressureBank")]
-position = Vector3(573.0000, 0.0000, -2.6500)
-scale = Vector3(1.1000, 1.1500, 0.9000)
-
 [node name="TitanWestHatch" parent="TERRAIN" instance=ExtResource("arena_hatch")]
 position = Vector3(548.7, 4.86, 0)
 deck_width = 6.4
@@ -3196,9 +3006,9 @@ deck_depth = 3.10
 climb_height = 4.86
 solid_deck = true
 
-[node name="TitanHighRun" parent="TERRAIN" instance=ExtResource("Grate")]
-position = Vector3(559.70, 6.25, 0)
-scale = Vector3(1.533333, 0.65, 1)
+[node name="TitanHighRun" parent="TERRAIN" groups=["arena_player_deck", "factory_drop_through"] instance=ExtResource("Grate")]
+position = Vector3(558.0, 6.55, 0)
+scale = Vector3(1.15, 0.58, 1)
 
 [node name="PlayerSpawn" type="Marker3D" parent="MARKERS"]
 position = Vector3(0.0000, 0.8700, 0.0000)
@@ -3291,3 +3101,143 @@ position = Vector3(559.5, 11.75, -2.4)
 position = Vector3(0.0000, 1.2300, 0.0000)
 script = ExtResource("camera")
 minimum_follow_y = -7.8
+
+[node name="GateRelay1" type="Marker3D" parent="MARKERS"]
+position = Vector3(286.35, 6.9, 0)
+metadata/landmark = "Fuel meter recess"
+metadata/label_distance = 9.0
+
+[node name="RelayApproach1" type="Marker3D" parent="MARKERS"]
+position = Vector3(245, 0, 0)
+
+[node name="GateRelay2" type="Marker3D" parent="MARKERS"]
+position = Vector3(487.65, -4.6, 0)
+metadata/landmark = "Valve gallery below the hoist"
+metadata/label_distance = 9.0
+
+[node name="RelayApproach2" type="Marker3D" parent="MARKERS"]
+position = Vector3(467.75, 0.6, 0)
+
+[node name="MeterRoomRoof" parent="TERRAIN" groups=["no_wall_kick"] instance=ExtResource("Floor")]
+position = Vector3(285.75, 9.85, 0)
+scale = Vector3(1.02, 0.76, 1)
+
+[node name="MeterRoomEnd" parent="TERRAIN" groups=["no_wall_kick"] instance=ExtResource("Wall")]
+position = Vector3(288.53, 8.28, 0)
+scale = Vector3(1, 0.74, 1)
+
+[node name="FuelMeterCover" type="StaticBody3D" parent="TERRAIN" groups=["no_wall_kick"]]
+position = Vector3(283.15, 6.9, 0)
+script = ExtResource("Barricade")
+
+[node name="CoolingGrotto" parent="TERRAIN" instance=ExtResource("Arch")]
+position = Vector3(52, 0, 0)
+scale = Vector3(1, 1, 1)
+
+[node name="CounterweightCage" parent="TERRAIN" instance=ExtResource("Bridge")]
+position = Vector3(471.55, 0.6, 0)
+scale = Vector3(0.91, 0.54, 1)
+
+[node name="ValveServiceLip" parent="TERRAIN" instance=ExtResource("Grate")]
+position = Vector3(479.15, 1.45, 0)
+scale = Vector3(0.81, 0.65, 1)
+
+[node name="ValveGalleryMouth" parent="TERRAIN" instance=ExtResource("Grate")]
+position = Vector3(480.05, -4.6, 0)
+scale = Vector3(1.14, 0.55, 1)
+
+[node name="HoistReturnLadder" parent="TERRAIN" instance=ExtResource("arena_hatch")]
+position = Vector3(464.05, 1.62, 0)
+scale = Vector3(1, 1, 1)
+deck_width = 2.0
+climb_height = 11.72
+
+[node name="ValveHoistCoupler" type="StaticBody3D" parent="TERRAIN" groups=["factory_shot_relay"]]
+position = Vector3(479.45, 1.66, 0)
+script = ExtResource("RelayCode")
+collision_layer = 2
+collision_mask = 0
+departure_delay = 2.15
+floating = true
+pressure_plate = false
+platform_path = NodePath("../CounterweightCage")
+travel = Vector3(0, -5.20, 0)
+operation = "LOWER INSPECTION CAGE"
+lift = true
+repeat_hold = 5.0
+
+[node name="Art" parent="TERRAIN/ValveHoistCoupler" instance=ExtResource("Relay")]
+position = Vector3(0.0000, 0.0000, 0.0000)
+
+[node name="Collider" type="CollisionShape3D" parent="TERRAIN/ValveHoistCoupler"]
+shape = SubResource("RelayShape")
+
+[node name="Lamp" type="MeshInstance3D" parent="TERRAIN/ValveHoistCoupler"]
+position = Vector3(0.0000, 0.0000, 0.0000)
+mesh = SubResource("LampMesh")
+
+
+[node name="ValveCabinetLamp" parent="DECOR" instance=ExtResource("ServiceLamp")]
+position = Vector3(487.7, -4.4, -2.17)
+scale = Vector3(0.85, 0.8, 0.7)
+
+[node name="HoistDrum" parent="DECOR" instance=ExtResource("Crane")]
+position = Vector3(474.05, 7.65, -3.25)
+scale = Vector3(0.9, 0.82, 0.77)
+
+[node name="VentManifold" parent="DECOR" instance=ExtResource("SumpPipes")]
+position = Vector3(497.5, -9.98, -2.65)
+scale = Vector3(0.87, 0.96, 0.86)
+
+[node name="CasterWall" parent="DECOR" instance=ExtResource("PitKit")]
+position = Vector3(564.5,0,0)
+
+[node name="BossFloorPorts" type="Node3D" parent="TERRAIN"]
+
+[node name="Caster01" parent="TERRAIN/BossFloorPorts" instance=ExtResource("BossPort")]
+position = Vector3(543.90,0,0)
+
+[node name="Caster02" parent="TERRAIN/BossFloorPorts" instance=ExtResource("BossPort")]
+position = Vector3(548.60,0,0)
+
+[node name="Caster03" parent="TERRAIN/BossFloorPorts" instance=ExtResource("BossPort")]
+position = Vector3(553.00,0,0)
+
+[node name="Caster04" parent="TERRAIN/BossFloorPorts" instance=ExtResource("BossPort")]
+position = Vector3(557.65,0,0)
+
+[node name="Caster05" parent="TERRAIN/BossFloorPorts" instance=ExtResource("BossPort")]
+position = Vector3(562.05,0,0)
+
+[node name="Caster06" parent="TERRAIN/BossFloorPorts" instance=ExtResource("BossPort")]
+position = Vector3(566.70,0,0)
+
+[node name="Caster07" parent="TERRAIN/BossFloorPorts" instance=ExtResource("BossPort")]
+position = Vector3(571.10,0,0)
+
+[node name="Caster08" parent="TERRAIN/BossFloorPorts" instance=ExtResource("BossPort")]
+position = Vector3(575.75,0,0)
+
+[node name="Caster09" parent="TERRAIN/BossFloorPorts" instance=ExtResource("BossPort")]
+position = Vector3(580.15,0,0)
+
+[node name="Caster10" parent="TERRAIN/BossFloorPorts" instance=ExtResource("BossPort")]
+position = Vector3(584.80,0,0)
+
+[node name="SpillwayFeed" parent="DECOR" instance=ExtResource("PurgeFeed")]
+position = Vector3(479.45,1.66,-1.68)
+[node name="FerrySpillway" parent="TERRAIN" groups=["factory_one_way", "factory_drop_through"] instance=ExtResource("Grate")]
+position = Vector3(450.5, 4.1, 0)
+scale = Vector3(0.72, 0.5, 1)
+
+[node name="OverflowInspection" parent="TERRAIN" groups=["factory_one_way", "factory_drop_through"] instance=ExtResource("Grate")]
+position = Vector3(457.8, 6.25, 0)
+scale = Vector3(0.61, 0.5, 1)
+
+[node name="TitanCastingLip" parent="TERRAIN" groups=["arena_player_deck", "factory_one_way", "factory_drop_through"] instance=ExtResource("Grate")]
+position = Vector3(576.0, 2.6, 0)
+scale = Vector3(0.86, 0.5, 0.84)
+
+[node name="TitanMouldReturn" parent="TERRAIN" groups=["arena_player_deck", "factory_one_way", "factory_drop_through"] instance=ExtResource("Grate")]
+position = Vector3(567.1, 4.55, 0)
+scale = Vector3(0.59, 0.5, 0.84)

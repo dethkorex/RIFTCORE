@@ -1,0 +1,162 @@
+[gd_scene format=3]
+
+[ext_resource type="Texture2D" path="res://assets/neon_factory/foundry/forged_tread.png" id="Steel"]
+
+[sub_resource type="StandardMaterial3D" id="Gunmetal"]
+albedo_color = Color(0.29, 0.33, 0.36, 1)
+metallic = 0.65
+roughness = 0.48
+albedo_texture = ExtResource("Steel")
+uv1_triplanar = true
+uv1_world_triplanar = true
+uv1_scale = Vector3(0.52,0.52,0.52)
+
+[sub_resource type="StandardMaterial3D" id="Bronze"]
+albedo_color = Color(0.65, 0.39, 0.16, 1)
+metallic = 0.58
+roughness = 0.46
+
+[sub_resource type="StandardMaterial3D" id="Flange"]
+albedo_color = Color(0.54, 0.6, 0.63, 1)
+metallic = 0.66
+roughness = 0.37
+albedo_texture = ExtResource("Steel")
+uv1_triplanar = true
+uv1_world_triplanar = true
+uv1_scale = Vector3(0.52,0.52,0.52)
+
+[sub_resource type="StandardMaterial3D" id="Enamel"]
+albedo_color = Color(0.12, 0.4, 0.43, 1)
+metallic = 0.52
+roughness = 0.44
+
+[sub_resource type="BoxMesh" id="Mesh0"]
+size = Vector3(0.66, 0.24, 1.1)
+material = SubResource("Gunmetal")
+
+[sub_resource type="CylinderMesh" id="Mesh1"]
+top_radius = 0.24
+bottom_radius = 0.24
+height = 0.98
+radial_segments = 24
+rings = 1
+material = SubResource("Enamel")
+
+[sub_resource type="CylinderMesh" id="Mesh2"]
+top_radius = 0.28
+bottom_radius = 0.28
+height = 0.17
+radial_segments = 24
+rings = 1
+material = SubResource("Bronze")
+
+[sub_resource type="CylinderMesh" id="Mesh3"]
+top_radius = 0.115
+bottom_radius = 0.115
+height = 0.62
+radial_segments = 24
+rings = 1
+material = SubResource("Flange")
+
+[sub_resource type="BoxMesh" id="Mesh4"]
+size = Vector3(0.58, 0.34, 0.64)
+material = SubResource("Gunmetal")
+
+[sub_resource type="CylinderMesh" id="Mesh5"]
+top_radius = 0.248
+bottom_radius = 0.248
+height = 0.052
+radial_segments = 24
+rings = 1
+material = SubResource("Bronze")
+
+[sub_resource type="BoxMesh" id="Mesh6"]
+size = Vector3(2.03, 0.37, 0.52)
+material = SubResource("Gunmetal")
+
+[node name="QuenchPress" type="Node3D"]
+
+[node name="Bed0" type="MeshInstance3D" parent="."]
+position = Vector3(-0.75, 0.12, -1.63)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("Mesh0")
+
+[node name="RamBarrel0" type="MeshInstance3D" parent="."]
+position = Vector3(-0.75, 0.7, -1.66)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("Mesh1")
+
+[node name="Gland0" type="MeshInstance3D" parent="."]
+position = Vector3(-0.75, 1.21, -1.66)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("Mesh2")
+
+[node name="ChromeRod0" type="MeshInstance3D" parent="."]
+position = Vector3(-0.75, 1.56, -1.66)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("Mesh3")
+
+[node name="ClampCheek0" type="MeshInstance3D" parent="."]
+position = Vector3(-0.64, 1.84, -1.55)
+rotation = Vector3(0, 0, -0.19)
+mesh = SubResource("Mesh4")
+
+[node name="HoseBand00" type="MeshInstance3D" parent="."]
+position = Vector3(-0.75, 0.42, -1.66)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("Mesh5")
+
+[node name="HoseBand01" type="MeshInstance3D" parent="."]
+position = Vector3(-0.75, 0.69, -1.66)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("Mesh5")
+
+[node name="HoseBand02" type="MeshInstance3D" parent="."]
+position = Vector3(-0.75, 0.96, -1.66)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("Mesh5")
+
+[node name="Bed1" type="MeshInstance3D" parent="."]
+position = Vector3(0.75, 0.12, -1.63)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("Mesh0")
+
+[node name="RamBarrel1" type="MeshInstance3D" parent="."]
+position = Vector3(0.75, 0.7, -1.66)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("Mesh1")
+
+[node name="Gland1" type="MeshInstance3D" parent="."]
+position = Vector3(0.75, 1.21, -1.66)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("Mesh2")
+
+[node name="ChromeRod1" type="MeshInstance3D" parent="."]
+position = Vector3(0.75, 1.56, -1.66)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("Mesh3")
+
+[node name="ClampCheek1" type="MeshInstance3D" parent="."]
+position = Vector3(0.64, 1.84, -1.55)
+rotation = Vector3(0, 0, 0.19)
+mesh = SubResource("Mesh4")
+
+[node name="HoseBand10" type="MeshInstance3D" parent="."]
+position = Vector3(0.75, 0.42, -1.66)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("Mesh5")
+
+[node name="HoseBand11" type="MeshInstance3D" parent="."]
+position = Vector3(0.75, 0.69, -1.66)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("Mesh5")
+
+[node name="HoseBand12" type="MeshInstance3D" parent="."]
+position = Vector3(0.75, 0.96, -1.66)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("Mesh5")
+
+[node name="RearBeam" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.25, -2.01)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("Mesh6")

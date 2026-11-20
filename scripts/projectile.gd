@@ -114,6 +114,14 @@ func setup(dir: Vector3, faction: String, tint: Color = Color.CYAN, drill := fal
 		collision.shape = sphere
 	add_child(collision)
 	body_entered.connect(_on_body_entered)
+	if owner_faction == "player":
+		area_entered.connect(_on_guard_entered)
+
+func _on_guard_entered(area: Area3D) -> void:
+	if area.is_in_group(&"enemy_guard_field") and area.visible:
+		var enemy := area.get_parent()
+		if enemy.guard_active() and direction.x * enemy.direction < 0.0:
+			_on_body_entered(enemy)
 
 func _physics_process(delta: float) -> void:
 	if clock == 0.0 and owner_faction == "enemy":
@@ -130,15 +138,13 @@ func _physics_process(delta: float) -> void:
 		queue_free()
 
 func _on_body_entered(body: Node) -> void:
-	if spent:
+	if spent or struck.has(body.get_instance_id()):
 		return
 	if body.has_method("hit_by_projectile") and body.hit_by_projectile(self):
 		spent = true
 		impact()
 		return
 	if body.has_method("take_damage") and body.get("faction") != owner_faction:
-		if struck.has(body.get_instance_id()):
-			return
 		struck[body.get_instance_id()] = true
 		if body is RiftPlayer and boss_status_sector > 0:
 			body.take_boss_hit(damage, global_position, boss_status_sector)

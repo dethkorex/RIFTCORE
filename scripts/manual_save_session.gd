@@ -109,6 +109,20 @@ func invalidate_defeated_run() -> Error:
 		data.set_value("equipment", id, profile.gear[id])
 	return write_slot(data)
 
+func persist_challenge_progress() -> Error:
+	var data := read_slot(slot)
+	if not data:
+		return ERR_FILE_NOT_FOUND
+	data.set_value("challenge_cycles", "sectors", profile.challenge_cycles)
+	return write_slot(data)
+
+func persist_reserve_lives() -> Error:
+	var data := read_slot(slot)
+	if not data:
+		return ERR_FILE_NOT_FOUND
+	data.set_value("profile", "reserve_lives", profile.reserve_lives)
+	return write_slot(data)
+
 func persist_blueprint_trade() -> Error:
 	if not owns_slot:
 		return OK

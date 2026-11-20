@@ -3,25 +3,39 @@ extends Node3D
 const UI := preload("res://scripts/rift_ui.gd")
 const COMBAT_VFX := preload("res://scripts/combat_vfx.gd")
 const Catalog := preload("res://scripts/sector_catalog.gd")
+const ChargingOrb := preload("res://scripts/buster_charge_orb.gd")
 
-func play(actor: RiftPlayer, rig: SideCameraRig, hud: CanvasLayer, reward: Dictionary, floor_point: Vector3, cosmetic_only := false) -> void:
+func play(actor: RiftPlayer, rig: SideCameraRig, hud: CanvasLayer, reward: Dictionary) -> void:
 	name = "SuitReveal"
+	# An airborne boss kill still lands under normal physics first. Animate
+	# only the mesh from there so the live collider never leaves the floor.
+	for frame in 90:
+		if actor.health<=0.0 or actor.grounded():
+			break
+		await get_tree().physics_frame
+	if actor.health<=0.0 or not actor.grounded():
+		return
+	actor.suit_showcase_active = true
+	actor.velocity = Vector3.ZERO
+	actor.wall_sliding = false
+	actor.melee_lock = 0.0
+	actor.cancel_saber_charge()
+	actor.present_saber_charge(-1.0,false)
+	actor.set_crouch(false)
+	actor.landing_left = 0.0
+	rig.set_process(false)
 	var id: String = reward.reward
 	var tint := Color(reward.color)
-	var feet := actor.standing_capsule.height * 0.5 + 0.025
-	var landing := floor_point + Vector3.UP * feet
+	var landing := actor.global_position
 	var original_model_y := actor.model_root.position.y
-	global_position = floor_point + Vector3.UP * 0.04
+	global_position = landing-Vector3.UP*(actor.standing_capsule.height*.5-.04)
 	var lens := rig.get_node("Camera3D") as Camera3D
 	var zoom := lens.position.z
 	var focus := landing + Vector3(0.8, 0.44, 0)
 	var view := create_tween().set_parallel().set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
 	view.tween_property(rig, "global_position", focus, 0.58)
 	view.tween_property(lens, "position:z", zoom * 0.73, 0.58)
-	if cosmetic_only:
-		view.tween_property(actor.model_root, "position:y", original_model_y + 0.41, 0.58)
-	else:
-		view.tween_property(actor, "global_position", landing + Vector3.UP * 0.41, 0.58)
+	view.tween_property(actor.model_root, "position:y", original_model_y + 0.41, 0.58)
 	actor.play_character_animation("idle", true)
 	actor.model_root.rotation = Vector3(0, -0.20, 0)
 	var aura := build_floor_light(tint)
@@ -31,10 +45,7 @@ func play(actor: RiftPlayer, rig: SideCameraRig, hud: CanvasLayer, reward: Dicti
 		aura.light_energy = 1.8 if equipped.is_empty() else 3.6
 		await get_tree().create_timer(0.32, false).timeout
 	var descent := create_tween().set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	if cosmetic_only:
-		descent.tween_property(actor.model_root, "position:y", original_model_y, 0.20)
-	else:
-		descent.tween_property(actor, "global_position", landing, 0.20)
+	descent.tween_property(actor.model_root, "position:y", original_model_y, 0.20)
 	await descent.finished
 	actor.play_character_animation("land", true)
 	RiftAudio.stop_effect(&"titan_windup")
@@ -54,7 +65,10 @@ func play(actor: RiftPlayer, rig: SideCameraRig, hud: CanvasLayer, reward: Dicti
 	resume.tween_property(plate, "modulate:a", 0.0, 0.28)
 	await resume.finished
 	plate.queue_free()
-	actor.model_root.rotation.y = PI * 0.5 * actor.facing
+	actor.model_root.rotation = Vector3(0,PI*.5*actor.facing,0)
+	actor.play_character_animation("idle",true)
+	actor.suit_showcase_active = false
+	rig.set_process(true)
 
 func demonstrate(actor: RiftPlayer, rig: SideCameraRig, plate: PanelContainer) -> void:
 	var camera := rig.get_node("Camera3D") as Camera3D
@@ -67,19 +81,40 @@ func demonstrate(actor: RiftPlayer, rig: SideCameraRig, plate: PanelContainer) -
 	actor.showcase_projectiles = self
 	actor.play_character_animation("idle", true)
 	var demo := plate.get_node("AbilityCopy/Demonstration") as Label
+	var tint := Color(Catalog.weapon(actor.equipped_suit()).color)
 	for i in 3:
-		demo.text = "STANDARD VOLLEY   %d / 3" % (i + 1)
-		await actor.shoot(false)
-		await get_tree().create_timer(0.29, false).timeout
-	for i in 3:
-		demo.text = "SUIT WEAPON   %d / 3" % (i + 1)
-		await actor.shoot(false, false, true)
-		await get_tree().create_timer(0.37, false).timeout
+		demo.text = "WINDING UP   %d / 3" % (i + 1)
+		if actor.buster_pose:
+			actor.buster_pose.ladder_direction = 0.0
+			actor.buster_pose.water_direction = Vector3.ZERO
+			actor.buster_pose.crouched = false
+			actor.buster_pose.influence = 1.0
+			await actor.buster_pose.modification_processed
+		var orb := ChargingOrb.new()
+		add_child(orb)
+		RiftAudio.play_effect(&"buster_charge")
+		var charge := create_tween()
+		charge.tween_method(func(amount: float):
+			orb.global_position = actor.cannon_muzzle(actor.facing)
+			orb.charge(amount,tint,amount>.8)
+		,0.0,1.0,.36)
+		await charge.finished
+		orb.hide()
+		orb.queue_free()
+		RiftAudio.stop_effect(&"buster_charge")
+		demo.text = "CHARGED SUIT SHOT   %d / 3" % (i + 1)
+		actor.play_character_animation("shoot",true)
+		await actor.shoot(true, true, true)
+		if actor.buster_pose:
+			create_tween().tween_property(actor.buster_pose,"influence",0.0,.16)
+		await get_tree().create_timer(.23,false).timeout
+		actor.play_character_animation("idle",true)
+		await get_tree().create_timer(.23,false).timeout
 	actor.showcase_projectiles = null
 	actor.fire_lock = 0.0
 	if actor.buster_pose:
 		actor.buster_pose.influence = 0.0
-	demo.text = "L / RT  Suit weapon"
+	demo.text = "L / RT  Fire suit weapon"
 
 func build_floor_light(tint: Color) -> OmniLight3D:
 	var light := OmniLight3D.new()

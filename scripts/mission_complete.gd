@@ -5,7 +5,7 @@ const Materials := preload("res://scripts/fabrication_catalog.gd")
 const Profile := preload("res://scripts/rogue_profile.gd")
 
 static func build(stack: VBoxContainer, sector_name: String, stats: Dictionary, materials: Dictionary,
-		blueprints: Array[String], supplies: Dictionary, bolts: int, lives: int, deaths: int, ending: String, exit: Callable) -> void:
+		blueprints: Array[String], supplies: Dictionary, bolts: int, challenges_completed: int, deaths: int, ending: String, exit: Callable) -> void:
 	UI.label(stack, "DEPLOYMENT COMPLETE", 43, UI.CYAN)
 	UI.label(stack, sector_name + "  /  EXTRACTION SUMMARY", 21, UI.WHITE)
 	var body := HBoxContainer.new()
@@ -59,10 +59,10 @@ static func build(stack: VBoxContainer, sector_name: String, stats: Dictionary, 
 	for id in supplies:
 		if Profile.stock.has(id) and int(supplies[id]) > 0:
 			reward(rewards, Profile.stock[id].name, "×%d sent to Storage" % supplies[id], UI.CYAN)
-	if lives > 0:
-		reward(rewards, "Challenge reward", "+%d reserve lives" % lives, Color("ffd079"))
 	if rewards.get_child_count() == 0:
 		UI.label(rewards, "No salvage recovered.", 16, UI.MUTED)
+	if challenges_completed > 0:
+		UI.label(stack, "Challenge rewards ready. Claim them in Challenges at the station.", 17, UI.VIOLET)
 	if not ending.is_empty():
 		UI.label(stack, ending, 15, UI.MUTED)
 	UI.button(stack, "Return to Station", exit, true).grab_focus()

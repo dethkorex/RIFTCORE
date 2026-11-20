@@ -1,0 +1,198 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://assets/campaign/machine_jungle/caverns/traverse_ledge.glb" id="Deck"]
+
+[ext_resource type="PackedScene" path="res://assets/campaign/machine_jungle/caverns/chamber_landmark.glb" id="Landmark"]
+
+[ext_resource type="Script" path="res://scripts/cavern_envelope.gd" id="Shell"]
+
+[ext_resource type="Texture2D" path="res://assets/campaign/machine_jungle/surfaces/sector_wall.jpg" id="Rock"]
+
+[ext_resource type="Script" path="res://scripts/biome_zone.gd" id="Zone"]
+
+[sub_resource type="BoxShape3D" id="Step00"]
+size = Vector3(4, 0.46, 3.2)
+
+[sub_resource type="BoxShape3D" id="Step01"]
+size = Vector3(4, 0.46, 3.2)
+
+[sub_resource type="BoxShape3D" id="Step02"]
+size = Vector3(4.2, 0.46, 3.2)
+
+[sub_resource type="BoxShape3D" id="Step03"]
+size = Vector3(5, 0.46, 3.2)
+
+[sub_resource type="BoxShape3D" id="Step04"]
+size = Vector3(6, 0.46, 3.2)
+
+[sub_resource type="BoxShape3D" id="Step05"]
+size = Vector3(4.6, 0.46, 3.2)
+
+[sub_resource type="BoxShape3D" id="Step06"]
+size = Vector3(4, 0.46, 3.2)
+
+[sub_resource type="BoxShape3D" id="Fork00"]
+size = Vector3(3.8, 0.46, 3.2)
+
+[sub_resource type="BoxShape3D" id="Fork01"]
+size = Vector3(5.5, 0.46, 3.2)
+
+[sub_resource type="BoxShape3D" id="Fork02"]
+size = Vector3(4.5, 0.46, 3.2)
+
+[sub_resource type="BoxShape3D" id="Fork03"]
+size = Vector3(4.2, 0.46, 3.2)
+
+[sub_resource type="BoxShape3D" id="Fork04"]
+size = Vector3(3.8, 0.46, 3.2)
+
+[node name="Root Siphon" type="Node3D" groups=["authored_cavern"]]
+metadata/branch_return = 5
+metadata/branch_from = 2
+metadata/chamber = "Root Siphon"
+
+[node name="Step00" type="StaticBody3D" parent="." groups=["factory_one_way", "factory_drop_through"]]
+position = Vector3(2, 0, 0)
+
+[node name="Deck" parent="Step00" instance=ExtResource("Deck")]
+scale = Vector3(1.0, 1, 1)
+
+[node name="Collider" type="CollisionShape3D" parent="Step00"]
+position = Vector3(0, -0.23, 0)
+shape = SubResource("Step00")
+
+[node name="Step01" type="StaticBody3D" parent="." groups=["factory_one_way", "factory_drop_through"]]
+position = Vector3(7.5, 0.5, 0)
+
+[node name="Deck" parent="Step01" instance=ExtResource("Deck")]
+scale = Vector3(1.0, 1, 1)
+
+[node name="Collider" type="CollisionShape3D" parent="Step01"]
+position = Vector3(0, -0.23, 0)
+shape = SubResource("Step01")
+
+[node name="Step02" type="StaticBody3D" parent="." groups=["factory_one_way", "factory_drop_through"]]
+position = Vector3(14.062, 1.775, 0)
+
+[node name="Deck" parent="Step02" instance=ExtResource("Deck")]
+scale = Vector3(1.05, 1, 1)
+
+[node name="Collider" type="CollisionShape3D" parent="Step02"]
+position = Vector3(0, -0.23, 0)
+shape = SubResource("Step02")
+
+[node name="Step03" type="StaticBody3D" parent="." groups=["factory_one_way", "factory_drop_through"]]
+position = Vector3(21.562, -0.425, 0)
+
+[node name="Deck" parent="Step03" instance=ExtResource("Deck")]
+scale = Vector3(1.25, 1, 1)
+
+[node name="Collider" type="CollisionShape3D" parent="Step03"]
+position = Vector3(0, -0.23, 0)
+shape = SubResource("Step03")
+
+[node name="Step04" type="StaticBody3D" parent="." groups=["factory_one_way", "factory_drop_through"]]
+position = Vector3(30.0, -3.7, 0)
+
+[node name="Deck" parent="Step04" instance=ExtResource("Deck")]
+scale = Vector3(1.5, 1, 1)
+
+[node name="Collider" type="CollisionShape3D" parent="Step04"]
+position = Vector3(0, -0.23, 0)
+shape = SubResource("Step04")
+
+[node name="Step05" type="StaticBody3D" parent="." groups=["factory_one_way", "factory_drop_through"]]
+position = Vector3(36.562, -2.925, 0)
+
+[node name="Deck" parent="Step05" instance=ExtResource("Deck")]
+scale = Vector3(1.15, 1, 1)
+
+[node name="Collider" type="CollisionShape3D" parent="Step05"]
+position = Vector3(0, -0.23, 0)
+shape = SubResource("Step05")
+
+[node name="Step06" type="StaticBody3D" parent="." groups=["factory_one_way", "factory_drop_through"]]
+position = Vector3(43.0, -3.6, 0)
+
+[node name="Deck" parent="Step06" instance=ExtResource("Deck")]
+scale = Vector3(1.0, 1, 1)
+
+[node name="Collider" type="CollisionShape3D" parent="Step06"]
+position = Vector3(0, -0.23, 0)
+shape = SubResource("Step06")
+
+[node name="Fork00" type="StaticBody3D" parent="." groups=["factory_one_way", "factory_drop_through"]]
+position = Vector3(16.875, 3.75, 0)
+
+[node name="Deck" parent="Fork00" instance=ExtResource("Deck")]
+scale = Vector3(0.95, 1, 1)
+
+[node name="Collider" type="CollisionShape3D" parent="Fork00"]
+position = Vector3(0, -0.23, 0)
+shape = SubResource("Fork00")
+
+[node name="Fork01" type="StaticBody3D" parent="." groups=["factory_one_way", "factory_drop_through"]]
+position = Vector3(10.312, 5.93, 0)
+
+[node name="Deck" parent="Fork01" instance=ExtResource("Deck")]
+scale = Vector3(1.375, 1, 1)
+
+[node name="Collider" type="CollisionShape3D" parent="Fork01"]
+position = Vector3(0, -0.23, 0)
+shape = SubResource("Fork01")
+
+[node name="Cavern" type="Node3D" parent="."]
+script = ExtResource("Shell")
+rock = ExtResource("Rock")
+ceiling = PackedVector2Array(0.0, 9.463, 5.9, 11.43, 11.8, 11.73, 17.7, 13.1, 23.6, 13.1, 29.5, 11.2, 35.4, 7.15, 41.3, 3.301)
+lower_edge = -12.7
+
+[node name="Machinery" parent="." instance=ExtResource("Landmark")]
+position = Vector3(14.062, 2.275, -2.85)
+scale = Vector3(0.78, 0.78, 0.78)
+
+[node name="Worklight" type="OmniLight3D" parent="."]
+position = Vector3(14.062, 4.775, 1.6)
+light_color = Color(0.5, 0.9, 0.24, 1)
+light_energy = 1.65
+omni_range = 11
+
+[node name="CrossingDevice" type="Area3D" parent="."]
+position = Vector3(31.5, -3.025, 0)
+script = ExtResource("Zone")
+kind = 7
+dimensions = Vector3(2.0, 1.35, 2.4)
+tint = Color(0.5, 0.9, 0.24, 1)
+period = 4.6
+offset = 0.37
+burnable_spore_pod = true
+
+[node name="Fork02" type="StaticBody3D" parent="." groups=["factory_one_way", "factory_drop_through"]]
+position = Vector3(18.6, 7.6, 0)
+
+[node name="Deck" parent="Fork02" instance=ExtResource("Deck")]
+scale = Vector3(1.1250, 1, 1)
+
+[node name="Collider" type="CollisionShape3D" parent="Fork02"]
+position = Vector3(0, -0.23, 0)
+shape = SubResource("Fork02")
+
+[node name="Fork03" type="StaticBody3D" parent="." groups=["factory_one_way", "factory_drop_through"]]
+position = Vector3(27.8, 5.7, 0)
+
+[node name="Deck" parent="Fork03" instance=ExtResource("Deck")]
+scale = Vector3(1.0500, 1, 1)
+
+[node name="Collider" type="CollisionShape3D" parent="Fork03"]
+position = Vector3(0, -0.23, 0)
+shape = SubResource("Fork03")
+
+[node name="Fork04" type="StaticBody3D" parent="." groups=["factory_one_way", "factory_drop_through"]]
+position = Vector3(33, 1.65, 0)
+
+[node name="Deck" parent="Fork04" instance=ExtResource("Deck")]
+scale = Vector3(0.9500, 1, 1)
+
+[node name="Collider" type="CollisionShape3D" parent="Fork04"]
+position = Vector3(0, -0.23, 0)
+shape = SubResource("Fork04")

@@ -35,6 +35,11 @@ var relay_paste: Button
 var relay_deploy: Button
 var relay_copy: Button
 var relay_leave: Button
+var relay_join_form: Control
+var relay_room: Label
+var relay_roster: VBoxContainer
+var relay_members: Label
+var relay_roster_key := ""
 
 var can_load := false
 var saved_sector := 1
@@ -49,6 +54,7 @@ var shop_status := ""
 var shop_category := "All Items"
 var enhancement_focus := ""
 const SHOP_FILTERS := {"All Items": "visor", "Supplies": "frame", "Buffs": "utility", "Materials": "core"}
+var claim_challenge_rewards: Callable
 var challenge_sector := 1
 var selected_sector := 1
 var selected_difficulty := 0
@@ -97,16 +103,16 @@ var page := "Title"
 const StoryDialogue := preload("res://scripts/story_dialogue.gd")
 var hub_tip: StoryDialogue
 const HUB_TIPS := {
-	"Sector select": ["Deploy", "Ready to head out? Pick a sector or resume your run here. Start a Group if you want company."],
-	"Shop": ["Shop", "Take a look before you deploy. Buy patches for health, cells for energy, or materials for your next build."],
-	"Fabrication": ["Crafting", "Bring me a blueprint you've learned and the materials it calls for. You can equip the gear here or send it straight to Storage."],
-	"Upgrades": ["Core Ascension", "Spend Core Shards on talents here. Pick one talent in each tier to open the next. When I rebuild you, these upgrades come back with you."],
-	"Save Game": ["System / Save", "Save your progress manually here. Settings is on the next tab."],
-	"Gear": ["Operator", "Check your stats and change gear here. Use Storage to stow salvage, learn blueprints, and keep supplies ready on the D-pad."],
-	"Player Profile": ["Profile", "Check your career progress, preview cosmetics, and manage your online account here."],
-	"Social": ["Social", "Find friends by username, send private messages, and check requests and game invites in Notifications."],
-	"Challenges": ["Challenges", "Each sector gets a fresh set of challenges at local midnight. Clear all five before the reset for bonus Core Shards."],
-	"Collection": ["NOVA Archive", "I keep copies of the records we find out there. Pick a sector to read them. The field guide is here whenever you need it."],
+	"Sector select": ["Deploy", "Pick a sector and difficulty, or resume your last mission. Activate both Gate Relays in each act to open its boss room."],
+	"Shop": ["Shop", "Spend Bolts on repair supplies, energy cells, buffs and materials. Better stock unlocks as your Operator Level rises."],
+	"Fabrication": ["Crafting", "Learn a blueprint in Storage first. Then bring its materials here. Pick Craft & Equip to wear it now, or Craft to Storage to save it for later."],
+	"Upgrades": ["Core Ascension", "Spend Core Shards to install talents. Take at least one talent in each earlier tier to unlock the next tier in that branch. Installed talents survive reconstruction."],
+	"Save Game": ["Save", "Save here to keep this operator's progress. Use the Settings tab to change controls, audio or video."],
+	"Gear": ["Operator", "Pick a gear socket to see what fits. In Storage, move items out of your carried inventory, learn blueprints, or assign supplies to your quick slots."],
+	"Player Profile": ["Profile", "See your career stats, change your armor finish or manage your account. Finish a sector and extract to earn Profile XP."],
+	"Social": ["Social", "Use Find Friends to look up an account username. Select a friend to message or invite them. Requests and invitations appear in Notifications."],
+	"Challenges": ["Challenges", "Complete all five challenges for a sector for bonus Core Shards. Check the countdown before starting. The list resets at local midnight."],
+	"Collection": ["NOVA Archive", "Open a sector to read the records you've recovered and see the loot you've discovered. Use Tutorials to look up a mechanic again."],
 }
 
 func _ready() -> void:
@@ -363,8 +369,8 @@ func station_tabs() -> Dictionary:
 		return {"Player Profile": "Profile", "Cosmetics": "Cosmetics"}
 	if page in ["Collection", "Tutorials"]:
 		return {"Collection": "NOVA Archive", "Tutorials": "Tutorials"}
-	if page in ["Social", "Notifications"]:
-		return {"Social": "Friends", "Notifications": "Notifications"}
+	if page in ["Social", "Party", "Notifications"]:
+		return {"Social": "Friends", "Party": "Party", "Notifications": "Notifications"}
 	return {}
 
 func build_station_header(header: HBoxContainer) -> void:
@@ -428,7 +434,7 @@ func show_station_tip(station: String) -> void:
 		RiftSettings.save()
 	hub_tip = dialogue
 	add_child(dialogue)
-	await dialogue.play([["NOVA", content[1]]], "Got it")
+	await dialogue.play([[Story.GUIDE, content[1]]], "Got it")
 	dialogue.queue_free()
 	if hub_tip == dialogue:
 		hub_tip = null
@@ -881,30 +887,47 @@ func update_social_tabs() -> void:
 		notifications_tab.text = "Notifications (%d)" % pending if pending > 0 else "Notifications"
 
 func build_online_room(columns: HBoxContainer) -> void:
-	var form := card(columns)
-	UI.label(form, "Start or Join a Group", 32, UI.CYAN)
-	UI.label(form, "Up to four players can join. The leader chooses a campaign sector.", 18, UI.MUTED)
-	relay_host = UI.button(form, "Create Group", RiftRelay.host_room, true)
-	var join_row := HBoxContainer.new()
-	join_row.add_theme_constant_override("separation", 12)
-	form.add_child(join_row)
+	var form := card(columns,0.9)
+	UI.label(form, "PARTY", 30, UI.CYAN).autowrap_mode=TextServer.AUTOWRAP_OFF
+	UI.label(form, "Create a party, invite friends, or join with a room code.", 17, UI.MUTED)
+	relay_status = UI.label(form, "", 18, UI.CYAN)
+	relay_status.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+	form.add_child(HSeparator.new())
+	relay_host = UI.button(form, "Create Party", RiftRelay.host_room, true)
+	relay_rejoin = UI.button(form, "Rejoin Party", RiftRelay.rejoin_party, true)
+	relay_join_form=UI.column(form,8)
+	UI.label(relay_join_form,"JOIN WITH A CODE",16,UI.MUTED).autowrap_mode=TextServer.AUTOWRAP_OFF
 	relay_code = LineEdit.new()
-	relay_code.placeholder_text = "Friend’s room code"
+	relay_code.placeholder_text = "Enter your friend's room code"
 	relay_code.max_length = 14
+	relay_code.custom_minimum_size.y=38
 	relay_code.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	relay_code.text_submitted.connect(RiftRelay.join_room)
-	join_row.add_child(relay_code)
+	relay_join_form.add_child(relay_code)
+	var join_row := HBoxContainer.new()
+	join_row.add_theme_constant_override("separation", 8)
+	relay_join_form.add_child(join_row)
 	relay_paste = UI.button(join_row, "Paste Code", func():
 		relay_code.text = DisplayServer.clipboard_get().strip_edges().left(relay_code.max_length)
 		relay_code.grab_focus()
 		relay_code.caret_column = relay_code.text.length()
 	)
-	relay_join = UI.button(join_row, "Join Room", func(): RiftRelay.join_room(relay_code.text))
-	relay_rejoin = UI.button(form, "Rejoin Party", RiftRelay.rejoin_party, true)
-	relay_status = UI.label(form, "", 18, UI.CYAN)
+	relay_join = UI.button(join_row, "Join Party", func(): RiftRelay.join_room(relay_code.text))
+	relay_room=UI.label(form,"",24,UI.WHITE)
+	relay_room.autowrap_mode=TextServer.AUTOWRAP_OFF
 	relay_deploy = UI.button(form, "Choose Co-op Sector", show_page.bind("Co-op Sectors"), true)
 	relay_copy = UI.button(form, "Copy Room Code", func(): DisplayServer.clipboard_set(RiftRelay.connected_room))
-	relay_leave = UI.button(form, "Leave Room", func(): RiftRelay.leave())
+	UI.button(form,"Find Friends",func(): SocialPanel.open_find_friends(self),false,36)
+	var space:=Control.new()
+	space.size_flags_vertical=Control.SIZE_EXPAND_FILL
+	form.add_child(space)
+	relay_leave = UI.button(form, "Leave Party", func(): RiftRelay.leave())
+	var squad:=card(columns,1.1)
+	relay_members=UI.label(squad,"SQUAD  /  0 OF 4",26,UI.CYAN)
+	relay_members.autowrap_mode=TextServer.AUTOWRAP_OFF
+	UI.label(squad,"The party leader selects the sector. Everyone keeps their own operator.",16,UI.MUTED)
+	relay_roster=scroll_entries(squad)
+	relay_roster_key=""
 	refresh_online_room()
 	if relay_rejoin.visible:
 		relay_rejoin.grab_focus()
@@ -919,6 +942,8 @@ func refresh_online_room() -> void:
 		return
 	var joined := not RiftRelay.connected_room.is_empty()
 	var requesting := not RiftRelay.pending.is_empty()
+	relay_host.visible=not joined and not requesting
+	relay_join_form.visible=not joined
 	relay_host.disabled = not RiftRelay.available or joined or requesting
 	relay_join.disabled = relay_host.disabled
 	relay_rejoin.visible = RiftRelay.can_rejoin_party()
@@ -926,18 +951,55 @@ func refresh_online_room() -> void:
 	relay_code.editable = not joined and not requesting
 	relay_deploy.visible = RiftRelay.can_deploy()
 	relay_copy.visible = joined
+	relay_room.visible=joined
+	relay_room.text="ROOM CODE  /  "+RiftRelay.connected_room
 	relay_leave.visible = joined or requesting
-	relay_leave.text = "Leave Room" if joined else "Cancel Connection"
-	relay_status.text = "%s   /   Code %s" % [RiftRelay.status, RiftRelay.connected_room] if joined else RiftRelay.status
-	if relay_deploy.visible:
-		relay_deploy.grab_focus()
-	elif joined:
-		relay_copy.grab_focus()
-	elif requesting or get_viewport().gui_get_focus_owner() == relay_leave:
-		if requesting:
-			relay_leave.grab_focus()
-		else:
-			relay_host.grab_focus()
+	relay_leave.text = "Leave Party" if joined else "Cancel Connection"
+	relay_status.text = RiftRelay.status
+	refresh_party_members()
+	var focused:=get_viewport().gui_get_focus_owner()
+	# Presence updates must not pull focus away while a user types a room code.
+	if focused and focused.is_visible_in_tree() and (not focused is BaseButton or not focused.disabled): return
+	if relay_deploy.visible: relay_deploy.grab_focus()
+	elif joined: relay_copy.grab_focus()
+	elif requesting: relay_leave.grab_focus()
+	elif relay_rejoin.visible: relay_rejoin.grab_focus()
+	elif not relay_host.disabled: relay_host.grab_focus()
+
+func refresh_party_members() -> void:
+	var members: Array=[]
+	if not RiftRelay.connected_room.is_empty() and is_instance_valid(RiftRelay.relay):
+		var local_id: int=RiftRelay.relay.get_client_id()
+		var leader: int=RiftRelay.relay.get_host()
+		for id in RiftRelay.relay.lobby_get_all_clients():
+			var username:=RiftRelay.local_name if id==local_id else String(RiftRelay.relay.player_get_data(id,"operator_name","Connecting…"))
+			members.append({"name":Profile.clean_operator_name(username),"leader":id==leader,"local":id==local_id})
+		members.sort_custom(func(a,b): return a.leader and not b.leader)
+	var key:=str(members)
+	if key==relay_roster_key: return
+	relay_roster_key=key
+	relay_members.text="SQUAD  /  %d OF 4"%members.size()
+	for child in relay_roster.get_children():
+		relay_roster.remove_child(child)
+		child.queue_free()
+	for index in 4:
+		var occupied:=index<members.size()
+		var plate:=UI.equipment_card(UI.PARTY_COLORS[index] if occupied else UI.MUTED.darkened(.5))
+		relay_roster.add_child(plate)
+		plate.custom_minimum_size.y=62
+		var row:=HBoxContainer.new()
+		row.add_theme_constant_override("separation",12)
+		plate.add_child(row)
+		var slot:=UI.label(row,"%02d"%(index+1),24,UI.PARTY_COLORS[index] if occupied else UI.MUTED)
+		slot.autowrap_mode=TextServer.AUTOWRAP_OFF
+		var copy:=UI.column(row,1)
+		copy.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+		var username:=UI.label(copy,members[index].name if occupied else "Open slot",21,UI.WHITE if occupied else UI.MUTED)
+		username.autowrap_mode=TextServer.AUTOWRAP_OFF
+		username.text_overrun_behavior=TextServer.OVERRUN_TRIM_ELLIPSIS
+		UI.label(copy,("Party leader" if members[index].leader else "Party member") if occupied else "Invite a friend to join",14,UI.MUTED).autowrap_mode=TextServer.AUTOWRAP_OFF
+		if occupied and members[index].local:
+			UI.label(row,"YOU",14,UI.CYAN).autowrap_mode=TextServer.AUTOWRAP_OFF
 
 func open_slot_picker(mode: String) -> void:
 	slot_error = ""
@@ -1321,7 +1383,7 @@ func build_challenges(columns: HBoxContainer) -> void:
 	var group := ButtonGroup.new()
 	for number in range(1, available + 1):
 		var label := "%02d   %s" % [number, Catalog.info(number).title]
-		var option := UI.button(list, label, select_challenge_sector.bind(number, details))
+		var option := UI.button(list, label, select_challenge_sector.bind(number, details, group))
 		option.custom_minimum_size.x = 205
 		option.toggle_mode = true
 		option.button_group = group
@@ -1329,13 +1391,13 @@ func build_challenges(columns: HBoxContainer) -> void:
 		if number == challenge_sector:
 			option.grab_focus()
 	var displayed_day := [Profile.challenge_day()]
-	select_challenge_sector(challenge_sector, details)
+	select_challenge_sector(challenge_sector, details, group)
 	var refresh := func():
 		var clock := Time.get_datetime_dict_from_system()
 		var today := Profile.challenge_day(clock)
 		if today > displayed_day[0]:
 			displayed_day[0] = today
-			select_challenge_sector(challenge_sector, details)
+			select_challenge_sector(challenge_sector, details, group)
 		var left: int = Profile.challenge_seconds_left(clock)
 		countdown.text = "Challenges Reset IN: %02dh %02dm %02ds" % [left / 3600, (left / 60) % 60, left % 60]
 	var heartbeat := Timer.new()
@@ -1344,32 +1406,53 @@ func build_challenges(columns: HBoxContainer) -> void:
 	heartbeat.start(1.0)
 	refresh.call()
 
-func select_challenge_sector(number: int, details: VBoxContainer) -> void:
+func select_challenge_sector(number: int, details: VBoxContainer, group: ButtonGroup = null) -> void:
 	challenge_sector = number
 	for child in details.get_children():
 		details.remove_child(child)
 		child.queue_free()
 	UI.label(details, Catalog.info(number).title, 30, UI.CYAN)
 	var cycle: Dictionary = profile.challenge_cycle(number)
-	UI.label(details, "%d / 5 cleared  ·  +%d Core Shards for finishing the set" % [cycle.done.size(), Profile.challenge_set_shards(number)], 17, UI.MUTED)
+	UI.label(details, "%d / 5 cleared  ·  %d bonus Core Shards for completing the set" % [cycle.done.size(), Profile.challenge_set_shards(number)], 17, UI.MUTED)
+	var rewards: Dictionary = profile.challenge_rewards(number, cycle)
+	if group:
+		for button in group.get_buttons():
+			button.focus_neighbor_right = NodePath()
+	if rewards.lives > 0 and not group:
+		UI.label(details, "Rewards ready to claim in Challenges at the station.", 18, UI.VIOLET)
+	elif rewards.lives > 0:
+		var life_reward := "%d %s" % [rewards.lives, "Life" if rewards.lives == 1 else "Lives"]
+		UI.label(details, "%d Bolts  ·  %d Core Shards  ·  %s" % [rewards.credits, rewards.shards, life_reward], 18, UI.VIOLET)
+		var status := UI.label(details, "", 16, UI.MUTED)
+		var claim := UI.button(details, "Claim Rewards", func():
+			var error: int = claim_challenge_rewards.call(number) if claim_challenge_rewards.is_valid() else ERR_UNCONFIGURED
+			if error == OK:
+				show_page("Challenges")
+			else:
+				status.text = "Could not claim your rewards. Try again."
+		, true, 36)
+		var sector_button := group.get_pressed_button()
+		if sector_button:
+			claim.focus_neighbor_left = claim.get_path_to(sector_button)
+			sector_button.focus_neighbor_right = sector_button.get_path_to(claim)
 	for tier in 5:
 		var data: Array = Profile.CHALLENGE_SETS[cycle.set][tier]
 		var done: bool = cycle.done.has(tier)
+		var claimed: bool = cycle.claimed.has(tier)
 		details.add_child(HSeparator.new())
 		var line := HBoxContainer.new()
 		details.add_child(line)
 		var title := UI.label(line, data[0], 20)
 		title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		title.autowrap_mode = TextServer.AUTOWRAP_OFF
-		var status := UI.label(line, "COMPLETE" if done else "OPEN", 17, Color("91f7a1") if done else UI.MUTED)
+		var status := UI.label(line, "CLAIMED" if claimed else ("READY TO CLAIM" if done else "OPEN"), 17, Color("91f7a1") if done else UI.MUTED)
 		status.autowrap_mode = TextServer.AUTOWRAP_OFF
 		UI.label(details, data[1], 16, UI.MUTED)
 		var amount := Profile.rotated_challenge_credits(number, tier)
 		var shards: int = Profile.challenge_shards(number, tier)
-		UI.label(details, "%s  %d bolts  ·  %d Core Shards  ·  1 reserve life" % ["Reward claimed" if done else "Reward", amount, shards], 17, Color("ffe28e"))
-	var reserve: int = profile.reserve_lives if profile else 0
+		UI.label(details, "%d Bolts  ·  %d Core Shards  ·  1 Life" % [amount, shards], 17, Color("ffe28e"))
 	details.add_child(HSeparator.new())
-	UI.label(details, "Reserve lives: %d. Used automatically when you lose your last life." % reserve, 16, UI.MUTED)
+	UI.label(details, "Banked bonus lives: %d" % profile.reserve_lives, 16, UI.MUTED)
 
 func purchase_upgrade(id: String) -> void:
 	shop_status = profile.buy(id)

@@ -332,9 +332,17 @@ func apply_guard_snapshot(state: int) -> void:
 	last_guard_state = state
 
 func hit_by_projectile(shot: RiftProjectile) -> bool:
-	if shot.owner_faction != "player" or shot.is_charged or shot.weapon_id == "data_lance" or not guard_active():
+	if shot.owner_faction != "player" or not guard_active():
 		return false
-	if (shot.global_position.x - global_position.x) * direction < 0.08:
+	if shot.direction.x * direction >= 0.0:
+		return false
+	if shot.is_charged:
+		# Keep the plate down long enough for the player to see the break and follow up.
+		shot_windup = 0.0
+		stagger_left = 0.8
+		refresh_defense()
+		return false
+	if shot.weapon_id == "data_lance":
 		return false
 	# A closed front plate blocks basic buster fire. Charged fire, melee,
 	# attacking from behind or shooting while the enemy fires defeat it.
@@ -352,7 +360,7 @@ func take_damage(amount: float, source_position := Vector3.ZERO) -> void:
 		var side := signf(global_position.x - source_position.x)
 		if is_zero_approx(side):
 			side = -direction
-		stagger_left = 0.18
+		stagger_left = maxf(stagger_left, 0.18)
 		recoil = 0.0 if variant == Variant.TURRET or planted_override else side * (3.2 if variant == Variant.HEAVY else 5.0)
 		refresh_defense()
 

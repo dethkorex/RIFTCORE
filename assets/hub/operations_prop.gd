@@ -6,7 +6,7 @@ const Face := preload("res://assets/ui/fonts/BarlowCondensed-ExtraBoldItalic.ttf
 const BRUSHED_FINISH := preload("res://assets/neon_factory/interiors/bulkhead_Brushed gunmetal • roughness.png")
 const IconDirectory := "res://assets/ui/riftcore_kit/"
 
-@export_enum("Terminal", "Deploy", "Window", "Deck", "Banner") var kind := 0:
+@export_enum("Terminal", "Deploy", "Window", "Deck", "Banner", "Service kiosk") var kind := 0:
 	set(value):
 		kind = value
 		refresh()
@@ -70,6 +70,7 @@ func build() -> void:
 		2: window_frame()
 		3: deck()
 		4: banner()
+		5: service_kiosk()
 
 func finish(color: Color, emission: float, metallic: float) -> StandardMaterial3D:
 	var material := StandardMaterial3D.new()
@@ -212,13 +213,40 @@ func deck() -> void:
 	for edge in [-1, 1]:
 		strut(Vector3(edge * 2.09, -0.42, 2.1), Vector3(edge * 1.13, -1.14, 2.1), 0.18, alloy)
 
+func illuminated_housing(model: PackedScene) -> void:
+	var housing := model.instantiate() as Node3D
+	geometry.add_child(housing)
+	var lenses := housing.find_child("LightGuides", true, false) as MeshInstance3D
+	lenses.material_override = lit
+
+func kiosk_symbol(at: Vector3, cell: int, width: float, tilt := 0.0) -> void:
+	var atlas := AtlasTexture.new()
+	atlas.atlas = preload("res://assets/hub/kiosk_symbols.svg")
+	atlas.region = Rect2(cell * 96, 0, 96, 96)
+	var graphic := Sprite3D.new()
+	graphic.texture = atlas
+	graphic.modulate = accent
+	graphic.pixel_size = width / 96.0
+	graphic.position = at
+	graphic.rotation.x = tilt
+	geometry.add_child(graphic)
+
+func service_kiosk() -> void:
+	illuminated_housing(preload("res://assets/hub/station_kiosk.glb"))
+	var cell: int = {"icon_craft": 0, "icon_person": 1, "icon_party": 2, "icon_save": 4,
+			"icon_profile": 5, "icon_leaderboard": 6, "icon_archive": 7}[icon]
+	var title_size := 70
+	var title_width := Face.get_string_size(caption, HORIZONTAL_ALIGNMENT_LEFT, -1, title_size).x * 0.005
+	kiosk_symbol(Vector3(-title_width * 0.5 - 0.07, 2.23, 0.305), cell, 0.43)
+	sign_text(Vector3(0.26, 2.23, 0.305), caption, title_size)
+	kiosk_symbol(Vector3(0, 1.29, 0.375), 3 if cell == 1 else cell,
+			0.94 if cell == 1 else 0.84, -atan(0.27))
+
 func banner() -> void:
-	plate(Vector3.ZERO, Vector3(4.84, 0.96, 0.26), steel, 0.15)
-	plate(Vector3(0, 0.02, 0.16), Vector3(4.54, 0.73, 0.08), dark)
+	illuminated_housing(preload("res://assets/hub/operations_sign.glb"))
 	var mark := Sprite3D.new()
 	mark.texture = preload("res://assets/ui/riftcore-wordmark.svg")
-	mark.pixel_size = 3.32 / mark.texture.get_width()
-	mark.position = Vector3(0, 0.13, 0.22)
+	mark.pixel_size = 3.85 / mark.texture.get_width()
+	mark.position = Vector3(0, 0.142, 0.31)
 	geometry.add_child(mark)
-	sign_text(Vector3(0, -0.24, 0.22), caption, 41)
-	plate(Vector3(0, -0.45, 0.20), Vector3(2.93, 0.045, 0.06), lit, 0.01)
+	sign_text(Vector3(0, -0.33, 0.31), caption, 52)

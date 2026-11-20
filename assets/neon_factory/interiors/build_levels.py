@@ -27,7 +27,7 @@ def make(act):
         ("FactorySky","res://scripts/jungle_backdrop.gd","Script"),
         ("FactoryPanorama","res://assets/neon_factory/foundry/foundry_panorama.jpg","Texture2D"),
         ("Bridge",kit+"powered_bridge.tscn","PackedScene"),("ArenaLift",kit+"warden_lift.tscn","PackedScene"),("Shutter","res://assets/neon_factory/interiors/service_shutter.tscn","PackedScene"),("Relay","res://assets/neon_factory/foundry/power_coupler.tscn","PackedScene"),
-        ("Supply","res://scripts/cargo_carrier.gd","Script"),("Chest",kit+"salvage_chest.glb","PackedScene"),("RelayCode","res://scripts/factory_interior_relay.gd","Script"),
+        ("Supply","res://scripts/cargo_carrier.gd","Script"),("Chest","res://assets/campaign/neon_factory/salvage_cache.glb","PackedScene"),("RelayCode","res://scripts/factory_interior_relay.gd","Script"),
         ("ChestCode","res://scripts/factory_salvage_chest.gd","Script"),("Hazard","res://scripts/foundry_vent.gd","Script"),("Boulder","res://scripts/foundry_boulder.gd","Script"),
         ("Pit","res://scripts/spike_pit.gd","Script"),
         ("player","res://scenes/actors/riftcore_player.tscn","PackedScene"),

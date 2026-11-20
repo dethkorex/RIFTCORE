@@ -2,7 +2,8 @@ extends StaticBody3D
 
 signal released
 
-const READY_TINT := Color("65e9ff")
+const VALVE_BODY := preload("res://assets/neon_factory/foundry/purge_valve_body.tscn")
+const READY_TINT := Color("2ccce3")
 var show_prompt := false
 var prompt: Label3D
 var ready_to_shoot := false
@@ -23,14 +24,17 @@ func _ready() -> void:
 	var panel := Node3D.new()
 	panel.position.z = -1.15
 	add_child(panel)
-	var frame := BoxMesh.new()
-	RiftProjectile.part(panel, frame, steel, Vector3(-.06, -.45, -.27), Vector3(.65, 1.65, .36))
+	if show_prompt:
+		panel.add_child(VALVE_BODY.instantiate())
+	else:
+		RiftProjectile.part(panel, BoxMesh.new(), steel, Vector3(-.06, -.45, -.27), Vector3(.65, 1.65, .36))
 	var ring := TorusMesh.new()
 	ring.inner_radius = .24
 	ring.outer_radius = .37
-	wheel = RiftProjectile.part(panel, ring, steel, Vector3.ZERO, Vector3.ONE)
+	var hub_z := 0.25 if show_prompt else 0.0
+	wheel = RiftProjectile.part(panel, ring, steel, Vector3(0, 0, hub_z), Vector3.ONE)
 	wheel.rotation.x = PI * .5
-	lamp = RiftProjectile.part(panel, RiftProjectile.cached_mesh("Orb"), steel, Vector3(0, 0, .16), Vector3.ONE * .26)
+	lamp = RiftProjectile.part(panel, RiftProjectile.cached_mesh("Orb"), steel, Vector3(0, 0, hub_z + .16), Vector3.ONE * (.105 if show_prompt else .22))
 
 	if show_prompt:
 		prompt = Label3D.new()
@@ -44,6 +48,7 @@ func _ready() -> void:
 		prompt.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 		prompt.position = Vector3(0, 0.88, 0.13)
 		panel.add_child(prompt)
+	show_target(false)
 
 func present_vent(enabled: bool, authority: bool) -> void:
 	if enabled == ready_to_shoot:
@@ -53,7 +58,7 @@ func present_vent(enabled: bool, authority: bool) -> void:
 	show_target(enabled)
 
 func show_target(enabled: bool) -> void:
-	var paint := RiftProjectile.light_paint(READY_TINT if enabled else Color("483845"), 1.60 if enabled else .08)
+	var paint := RiftProjectile.light_paint(READY_TINT if enabled else Color("967550"), 0.85 if enabled else .08)
 	if prompt:
 		prompt.text = "▼  SHOOT VALVE" if enabled else "PURGE VALVE"
 		prompt.modulate = Color("b6f9ff") if enabled else Color("a1b5c4")

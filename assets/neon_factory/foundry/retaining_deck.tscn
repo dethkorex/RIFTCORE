@@ -1,0 +1,80 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://assets/campaign/neon_factory/surfaces/deck.tscn" id="Tread"]
+[ext_resource type="Texture2D" path="res://assets/campaign/neon_factory/surfaces/sector_wall.jpg" id="PlateTexture"]
+
+[sub_resource type="StandardMaterial3D" id="Recess"]
+albedo_texture = ExtResource("PlateTexture")
+albedo_color = Color(0.52, 0.48, 0.45, 1)
+metallic = 0.38
+roughness = 0.76
+uv1_triplanar = true
+uv1_world_triplanar = true
+uv1_scale = Vector3(0.22, 0.22, 0.22)
+
+[sub_resource type="StandardMaterial3D" id="Girder"]
+albedo_texture = ExtResource("PlateTexture")
+albedo_color = Color(0.55, 0.37, 0.25, 1)
+metallic = 0.54
+roughness = 0.58
+uv1_triplanar = true
+uv1_world_triplanar = true
+uv1_scale = Vector3(0.36, 0.36, 0.36)
+
+[sub_resource type="BoxMesh" id="Face"]
+size = Vector3(5.98, 19.25, 4.08)
+material = SubResource("Recess")
+
+[sub_resource type="BoxMesh" id="Rib"]
+size = Vector3(0.25, 19.2, 0.18)
+material = SubResource("Girder")
+
+[sub_resource type="BoxMesh" id="Collar"]
+size = Vector3(5.97, 0.15, 0.22)
+material = SubResource("Girder")
+
+[sub_resource type="BoxShape3D" id="Foundation"]
+size = Vector3(6, 20, 4.08)
+
+[sub_resource type="BoxShape3D" id="Lip"]
+size = Vector3(6, 0.84, 4.8)
+
+[node name="RetainingDeck" type="StaticBody3D" groups=["no_wall_kick"]]
+
+[node name="Tread" parent="." instance=ExtResource("Tread")]
+
+[node name="Foundation" type="MeshInstance3D" parent="."]
+position = Vector3(0, -10.35, 0)
+mesh = SubResource("Face")
+
+[node name="WestStiffener" type="MeshInstance3D" parent="."]
+position = Vector3(-2.69, -10.35, 2.07)
+mesh = SubResource("Rib")
+
+[node name="EastStiffener" type="MeshInstance3D" parent="."]
+position = Vector3(2.69, -10.35, 2.07)
+mesh = SubResource("Rib")
+
+[node name="PlateJoint0" type="MeshInstance3D" parent="."]
+position = Vector3(0, -1.45, 2.095)
+mesh = SubResource("Collar")
+
+[node name="PlateJoint1" type="MeshInstance3D" parent="."]
+position = Vector3(0, -7.45, 2.095)
+mesh = SubResource("Collar")
+
+[node name="PlateJoint2" type="MeshInstance3D" parent="."]
+position = Vector3(0, -13.45, 2.095)
+mesh = SubResource("Collar")
+
+[node name="PlateJoint3" type="MeshInstance3D" parent="."]
+position = Vector3(0, -19.45, 2.095)
+mesh = SubResource("Collar")
+
+[node name="LipCollider" type="CollisionShape3D" parent="."]
+position = Vector3(0, -0.42, 0)
+shape = SubResource("Lip")
+
+[node name="FoundationCollider" type="CollisionShape3D" parent="."]
+position = Vector3(0, -10, 0)
+shape = SubResource("Foundation")

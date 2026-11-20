@@ -18,7 +18,7 @@ def main():
     parser.add_argument("--windows", type=Path, required=True)
     parser.add_argument("--linux", type=Path, required=True)
     parser.add_argument("--platforms", default="windows,linux")
-    parser.add_argument("--suite", choices=("network", "campaign"), default="network")
+    parser.add_argument("--suite", choices=("network", "campaign", "abyssal", "lava"), default="network")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--distro", default="RIFTCORE-QA")
     args = parser.parse_args()

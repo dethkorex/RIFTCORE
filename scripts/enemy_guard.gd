@@ -1,10 +1,11 @@
-extends Node3D
+extends Area3D
 
 const FIELD_SHADER := preload("res://assets/enemies/guard_field.gdshader")
 const CHAMFER := preload("res://scripts/factory_chamfer.gd")
 const HIT_SECONDS := 0.25
 const SPAN := Vector2(1.53, 1.69)
 static var field_mesh: ArrayMesh
+static var field_hull: ConvexPolygonShape3D
 static var metal: StandardMaterial3D
 static var contact_pin: StandardMaterial3D
 var field: ShaderMaterial
@@ -14,13 +15,26 @@ var hit_remaining := 0.0
 
 func install(hull: BoxShape3D) -> void:
 	name = "FrontGuard"
+	add_to_group(&"enemy_guard_field")
+	collision_layer = 16
+	collision_mask = 0
+	monitoring = false
 	reach = hull.size.x * 0.5 + 0.17
 	scale = Vector3(hull.size.z / 1.18, hull.size.y / 1.36, 1.0)
 	if field_mesh == null:
 		field_mesh = make_field()
+		var vertices := PackedVector3Array()
+		for point in field_mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]:
+			vertices.append(point + Vector3.BACK * 0.035)
+			vertices.append(point + Vector3.FORWARD * 0.035)
+		field_hull = ConvexPolygonShape3D.new()
+		field_hull.points = vertices
 		metal = RiftProjectile.light_paint(Color("343047"), 0.03)
 		contact_pin = RiftProjectile.light_paint(Color("b883fa"), 1.25)
 
+	var collider := CollisionShape3D.new()
+	collider.shape = field_hull
+	add_child(collider)
 	field = ShaderMaterial.new()
 	field.shader = FIELD_SHADER
 	var mesh := MeshInstance3D.new()
@@ -42,6 +56,7 @@ func update_pose(facing: float, guarding: bool) -> void:
 		rotation.y = side * 1.04
 	if visible != guarding:
 		visible = guarding
+		set_deferred("monitorable", guarding)
 
 func flash_at(at: Vector3) -> void:
 	var local := to_local(at)

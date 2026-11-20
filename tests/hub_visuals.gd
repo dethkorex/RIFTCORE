@@ -52,10 +52,28 @@ func run() -> void:
 		check(is_instance_valid(ring) and ring.mesh is TorusMesh and ring.is_visible_in_tree()
 			and pad.beam.visible == occupied and pad.pulse.visible == occupied,
 			"%s has a visible standing ring and the correct occupancy effects" % hub.STATIONS[index].name)
-	check(hub.get_node("OperationsBanner/Geometry").get_child_count() > 4, "Modular signage builds")
+	var sign_model = hub.get_node("OperationsBanner/Geometry").find_child("Chassis", true, false)
+	check(is_instance_valid(sign_model), "The wall sign uses its modeled housing")
+	for station in hub.STATIONS:
+		if station.prop != "service_kiosk":
+			continue
+		var kiosk: Node3D
+		for child in hub.get_children():
+			if child.scene_file_path == "res://assets/hub/service_kiosk.tscn" and is_equal_approx(child.position.x, station.x):
+				kiosk = child
+				break
+		check(is_instance_valid(kiosk) and kiosk.caption == station.get("caption", station.name.to_upper())
+				and kiosk.icon == station.icon and kiosk.accent == station.color
+				and is_instance_valid(kiosk.find_child("LightGuides", true, false)),
+				"%s shows its modeled kiosk, symbol and station color" % station.name)
 	if DisplayServer.get_name() != "headless" and not OS.get_cmdline_user_args().is_empty():
 		await RenderingServer.frame_post_draw
 		root.get_texture().get_image().save_png(OS.get_cmdline_user_args()[0])
+	hub.activate_station()
+	await frames(2)
+	check(menu.page == "Sector select" and hub.panel_open, "Deploy opens sector selection")
+	menu.leave_page()
+	await frames(2)
 	Input.action_press("move_right")
 	for index in 70:
 		await frames(1)
@@ -104,4 +122,15 @@ func run() -> void:
 	menu.leave_page()
 	await open_station(hub, 9.0)
 	check(menu.page == "Social" and is_instance_valid(control(menu, "Notifications")), "Social groups friends and notifications")
+	menu.leave_page()
+	await open_station(hub, 13.5)
+	check(menu.page == "Challenges", "Challenges opens from the trophy kiosk")
+	menu.leave_page()
+	await open_station(hub, 18.0)
+	check(menu.page == "Collection", "NOVA Archive opens the collection")
+	menu.leave_page()
+	game.queue_free()
+	for voice in root.get_node("RiftAudio").find_children("*", "AudioStreamPlayer", true, false):
+		voice.stop()
+	await create_timer(0.4).timeout
 	quit(failures)

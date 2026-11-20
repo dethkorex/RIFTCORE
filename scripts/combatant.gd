@@ -1,6 +1,9 @@
 class_name Combatant
 extends CharacterBody3D
 
+# Boss art is mounted with its nose on local +Z. Combat takes place on world X.
+const BOSS_SIDE_YAW := PI * 0.5
+
 signal health_changed(current: float, maximum: float)
 signal died
 

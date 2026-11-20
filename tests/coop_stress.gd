@@ -37,7 +37,8 @@ func barrier(name: String, timeout := 30.0) -> bool:
 	peer.lobby_set_data("stress_"+str(client),phase)
 	var ready := await until(func():
 		for index in count:
-			if int(peer.lobby_get_data("stress_"+str(index),0))<phase: return false
+			var reached = peer.lobby_get_data("stress_"+str(index),0)
+			if not (reached is int or reached is float) or reached < phase: return false
 		return true
 	,timeout)
 	check(ready,"barrier "+name)
@@ -55,6 +56,13 @@ func run() -> void:
 	game.checkpoint_path="user://stress-operator.cfg"
 	root.add_child(game)
 	current_scene=game
+	# Physical controllers connected to the QA machine must not overwrite the
+	# synthetic held actions of background clients. This changes this test's
+	# in-memory InputMap only; player bindings/settings files are untouched.
+	for action in InputMap.get_actions():
+		for event in InputMap.action_get_events(action):
+			if event is InputEventJoypadMotion or event is InputEventJoypadButton:
+				InputMap.action_erase_event(action,event)
 	lobby=root.get_node("RiftRelay")
 	game.profile.operator_name="Stress %d"%client
 	game.profile.unlocked_sector=10
@@ -88,7 +96,7 @@ func run() -> void:
 	if failures>0:
 		quit(1)
 		return
-	for sector in ([1,2,3] if suite=="network" else range(1,11)):
+	for sector in ([1] if suite=="lava" else ([4] if suite=="abyssal" else ([1,2,3] if suite=="network" else range(1,11)))):
 		if not await barrier("deploy-%d"%sector): break
 		game.menu.leave_page()
 		if host: lobby.deploy(sector)
@@ -110,6 +118,11 @@ func run() -> void:
 				check(false,"act %d loaded"%act)
 				break
 			if not await barrier("sector-%d-act-%d"%[sector,act]): break
+			if sector==4 and act==2 and suite=="abyssal":
+				await swim_cases()
+				await pressure_cases()
+			if sector==1 and act==2 and suite=="lava":
+				await lava_cases()
 			if sector==3 and act==2:
 				if host:
 					var course=mission.stage.get_node("TERRAIN/RocketCourse")
@@ -148,6 +161,34 @@ func capture_chat() -> void:
 	for message in lobby.party_messages:
 		if String(message.body).begins_with("STRESS-"):
 			seen[message.body]=true
+
+func lava_cases() -> void:
+	var lava=mission.lava_escape
+	check(is_instance_valid(lava),"native co-op rising lava is installed")
+	if host:
+		for actor in mission.operators:
+			actor.global_position=mission.respawn_point()
+			actor.velocity=Vector3.ZERO
+			mission.mark_position_reset(actor)
+		mission.broadcast_state(true)
+	await barrier("lava-ready")
+	for victim in count:
+		var actor=mission.operators[victim]
+		var starting_lives=actor.lives
+		await barrier("lava-contact-%d"%victim)
+		if host:
+			actor.invulnerable_time=1000
+			actor.velocity=Vector3.ZERO
+			actor.global_position=lava.to_global(Vector3(12,4+actor.standing_capsule.height*.5,0))
+			lava.surface=5
+			lava.phase=lava.Phase.RISING
+			mission.mark_position_reset(actor)
+			mission.broadcast_state(true)
+		check(await until(func(): return actor.lives==starting_lives-1,8),"rising lava deducts one life for player %d on every client"%victim)
+		check(await until(func(): return actor.health>0 and actor.lives==starting_lives-1 and not actor.has_meta("coop_down"),8),"player %d respawns alive at the squad checkpoint"%victim)
+		check(actor.global_position.distance_to(mission.respawn_point())<2,"lava respawn location stays synchronized for player %d"%victim)
+		await barrier("lava-respawned-%d"%victim)
+	check(not lobby.connected_room.is_empty() and lobby.room_size==count,"lava deaths preserve the co-op party")
 
 func build_arena() -> void:
 	var terrain=mission.stage.get_node("TERRAIN")
@@ -298,6 +339,7 @@ func clear_boss(sector: int, act: int) -> void:
 		actor.velocity=Vector3.ZERO
 		mission.mark_position_reset(actor)
 	mission.check_campaign_progress()
+
 	check(await until(func(): return mission.arena_door.passable,4),"boss door opens for whole party")
 	for i in count:
 		mission.operators[i].global_position=mission.gate.global_position+Vector3(4+i*.5,.95,0)
@@ -315,3 +357,114 @@ func clear_boss(sector: int, act: int) -> void:
 	if act==2: await until(func(): return not mission.suit_reveal_playing,25)
 	mission.operators[0].global_position=mission.exit_marker.global_position
 	mission.check_campaign_progress()
+
+
+func pressure_cases() -> void:
+	var pressure=mission.stage.get_node("TERRAIN/PressureBreach")
+	link.latency_ms=70
+	link.jitter_ms=65
+	link.loss_percent=10
+	if host:
+		for i in count:
+			var actor=mission.operators[i]
+			actor.invulnerable_time=1000
+			actor.global_position=pressure.valves[i%3].at+Vector3(0,.86,0)
+			actor.velocity=Vector3.ZERO
+			mission.mark_position_reset(actor)
+		pressure.started=true
+		pressure.elapsed=0
+		mission.broadcast_state(true)
+	await barrier("pressure-valves-ready")
+	Input.action_press("field_interact")
+	await create_timer(3.2).timeout
+	Input.action_release("field_interact")
+	var first_flags:=3 if count==2 else 7
+	check(await until(func():return pressure.active_valves==first_flags,5),"cross-platform held valves replicate under jitter and loss")
+	await barrier("pressure-first-valves")
+	if host and pressure.active_valves!=7:
+		mission.operators[0].global_position=pressure.valves[2].at+Vector3(0,.86,0)
+		mission.operators[0].velocity=Vector3.ZERO
+		mission.mark_position_reset(mission.operators[0])
+		Input.action_press("field_interact")
+		await create_timer(2.5).timeout
+		Input.action_release("field_interact")
+	check(await until(func():return pressure.active_valves==7,6),"whole squad sees all three pressure valves")
+	check(await until(func():return pressure.redirects[0].jet.direction==Vector3.RIGHT,3),"valve current redirection matches on every client")
+	check(not pressure.completed,"co-op valves respect the ninety-second pressure cycle")
+	await barrier("pressure-cycle")
+	if host:
+		pressure.elapsed=89.9
+		mission.broadcast_state(true)
+	check(await until(func():return pressure.completed,6),"shared lock opens on Windows and Linux")
+	check(await until(func():return pressure.locks[0].body.get_child(0).disabled,4),"shared lock collider clears for every party member")
+	await barrier("pressure-complete")
+	# Application packet interruption, without disconnecting the real account.
+	await barrier("pressure-rejoin-ready")
+	if not host:
+		link.blacked_out_until=Time.get_ticks_msec()+600
+		await create_timer(1.2).timeout
+	check(pressure.completed and pressure.active_valves==7,"completed pressure lock survives packet interruption")
+	link.latency_ms=0
+	link.jitter_ms=0
+	link.loss_percent=0
+	await barrier("pressure-recovered")
+	for target in [1,0]:
+		await barrier("pressure-disconnect-%d"%target)
+		var local=mission.operators[slot]
+		var before:=[local.experience,local.lives,local.health]
+		if slot==target: peer._connection_controller.reset_multiplayer(true)
+		check(await until(func():return lobby.recovery.active(),10),"pressure run enters recovery after real disconnection")
+		if slot==target: lobby.rejoin_party()
+		check(await until(func():return not lobby.recovery.active() and lobby.room_size==count,45),"pressure run resumes after slot %d rejoins"%target)
+		await create_timer(1.0).timeout
+		check(pressure.completed and pressure.active_valves==7,"real rejoin retains all valves and the open pressure lock")
+		check(local.experience==before[0] and local.lives==before[1] and is_equal_approx(local.health,before[2]),"pressure rejoin preserves operator progress")
+		await barrier("pressure-disconnect-%d-done"%target)
+
+func swim_cases() -> void:
+	link.latency_ms=70
+	link.jitter_ms=65
+	link.loss_percent=10
+	if host:
+		for i in count:
+			var actor=mission.operators[i]
+			actor.invulnerable_time=1000
+			actor.global_position=Vector3(104+i*.1,5.655,0)
+			actor.velocity=Vector3.ZERO
+			mission.mark_position_reset(actor)
+		mission.broadcast_state(true)
+	await barrier("swim-ready")
+	await create_timer(.7).timeout
+	var local=mission.operators[slot]
+	var entered:=false
+	var dived:=false
+	var rose:=false
+	var done:=false
+	var deadline:=Time.get_ticks_msec()+45000
+	var trace_at:=0
+	while Time.get_ticks_msec()<deadline:
+		var at: Vector3=local.global_position
+		if Time.get_ticks_msec()>trace_at:
+			trace_at=Time.get_ticks_msec()+5000
+			print("SWIM TRACE slot=",slot," at=",at," wet=",local.swim_volume()!=null," suspended=",local.controls_suspended," blocked=",mission.local_input_blocked()," flags=",[entered,dived,rose])
+		entered=entered or local.swim_volume()!=null
+		dived=dived or (at.x>126.7 and at.y<-3.4)
+		rose=rose or (at.x>149.8 and at.y>-.7)
+		if at.x>185 and local.grounded():
+			done=true
+			break
+		var target_y: float=-5.4 if at.x<132 else .2
+		var vertical:=clampf((target_y-at.y)*1.5,-1,1)
+		Input.action_press("move_right",1)
+		if vertical<0:
+			Input.action_release("climb_up")
+			Input.action_press("climb_down",-vertical)
+		else:
+			Input.action_release("climb_down")
+			Input.action_press("climb_up",vertical)
+		await create_timer(.04).timeout
+	for action in ["move_right","climb_down","climb_up"]: Input.action_release(action)
+	check(done and entered and dived and rose,"native co-op swims below/above both baffles and exits on dry ground at=%s flags=%s"%[local.global_position,str([entered,dived,rose])])
+	check(local.health>0 and local.swim_volume()==null,"native swimmer retains health and leaves water movement cleanly")
+	await barrier("swim-exited")
+	check(await until(func():return mission.checkpoint_notices>0,6),"swim exit checkpoint notifies the squad")

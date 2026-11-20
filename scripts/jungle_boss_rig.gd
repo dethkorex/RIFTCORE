@@ -44,8 +44,12 @@ func bind_model(model: Node3D, height: float, floor_offset: float, is_sentinel: 
 	model.scale *= fit
 	var center := bounds.get_center()
 	model.position = Vector3(-center.x * fit, -floor_offset - bounds.position.y * fit, -center.z * fit)
-	rotation.y = -1.04
+	rotation.y = -Combatant.BOSS_SIDE_YAW
 	set_process(true)
+
+func face_immediately(direction: float) -> void:
+	intent[0] = direction
+	rotation.y = direction * Combatant.BOSS_SIDE_YAW
 
 func set_combat_pose(facing: float, speed: float, motion: Motion, weight: float) -> void:
 	intent = [facing, speed, motion, weight]
@@ -64,7 +68,7 @@ func _process(delta: float) -> void:
 	var desired_speed := minf(float(intent[1]) / 4.5, 1.0)
 	walking = lerpf(walking, desired_speed, ease)
 	stride_phase = fposmod(stride_phase + (3.0 + desired_speed * 7.4) * delta, TAU)
-	rotation.y = lerp_angle(rotation.y, float(intent[0]) * 1.04, ease)
+	rotation.y = lerpf(rotation.y, float(intent[0]) * Combatant.BOSS_SIDE_YAW, ease)
 	for motion in weights.size():
 		var desired := float(intent[3]) if motion == int(intent[2]) else 0.0
 		weights[motion] = lerpf(weights[motion], desired, ease)

@@ -32,6 +32,7 @@ var active := false
 var facing := -1.0
 var arena_left := -100.0
 var arena_right := 100.0
+var floor_ports := PackedFloat32Array()
 var floor_height := 0.0
 var cooldown := 0.85
 var step := 0
@@ -74,6 +75,15 @@ func _ready() -> void:
 		floor_height = entry.global_position.y
 		arena_left = entry.global_position.x + 2.5
 		arena_right = exit.global_position.x - 2.3
+	var ports := stage.get_node_or_null("TERRAIN/BossFloorPorts")
+	if ports:
+		for port: Node3D in ports.get_children():
+			floor_ports.append(port.global_position.x)
+		floor_ports.sort()
+	if floor_ports.size() < 3:
+		floor_ports.clear()
+		for index in 10:
+			floor_ports.append(lerpf(arena_left, arena_right, (float(index) + 0.5) / 10.0))
 	var locks := stage.get_node_or_null("TERRAIN/TitanQuenchLocks")
 	if not warden and locks:
 		for child in locks.get_children():
@@ -86,7 +96,7 @@ func _ready() -> void:
 	exposed_light.position = Vector3(0, 0.18 if warden else 1.12, 0.88)
 	exposed_light.hide()
 	add_child(exposed_light)
-	armor.rotation.y = facing * 1.10
+	armor.rotation.y = facing * BOSS_SIDE_YAW
 	collision_mask = 1
 	for catwalk in get_tree().get_nodes_in_group(&"factory_one_way"):
 		if stage.is_ancestor_of(catwalk):
@@ -202,17 +212,20 @@ func begin_attack(kind: String, elevated: RiftPlayer = null) -> void:
 				var platform_y := elevated.global_position.y - elevated.standing_capsule.height * 0.5
 				add_flame(elevated.global_position.x, 2.22, 2.30, 0.95, platform_y + 0.025)
 		"kiln_backdraft":
-			var goal := clampf(target.global_position.x, arena_left + 4.4, arena_right - 4.4)
-			for offset in [-4.3, 0.0, 4.3]:
-				add_flame(goal + offset, 2.38, 3.35, backdraft_warning())
+			var nearest := 1
+			for index in range(2, floor_ports.size() - 1):
+				if absf(floor_ports[index] - target.global_position.x) < absf(floor_ports[nearest] - target.global_position.x):
+					nearest = index
+			for index in range(nearest - 1, nearest + 2):
+				add_flame(floor_ports[index], 2.38, 2.45, backdraft_warning())
 			present_purge_valves(true, true)
 		"casting_wave":
-			var split := (arena_left + arena_right) * 0.5
-			var toward_east := target.global_position.x >= split
-			var edge := arena_right if toward_east else arena_left
-			for index in 5:
-				var part := (float(index) + 0.5) / 5.0
-				add_flame(lerpf(split, edge, part), 1.62, absf(edge-split) / 5.0, 1.65 + index * 0.08)
+			var middle := floori(floor_ports.size() * 0.5)
+			var east := target.global_position.x >= (floor_ports[middle - 1] + floor_ports[middle]) * 0.5
+			var count := floor_ports.size() - middle if east else middle
+			for index in count:
+				var port := middle + index if east else middle - 1 - index
+				add_flame(floor_ports[port], 1.70, 3.15, 1.10 + index * 0.20)
 		"firewall":
 			var goal := target.global_position.x
 			for span in [-2.85, 0.0, 2.85]:
@@ -515,7 +528,7 @@ func draw_pose(delta: float) -> void:
 			lean = -0.12 * windup
 			rise = -0.14 * windup
 	var front_pull := sin(stride) * 0.23 * clampf(absf(move_phase) * 0.50, 0.0, 1.0)
-	armor.rotation.y = lerp_angle(armor.rotation.y, facing * 1.13, mix_weight)
+	armor.rotation.y = lerpf(armor.rotation.y, facing * BOSS_SIDE_YAW, mix_weight)
 	armor.rotation.x = lerpf(armor.rotation.x, lean, mix_weight)
 	armor.position.y = lerpf(armor.position.y, rise + absf(front_pull) * 0.195, mix_weight)
 	armor.animate(delta, front_pull, windup, hammer, recoil, exposed)

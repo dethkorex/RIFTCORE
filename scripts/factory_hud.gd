@@ -34,7 +34,6 @@ var act := 1
 var coop := false
 var coop_objective: Control
 var coop_party: Control
-var reserve_lives := 0
 var reached_exit := false
 var weapon := "STANDARD FRAME"
 var suit_tint := Color("55e7ff")
@@ -372,8 +371,6 @@ func _draw() -> void:
 	caption(counters + Vector2(47, 55), "%04d CORE SHARDS" % core_shards, 17)
 	plate(Rect2(counters + Vector2(0, 71), Vector2(222, 33)), 9)
 	var life_text := "RX   LIVES   %02d" % lives
-	if reserve_lives > 0:
-		life_text += "  +%d" % reserve_lives
 	caption(counters + Vector2(15, 94), life_text, 17)
 	plate(Rect2(counters + Vector2(0, 111), Vector2(222, 33)), 9)
 	var time_text := "%02d:%02d.%d" % [run_tenths / 600, run_tenths / 10 % 60, run_tenths % 10]

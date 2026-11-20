@@ -6,14 +6,14 @@ const STATIONS := ["TERRAIN/MidpointCheckpoint", "TERRAIN/ForgeHallCheckpoint"]
 
 var active: int
 var terminals: Array[Node3D] = []
+var return_points: Dictionary[int, Vector3] = {}
+var landmarks: Array[String] = []
 var prompts: Array[Label3D] = []
 var door_prompt: Label3D
 var lit: StandardMaterial3D
-var service_return := true
 
-func install(stage: Node3D, tint: Color, allow_service_return := true) -> void:
+func install(stage: Node3D, tint: Color) -> void:
 	name = "GateRelays"
-	service_return = allow_service_return
 	stage.add_child(self)
 	lit = RiftProjectile.light_paint(Color("68ffb3"), 1.45)
 	for index in STATIONS.size():
@@ -21,11 +21,16 @@ func install(stage: Node3D, tint: Color, allow_service_return := true) -> void:
 		var station := stage.get_node(STATIONS[index]) as Node3D
 		var position_marker := stage.get_node_or_null("MARKERS/GateRelay" + str(index + 1)) as Marker3D
 		var ground := position_marker if position_marker else station
+		landmarks.append(str(ground.get_meta("landmark", "")))
 		add_child(terminal)
 		terminal.global_position = ground.global_position
+		var approach := stage.get_node_or_null("MARKERS/RelayApproach" + str(index + 1)) as Marker3D
+		if approach:
+			return_points[index] = approach.global_position
 		var socket := terminal.get_node("Signal") as MeshInstance3D
 		socket.material_override = RiftProjectile.light_paint(tint, 1.25)
 		var title := make_label(terminal, Vector3(0, 2.26, -0.5), 0.0054)
+		title.visibility_range_end = float(ground.get_meta("label_distance", 0.0))
 		title.text = "GATE RELAY " + ("A" if index == 0 else "B")
 		title.show()
 		var prompt := make_label(terminal, Vector3(0, 1.97, -0.49), 0.0047)
@@ -88,10 +93,14 @@ func update_prompt(operator: RiftPlayer, at_gate: bool) -> void:
 			prompt.text = "%s  ·  ACTIVATE" % interact
 	door_prompt.visible = at_gate and not complete()
 	if door_prompt.visible:
-		var missing := "FIND BOTH RELAYS" if count() == 0 else ("FIND RELAY B" if active == 1 else "FIND RELAY A")
-		if service_return:
+		var index := 0 if (active & 1) == 0 else 1
+		var relay := "A" if index == 0 else "B"
+		var missing := "FIND RELAY " + relay
+		if not landmarks[index].is_empty():
+			missing += "  ·  " + landmarks[index].to_upper()
+		if return_points.has(index):
 			interact = interact if not interact.is_empty() else interaction_binding()
-			missing = "%s  ·  RETURN TO MISSING RELAY" % interact
+			missing += "\n%s  ·  RETURN TO APPROACH" % interact
 		door_prompt.text = "DOOR LOCKED  ·  GATE RELAYS %d/2\n%s" % [count(), missing]
 
 func interaction_binding() -> String:
@@ -107,10 +116,10 @@ func interact(operator: RiftPlayer, at_gate: bool) -> bool:
 			set_active(active | bit)
 			RiftAudio.play_effect(&"checkpoint")
 			return true
-	if at_gate and service_return:
-		var missing := 0 if (active & 1) == 0 else 1
+	var missing := 0 if (active & 1) == 0 else 1
+	if at_gate and return_points.has(missing):
 		operator.cancel_charge()
-		operator.velocity = Vector3.ZERO
-		operator.global_position = terminals[missing].global_position + Vector3.UP * (operator.standing_capsule.height * 0.5 + 0.08)
+		var arrival := return_points[missing] + Vector3.UP * (operator.standing_capsule.height * 0.5 + 0.08)
+		operator.reset_predicted_position(arrival, Vector3.ZERO, operator.facing)
 		return true
 	return false

@@ -9,6 +9,7 @@ const OperatorPanel := preload("res://scripts/pause_operator_panel.gd")
 
 var in_mission := false
 var operator: Callable
+var life_total: Callable
 var quick_edited: Callable
 var profile
 var menu: Control
@@ -54,6 +55,7 @@ func _ready() -> void:
 	if in_mission:
 		var operator_panel := OperatorPanel.new()
 		operator_panel.operator = operator
+		operator_panel.life_total = life_total
 		operator_panel.profile = profile
 		operator_panel.quick_edited = quick_edited
 		layout.add_child(operator_panel)

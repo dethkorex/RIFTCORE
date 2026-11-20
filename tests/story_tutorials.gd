@@ -43,6 +43,16 @@ func run() -> void:
 	check(settings.claim_story_beat("arena_hint_1_1") and not settings.claim_story_beat("arena_hint_1_1"),
 		"The first-visit arena hint only shows once")
 
+	settings.seen_story_beats.append("campaign_story_v2_1_1")
+	var revised: Array = settings.deployment_dialogue(rebuilt.profile, 1, 1)
+	check(revised.size() == 2 and revised[0][0] == "NOVA" and revised[1][0] == "RX-07",
+		"Returning operators see the rewritten campaign dialogue without repeating a tutorial they already saw")
+	check(settings.deployment_dialogue(rebuilt.profile, 1, 1).is_empty(),
+		"The updated deployment dialogue is remembered after its first showing")
+	var fresh_sector: Array = settings.deployment_dialogue(rebuilt.profile, 2, 2)
+	check(fresh_sector.size() == 3 and fresh_sector[2][0] == Story.GUIDE,
+		"New lessons are tagged for NOVA's tutorial presentation")
+
 	var valid_campaign := true
 	for sector in range(1, 11):
 		for act in [1, 2]:

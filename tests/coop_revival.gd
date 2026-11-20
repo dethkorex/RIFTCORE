@@ -138,6 +138,24 @@ func run() -> void:
 	mission.peer.sender=12
 	mission.receive_checkpoint(1,"TERRAIN/ForgeHallCheckpoint",Vector3(99,99,0))
 	check(mission.checkpoint==shared_at,"guests cannot forge a new squad checkpoint")
+	# Give only the guest a banked life, then run the host's normal death handler.
+	mission.host = true
+	var guest_profile = load("res://scripts/rogue_profile.gd").new()
+	guest_profile.manual_only = true
+	guest_profile.reserve_lives = 1
+	fallen.quick_profile = guest_profile
+	fallen.remove_meta(&"coop_down")
+	fallen.health = fallen.max_health
+	fallen.lives = 1
+	await mission.respawn_operator(fallen)
+	check(fallen.lives == 1 and fallen.health == fallen.max_health and guest_profile.reserve_lives == 0,
+		"A banked guest life keeps that operator eligible for normal co-op respawn")
+	check(rescuer.lives == 3 and mission.reported_reserves_used.get(1) == 1,
+		"Host reports the spend for the affected guest only")
+	mission.local_profile.reserve_lives = 2
+	mission.record_guest_lives_spent(1)
+	mission.record_guest_lives_spent(1)
+	check(mission.local_profile.reserve_lives == 1, "Repeated reserve confirmations charge the guest only once")
 	mission.peer.free()
 	mission.queue_free()
 	await process_frame

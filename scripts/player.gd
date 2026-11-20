@@ -199,6 +199,7 @@ const HEAL_TINT := Color("6fff94")
 const ENERGY_TINT := Color("69c7ff")
 var full_charge_visual := false
 var showcase_projectiles: Node3D
+var suit_showcase_active := false
 var muzzle_skeleton: Skeleton3D
 var muzzle_bone := -1
 var muzzle_offset := Vector3.ZERO
@@ -232,6 +233,10 @@ func _ready() -> void:
 		slide_pose.set("clips", animation_player)
 		slide_pose.influence = 0.0
 		skeleton.add_child(slide_pose)
+		var swim_pose := preload("res://scripts/swim_pose.gd").new()
+		swim_pose.actor=self
+		swim_pose.influence=0.0
+		skeleton.add_child(swim_pose)
 		var board_pose := preload("res://scripts/rocket_board_pose.gd").new()
 		board_pose.actor = self
 		board_pose.influence = 0.0
@@ -455,12 +460,18 @@ func _physics_process(delta: float) -> void:
 
 func simulate_movement(delta: float) -> void:
 	resume_input_guard = maxf(0.0, resume_input_guard - delta)
+	if suit_showcase_active:
+		return
 	if health <= 0.0:
 		cancel_charge()
 		cancel_saber_charge()
 		return
 	if is_instance_valid(rocket_course):
 		rocket_course.simulate(self,delta)
+		return
+	var water:=swim_volume()
+	if water:
+		water.simulate(self,delta)
 		return
 	var terrain := environment_control()
 	if boss_debuff == 8:
@@ -564,6 +575,8 @@ func simulate_movement(delta: float) -> void:
 		if jungle_release_left <= 0.0 and action_released("jump") and not action_held("jump") and velocity.y > 0.0:
 			velocity.y *= 0.45
 	velocity.z = -global_position.z * 18.0
+	for current in get_tree().get_nodes_in_group(&"abyssal_current"):
+		current.apply_to(self,delta)
 	update_one_way_collisions()
 	var was_airborne := not grounded()
 	var incoming_velocity := velocity
@@ -714,6 +727,11 @@ func has_dash_floor(delta: float) -> bool:
 	var hit := get_world_3d().direct_space_state.intersect_ray(ray)
 	return not hit.is_empty() and hit.normal.y > 0.5
 
+func swim_volume() -> Node3D:
+	for water in get_tree().get_nodes_in_group(&"abyssal_water"):
+		if water.contains(global_position): return water
+	return null
+
 func environment_control() -> Vector4:
 	# Ground grip, gravity, lateral flow, and buoyant jump.
 	var result := Vector4(1, 1, 0, 0)
@@ -855,7 +873,7 @@ func update_wall_contact(delta: float, axis: float) -> void:
 		var normal := collision.get_normal()
 		if not barrier or absf(normal.x) < 0.77 or absf(normal.y) > 0.53:
 			continue
-		if barrier.name in ["Blocker", "ExitBarrier"]:
+		if barrier.is_in_group(&"no_wall_kick") or barrier.name in ["Blocker", "ExitBarrier"]:
 			continue
 		var side := -signf(normal.x)
 		if absf(axis) > 0.14 and axis * side < 0.0:
@@ -1292,7 +1310,8 @@ func shoot(charged := false, pose_held := false, suit_shot := false) -> void:
 	var magma := uses_suit and magma_active
 	var thorn := uses_suit and thorn_active
 	var special := special_weapon if uses_suit else ""
-	charged = charged and suit.is_empty()
+	# The reveal previews the suit's charged VFX without changing live controls.
+	charged = charged and (suit.is_empty() or (showcase and uses_suit))
 	fire_lock = fire_interval
 	if uses_suit and not showcase:
 		restore_energy(-suit_shot_cost())
@@ -1315,9 +1334,13 @@ func shoot(charged := false, pose_held := false, suit_shot := false) -> void:
 		muzzle = Vector3(global_position.x + aim * .74, minf(muzzle.y, global_position.y + .09), global_position.z)
 	if not special.is_empty():
 		launch_reward_weapon(muzzle, aim, charged, special)
+	elif magma and charged:
+		for angle in [-.19, 0.0, .19]:
+			launch_buster(muzzle,Vector3(aim*cos(angle),sin(angle),0),true,true,34.0*level_damage_scale(),Color.TRANSPARENT,"magma_breaker")
 	elif thorn:
-		for angle in [-.09, .09]:
-			launch_buster(muzzle, Vector3(aim * cos(angle), sin(angle), 0), false, false, 16.0 * level_damage_scale(), Color("a8ff64"), "thorn_swarm")
+		var spread := [-.16, 0.0, .16] if charged else [-.09, .09]
+		for angle in spread:
+			launch_buster(muzzle, Vector3(aim * cos(angle), sin(angle), 0), charged, false, 16.0 * level_damage_scale(), Color("a8ff64"), "thorn_swarm")
 	else:
 		var power := (34.0 * level_damage_scale()) if magma else (buster_power() * (4.0 if charged else 1.0))
 		launch_buster(muzzle, Vector3(aim, 0, 0), charged, magma, power, Color.TRANSPARENT, "magma_breaker" if magma else "")
@@ -1789,23 +1812,38 @@ func update_character_visuals(axis: float) -> void:
 		play_character_animation("crouch" if low_profile else "idle")
 		return
 	var bracing := wall_sliding and not grounded() and dash_left <= 0.0 and melee_lock <= 0.0
+	var in_water:=swim_volume()!=null
 	if model_root:
 		var visual_facing := signf(velocity.x) if absf(velocity.x) > 0.65 and fire_lock <= 0.0 and melee_lock <= 0.0 else facing
 		if bracing:
 			visual_facing = -wall_side
 		elif is_instance_valid(charge_orb):
 			visual_facing = facing
-		model_root.rotation.y = (PI * 0.5 - 0.22) * combo_facing if melee_lock > 0.0 else PI * 0.5 * visual_facing
-		model_root.rotation.x = lerpf(model_root.rotation.x, 0.0, 0.48)
+		var heading := (PI * 0.5 - 0.22) * combo_facing if melee_lock > 0.0 else PI * 0.5 * visual_facing
+		model_root.rotation.y = lerp_angle(model_root.rotation.y,heading,1.0-exp(-get_process_delta_time()*12.0)) if in_water else heading
+		var pitch:=0.0
+		if in_water and Vector2(velocity.x,velocity.y).length()>.55:
+			pitch=clampf(atan2(absf(velocity.x),velocity.y+.65),.12,PI-.12)
+		elif in_water:
+			pitch=.12
+		var blend:=1.0-exp(-get_process_delta_time()*9.0)
+		model_root.rotation.x=lerpf(model_root.rotation.x,pitch,blend)
+		# Rotate around the torso, rather than swinging the entire mesh off its feet.
+		var pivot:=Vector3(0,standing_capsule.height*.5,0)
+		model_root.position=-(model_root.basis*pivot)
 	var swinging := melee_lock > 0.0
 	if buster_pose:
 		buster_pose.ladder_direction = 0.0
+		buster_pose.water_direction=Vector3.RIGHT*facing if in_water else Vector3.ZERO
 		buster_pose.crouched = low_profile
 		var aiming := not bracing and not swinging and displayed_saber_charge < 0.10 and not (ground_dash and dash_left > 0.0) and (charge_held or is_instance_valid(charge_orb) or fire_lock > 0.0)
 		buster_pose.influence = 0.0 if bracing else move_toward(buster_pose.influence, 1.0 if aiming else 0.0, 0.30)
 	if is_instance_valid(charge_orb):
 		charge_orb.global_position = cannon_muzzle(facing)
 	if swinging:
+		return
+	if in_water:
+		play_character_animation("idle")
 		return
 	if dash_left > 0.0:
 		play_character_animation("slide" if ground_dash else "dash")

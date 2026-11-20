@@ -46,3 +46,7 @@ static func windup_time(base: float, mode: int, minimum: float = 0.42) -> float:
 
 static func boss_pursuit_scale(mode: int, miniboss := false) -> float:
 	return [1.14, 1.24, 1.35][index(mode)] if miniboss else [1.0, 1.09, 1.17][index(mode)]
+
+static func extraction_shards(sector: int, mode: int) -> int:
+	# Early sectors earn two on Normal. Later sectors and higher difficulties pay more.
+	return 2 + (sector - 1) / 4 + index(mode)

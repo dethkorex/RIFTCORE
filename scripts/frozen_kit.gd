@@ -15,6 +15,7 @@ const GATE_TOP := 5.35
 const RACK_HEIGHT := 1.02
 @export var piece: Piece
 @export var width := 5.0
+@export var drop_through := true
 var metal: StandardMaterial3D
 var ceramic: StandardMaterial3D
 var light: StandardMaterial3D
@@ -37,7 +38,8 @@ func _ready() -> void:
 			body.name = "DeckCollider"
 			if piece == Piece.ICE_PLATFORM:
 				body.add_to_group(&"ice_deck")
-			body.add_to_group(&"factory_drop_through")
+			if drop_through:
+				body.add_to_group(&"factory_drop_through")
 			add_child(body)
 			collider(body, Vector3(0,-.30,0), Vector3(width,.60,3.2))
 		Piece.ICICLES:

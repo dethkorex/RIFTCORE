@@ -8,6 +8,7 @@ const EquipmentIcons := preload("res://scripts/equipment_icons.gd")
 const Catalog := preload("res://scripts/sector_catalog.gd")
 
 var operator: Callable
+var life_total: Callable
 var profile
 var progress: Label
 var stat_values: Array[Label] = []
@@ -283,7 +284,8 @@ func refresh() -> void:
 	var level := RiftPlayer.level_for_experience(player.experience)
 	var xp_floor := RiftPlayer.experience_threshold(level)
 	var xp_next := RiftPlayer.experience_threshold(level + 1)
-	progress.text = "LV. %d   ·   XP %d / %d   ·   Lives %d" % [level, player.experience - xp_floor, xp_next - xp_floor, player.lives]
+	var lives: int = life_total.call(player) if life_total.is_valid() else player.lives
+	progress.text = "LV. %d   ·   XP %d / %d   ·   Lives %d" % [level, player.experience - xp_floor, xp_next - xp_floor, lives]
 	var values := [
 		"%.0f / %.0f" % [player.health, player.max_health],
 		"%.0f / %.0f" % [player.energy, player.max_energy],

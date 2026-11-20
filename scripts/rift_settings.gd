@@ -120,6 +120,12 @@ func claim_story_beat(key: String, previously_seen := false) -> bool:
 		push_warning("Could not remember story dialogue (%s)." % error_string(error))
 	return not previously_seen
 
+func deployment_dialogue(profile: RefCounted, sector: int, act: int) -> Array:
+	var story := preload("res://scripts/rift_story.gd")
+	var tell_story := claim_story_beat("campaign_story_v3_%d_%d" % [sector, act])
+	var teach := claim_deployment_briefing(profile, sector, act)
+	return story.deployment(sector, act, tell_story, teach)
+
 func claim_deployment_briefing(profile: RefCounted, sector: int, act: int) -> bool:
 	# Keep legacy slot history, but save this visit even if the player loses the run before saving.
 	var previously_seen: bool = not profile.claim_briefing(sector, act)

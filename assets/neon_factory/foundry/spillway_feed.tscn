@@ -1,0 +1,171 @@
+[gd_scene format=3]
+
+[ext_resource type="Texture2D" path="res://assets/neon_factory/foundry/forged_tread.png" id="Steel"]
+
+[sub_resource type="StandardMaterial3D" id="Gunmetal"]
+albedo_color = Color(0.29, 0.33, 0.36, 1)
+metallic = 0.65
+roughness = 0.48
+albedo_texture = ExtResource("Steel")
+uv1_triplanar = true
+uv1_world_triplanar = true
+uv1_scale = Vector3(0.52,0.52,0.52)
+
+[sub_resource type="StandardMaterial3D" id="Bronze"]
+albedo_color = Color(0.65, 0.39, 0.16, 1)
+metallic = 0.58
+roughness = 0.46
+
+[sub_resource type="StandardMaterial3D" id="Enamel"]
+albedo_color = Color(0.12, 0.4, 0.43, 1)
+metallic = 0.52
+roughness = 0.44
+
+[sub_resource type="CylinderMesh" id="Mesh0"]
+top_radius = 0.128
+bottom_radius = 0.128
+height = 1.35
+radial_segments = 24
+rings = 1
+material = SubResource("Enamel")
+
+[sub_resource type="CylinderMesh" id="Mesh1"]
+top_radius = 0.165
+bottom_radius = 0.165
+height = 0.09
+radial_segments = 24
+rings = 1
+material = SubResource("Bronze")
+
+[sub_resource type="BoxMesh" id="Mesh2"]
+size = Vector3(0.4, 0.39, 0.26)
+material = SubResource("Gunmetal")
+
+[sub_resource type="CylinderMesh" id="Mesh3"]
+top_radius = 0.128
+bottom_radius = 0.128
+height = 7.0
+radial_segments = 24
+rings = 1
+material = SubResource("Enamel")
+
+[sub_resource type="CylinderMesh" id="Mesh4"]
+top_radius = 0.203
+bottom_radius = 0.203
+height = 0.37
+radial_segments = 8
+rings = 1
+material = SubResource("Gunmetal")
+
+[sub_resource type="CylinderMesh" id="Mesh5"]
+top_radius = 0.128
+bottom_radius = 0.128
+height = 9.450000000000001
+radial_segments = 24
+rings = 1
+material = SubResource("Enamel")
+
+[sub_resource type="CylinderMesh" id="Mesh6"]
+top_radius = 0.128
+bottom_radius = 0.128
+height = 4.65
+radial_segments = 24
+rings = 1
+material = SubResource("Enamel")
+
+[node name="SpillwayFeed" type="Node3D"]
+
+[node name="SupplyTube0" type="MeshInstance3D" parent="."]
+position = Vector3(0.675, 0, 0)
+rotation = Vector3(0, 0, 1.5708)
+mesh = SubResource("Mesh0")
+
+[node name="Collar0_0" type="MeshInstance3D" parent="."]
+position = Vector3(0.135, 0, 0)
+rotation = Vector3(0, 0, 1.5708)
+mesh = SubResource("Mesh1")
+
+[node name="Collar0_1" type="MeshInstance3D" parent="."]
+position = Vector3(1.215, 0, 0)
+rotation = Vector3(0, 0, 1.5708)
+mesh = SubResource("Mesh1")
+
+[node name="Brace0" type="MeshInstance3D" parent="."]
+position = Vector3(0.675, 0, -0.08)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("Mesh2")
+
+[node name="SupplyTube1" type="MeshInstance3D" parent="."]
+position = Vector3(1.35, -3.5, 0)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("Mesh3")
+
+[node name="Collar1_0" type="MeshInstance3D" parent="."]
+position = Vector3(1.35, -0.7, 0)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("Mesh1")
+
+[node name="Collar1_1" type="MeshInstance3D" parent="."]
+position = Vector3(1.35, -6.3, 0)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("Mesh1")
+
+[node name="Brace1" type="MeshInstance3D" parent="."]
+position = Vector3(1.35, -3.5, -0.08)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("Mesh2")
+
+[node name="ServiceCap1" type="MeshInstance3D" parent="."]
+position = Vector3(1.35, 0, 0.012)
+rotation = Vector3(1.5708, 0, 0)
+mesh = SubResource("Mesh4")
+
+[node name="SupplyTube2" type="MeshInstance3D" parent="."]
+position = Vector3(6.075, -7, 0)
+rotation = Vector3(0, 0, 1.5708)
+mesh = SubResource("Mesh5")
+
+[node name="Collar2_0" type="MeshInstance3D" parent="."]
+position = Vector3(2.295, -7, 0)
+rotation = Vector3(0, 0, 1.5708)
+mesh = SubResource("Mesh1")
+
+[node name="Collar2_1" type="MeshInstance3D" parent="."]
+position = Vector3(9.855, -7, 0)
+rotation = Vector3(0, 0, 1.5708)
+mesh = SubResource("Mesh1")
+
+[node name="Brace2" type="MeshInstance3D" parent="."]
+position = Vector3(6.075, -7, -0.08)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("Mesh2")
+
+[node name="ServiceCap2" type="MeshInstance3D" parent="."]
+position = Vector3(1.35, -7, 0.012)
+rotation = Vector3(1.5708, 0, 0)
+mesh = SubResource("Mesh4")
+
+[node name="SupplyTube3" type="MeshInstance3D" parent="."]
+position = Vector3(10.8, -9.325, 0)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("Mesh6")
+
+[node name="Collar3_0" type="MeshInstance3D" parent="."]
+position = Vector3(10.8, -7.465, 0)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("Mesh1")
+
+[node name="Collar3_1" type="MeshInstance3D" parent="."]
+position = Vector3(10.8, -11.185, 0)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("Mesh1")
+
+[node name="Brace3" type="MeshInstance3D" parent="."]
+position = Vector3(10.8, -9.325, -0.08)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("Mesh2")
+
+[node name="ServiceCap3" type="MeshInstance3D" parent="."]
+position = Vector3(10.8, -7, 0.012)
+rotation = Vector3(1.5708, 0, 0)
+mesh = SubResource("Mesh4")

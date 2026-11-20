@@ -1,6 +1,7 @@
 extends Node3D
 
 const VFX := preload("res://scripts/factory_trap_vfx.gd")
+const PRESS := preload("res://assets/neon_factory/foundry/quench_press.tscn")
 const CHAMFER := preload("res://scripts/factory_chamfer.gd")
 const FONT := preload("res://assets/ui/fonts/BarlowCondensed-ExtraBoldItalic.ttf")
 enum State { READY, ARMED, CLAMPED }
@@ -12,6 +13,7 @@ var piston: Node3D
 var label: Label3D
 
 func _ready() -> void:
+	add_child(PRESS.instantiate())
 	var steel := RiftProjectile.light_paint(Color("302a31"), 0)
 	var copper := RiftProjectile.light_paint(Color("8d5541"), 0)
 	box(self, Vector3(1.44, 2.15, 0.52), Vector3(0, 1.08, -1.78), steel, 0.105)
@@ -20,14 +22,14 @@ func _ready() -> void:
 	box(self, Vector3(0.66, 1.64, 0.16), Vector3(0, 1.14, -1.46), steel, 0.052)
 	box(self, Vector3(0.78, 0.045, 2.9), Vector3(0, 0.028, 0.20), steel)
 	for side in [-1.0, 1.0]:
-		box(self, Vector3(0.12, 1.80, 0.16), Vector3(side * 0.56, 1.07, -1.43), copper)
-		box(self, Vector3(0.08, 0.24, 0.12), Vector3(side * 0.60, 1.59, -1.33), steel, 0.018)
-		box(self, Vector3(0.36, 0.11, 0.28), Vector3(side * 0.45, 0.19, -1.28), copper, 0.028)
 		rails.append(box(self, Vector3(0.13, 0.028, 2.66), Vector3(side * 0.29, 0.07, 0.22), steel))
 	piston = Node3D.new()
 	add_child(piston)
 	piston.position.z = -1.42
 	box(piston, Vector3(0.34, 0.57, 0.22), Vector3(0, 0.04, 0), copper)
+	for side in [-1.0, 1.0]:
+		var jaw := box(piston, Vector3(.24, .55, .36), Vector3(side * .26, -.11, .06), copper, .05)
+		jaw.rotation.z = side * .31
 	lamp = box(piston, Vector3(0.41, 0.20, 0.14), Vector3(0, -0.02, 0.14), steel)
 	label = Label3D.new()
 	label.font = FONT

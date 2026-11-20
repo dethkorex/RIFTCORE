@@ -11,10 +11,13 @@ const SHAFT_RIGHT := 19.75
 const EXIT_CLEARANCE := 20.75
 const ENTRY_CLEARANCE := 1.0
 const TUNNEL_CEILING := 3.16
-const RISE_SPEED := 1.65
-const RISE_ACCELERATION := 0.047
-const RISE_DELAY := 3.0
+const RISE_SPEED := 2.14
+const RISE_ACCELERATION := 0.028
+const MAX_RISE_SPEED := 3.12
+const RISE_DELAY := 1.65
 const WARNING_SECONDS := 3.6
+const SURFACE_CONTACT := 0.10 # Includes the crest of the visible surface waves.
+const LAVA_HALF_DEPTH := 2.29
 
 enum Phase { READY, SEALED, RISING, DRAINING }
 
@@ -119,19 +122,29 @@ func _physics_process(delta: float) -> void:
 		Phase.RISING:
 			elapsed += delta
 			var rise_time := elapsed - RISE_DELAY
-			surface = minf(TOP_LEVEL, surface + (RISE_SPEED + rise_time * RISE_ACCELERATION) * delta)
-			for operator: RiftPlayer in inside:
-				var feet := to_local(operator.global_position).y - operator.standing_capsule.height * 0.5
-				if feet < surface + 0.06:
-					operator.die_in_pit()
+			surface = minf(TOP_LEVEL, surface + minf(MAX_RISE_SPEED, RISE_SPEED + rise_time * RISE_ACCELERATION) * delta)
 			if inside.is_empty():
 				set_phase(Phase.DRAINING)
 		Phase.DRAINING:
 			surface = move_toward(surface, REST_LEVEL, 27.0 * delta)
 			if is_equal_approx(surface, REST_LEVEL):
 				set_phase(Phase.READY)
+	# Damage follows the rendered lava, independently of the escape-room trigger.
+	# In particular, it remains lethal while draining and at the sides of the
+	# player capsule, where the old centre-point room test missed contact.
+	for operator: RiftPlayer in party:
+		if touches_lava(operator):
+			operator.die_in_pit()
 	door.step(delta, phase == Phase.READY or phase == Phase.DRAINING, party)
 	present()
+
+func touches_lava(operator: RiftPlayer) -> bool:
+	var at := to_local(operator.global_position)
+	var radius := operator.standing_capsule.radius
+	var contact_surface := surface if at.x + radius >= SHAFT_LEFT else minf(surface, TUNNEL_CEILING)
+	return at.x + radius >= 0.0 and at.x - radius <= SHAFT_RIGHT \
+		and absf(at.z) - radius <= LAVA_HALF_DEPTH \
+		and at.y - operator.standing_capsule.height * 0.5 <= contact_surface + SURFACE_CONTACT
 
 func past_entrance(operator: RiftPlayer) -> bool:
 	return to_local(operator.global_position).x >= ENTRY_CLEARANCE

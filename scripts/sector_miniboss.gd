@@ -166,7 +166,7 @@ func _ready() -> void:
 	skin.scale = Vector3.ONE * fit
 	var center := mesh_bounds.get_center()
 	skin.position = Vector3(-center.x * fit, -chassis_height - mesh_bounds.position.y * fit, -center.z * fit)
-	armor.rotation.y = facing * 0.90
+	armor.rotation.y = facing * BOSS_SIDE_YAW
 	preload("res://scripts/boss_armor_kit.gd").mount(armor, sector, true, accent)
 	core = RiftProjectile.part(armor, RiftProjectile.cached_mesh("Orb"), RiftProjectile.light_paint(accent, 2.2), Vector3(0, 0.65, 0.65), Vector3(0.24, 0.24, 0.17))
 	for side in [-1.0, 1.0]:
@@ -235,7 +235,7 @@ func _physics_process(delta: float) -> void:
 	elif frozen_rig:
 		frozen_rig.set_combat_pose(facing,absf(velocity.x),attack if charge_time<=0 else "charge")
 	else:
-		armor.rotation.y = lerp_angle(armor.rotation.y, facing * 1.03, minf(12.0 * delta, 1.0))
+		armor.rotation.y = lerpf(armor.rotation.y, facing * BOSS_SIDE_YAW, minf(12.0 * delta, 1.0))
 		armor.rotation.z = sin(elapsed * 11.0) * minf(absf(velocity.x) * 0.012, 0.12)
 		core.scale = Vector3(0.24, 0.24, 0.17) * (1.0 if attack.is_empty() else 1.5 + sin(elapsed * 25.0) * 0.18)
 	if cooldown > 0.0 or charge_time > 0.0:

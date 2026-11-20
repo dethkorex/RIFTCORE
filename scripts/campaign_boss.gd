@@ -120,9 +120,10 @@ func _physics_process(delta: float) -> void:
 	velocity.y -= 29.0 * delta
 	move_and_slide()
 	global_position.x = clampf(global_position.x, left, right)
-	armor.rotation.y = lerp_angle(armor.rotation.y, facing * 1.03, 1.0 - exp(-12.0 * delta))
 	if frozen_rig:
 		frozen_rig.set_combat_pose(facing,absf(velocity.x),attack if sprint_left<=0 else "charge")
+	else:
+		armor.rotation.y = lerpf(armor.rotation.y, facing * BOSS_SIDE_YAW, 1.0 - exp(-12.0 * delta))
 	var stepping := sin(clock * 9.5) * minf(absf(velocity.x) * 0.11, 0.39)
 	for label in joints:
 		var limb: Node3D = joints[label]

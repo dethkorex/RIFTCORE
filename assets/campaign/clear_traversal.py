@@ -105,6 +105,31 @@ def clear_decks(scene):
     return updated.replace("metadata/interior_layout = true", "metadata/interior_layout = true\nmetadata/clearance_pass = 1", 1)
 
 
+def frozen_switchback(scene):
+    """Fit the two authored lines between the existing vault and sump."""
+    room = "TERRAIN/Room05_Switchback"
+    path = "res://assets/campaign/frozen_reactor/kit/coolant_switchback.tscn"
+    if path in scene:
+        return scene
+    replaced = {"Entry00", "ForkApron00", "MiddleStep", "MiddleEast00",
+                "VaultExitStep", "VaultSecondStep", "MainDescent"}
+
+    def replace_deck(match):
+        name, parent = split_node(match[0])
+        parts = (parent + "/" + name).split(room + "/", 1)
+        if len(parts) == 2:
+            deck = parts[1].split("/", 1)[0]
+            if deck == name == "Entry00":
+                return (f'[node name="CoolantSwitchback" parent="{room}" instance=ExtResource("CoolantFork")]\n'
+                        'position = Vector3(289, 4.35, 0)\n\n')
+            if deck in replaced or deck.startswith(("MainToDrop", "MiddleWest")):
+                return ""
+        return match[0]
+
+    scene = NODE.sub(replace_deck, scene)
+    return scene.replace("[ext_resource", f'[ext_resource type="PackedScene" path="{path}" id="CoolantFork"]\n[ext_resource', 1)
+
+
 def frost_decks(scene):
     def mark(match):
         body = match[0]

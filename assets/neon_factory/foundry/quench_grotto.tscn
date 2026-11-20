@@ -1,0 +1,65 @@
+[gd_scene format=3]
+
+[ext_resource type="Texture2D" path="res://assets/neon_factory/foundry/bedrock_Volcanic basalt • albedo.png" id="Basalt"]
+[ext_resource type="Texture2D" path="res://assets/neon_factory/foundry/bedrock_Volcanic basalt • roughness.png" id="Rough"]
+[ext_resource type="PackedScene" path="res://assets/neon_factory/foundry/cave_lining.tscn" id="Lining"]
+
+[ext_resource type="Shader" path="res://assets/neon_factory/foundry/basalt_cut.gdshader" id="CutShader"]
+
+[sub_resource type="ShaderMaterial" id="Cut"]
+shader = ExtResource("CutShader")
+shader_parameter/basalt = ExtResource("Basalt")
+
+[sub_resource type="StandardMaterial3D" id="Deep"]
+albedo_texture = ExtResource("Basalt")
+roughness_texture = ExtResource("Rough")
+albedo_color = Color(0.53, 0.54, 0.61, 1)
+uv1_triplanar = true
+uv1_world_triplanar = true
+uv1_scale = Vector3(0.34, 0.34, 0.34)
+
+[node name="QuenchGrotto" type="Node3D"]
+
+[node name="Vault" type="CSGPolygon3D" parent="."]
+position = Vector3(0,0,1.7)
+depth = 4.8
+use_collision = true
+polygon = PackedVector2Array(-18, 9, -13.5, 9.85, -8.9, 9.15, -6.3, 10.85, -0.2, 11.4, 4, 12.05, 8.3, 12.75, 12.6, 10.8, 17, 10.6, 21.5, 8.7, 19.8, 12.5, 14, 15.1, 8, 17.8, 1, 17, -4, 15.7, -8.4, 15.85, -13, 13.8)
+material = SubResource("Cut")
+
+[node name="Excavation" type="CSGPolygon3D" parent="."]
+position = Vector3(0,0,-3.01)
+depth = 2.2
+use_collision = false
+polygon = PackedVector2Array(-18, -4, 21, -4, 21, 8.65, 17, 11, 9, 15.4, 4, 16, -4, 14.9, -12, 12.8, -18, 8.8)
+material = SubResource("Deep")
+
+[node name="RockCut0" parent="." instance=ExtResource("Lining")]
+position = Vector3(-13,1.3,-2.8)
+scale = Vector3(1.05,1.55,0.85)
+
+[node name="RockCut1" parent="." instance=ExtResource("Lining")]
+position = Vector3(-7.05,2,-2.8)
+scale = Vector3(1.05,1.55,0.85)
+
+[node name="RockCut2" parent="." instance=ExtResource("Lining")]
+position = Vector3(-1,1.1,-2.8)
+scale = Vector3(1.05,1.55,0.85)
+
+[node name="RockCut3" parent="." instance=ExtResource("Lining")]
+position = Vector3(5,2.8,-2.8)
+scale = Vector3(1.05,1.55,0.85)
+
+[node name="RockCut4" parent="." instance=ExtResource("Lining")]
+position = Vector3(11,2.1,-2.8)
+scale = Vector3(1.05,1.55,0.85)
+
+[node name="RockCut5" parent="." instance=ExtResource("Lining")]
+position = Vector3(17,1.1,-2.8)
+scale = Vector3(1.05,1.55,0.85)
+
+[node name="BlueQuenchLight" type="OmniLight3D" parent="."]
+position = Vector3(5,6.7,0.6)
+light_color = Color(0.43,0.73,0.9,1)
+light_energy = 2.1
+omni_range = 13.0

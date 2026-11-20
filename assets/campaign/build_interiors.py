@@ -13,6 +13,7 @@ from folded_rooms import FOLDS, FOLD_TIMED_FIXTURE, folded_route
 from interior_routes import ROUTES
 from overhead_routes import ARENAS, OVERHEAD
 from signature_rooms import ROOMS
+from service_routes import LINES, outbound
 
 PROJECT = Path(__file__).resolve().parents[2]
 LEVELS = PROJECT / "scenes/levels"
@@ -123,7 +124,7 @@ class Scene:
             ("SectorAlbedo", f"{sector_root}/surfaces/sector_wall.jpg", "Texture2D"),
         ])
         assets += [("RCDoorRelay", FACTORY + "shot_relay.glb", "PackedScene"),
-                   ("RCCache", FACTORY + "salvage_chest.glb", "PackedScene"),
+                   ("RCCache", f"{sector_root}/salvage_cache.glb", "PackedScene"),
                    ("RCRelayScript", "res://scripts/factory_interior_relay.gd", "Script"),
                    ("RCCacheScript", "res://scripts/factory_salvage_chest.gd", "Script"),
                    ("RCBiome", "res://scripts/biome_zone.gd", "Script"),
@@ -185,8 +186,10 @@ size = Vector3(1.52, 1.25, 1.5)"""
         return f"{parent}/{name}" if parent != "." else name
 
     def solid(self, name, art, pos, dimensions, art_scale, offset=0, angle=0, moving=False, layer=1, drop=False,
-              arena_deck=False, **properties):
+              arena_deck=False, icy=False, **properties):
         groups = ("arena_player_deck",) if arena_deck else ()
+        if icy:
+            groups += ("ice_deck",)
         if drop:
             groups += ("factory_drop_through",)
         body = self.node(name, pos=pos, kind="AnimatableBody3D" if moving else "StaticBody3D",
@@ -605,7 +608,10 @@ size = Vector3(1.52, 1.25, 1.5)"""
         gap_b = gap_a + min(spec.gap, 4.65 if lower_kind == 4 and self.sector == "frozen_reactor" else 5.2)
         ceiling = floor-5.85
         self.deck("MainDescent",p+5,p+11,floor,floor-1.3)
-        self.stretch("MainToDrop",p+11,drop-6.95,floor-1.3)
+        if (self.number, self.act) in LINES:
+            outbound(self, p+11, drop-6.95, floor-1.3)
+        else:
+            self.stretch("MainToDrop",p+11,drop-6.95,floor-1.3)
         # An overhead baffle forces the approach to fall west of the sealed return wing.
         self.wall("DropBulkhead",drop+2.65,return_y+4.50,floor+MIDDLE_RISE+UPPER_RISE+3.0)
         self.stretch("SumpWest",west,gap_a,low)
@@ -778,8 +784,6 @@ size = Vector3(1.52, 1.25, 1.5)"""
         at = gate+width*location
         for index,(fraction,length,height) in enumerate(decks):
             x = gate+width*fraction
-            launch_shelf = self.act == 1 and index == 0 and mechanic in ("cover", "phase")
-            height = (2.45 if mechanic == "phase" else 2.55) if launch_shelf else max(height, 2.69 if self.act == 1 else 3.75)
             supply = {"metadata/boss_supply_anchor": int(index != 0)} if self.act == 2 and index in (0, len(decks)-1) else {}
             vine_hatch = mechanic == "vine" and fraction == location
             ladder_hatch = self.sector == "buried_archives" and self.act == 2 and index == 1
@@ -788,7 +792,7 @@ size = Vector3(1.52, 1.25, 1.5)"""
                           deck_width=length,climb_height=height, **supply)
             else:
                 self.deck(f"TacticalDeck{index}",x-length/2,x+length/2,floor+height,thin=True,
-                          arena_deck=True, **supply)
+                          arena_deck=True, icy=self.number == 3 and index == len(decks)-1, **supply)
             self.node(f"TacticalLight{index}",kind="OmniLight3D",
                       pos=(x,floor+height+1.1,-1.6),
                       light_color=self.color(),light_energy=1.55,omni_range=5.6)
@@ -810,6 +814,21 @@ size = Vector3(1.52, 1.25, 1.5)"""
             # Make the gravity/vent recovery influence large enough to reach
             # the next deck, while leaving the boss's floor continuous.
             self.field("ArenaMovementField",at,floor,effect,sign,direction=-1 if self.act==2 else 1,width=5.8,field_height={"gravity":7.6, "vent":6.84, "current":2.6}[mechanic])
+
+        if self.act == 2:
+            if self.sector == "machine_jungle":
+                # A low nursery pod rises beside the west crown; the eastern vine remains the other entrance.
+                pod = gate + width*.22
+                self.deck("NurseryPod",pod-1.8,pod+1.8,floor+.16,moving=True,arena_deck=True)
+                self.relay(pod-2.7,floor,"NurseryPod",3.25,True,"RAISE POD",hold=4.0,delay=.70)
+            elif self.sector == "sky_dock":
+                # Operators can call a freight pallet across the left gantry, then take the central updraft.
+                dock = gate + width*.23
+                self.deck("CargoPallet",dock-1.65,dock+1.65,floor+.18,moving=True,arena_deck=True)
+                self.relay(dock-2.5,floor,"CargoPallet",3.1,True,"SEND PALLET",dx=6.2,hold=3.8,delay=.7)
+            elif self.sector == "orbital_array":
+                self.node("EclipseTransfer",art="RCPhase",pos=(gate+width*.245,floor+3.25,0),
+                          group="arena_player_deck",period=5.2,phase_offset=.8)
 
     def signature_room(self, profile, p, q, floor):
         # Room edges remain level; route changes are carried into the next room.
@@ -1223,10 +1242,12 @@ size = Vector3(1.52, 1.25, 1.5)"""
         header = pieces[0] + "".join(piece for piece in pieces[1:]
                                     if re.search(r'id="([^"]+)"',piece)[1] in keep)
         header = re.sub(r"\n{3,}", "\n\n", header.strip())
-        from clear_traversal import clear_decks, frost_decks
+        from clear_traversal import clear_decks, frost_decks, frozen_switchback
         scene = clear_decks(outfit(self.sector, "\n\n".join([header,*self.shapes,*result,*self.nodes]) + "\n"))
         if self.sector == "frozen_reactor":
             scene = frost_decks(scene)
+            if self.act == 1:
+                scene = frozen_switchback(scene)
         return update_encounters(scene)
 
 
