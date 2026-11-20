@@ -31,7 +31,8 @@ func _ready() -> void:
 	install_root = root_arg[0] if OS.has_feature("editor") and not root_arg.is_empty() else OS.get_executable_path().get_base_dir()
 	add_child(client)
 	var config := ConfigFile.new()
-	if config.load(install_root.path_join("updates.cfg")) == OK:
+	var configured := config.load(install_root.path_join("updates.cfg")) == OK
+	if configured:
 		repo = String(config.get_value("updates", "repository", ""))
 		preview_channel = config.get_value("updates", "preview_channel", false)
 	resume_upgrade = root_arg.has("--resume-upgrade")
@@ -62,6 +63,8 @@ func _ready() -> void:
 	if installed == config.get_value("updates", "bundled_notes_tag", "") and FileAccess.file_exists(notes_path):
 		bundled_notes = FileAccess.get_file_as_string(notes_path)
 	build_ui()
+	if configured and not OS.has_feature("editor") and OS.get_executable_path().get_file() == client.game_filename:
+		clean_retired_launcher.call_deferred()
 	if client.is_match(UpdateClient.REPO_PATTERN, repo):
 		check_updates()
 	else:
@@ -71,6 +74,12 @@ func _ready() -> void:
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:
 		client.cancel_download()
+
+func clean_retired_launcher() -> void:
+	var directory := DirAccess.open(install_root)
+	var backup := client.game_filename + ".previous"
+	if directory and directory.file_exists(backup) and not directory.is_link(backup):
+		directory.remove(backup)
 
 func clean_launcher_download(folder: String) -> void:
 	if not client.is_match("^launcher-[0-9]+-[0-9]+$", folder):
@@ -135,15 +144,15 @@ func migrate_launcher(self_update := false) -> void:
 		DirAccess.rename_absolute(backup, target)
 		status.text = "The launcher could not restart. Reopen it to retry."
 		return
-	if not self_update:
-		DirAccess.remove_absolute(backup)
 	get_tree().quit()
 
 func relaunched_arguments() -> PackedStringArray:
-	if DisplayServer.get_name() == "headless":
-		return PackedStringArray(["--headless", "--quit-after", "60"])
-	var args := PackedStringArray(["--"])
-	if not OS.get_cmdline_user_args().has("--no-autoplay"):
+	var args := PackedStringArray()
+	var headless := DisplayServer.get_name() == "headless"
+	if headless:
+		args.append_array(["--headless", "--quit-after", "60"])
+	args.append("--")
+	if not headless and not OS.get_cmdline_user_args().has("--no-autoplay"):
 		args.append("--resume-upgrade")
 	var folder := OS.get_executable_path().get_base_dir().get_file()
 	if client.is_match("^launcher-[0-9]+-[0-9]+$", folder):
