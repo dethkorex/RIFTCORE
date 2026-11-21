@@ -71,6 +71,8 @@ func run() -> void:
 	for sample in [
 		["move_right", 1.0, 1.0, Vector3(1.0, 1.0, 0.0)],
 		["move_right", 1.0, 0.4, Vector3(1.0, 0.4, 0.0)],
+		["move_right", 1.0, 0.14, Vector3(1.0, 0.14, 0.0)],
+		["move_right", 1.0, 0.19, Vector3(1.0, 0.19, 0.0)],
 		["move_left", 0.35, 1.0, Vector3(-0.35, 1.0, 0.0)],
 	]:
 		actor.reset_predicted_position(spawn.global_position, Vector3.ZERO, 1.0)
@@ -115,14 +117,21 @@ func run() -> void:
 			Input.action_press("move_left")
 		var before := directions.size()
 		await fire()
-		var expected := Vector3.LEFT if sideways else Vector3.RIGHT
-		var level: bool = not actor.grounded() and directions.size() > before and directions.back().is_equal_approx(expected)
-		print("PASS " if level else "FAIL ", "Airborne down input fires horizontally, sideways=", sideways)
-		failures += int(not level)
+		var expected := Vector3(-1, -1, 0).normalized() if sideways else Vector3.DOWN
+		var down_shot: bool = not actor.grounded() and directions.size() > before and directions.back().is_equal_approx(expected)
+		print("PASS " if down_shot else "FAIL ", "Free fall allows downward aim, sideways=", sideways)
+		failures += int(not down_shot)
 		Input.action_release("move_left")
 		Input.action_release("climb_down")
 		Input.action_release("crouch")
 		await frames(20)
+	actor.reset_predicted_position(spawn.global_position + Vector3.UP * 4.0, Vector3.UP * 11.0, 1.0)
+	Input.action_press("climb_down")
+	await fire()
+	Input.action_release("climb_down")
+	var rising_level: bool = directions.back().is_equal_approx(Vector3.RIGHT)
+	print("PASS " if rising_level else "FAIL ", "Rising with Down held fires horizontally")
+	failures += int(not rising_level)
 	quit(failures)
 
 func fire() -> void:

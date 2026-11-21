@@ -6,7 +6,7 @@ const Profile := preload("res://scripts/rogue_profile.gd")
 const SkinKit := preload("res://scripts/operator_skins.gd")
 
 static func build(stack: VBoxContainer, sector_name: String, stats: Dictionary, materials: Dictionary,
-		blueprints: Array[String], supplies: Dictionary, bolts: int, challenges_completed: int, deaths: int, ending: String, exit: Callable) -> void:
+		blueprints: Array[String], supplies: Dictionary, bolts: int, challenges_completed: int, deaths: int, ending: String, exit: Callable) -> Button:
 	UI.profile_label(stack, "//  DEPLOYMENT COMPLETE", 37, UI.CYAN)
 	UI.label(stack, sector_name + "  /  EXTRACTION SUMMARY", 21, UI.WHITE)
 	var body := HBoxContainer.new()
@@ -76,6 +76,7 @@ static func build(stack: VBoxContainer, sector_name: String, stats: Dictionary, 
 	var return_button := UI.button(stack, "Return to Station", exit, true, 40, false)
 	UI.profile_button(return_button, true)
 	return_button.grab_focus()
+	return return_button
 
 static func profile_progress(parent: Control, progress: Dictionary) -> void:
 	var start := int(progress.before)

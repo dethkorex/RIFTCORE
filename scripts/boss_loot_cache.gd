@@ -58,7 +58,7 @@ static func roll_loot(sector: int, mode: int, level: int) -> Dictionary:
 	for item in ["scrap", Materials.sector_key(sector)]:
 		bonus[item] = int(bonus.get(item, 0)) + 2
 	return {"materials": bonus, "blueprint": Blueprints.roll_cache(sector, mode, level, true, rng),
-		"supply": Orbs.supply_roll(rng, 1.0, mode != Difficulty.NORMAL)}
+		"supply": Orbs.supply_roll(rng, 1.0, mode != Difficulty.NORMAL), "life": rng.randf() < Orbs.EXTRA_LIFE_CHANCE}
 
 
 static func spill(parent: Node3D, at: Vector3, rewards: Dictionary, authority := true) -> Array[Area3D]:

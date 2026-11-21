@@ -17,15 +17,6 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	clip_contents = true
 
-func place_in_hud(parent: CanvasLayer) -> void:
-	name = "Minimap"
-	parent.add_child(self)
-	set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
-	offset_left = -268
-	offset_right = -16
-	offset_top = -154
-	offset_bottom = -16
-
 func _process(delta: float) -> void:
 	if not is_visible_in_tree() or not stage_source.is_valid():
 		return

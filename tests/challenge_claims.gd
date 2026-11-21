@@ -45,9 +45,12 @@ func run() -> void:
 	profile.challenge_cycle(1).day = 20000101
 	check(profile.challenge_cycle(1).done.is_empty() and profile.challenge_rewards(1, profile.challenge_cycle(1)) == before,
 		"Unclaimed rewards survive the midnight reset")
-	profile.challenge_cycles[2] = {"set": 0, "day": profile.challenge_day(), "done": [0, 1, 2, 3, 4]}
-	check(profile.challenge_rewards(2, profile.challenge_cycle(2)).lives == 0,
-		"Legacy auto-paid challenges cannot be claimed again")
+	profile.challenge_cycles[2] = {"version": 2, "set": 1, "day": profile.challenge_day(), "done": [0, 1, 2], "claimed": [0]}
+	var reset: Dictionary = profile.challenge_cycle(2)
+	var reset_rewards: Dictionary = profile.challenge_rewards(2, reset)
+	check(reset.version == 3 and reset.done.is_empty() and reset.claimed.is_empty() and reset_rewards.shards == 0 and profile.core_shards == starting_shards,
+		"Upgrading resets every old challenge cycle without taking back claimed currency")
+	check(profile.challenge_cycle(2) == reset, "The new challenge cycle is kept on subsequent visits")
 
 	var game := (load("res://scenes/main.tscn") as PackedScene).instantiate()
 	set_meta(&"riftcore_save_session", session)

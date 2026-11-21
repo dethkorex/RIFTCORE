@@ -434,6 +434,7 @@ func supply_bonus(stat: String) -> float:
 	return active.x if active.y > 0.0 else 0.0
 
 var remote_axis := Vector2.ZERO
+var remote_buster_axis := Vector2.INF
 var remote_held: Dictionary = {}
 var remote_pressed: Dictionary = {}
 var remote_released: Dictionary = {}
@@ -1318,7 +1319,8 @@ func update_charge(delta: float) -> void:
 		return
 	charge_elapsed += delta
 	if buster_pose and fire_lock <= 0.0:
-		present_buster_pitch(requested_buster_pitch(), facing)
+		var next_pitch := lerpf(buster_pitch, requested_buster_pitch(), 1.0 - exp(-28.0 * delta))
+		present_buster_pitch(allowed_buster_pitch(next_pitch), facing)
 	present_charge(charge_elapsed, boss_debuff != 5 and energy >= charged_shot_cost())
 
 func queue_buster_shot(charged: bool, pose_held: bool, suit_shot := false) -> void:
@@ -1334,19 +1336,29 @@ func queue_buster_shot(charged: bool, pose_held: bool, suit_shot := false) -> vo
 		queued_suit_shot = suit_shot
 		queued_buster_pitch = shot_pitch
 
+static func local_buster_axis() -> Vector2:
+	# Use one circular dead zone so ladder thresholds don't flatten shallow aim.
+	return Input.get_vector("move_left", "move_right", "climb_down", "climb_up", 0.18)
+
 func requested_buster_pitch() -> float:
+	if controls_suspended:
+		return 0.0
+	var axis := local_buster_axis()
+	if remote_input:
+		axis = remote_buster_axis if remote_buster_axis.is_finite() else remote_axis
+	return allowed_buster_pitch(atan2(axis.y, absf(axis.x)) if not axis.is_zero_approx() else 0.0)
+
+func allowed_buster_pitch(pitch: float) -> float:
 	if low_profile or is_instance_valid(ladder) or is_instance_valid(rocket_course) or swim_volume():
 		return 0.0
-	var up := movement_axis("climb_down", "climb_up")
-	if up <= 0.0:
-		return 0.0
-	return atan2(up, absf(movement_axis("move_left", "move_right")))
+	var free_falling := velocity.y < -0.05 and not grounded() and not wall_sliding and dash_left <= 0.0 and not is_instance_valid(jungle_vine)
+	return clampf(pitch, -PI * 0.5 if free_falling else 0.0, PI * 0.5)
 
 func buster_direction(pitch: float, side: float) -> Vector3:
 	return Vector3(cos(pitch) * side, sin(pitch), 0.0)
 
 func present_buster_pitch(pitch: float, side: float) -> void:
-	buster_pitch = clampf(pitch, 0.0, PI * 0.5)
+	buster_pitch = clampf(pitch, -PI * 0.5, PI * 0.5)
 	if buster_pose:
 		buster_pose.direction_override = Vector3.ZERO if is_zero_approx(buster_pitch) else buster_direction(buster_pitch, side)
 
@@ -1423,7 +1435,7 @@ func shoot(charged := false, pose_held := false, suit_shot := false, shot_pitch 
 	if uses_suit and not showcase:
 		restore_energy(-suit_shot_cost())
 	var aim := facing
-	present_buster_pitch(0.0 if low_profile else shot_pitch, aim)
+	present_buster_pitch(allowed_buster_pitch(shot_pitch), aim)
 	var direction := buster_direction(buster_pitch, aim)
 	if buster_pose:
 		var climbing := is_instance_valid(ladder)
@@ -1935,10 +1947,14 @@ func strike_melee() -> void:
 		var offset: Vector3 = candidate.global_position - global_position
 		if absf(offset.z) < 1.4 and absf(offset.y) < 1.7 and absf(offset.x) <= reach and offset.x * combo_facing > -0.05:
 			var before: float = candidate.health
+			if candidate is Combatant:
+				candidate.damage_operator_id = get_instance_id()
 			if combo_hot and candidate.has_method("take_fire_damage"):
 				candidate.take_fire_damage(power, global_position)
 			else:
 				candidate.take_damage(power, global_position)
+			if candidate is Combatant:
+				candidate.damage_operator_id = 0
 			if candidate.health < before:
 				RiftAudio.play_effect(&"saber_impact")
 				PACK_VFX.saber_hit.call_deferred(get_parent(), candidate.global_position + Vector3(0, 0.34, 0.3), combo_facing, saber_tint())

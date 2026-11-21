@@ -1,6 +1,7 @@
 extends Node3D
 
 signal exit_requested
+signal local_return_requested
 signal rewards_earned(xp: int, bolts: int, blueprints: Array, sector: int)
 signal operator_wiped
 
@@ -27,6 +28,7 @@ const INPUTS := [&"jump", &"dash", &"crouch", &"crouch_stick", &"shoot", &"melee
 const LEGACY_BUSTER_AIM_SHIFT := 11
 const BUSTER_PITCH_SHIFT := 14
 const BUSTER_PITCH_MASK := 127 << BUSTER_PITCH_SHIFT
+const BUSTER_PITCH_DOWN := 1 << 21
 const LEGACY_BUSTER_AIM_MASK := 7 << LEGACY_BUSTER_AIM_SHIFT
 const INPUT_ACT_SHIFT := 28
 const INPUT_ACT_MASK := 3 << INPUT_ACT_SHIFT
@@ -108,10 +110,11 @@ var module_chooser: CanvasLayer
 var personal_hud: Control
 var teammate_status: Array[Dictionary] = []
 var return_timer: Timer
-var squad_rewards: Array = []
+var party_extracted := false
+var returned_locally := false
 var ready_to_return: Array[int] = []
 var extraction_layer: CanvasLayer
-var extraction_status: Label
+var extraction_return_button: Button
 var last_boss_health := -1.0
 var remote_checkpoint := Vector3.ZERO
 var peer: Node
@@ -211,7 +214,7 @@ func _ready() -> void:
 	deployment_xp[local_index] = starting_xp
 	guest_reserves = local_profile.reserve_lives
 	for index in roster.size():
-		personal_rewards.append({"bolts": 0, "blueprints": [], "materials": {}, "supplies": {}})
+		personal_rewards.append({"bolts": 0, "blueprints": [], "materials": {}, "supplies": {}, "kills": 0, "deaths": 0})
 	difficulty = (1.0 + DIFFICULTY_PER_GUEST * (roster.size() - 1)) * Difficulty.combat_scale(sector, mode)
 	if host:
 		for id in roster.slice(1):
@@ -695,6 +698,9 @@ func respawn_operator(operator: RiftPlayer, pit := false) -> void:
 				if is_instance_valid(peer):
 					broadcast_state.call_deferred(true)
 	lives_lost += 1
+	var operator_index := operators.find(operator)
+	if operator_index >= 0 and operator_index < personal_rewards.size():
+		personal_rewards[operator_index].deaths += 1
 	operator.health = 0.0
 	operator.guarding = false
 	operator.rocket_course=null
@@ -1124,7 +1130,7 @@ func check_campaign_progress() -> void:
 				change_act.call_deferred(2)
 			else:
 				collect_personal_totals(true)
-				capture_squad_rewards()
+				party_extracted = true
 				for index in operators.size():
 					if index != local_index:
 						var ledger := personal_rewards[index]
@@ -1284,7 +1290,7 @@ func build_hud() -> void:
 	personal_hud.show_quick_slots(local_profile)
 	var minimap := MissionMap.new()
 	configure_mission_map(minimap)
-	minimap.place_in_hud(layer)
+	personal_hud.install_minimap(minimap)
 	build_revive_meter(layer)
 	revive_indicators = ReviveIndicators.new()
 	layer.add_child(revive_indicators)
@@ -1297,10 +1303,9 @@ func build_hud() -> void:
 	panel.offset_right = -16
 	panel.offset_top = 16
 	personal_hud.coop_objective = panel
-	panel.item_rect_changed.connect(personal_hud.queue_redraw)
+	panel.item_rect_changed.connect(personal_hud.update_right_column)
 	var content := UI.column(panel, 4)
-	stage_title = UI.label(content, "", 24, UI.CYAN)
-	content.add_child(HSeparator.new())
+	stage_title = UI.label(content, "", 21, UI.CYAN)
 	objective = UI.label(content, "", 17, UI.WHITE)
 	update_hud_title()
 	stats = UI.label(content, "", 16)
@@ -1311,6 +1316,8 @@ func build_hud() -> void:
 	return_button = UI.button(content, "Pause", func():
 		if outcome.is_empty():
 			open_pause()
+		elif party_extracted:
+			mark_local_return_ready()
 		else:
 			exit_requested.emit()
 	, false, 34)
@@ -1334,7 +1341,7 @@ func build_teammate_status() -> void:
 	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	panel.theme = UI.theme()
 	panel.add_theme_stylebox_override("panel", UI.hud_frame(UI.CYAN, Vector2(10, 8)))
-	panel.custom_minimum_size.x = 246.0
+	panel.custom_minimum_size.x = 326.0
 	personal_hud.add_child(panel)
 	personal_hud.coop_party = panel
 	panel.resized.connect(personal_hud.queue_redraw)
@@ -1354,22 +1361,32 @@ func build_teammate_status() -> void:
 		name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		name_label.autowrap_mode = TextServer.AUTOWRAP_OFF
 		name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-		var value := UI.label(heading, "", 18, UI.MUTED)
-		value.autowrap_mode = TextServer.AUTOWRAP_OFF
-		value.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-		var lives := UI.label(heading, "", 15, UI.CYAN)
+		var tracking := UI.label(heading, "", 15, UI.MUTED)
+		tracking.autowrap_mode = TextServer.AUTOWRAP_OFF
+		tracking.hide()
+		var lives := UI.label(heading, "", 17, UI.CYAN)
 		lives.autowrap_mode = TextServer.AUTOWRAP_OFF
 		lives.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		var health_row := HBoxContainer.new()
+		health_row.add_theme_constant_override("separation", 10)
+		row.add_child(health_row)
 		var bar := ProgressBar.new()
-		bar.custom_minimum_size.y = 7.0
+		bar.custom_minimum_size.y = 8.0
+		bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		bar.show_percentage = false
 		bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		var background := UI.profile_frame(Color("1c324a"), Color.TRANSPARENT, Vector2.ZERO)
 		bar.add_theme_stylebox_override("background", background)
 		var fill := UI.profile_frame(Color("72e3a6"), Color.TRANSPARENT, Vector2.ZERO)
 		bar.add_theme_stylebox_override("fill", fill)
-		row.add_child(bar)
-		teammate_status.append({"name": name_label, "value": value, "lives": lives, "bar": bar, "fill": fill, "microphone": microphone})
+		health_row.add_child(bar)
+		var value := UI.label(health_row, "", 16, UI.WHITE)
+		value.custom_minimum_size.x = 85
+		value.autowrap_mode = TextServer.AUTOWRAP_OFF
+		value.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		teammate_status.append({"name": name_label, "tracking": tracking, "value": value, "lives": lives,
+			"bar": bar, "fill": fill, "microphone": microphone})
 	partner_status = UI.label(content, "", 16, UI.CYAN)
 	partner_status.hide()
 
@@ -1390,8 +1407,11 @@ func update_teammate_status(index: int, display_name: String, status: String) ->
 	var row := teammate_status[index]
 	var fraction := clampf(teammate.health / maxf(teammate.max_health, 1.0), 0.0, 1.0)
 	row.name.text = display_name
-	row.name.tooltip_text = status
+	row.name.add_theme_color_override("font_color", nameplates[index].modulate)
+	row.tracking.visible = status.begins_with("←") or status.begins_with("→")
+	row.tracking.text = status
 	row.value.text = "DOWN" if fraction <= 0.0 else "%d / %d HP" % [ceili(teammate.health), ceili(teammate.max_health)]
+	row.value.add_theme_color_override("font_color", Color("ff8991") if fraction <= 0.0 else UI.WHITE)
 	var lives := available_lives(teammate)
 	row.lives.text = "%02d %s" % [lives, "LIFE" if lives == 1 else "LIVES"]
 	row.lives.add_theme_color_override("font_color", Color("ff6c76") if lives == 0 else UI.CYAN)
@@ -1634,9 +1654,10 @@ func send_input(force_reliable := false) -> void:
 		input_positions.erase(expired)
 		input_times.erase(expired)
 	# Take the first arrival for action edges, with reliable delivery as a fallback.
-	peer.call_func_on_unreliable(peer.get_host(), receive_input, axis, current, down, up, input_sequence)
+	var aim := Vector2.ZERO if suspended else RiftPlayer.local_buster_axis()
+	peer.call_func_on_unreliable(peer.get_host(), receive_input, axis, current, down, up, input_sequence, aim)
 	if send_reliably:
-		peer.call_func_on(peer.get_host(), receive_input, axis, current, down, up, input_sequence)
+		peer.call_func_on(peer.get_host(), receive_input, axis, current, down, up, input_sequence, aim)
 
 func suspend_remote_input(operator: RiftPlayer, remote: Dictionary) -> void:
 	remote.timeout = 0.0
@@ -1644,11 +1665,12 @@ func suspend_remote_input(operator: RiftPlayer, remote: Dictionary) -> void:
 	remote.edge = maxi(remote.edge, remote.input)
 	operator.set_controls_suspended(true)
 	operator.remote_axis = Vector2.ZERO
+	operator.remote_buster_axis = Vector2.ZERO
 	operator.remote_held.clear()
 	operator.remote_pressed.clear()
 	operator.remote_released.clear()
 
-func receive_input(axis: Vector2, current: int, down: int, up: int, sequence: int) -> void:
+func receive_input(axis: Vector2, current: int, down: int, up: int, sequence: int, aim := Vector2.INF) -> void:
 	var sender: int = peer.get_sender_id()
 	var input_act := (current & INPUT_ACT_MASK) >> INPUT_ACT_SHIFT
 	if not host or suit_reveal_playing or boss_intro_active or changing_act or not outcome.is_empty() or not axis.is_finite() or not remote_players.has(sender) or (input_act != 0 and input_act != act):
@@ -1664,6 +1686,7 @@ func receive_input(axis: Vector2, current: int, down: int, up: int, sequence: in
 		remote.suspended = false
 		operator.set_controls_suspended(false)
 		operator.remote_axis = axis.clamp(Vector2(-1, -1), Vector2(1, 1))
+		operator.remote_buster_axis = aim.limit_length(1.0) if aim.is_finite() else operator.remote_axis
 		operator.remote_held.clear()
 		for index in INPUTS.size():
 			if current & (1 << index):
@@ -1694,6 +1717,10 @@ func apply_input_edges(operator: RiftPlayer, remote: Dictionary, down: int, up: 
 
 func earn_security_rewards(enemy: WalkerBot) -> void:
 	security_defeated += 1
+	if enemy.defeated_by_operator_id != 0:
+		var credited := operators.find(instance_from_id(enemy.defeated_by_operator_id))
+		if credited >= 0:
+			personal_rewards[credited].kills += 1
 	award_team_experience(enemy.experience_reward())
 	for index in operators.size():
 		var reward := enemy.roll_field_drop()
@@ -1729,7 +1756,9 @@ func broadcast_state(reliable_operators := false) -> void:
 		flags |= (operator.guard_stage << 8) if operator.guarding else 0
 		if not operator.saber_equipped:
 			var pitch := roundi(rad_to_deg(operator.buster_pitch))
-			flags |= pitch << BUSTER_PITCH_SHIFT
+			flags |= absi(pitch) << BUSTER_PITCH_SHIFT
+			if pitch < 0:
+				flags |= BUSTER_PITCH_DOWN
 			# Older clients can still display an approximate upward pose.
 			flags |= (1 if pitch >= 68 else (2 if pitch > 0 else 0)) << LEGACY_BUSTER_AIM_SHIFT
 		players.back().append(flags)
@@ -1737,7 +1766,7 @@ func broadcast_state(reliable_operators := false) -> void:
 			var vine_index := canopy_vines.find(operator.jungle_vine) if is_instance_valid(operator.jungle_vine) else -1
 			players.back().append(Vector4(vine_index, operator.jungle_swing_time, operator.jungle_release_left, operator.jungle_grab_lock))
 		var swing := RiftPlayer.SWING_CLIPS.find(operator.current_animation) + 1
-		saber_states.append((flags & ~(BUSTER_PITCH_MASK | LEGACY_BUSTER_AIM_MASK)) | (int(operator.saber_hold >= 0.0) << 2) | (swing << 3))
+		saber_states.append((flags & ~(BUSTER_PITCH_MASK | BUSTER_PITCH_DOWN | LEGACY_BUSTER_AIM_MASK)) | (int(operator.saber_hold >= 0.0) << 2) | (swing << 3))
 	# A short swing or guard transition can fit entirely between delivered UDP snapshots.
 	# Send transitions reliably, while movement and charge intensity continue at the normal rate.
 	if saber_states != last_saber_states:
@@ -2060,13 +2089,14 @@ func apply_operator_state(operator: RiftPlayer, data: Array, is_local: bool) -> 
 	var combat_flags := int(data[24]) if data.size() > 24 else (int(data[14]) if data.size() == 15 else 0)
 	operator.saber_equipped = bool(combat_flags & 1)
 	if operator.buster_pose:
-		var was_aiming_up := not is_zero_approx(operator.buster_pitch)
+		var was_aiming := not is_zero_approx(operator.buster_pitch)
 		var pitch := (combat_flags & BUSTER_PITCH_MASK) >> BUSTER_PITCH_SHIFT
 		if pitch == 0:
 			var legacy := (combat_flags & LEGACY_BUSTER_AIM_MASK) >> LEGACY_BUSTER_AIM_SHIFT
 			pitch = 90 if legacy == 1 else (45 if legacy == 2 else 0)
-		operator.present_buster_pitch(deg_to_rad(pitch), data[5])
-		if not is_local and (was_aiming_up or pitch > 0):
+		var direction := -1.0 if combat_flags & BUSTER_PITCH_DOWN else 1.0
+		operator.present_buster_pitch(deg_to_rad(pitch) * direction, data[5])
+		if not is_local and (was_aiming or pitch > 0):
 			operator.buster_pose.influence = float(pitch > 0)
 	if combat_flags & 2 and operator.health > 0.0 and operator.saber_equipped:
 		operator.show_guard(mini(2, (combat_flags >> 8) & 3))
@@ -2204,7 +2234,6 @@ func _process(delta: float) -> void:
 			status = "No spare lives"
 		elif not get_viewport().get_visible_rect().has_point(view.unproject_position(teammate.global_position)):
 			status = "%s %.0f m" % ["←" if offset < 0.0 else "→", absf(offset)]
-			display_name = "%s  %s" % [display_name, status]
 		update_teammate_status(index, display_name, status)
 	if local.health <= 0.0:
 		var down := "Waiting for a teammate to revive you" if local.lives <= 0 else ("Down / waiting for the team" if boss_started and not boss_defeated else "Respawning at checkpoint")
@@ -2269,6 +2298,7 @@ func challenge_results(index := 0) -> Dictionary:
 		"materials": count, "bolts": ledger.bolts, "time": sector_seconds, "health": health, "energy": energy,
 		"lives": operators[index].lives + remote_reserves_for(index),
 		"recovered": ledger.materials.duplicate(), "supplies": ledger.supplies.duplicate(),
+		"personal_kills": ledger.kills, "personal_deaths": ledger.deaths,
 		"weapons": operators[index].run_weapon_ids.duplicate(), "equipped": operators[index].equipped_suit()}
 
 func send_weapon_sound(cue: StringName, at: Vector3, index: int) -> void:
@@ -2342,13 +2372,13 @@ func send_party_result(index: int) -> void:
 	var result := party_results[index]
 	var summary: Dictionary = result[5].duplicate()
 	summary["bonus_lives_used"] = reported_reserves_used.get(index, 0)
-	summary["squad_rewards"] = squad_rewards
+	summary["party_extracted"] = party_extracted
 	peer.call_func_on(roster[index], receive_outcome, result[0], result[1], result[2], result[3], result[4], summary)
 
 func receive_outcome(success: bool, xp: int, bolts: int, blueprints: Array, duration: float, results := {}) -> void:
 	if outcome.is_empty() and not host and peer.get_sender_id() == peer.get_host():
 		record_guest_lives_spent(int(results.get("bonus_lives_used", 0)))
-		squad_rewards = results.get("squad_rewards", [])
+		party_extracted = results.get("party_extracted", success)
 		extracted_results = results
 		sector_seconds = duration
 		finish_mission(success, xp, bolts, blueprints, results.get("operator_wiped", false), results.get("party_wiped", false))
@@ -2370,7 +2400,7 @@ func keep_recovered_blueprints(blueprints: Array) -> int:
 func finish_mission(success: bool, xp: int, bolts: int, blueprints: Array, exhausted_lives := false, party_wiped := false) -> void:
 	if not outcome.is_empty():
 		return
-	var party_extracted := success or not squad_rewards.is_empty()
+	party_extracted = party_extracted or success
 	success = success and not exhausted_lives
 	var message := "Mission failed. The party ran out of lives."
 	var new_hard_unlock: bool = success and mode == Difficulty.NORMAL and not local_profile.hard_unlocked(sector)
@@ -2402,149 +2432,109 @@ func finish_mission(success: bool, xp: int, bolts: int, blueprints: Array, exhau
 		pause_menu.close()
 	room_status.text = message
 	rewards_status.visible = success or exhausted_lives
+	if party_extracted:
+		relay_owner.station_return_phase = true
+		relay_owner.changed.connect(check_party_return)
 	if success:
+		var ending := ""
 		var extraction_dialogue: Array = Story.hard_unlock(sector) if new_hard_unlock else []
-		if not profile_xp_progress.is_empty():
-			preload("res://scripts/mission_complete.gd").profile_progress(rewards_status.get_parent(), profile_xp_progress)
-			var points := int(profile_xp_progress.get("gamer_points", 0))
-			if points > 0:
-				UI.label(rewards_status.get_parent(), "ACHIEVEMENT UNLOCKED  ·  +%d GAMER SCORE" % points, 17, UI.VIOLET)
-		rewards_status.text = "Recovered items sent to Storage. Save at the System pad to keep your rewards."
-		if extracted_results.get("banked_shards", 0) > 0:
-			rewards_status.text += "\nExtraction · +%s Core Shards." % UI.shard_amount(extracted_results.banked_shards)
-		if challenges_completed > 0:
-			rewards_status.text += "\nClaim your challenge rewards in Challenges at the station."
-		if extracted_results.get("talent_packs", 0) > 0:
-			rewards_status.text += "\nResupply Contract · +%d Resupply Packs." % extracted_results.talent_packs
-		if not extracted_results.get("talent_blueprints", []).is_empty():
-			rewards_status.text += "\nArchive Mastery · " + ", ".join(extracted_results.talent_blueprints)
-		if extracted_results.has("hunt_award"):
-			rewards_status.text += "\nHunt complete · %s sent to Storage." % extracted_results.hunt_award
 		if sector == Catalog.SECTORS.size():
 			var restored := Story.has_all_memories(local_profile.memories)
-			rewards_status.text = Story.ending(restored)
+			ending = Story.ending(restored)
 			extraction_dialogue.append_array(Story.ending_exchange(restored))
+		return_button.hide()
 		if not extraction_dialogue.is_empty() and DisplayServer.get_name() != "headless":
 			var dialogue := StoryDialogue.new()
 			stage.add_child(dialogue)
-			play_extraction_dialogue.call_deferred(dialogue, extraction_dialogue)
-	if party_extracted and not squad_rewards.is_empty():
-		show_squad_extraction()
-		return_button.hide()
+			play_extraction_dialogue.call_deferred(dialogue, extraction_dialogue, xp, bolts, ending)
+		else:
+			show_personal_extraction(xp, bolts, ending)
 	else:
-		return_button.text = "Return Together" if host else ("Returning to Station…" if party_wiped else "Leave Mission")
-	return_button.disabled = party_wiped and not host
-	if return_button.visible and not return_button.disabled:
-		return_button.focus_mode = Control.FOCUS_ALL
-		return_button.grab_focus()
-	if (party_extracted or party_wiped) and host:
+		return_button.text = "Return to Station" if party_extracted or host else ("Returning to Station…" if party_wiped else "Leave Mission")
+		return_button.disabled = party_wiped and not host
+		if not return_button.disabled:
+			return_button.focus_mode = Control.FOCUS_ALL
+			return_button.grab_focus()
+	if party_wiped and host:
 		return_timer = Timer.new()
 		return_timer.one_shot = true
 		add_child(return_timer)
 		return_timer.timeout.connect(relay_owner.return_to_station)
-		var reading_seconds := 3.0 if party_wiped else (30.0 if sector == Catalog.SECTORS.size() else 15.0)
-		return_timer.start(reading_seconds)
+		return_timer.start(3.0)
 	for operator in operators:
 		operator.set_physics_process(false)
 	for enemy in enemies:
 		if is_instance_valid(enemy):
 			enemy.set_physics_process(false)
 
-func capture_squad_rewards() -> void:
-	squad_rewards.clear()
-	for index in operators.size():
-		var operator := operators[index]
-		var ledger := personal_rewards[index]
-		var extracted := operator.health > 0.0 or operator.lives > 0
-		squad_rewards.append({
-			"name": nameplates[index].text,
-			"extracted": extracted,
-			"xp": maxi(0, operator.experience - int(deployment_xp.get(index, 0))) if extracted else 0,
-			"bolts": ledger.bolts if extracted else 0,
-			"materials": ledger.materials.duplicate() if extracted else {},
-			"supplies": ledger.supplies.duplicate() if extracted else {},
-			"blueprints": recovered_blueprint_ids(index),
-		})
-
-func show_squad_extraction() -> void:
+func show_personal_extraction(xp: int, bolts: int, ending: String) -> void:
 	extraction_layer = CanvasLayer.new()
 	extraction_layer.layer = 37
 	add_child(extraction_layer)
-	var backdrop := ColorRect.new()
-	backdrop.color = Color(0.02, 0.045, 0.08, 0.92)
+	var backdrop := preload("res://scripts/controller_overlay.gd").new()
+	backdrop.theme = UI.theme()
 	extraction_layer.add_child(backdrop)
 	backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	var shade := ColorRect.new()
+	shade.color = Color(0.015, 0.035, 0.075, 0.8)
+	backdrop.add_child(shade)
+	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	var center := CenterContainer.new()
-	backdrop.add_child(center)
+	shade.add_child(center)
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	var panel := UI.equipment_card(UI.CYAN)
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size.x = 1050
+	panel.add_theme_stylebox_override("panel", UI.hud_frame(UI.CYAN, Vector2(18, 14), true))
 	center.add_child(panel)
-	var stack := UI.column(panel, 12)
-	UI.profile_label(stack, "// SQUAD EXTRACTION", 38, UI.CYAN)
-	UI.label(stack, Catalog.info(sector).title, 23, UI.WHITE)
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 10)
-	stack.add_child(row)
-	for index in squad_rewards.size():
-		add_extraction_card(row, squad_rewards[index], index)
-	extraction_status = UI.label(stack, "Ready up to return together, or wait for automatic return.", 19, UI.MUTED)
-	var confirm := UI.button(stack, "Ready to Return", func():
-		mark_local_return_ready()
-	, true, 40)
-	UI.profile_button(confirm, true)
-	confirm.grab_focus()
-	confirm.pressed.connect(func(): confirm.disabled = true)
-
-func add_extraction_card(row: HBoxContainer, entry: Dictionary, index: int) -> void:
-	const Materials := preload("res://scripts/fabrication_catalog.gd")
-	var tint := UI.CYAN if index == local_index else UI.VIOLET
-	var card := UI.equipment_card(tint)
-	card.custom_minimum_size.x = 232
-	row.add_child(card)
-	var body := UI.column(card, 8)
-	UI.profile_label(body, String(entry.name) + (" · YOU" if index == local_index else ""), 23, tint)
-	UI.label(body, "EXTRACTED" if entry.extracted else "OPERATOR LOST", 17, UI.MUTED)
-	UI.label(body, "+%d XP  ·  +%d Bolts" % [entry.xp, entry.bolts], 18, UI.WHITE)
-	var scroll := ScrollContainer.new()
-	scroll.custom_minimum_size = Vector2(205, 168)
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	scroll.follow_focus = true
-	UI.make_readable_scroll(scroll)
-	body.add_child(scroll)
-	var items := UI.column(scroll, 5)
-	items.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	for id in entry.blueprints:
-		if Profile.GEAR.has(id):
-			UI.label(items, "Blueprint · " + Profile.GEAR[id].name, 16, tint)
-	for id in entry.materials:
-		UI.label(items, "%s ×%d" % [Materials.label(id), entry.materials[id]], 16)
-	for id in entry.supplies:
-		if Profile.stock.has(id):
-			UI.label(items, "%s ×%d" % [Profile.stock[id].name, entry.supplies[id]], 16)
-	if items.get_child_count() == 0:
-		UI.label(items, "No items recovered", 16, UI.MUTED)
+	var actor := operators[local_index]
+	var summary := {
+		"seconds": sector_seconds, "kills": int(extracted_results.get("personal_kills", 0)),
+		"operator_xp": maxi(0, xp - starting_xp),
+		"player_xp": int(profile_xp_progress.get("after", 0)) - int(profile_xp_progress.get("before", 0)),
+		"shards": int(extracted_results.get("banked_shards", 0)), "operator_frame": actor.operator_frame,
+		"armor_finish": actor.armor_finish,
+	}
+	if not profile_xp_progress.is_empty():
+		summary["profile_progress"] = profile_xp_progress
+	var recovered_blueprints: Array[String] = []
+	recovered_blueprints.assign(extracted_results.get("blueprint_rewards", []))
+	extraction_return_button = preload("res://scripts/mission_complete.gd").build(
+		UI.column(panel, 9), Catalog.info(sector).title, summary, extracted_results.get("recovered", {}),
+		recovered_blueprints, extracted_results.get("supplies", {}), bolts, challenges_completed,
+		int(extracted_results.get("personal_deaths", 0)), ending, mark_local_return_ready
+	)
 
 func mark_local_return_ready() -> void:
-	extraction_status.text = "Waiting for the party. Everyone returns together."
-	if host:
-		record_return_ready(roster[local_index])
-	else:
-		peer.call_func_on(peer.get_host(), receive_return_ready, act)
+	if returned_locally or not party_extracted:
+		return
+	returned_locally = true
+	relay_owner.at_station_during_return = true
+	record_return_ready(roster[local_index])
+	peer.call_func(receive_return_ready, act)
+	local_return_requested.emit()
 
 func receive_return_ready(remote_act: int) -> void:
-	if host and remote_act == act:
+	if remote_act == act and act == 2:
 		record_return_ready(peer.get_sender_id())
 
 func record_return_ready(id: int) -> void:
-	if outcome.is_empty() or squad_rewards.is_empty() or not roster.has(id) or ready_to_return.has(id):
-		return
-	ready_to_return.append(id)
-	if ready_to_return.size() == roster.size():
-		relay_owner.return_to_station.call_deferred()
+	if roster.has(id) and not ready_to_return.has(id):
+		ready_to_return.append(id)
+		check_party_return()
 
-func play_extraction_dialogue(dialogue: CanvasLayer, lines: Array) -> void:
+func check_party_return() -> void:
+	if not party_extracted or not returned_locally or not relay_owner.mission_active or not peer.is_host():
+		return
+	var current: Array = peer.lobby_get_all_clients()
+	for id in roster:
+		if current.has(id) and not ready_to_return.has(id):
+			return
+	relay_owner.return_to_station.call_deferred()
+
+func play_extraction_dialogue(dialogue: CanvasLayer, lines: Array, xp: int, bolts: int, ending: String) -> void:
 	await dialogue.play(lines, "", true)
 	dialogue.queue_free()
+	show_personal_extraction(xp, bolts, ending)
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouse and not is_pause_open():

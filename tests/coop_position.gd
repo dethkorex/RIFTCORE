@@ -126,6 +126,9 @@ func run() -> void:
 	mission.apply_operator_state(partner, partner_state, false)
 	var pitch := deg_to_rad(27.0)
 	check(partner.buster_pose.direction_override.is_equal_approx(Vector3(-cos(pitch), sin(pitch), 0.0)), "Co-op keeps a partner's shallow left aim")
+	partner_state[24] = (27 << mission.BUSTER_PITCH_SHIFT) | mission.BUSTER_PITCH_DOWN
+	mission.apply_operator_state(partner, partner_state, false)
+	check(partner.buster_pose.direction_override.is_equal_approx(Vector3(-cos(pitch), -sin(pitch), 0.0)), "Co-op keeps a partner's downward aim")
 	partner_state[24] = 4 << mission.LEGACY_BUSTER_AIM_SHIFT
 	mission.apply_operator_state(partner, partner_state, false)
 	check(partner.buster_pose.direction_override.is_zero_approx(), "A legacy downward pose cannot aim the partner's cannon below level")

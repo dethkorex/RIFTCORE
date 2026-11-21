@@ -17,6 +17,8 @@ const EDGE := 20.0
 const SUIT_TOP := 200.0
 const SUIT_BOTTOM := 241.0
 const PARTY_TOP := 253.0
+const WALLET_HEIGHT := 44.0
+const MINIMAP_HEIGHT := 159.0
 const PORTRAIT_FRAME := Rect2(32, 34, 80, 143)
 const PICKUP_HEAD_CLEARANCE := 56.0
 const HEART := preload("res://assets/ui/riftcore_kit/icon_heart.png")
@@ -58,6 +60,7 @@ var act := 1
 var coop := false
 var coop_objective: Control
 var coop_party: Control
+var minimap: Control
 var reached_exit := false
 var weapon := "STANDARD FRAME"
 var suit_tint := Color("55e7ff")
@@ -165,8 +168,8 @@ func place_quick_slots() -> void:
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	resized.connect(queue_redraw)
-	RiftSettings.hud_scale_changed.connect(queue_redraw)
+	resized.connect(update_right_column)
+	RiftSettings.hud_scale_changed.connect(update_right_column)
 	if DisplayServer.get_name() != "headless":
 		portrait = EquipmentDisplay.new()
 		portrait.name = "IdlePortrait"
@@ -297,7 +300,7 @@ func announce(message: String, tint: Color, font_size := 36) -> void:
 func set_gate_relays(count: int) -> void:
 	if gate_relay_count != count:
 		gate_relay_count = count
-		queue_redraw()
+		update_right_column()
 
 func set_run_time(seconds: float) -> void:
 	var next := floori(seconds * 10.0)
@@ -450,39 +453,59 @@ func draw_objective(right: float) -> float:
 		task(Vector2(x + 17, 123), "GATE RELAYS   %d / 2" % gate_relay_count, gate_relay_count == 2)
 	return EDGE + height
 
-func draw_resources(at: Vector2) -> void:
-	plate(Rect2(at, Vector2(219, 63)), 9)
-	draw_texture_rect(CURRENCY, Rect2(at + Vector2(12, 7), Vector2(20, 20)), false)
-	draw_texture_rect(SHARD, Rect2(at + Vector2(12, 36), Vector2(20, 20)), false)
-	caption(at + Vector2(40, 23), "BOLTS", 17, UI.MUTED)
-	caption(at + Vector2(40, 51), "CORE SHARDS", 17, UI.MUTED)
-	var bolt_count := "%04d" % credits
-	var shard_count := UI.shard_amount(core_shards, 4)
-	caption(at + Vector2(204 - text_width(bolt_count, 19), 24), bolt_count, 19, Color("ffd481"))
-	caption(at + Vector2(204 - text_width(shard_count, 19), 52), shard_count, 19, Color("d7b0ff"))
-	draw_line(at + Vector2(12, 32), at + Vector2(207, 32), Color("284861"))
-	var strip := at + Vector2(0, 71)
-	plate(Rect2(strip, Vector2(219, 34)), 8)
-	caption(strip + Vector2(14, 22), "RUN TIME", 15, UI.MUTED)
+func install_minimap(map: Control) -> void:
+	minimap = map
+	minimap.name = "Minimap"
+	add_child(minimap)
+	update_right_column()
+
+func right_column(factor: float) -> Rect2:
+	if coop and is_instance_valid(coop_objective):
+		var objective := coop_objective.get_global_rect()
+		return Rect2(objective.position.x / factor, objective.end.y / factor + 8.0, objective.size.x / factor, WALLET_HEIGHT)
+	var x := size.x / factor - EDGE - OBJECTIVE_WIDTH
+	var top := EDGE + (121.0 if gate_relay_count >= 0 else 96.0) + 8.0
+	return Rect2(x, top, OBJECTIVE_WIDTH, WALLET_HEIGHT)
+
+func update_right_column() -> void:
+	if is_instance_valid(minimap):
+		var factor := HUD_SCALE * RiftSettings.hud_scale
+		var wallet := right_column(factor)
+		minimap.position = Vector2(wallet.position.x, wallet.end.y + 8.0) * factor
+		minimap.size = Vector2(wallet.size.x, MINIMAP_HEIGHT)
+		minimap.scale = Vector2.ONE * factor
+	queue_redraw()
+
+func draw_resources(wallet: Rect2) -> void:
+	plate(wallet, 9)
+	var width := wallet.size.x / 3.0
 	var time := "%02d:%02d.%d" % [run_tenths / 600, run_tenths / 10 % 60, run_tenths % 10]
-	caption(strip + Vector2(204 - text_width(time, 18), 23), time, 18)
+	var entries := [
+		["BOLTS", "%04d" % credits, Color("ffd481"), CURRENCY],
+		["SHARDS", UI.shard_amount(core_shards, 4), Color("d7b0ff"), SHARD],
+		["RUN TIME", time, WHITE, null],
+	]
+	for index in entries.size():
+		var at := wallet.position + Vector2(index * width, 0.0)
+		var entry: Array = entries[index]
+		var inset := 13.0
+		if entry[3] != null:
+			draw_texture_rect(entry[3], Rect2(at + Vector2(11, 13), Vector2(18, 18)), false)
+			inset = 36.0
+		caption(at + Vector2(inset, 16), entry[0], 13, UI.MUTED)
+		caption(at + Vector2(inset, 35), entry[1], fit_font(entry[1], 19, width - inset - 8.0), entry[2])
+		if index > 0:
+			draw_line(at + Vector2(0, 9), at + Vector2(0, 36), Color("284861"))
 
 func _draw() -> void:
 	var hud_scale := HUD_SCALE * RiftSettings.hud_scale
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE * hud_scale)
 	var hud_size := size / hud_scale
-	var right := hud_size.x - EDGE
-	var right_start := right - OBJECTIVE_WIDTH
-	var counters_top := EDGE + 127.0
 	draw_operator()
 	if not coop:
-		counters_top = draw_objective(right) + 9.0
-	elif is_instance_valid(coop_objective):
-		var objective := coop_objective.get_global_rect()
-		right_start = objective.position.x / hud_scale
-		counters_top = objective.end.y / hud_scale + 9.0
-	var counters_at := Vector2(right - 219, counters_top)
-	draw_resources(counters_at)
+		draw_objective(hud_size.x - EDGE)
+	var wallet := right_column(hud_scale)
+	draw_resources(wallet)
 
 	var status_y := PARTY_TOP
 	if coop and is_instance_valid(coop_party):
@@ -493,7 +516,7 @@ func _draw() -> void:
 		caption(Vector2(34, status_y + 21), line, fit_font(line, 18, 192.0), tint)
 		status_y += 36.0
 	if boss_visible:
-		draw_boss_readout(hud_size, right_start, maxf(status_y, counters_top + 108.0) + 16.0)
+		draw_boss_readout(hud_size, wallet.position.x, maxf(status_y, wallet.end.y + 8.0) + 16.0)
 	if failed:
 		var width := 340.0
 		var at := Vector2((hud_size.x - width) * 0.5, hud_size.y * 0.72)

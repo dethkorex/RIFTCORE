@@ -3,6 +3,8 @@ extends Area3D
 signal collected
 
 const Orb := preload("res://scripts/pickup_orb_visual.gd")
+const EXTRA_LIFE := preload("res://assets/pickups/extra_life.tscn")
+const EXTRA_LIFE_CHANCE := 0.08
 var materials: Dictionary
 var blueprint_id := ""
 var consumed := false
@@ -42,6 +44,8 @@ static func spill(host: Node3D, at: Vector3, rewards: Dictionary, authority := t
 	for kind in ["blueprint", "supply"]:
 		if not String(rewards.get(kind, "")).is_empty():
 			contents.append({kind: rewards[kind]})
+	if rewards.get("life", false):
+		contents.append({"life": true})
 	for index in contents.size():
 		var offset: float = [0.95, -1.0, 1.9, -2.0, 2.75][index]
 		var drop_position := at + Vector3(offset, 0, 0)
@@ -52,7 +56,16 @@ static func spill(host: Node3D, at: Vector3, rewards: Dictionary, authority := t
 		else:
 			drop_position = at + Vector3(offset * .22, .10 * index, 0)
 		var payload := contents[index]
-		drops.append(spawn(host, drop_position, payload.get("materials", {}), payload.get("blueprint", ""), payload, at, authority, owner, show_local))
+		if payload.has("life"):
+			var life := EXTRA_LIFE.instantiate() as Area3D
+			life.position = host.to_local(drop_position)
+			life.claimant = owner
+			life.replica = not authority
+			life.local_copy = show_local
+			host.add_child.call_deferred(life)
+			drops.append(life)
+		else:
+			drops.append(spawn(host, drop_position, payload.get("materials", {}), payload.get("blueprint", ""), payload, at, authority, owner, show_local))
 	return drops
 
 func _ready() -> void:

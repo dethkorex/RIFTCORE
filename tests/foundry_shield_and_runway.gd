@@ -57,7 +57,12 @@ func check_boulder(game, act: int) -> void:
 	player.global_position = rock.global_position + Vector3(rock.direction * 2.0, -1.0, 0)
 	await frames(3)
 	check(rock.status == 1, "Act %d approach triggers the boulder warning" % act)
-	player.global_position = rock.global_position + Vector3.UP * 15
+	var lives: int = player.lives
+	if act == 1:
+		var beacon: Node3D = game.game_root.get_node("TERRAIN/MidpointCheckpoint")
+		player.global_position = beacon.global_position + Vector3.UP * 0.85
+	else:
+		player.global_position = rock.global_position + Vector3.UP * 15
 	var mark: float = rock.start.x + rock.direction * rock.runway_length
 	var crossed := false
 	var ticks := 0
@@ -73,6 +78,9 @@ func check_boulder(game, act: int) -> void:
 			crossed = true
 	print("Act ", act, " mark ", mark, " final ", rock.position, " state ", rock.status, " ticks ", ticks)
 	check(crossed, "Act %d boulder keeps rolling beyond the yellow line" % act)
+	if act == 1:
+		check(player.lives == lives and rock.position.x > rock.start.x and not rock.threatens(player),
+			"The Act I checkpoint is outside the boulder's trigger and roll path")
 	check(rock.status == 3 and not rock.body_mesh.visible, "Act %d roll ends by shattering or leaving the sector" % act)
 	var state: Array = rock.snapshot()
 	check(is_equal_approx(state[4], rock.position.y), "Co-op snapshot includes actual boulder height")

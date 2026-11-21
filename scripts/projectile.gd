@@ -223,12 +223,16 @@ func _on_body_entered(body: Node) -> void:
 			if weapon_id == "chimera_burst" and body is Combatant and body.has_meta(&"chimera_mark_until"):
 				if int(body.get_meta(&"chimera_mark_until")) > Time.get_ticks_msec():
 					corrosion = 1.35 if is_charged else 1.22
+			if body is Combatant:
+				body.damage_operator_id = source_operator
 			if is_magma and body.has_method("take_fire_damage"):
 				body.take_fire_damage(damage + combo, global_position)
 			elif not weapon_id.is_empty() and body.has_method("take_element_damage"):
 				body.take_element_damage(damage * corrosion, global_position, weapon_id)
 			else:
 				body.take_damage(damage + combo, global_position)
+			if body is Combatant:
+				body.damage_operator_id = 0
 			if combo > 0.0:
 				spawn_impact(true)
 			elif is_magma and burn_power > 0.0 and body.has_method("ignite") and body.health < prior:
@@ -255,6 +259,7 @@ func spawn_prism_fragments(at: Vector3, original: int) -> void:
 		var fragment := RiftProjectile.new()
 		fragment.collision_mask = collision_mask
 		fragment.damage = damage * 0.57
+		fragment.source_operator = source_operator
 		fragment.speed = 25.0
 		fragment.range_remaining = 8.5
 		fragment.struck[original] = true
@@ -321,14 +326,14 @@ func spread_reward_impact(body: Node3D, radius: float) -> void:
 			"magma_breaker":
 				target.ignite(burn_power * 0.48, 2.0, source_operator)
 			"thorn_swarm":
-				target.take_damage(damage * 0.22, at)
+				target.take_operator_damage(damage * 0.22, at, source_operator)
 				root_mobile(target, 1.3)
 			"singularity_shot":
-				target.take_damage(damage * 0.44, at)
+				target.take_operator_damage(damage * 0.44, at, source_operator)
 				if movable_target(target):
 					target.recoil = signf(at.x - target.global_position.x) * (11.0 if is_charged else 6.5)
 			"scrap_reaver":
-				target.take_damage(damage * 0.50, at)
+				target.take_operator_damage(damage * 0.50, at, source_operator)
 				if movable_target(target):
 					target.recoil = signf(target.global_position.x - at.x) * 8.0
 		links.append(target.global_position)
@@ -346,7 +351,7 @@ func chain_reward_lightning(body: Node3D) -> void:
 		if targets.is_empty():
 			break
 		var next := targets.front() as Combatant
-		next.take_damage(power, origin)
+		next.take_operator_damage(power, origin, source_operator)
 		used.append(next)
 		origin = next.global_position
 		links.append(origin)

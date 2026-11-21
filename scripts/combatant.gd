@@ -17,6 +17,8 @@ const BOSS_DIFFICULTY := preload("res://scripts/mission_difficulty.gd")
 @export var weakness_weapon := ""
 @export var weapon_weakness := 1.45
 var incoming_critical := false
+var damage_operator_id := 0
+var defeated_by_operator_id := 0
 var health: float
 var invulnerable_time := 0.0
 var burn_left := 0.0
@@ -63,7 +65,13 @@ func lose_health(amount: float, burning: bool, critical: bool) -> void:
 	show_damage.call_deferred(amount, burning, critical)
 	health_changed.emit(health, max_health)
 	if health <= 0.0:
+		defeated_by_operator_id = burn_source if burning else damage_operator_id
 		died.emit()
+
+func take_operator_damage(amount: float, at: Vector3, operator_id: int) -> void:
+	damage_operator_id = operator_id
+	take_damage(amount, at)
+	damage_operator_id = 0
 
 func take_fire_damage(amount: float, source_position := Vector3.ZERO) -> void:
 	incoming_critical = fire_weakness > 1.0

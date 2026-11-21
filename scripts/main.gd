@@ -519,16 +519,29 @@ func verify_coop_mission(host: bool, smoke_sector: int, wipe_test := false) -> v
 		if not await clear_coop_test_boss(mission):
 			finish_relay_check(false)
 			return
-	if not await wait_for_relay(func(): return is_instance_valid(mission) and is_instance_valid(mission.extraction_status), 45.0):
-		print("Campaign check did not see the squad extraction screen")
+	if not await wait_for_relay(func(): return is_instance_valid(mission) and is_instance_valid(mission.extraction_return_button), 45.0):
+		print("Campaign check did not see the personal extraction summary")
 		finish_relay_check(false)
 		return
-	var squad: Array = mission.squad_rewards
-	if squad.size() != 2 or squad[0].bolts == squad[1].bolts:
-		print("Campaign check did not see separate reward cards for both operators")
+	var labels: Array = mission.extraction_layer.find_children("*", "Label", true, false).map(func(label): return str(label.text))
+	var partner_blueprint := "bp_%02d_%02d" % [smoke_sector, int(host)]
+	if not labels.has("Enemies defeated") or not labels.has("Operator XP gained") or not labels.has(profile.GEAR[reward_blueprint].name) or labels.has(profile.GEAR[partner_blueprint].name):
+		print("Campaign check did not see the solo summary with only local rewards")
 		finish_relay_check(false)
 		return
-	mission.mark_local_return_ready()
+	if host:
+		mission.mark_local_return_ready()
+		if not is_instance_valid(home_hub) or not RiftRelay.mission_active:
+			print("Campaign check could not visit the hub before the guest dismissed results")
+			finish_relay_check(false)
+			return
+		RiftRelay.relay.lobby_set_data("coop_first_player_returned", true)
+	else:
+		if not await wait_for_relay(func(): return RiftRelay.relay.lobby_get_data("coop_first_player_returned", false), 7.0) or is_instance_valid(home_hub):
+			print("Campaign check lost the guest's summary when the leader left")
+			finish_relay_check(false)
+			return
+		mission.mark_local_return_ready()
 	var returned := await wait_for_relay(func(): return is_instance_valid(home_hub) and not RiftRelay.mission_active, 10.0)
 	var continuation := read_checkpoint()
 	var next_sector := mini(smoke_sector + 1, Catalog.SECTORS.size())
@@ -1098,6 +1111,7 @@ func start_coop_mission(is_host: bool, number: int) -> void:
 		coop_mission.starting_suit = String(save.get_value("checkpoint", "equipped", ""))
 	coop_mission.rewards_earned.connect(bank_coop_rewards)
 	coop_mission.operator_wiped.connect(reset_defeated_run)
+	coop_mission.local_return_requested.connect(return_local_coop_operator)
 	coop_mission.exit_requested.connect(func():
 		if is_host and not coop_mission.outcome.is_empty():
 			RiftRelay.return_to_station()
@@ -1120,14 +1134,15 @@ func bank_coop_rewards(xp: int, bolts: int, blueprints: Array, number: int) -> v
 	profile.apply_recovery_crew(number, recovered)
 	profile.deposit_materials(recovered)
 	var supplies: Dictionary = results.get("supplies", {}).duplicate()
-	var packs := int(profile.apply_resupply_contract(supplies))
+	profile.apply_resupply_contract(supplies)
 	profile.deposit_supplies(supplies)
+	coop_mission.extracted_results["recovered"] = recovered
+	coop_mission.extracted_results["supplies"] = supplies
 	coop_mission.profile_xp_progress = award_profile_clear(number, RiftRelay.mission_mode, coop_mission.sector_seconds, int(results.get("kills", 0)), true, results)
 	profile.credits += bolts
 	var shards := Difficulty.extraction_shards(number, RiftRelay.mission_mode) + int(profile.talent_bonus("shard_reclaimer"))
 	profile.core_shards += shards
 	coop_mission.extracted_results["banked_shards"] = shards
-	coop_mission.extracted_results["talent_packs"] = packs
 	profile.unlock_sector(mini(number + 1, Catalog.SECTORS.size()))
 	if number <= Story.MEMORIES.size() and not profile.memories.has(number):
 		profile.memories.append(number)
@@ -1135,13 +1150,16 @@ func bank_coop_rewards(xp: int, bolts: int, blueprints: Array, number: int) -> v
 		var ending := "secret" if Story.has_all_memories(profile.memories) else "standard"
 		if not profile.endings.has(ending):
 			profile.endings.append(ending)
+	var stored_blueprints: Array[String] = []
 	for id in blueprints:
-		profile.collect_blueprint(id)
+		if profile.collect_blueprint(id):
+			stored_blueprints.append(profile.GEAR[id].name)
 	var operator_level := RiftPlayer.level_for_experience(xp)
 	var hunt: String = profile.advance_blueprint_hunt(number, RiftRelay.mission_mode, operator_level)
 	if not hunt.is_empty():
-		coop_mission.extracted_results["hunt_award"] = profile.GEAR[hunt].name
-	coop_mission.extracted_results["talent_blueprints"] = profile.award_archive_mastery(number, RiftRelay.mission_mode, operator_level)
+		stored_blueprints.append(profile.GEAR[hunt].name)
+	stored_blueprints.append_array(profile.award_archive_mastery(number, RiftRelay.mission_mode, operator_level))
+	coop_mission.extracted_results["blueprint_rewards"] = stored_blueprints
 	profile.operator_level = operator_level
 	var save := read_checkpoint()
 	if save == null:
@@ -1167,12 +1185,24 @@ func bank_coop_rewards(xp: int, bolts: int, blueprints: Array, number: int) -> v
 	elif save_session and persist_operator_save() != OK:
 		push_warning("Could not save the co-op extraction rewards to disk.")
 
+func return_local_coop_operator() -> void:
+	if not is_instance_valid(coop_mission):
+		return
+	coop_mission.hide()
+	coop_mission.process_mode = Node.PROCESS_MODE_DISABLED
+	for layer in coop_mission.find_children("*", "CanvasLayer", true, false):
+		layer.hide()
+	open_home_hub()
+	RiftAudio.play_music(false)
+
 func close_coop_mission(message: String) -> void:
 	if not is_instance_valid(coop_mission):
 		return
 	var local: RiftPlayer = coop_mission.operators[coop_mission.local_index] if coop_mission.operators.size() > coop_mission.local_index else null
 	var exhausted := is_instance_valid(local) and local.lives <= 0 and local.health <= 0
-	profile.finish_field_supplies({}, false)
+	var returned: bool = coop_mission.returned_locally
+	if not returned:
+		profile.finish_field_supplies({}, false)
 	if coop_mission.outcome.is_empty() and exhausted:
 		coop_mission.keep_recovered_blueprints(coop_mission.recovered_blueprint_ids(coop_mission.local_index))
 		reset_defeated_run()
@@ -1181,6 +1211,8 @@ func close_coop_mission(message: String) -> void:
 	coop_mission = null
 	for shot in get_tree().get_nodes_in_group(&"rift_projectile"):
 		shot.queue_free()
+	if returned:
+		return
 	open_home_hub()
 	RiftAudio.play_music(false)
 	if RiftRelay.connected_room.is_empty():
@@ -2127,7 +2159,7 @@ func build_hud() -> void:
 	factory_hud.show_quick_slots(profile)
 	var minimap := MissionMap.new()
 	configure_mission_map(minimap)
-	minimap.place_in_hud(hud)
+	factory_hud.install_minimap(minimap)
 	factory_hud.add_field_lessons(sector, act, can_open_chat)
 	var lessons := preload("res://scripts/pickup_lessons.gd").new()
 	hud.add_child(lessons)
@@ -2737,10 +2769,10 @@ func _input(event: InputEvent) -> void:
 func can_open_chat() -> bool:
 	if get_tree().paused or get_tree().has_group(&"interactive_dialogue") or (is_instance_valid(menu) and menu.is_visible_in_tree()):
 		return false
-	if is_instance_valid(coop_mission):
-		return coop_mission.can_open_chat()
 	if is_instance_valid(home_hub):
 		return not home_hub.panel_open and not home_hub.reconstructing and not home_hub.tour_active and not home_hub.has_dialogue()
+	if is_instance_valid(coop_mission):
+		return coop_mission.can_open_chat()
 	return is_instance_valid(player) and player.visible and not deploying and not advancing_act and not arena_intro and not suit_reveal_active and not sector_complete and not respawning
 
 func set_chat_open(open: bool) -> void:
@@ -2748,10 +2780,10 @@ func set_chat_open(open: bool) -> void:
 		for action in RiftSettings.ACTIONS.keys() + ["crouch_stick", "quick_0", "quick_1", "quick_2", "quick_3"]:
 			if action != "push_to_talk":
 				Input.action_release(action)
-	if is_instance_valid(coop_mission):
-		coop_mission.set_chat_open(open)
-	elif is_instance_valid(home_hub):
+	if is_instance_valid(home_hub):
 		home_hub.set_chat_open(open)
+	elif is_instance_valid(coop_mission):
+		coop_mission.set_chat_open(open)
 	elif is_instance_valid(player):
 		player.set_controls_suspended(open)
 

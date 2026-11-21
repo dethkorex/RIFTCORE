@@ -60,6 +60,8 @@ var last_party_whisper: Dictionary[int, int] = {}
 var party_messages: Array[Dictionary] = []
 var party_chat_allowance: Dictionary[int, Vector2] = {}
 var mission_active := false
+var station_return_phase := false
+var at_station_during_return := false
 var mission_roster: Array = []
 var mission_mode := 0
 var previous_room := ""
@@ -761,7 +763,7 @@ func _receive_deploy(sector: int, roster: Array, mode: int, credentials: Diction
 	deploy_requested.emit(false, sector)
 
 func send_station_position(x: float, facing: float, animation: String) -> void:
-	if room_size >= 2 and not mission_active and is_instance_valid(relay):
+	if room_size >= 2 and (not mission_active or at_station_during_return) and is_instance_valid(relay):
 		station_positions[relay.get_client_id()] = x
 		var now := Time.get_ticks_msec()
 		var pose := Vector2(x, facing)
@@ -774,7 +776,7 @@ func send_station_position(x: float, facing: float, animation: String) -> void:
 
 func _receive_partner_position(x: float, facing: float, animation: String, display_name: String) -> void:
 	var sender: int = relay.get_sender_id()
-	if mission_active or room_size < 2 or sender == relay.get_client_id() or not relay.lobby_get_all_clients().has(sender):
+	if (mission_active and not at_station_during_return) or room_size < 2 or sender == relay.get_client_id() or not relay.lobby_get_all_clients().has(sender):
 		return
 	if is_finite(x) and is_finite(facing) and animation in ["idle", "walk", "run"]:
 		station_positions[sender] = clampf(x, -19.15, 19.15)
@@ -798,6 +800,8 @@ func _receive_return() -> void:
 
 func _finish_return() -> void:
 	mission_active = false
+	station_return_phase = false
+	at_station_during_return = false
 	mission_roster.clear()
 	recovery.clear()
 	recovery.changed.emit()
@@ -819,27 +823,27 @@ func _peer_left(client_id: int) -> void:
 			if int(offer.get("claim", 0)) == client_id:
 				offer.erase("claim")
 				_publish_hub_drop(key, offer)
-	if mission_active and mission_roster.has(client_id):
+	if mission_active and not station_return_phase and mission_roster.has(client_id):
 		recovery.begin()
 	_players_changed(client_id)
 
 func _host_changed(is_host: bool, _host_id: int) -> void:
 	if not is_host or connected_room.is_empty():
 		return
-	if mission_active:
+	if mission_active and not station_return_phase:
 		if recovery.slot == 0:
 			return
 		recovery.begin()
 		# When the relay promotes a guest, keep the original room open to the reserved seats.
 		relay.lobby_change_password(recovery.password)
-	else:
+	elif not mission_active:
 		relay.lobby_set_tag("RiftcoreHost", local_name)
 	relay.lobby_open()
 	relay._data_controller.schedule_friend_status()
 	changed.emit()
 
 func _receive_abandon() -> void:
-	if mission_active and mission_roster.has(relay.get_sender_id()):
+	if mission_active and not station_return_phase and mission_roster.has(relay.get_sender_id()):
 		if relay.is_host() and not connected_room.is_empty():
 			_restore_party_access()
 		_finish_return()
@@ -852,13 +856,15 @@ func leave(message := "Create a room or enter a friend’s room code.", delibera
 	if deliberate:
 		previous_room = ""
 		previous_room_password = ""
-		if was_in_mission and not connected_room.is_empty() and relay.is_active():
+		if was_in_mission and not station_return_phase and not connected_room.is_empty() and relay.is_active():
 			relay.call_func(_receive_abandon)
 			if relay.is_host():
 				_restore_party_access()
 	recovery.clear()
 	recovery.changed.emit()
 	mission_active = false
+	station_return_phase = false
+	at_station_during_return = false
 	mission_roster.clear()
 	var was_joined := not connected_room.is_empty()
 	var disconnect := not pending.is_empty() or was_joined

@@ -8,7 +8,7 @@ const Catalog := preload("res://scripts/sector_catalog.gd")
 const Difficulty := preload("res://scripts/mission_difficulty.gd")
 const LEGACY_CHALLENGE_COUNT := 3
 const SECONDS_PER_DAY := 86400
-const CHALLENGE_VERSION := 2
+const CHALLENGE_VERSION := 3
 const CHALLENGE_SETS := [
 	[
 		["Gatebreaker", "Reach Act II after defeating 6 security units.", "act", 1, 0, {"act_kills": 6}],
@@ -607,13 +607,13 @@ func nightmare_unlocked() -> bool:
 func challenge_cycle(sector: int, clock := Time.get_datetime_dict_from_system()) -> Dictionary:
 	var cycle: Dictionary = challenge_cycles.get(sector, {})
 	var today := challenge_day(clock)
-	if cycle.is_empty():
+	if int(cycle.get("version", 0)) != CHALLENGE_VERSION:
 		cycle = {"version": CHALLENGE_VERSION, "set": 0, "done": [], "claimed": [], "day": today}
 		challenge_cycles[sector] = cycle
 		return cycle
 	if not cycle.has("claimed"):
 		cycle["claimed"] = cycle.done.duplicate()
-	if int(cycle.get("version", 0)) != CHALLENGE_VERSION or today > int(cycle.get("day", today)):
+	if today > int(cycle.get("day", today)):
 		var picker := RandomNumberGenerator.new()
 		picker.seed = hash([today, sector, operator_name])
 		var next := posmod(int(cycle.set) + picker.randi_range(1, CHALLENGE_SETS.size() - 1), CHALLENGE_SETS.size())
