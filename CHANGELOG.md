@@ -1,4 +1,4 @@
-# RIFTCORE Alpha 6.3.53
+# RIFTCORE Alpha 6.3.54
 
 ## Operator progression
 - Operator levels grant stronger base damage and damage resistance. The damage bonus also applies to the saber, boss suit weapons, and their damage effects.
@@ -8,4 +8,5 @@
 ## Workshop and cloud saves
 - Crafting has a filterable recipe list, a schematic preview with material requirements, and a Materials in Storage panel.
 - Marketplace pairs a filterable catalog with item stats, distinct item icons, quantity controls, and a live purchase total.
+- Core Ascension has color-coded talent branches, clearer tier connections and ranks, and a focused panel for effects and shard costs.
 - Checking Cloud Saves shows the active stage, connected profile, last recorded sync, and the number of cloud saves once verified.

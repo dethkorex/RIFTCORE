@@ -1536,16 +1536,8 @@ func show_save_result(result: String) -> void:
 	save_status.text = result
 
 func build_workshop(columns: HBoxContainer) -> void:
-	var tree := card(columns)
-	var header := HBoxContainer.new()
-	tree.add_child(header)
-	var heading := UI.label(header, "Core Ascension", 30, UI.CYAN)
-	heading.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var level := UI.label(header, "PLAYER LV. %d" % profile.player_level(), 17, Color("ffd079"))
-	level.autowrap_mode = TextServer.AUTOWRAP_OFF
-	UI.label(tree, "Install a talent in each earlier tier to unlock the next tier of that branch.", 16, UI.MUTED)
 	var talent_tree := TalentTree.new()
-	tree.add_child(talent_tree)
+	columns.add_child(talent_tree)
 	talent_tree.build(profile, enhancement_focus, shop_status if not enhancement_focus.is_empty() else "", purchase_upgrade)
 	enhancement_focus = ""
 
