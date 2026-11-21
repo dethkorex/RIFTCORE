@@ -1337,24 +1337,23 @@ func build_hud() -> void:
 	update_personal_hud(operators[local_index])
 
 func build_teammate_status() -> void:
-	var panel := PanelContainer.new()
-	panel.name = "PartyHUD"
-	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	panel.theme = UI.theme()
-	panel.add_theme_stylebox_override("panel", UI.hud_frame(UI.CYAN, Vector2(10, 8)))
-	panel.custom_minimum_size.x = FactoryHUD.PANEL_WIDTH
-	personal_hud.add_child(panel)
-	personal_hud.coop_party = panel
-	panel.resized.connect(personal_hud.queue_redraw)
+	var content := VBoxContainer.new()
+	content.name = "PartyHUD"
+	content.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	content.theme = UI.theme()
+	content.custom_minimum_size.x = FactoryHUD.PANEL_WIDTH - 25.0
+	content.add_theme_constant_override("separation", 4)
+	personal_hud.add_child(content)
+	personal_hud.coop_party = content
+	content.resized.connect(personal_hud.queue_redraw)
 	RiftSettings.hud_scale_changed.connect(personal_hud.place_party)
 	personal_hud.place_party()
-	var content := UI.column(panel, 5)
 	var title := HBoxContainer.new()
 	title.add_theme_constant_override("separation", 7)
 	content.add_child(title)
 	var person_icon := preload("res://assets/ui/riftcore_kit/icon_person.png")
 	add_squad_icon(title, person_icon, UI.CYAN)
-	UI.profile_label(title, "SQUAD", 17, UI.CYAN)
+	UI.profile_label(title, "SQUAD", 14, UI.CYAN)
 	for index in roster.size():
 		if index == local_index:
 			teammate_status.append({})
@@ -1362,31 +1361,30 @@ func build_teammate_status() -> void:
 		var tint := UI.operator_tint(roster[index], peer.get_host(), roster)
 		var card := PanelContainer.new()
 		card.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		card.add_theme_stylebox_override("panel", UI.profile_frame(Color("102639"), tint.darkened(0.55), Vector2(9, 4)))
+		card.add_theme_stylebox_override("panel", UI.profile_frame(Color("0b1b2be9"), tint.darkened(0.47), Vector2(8, 2)))
 		content.add_child(card)
-		var row := UI.column(card, 1)
+		var row := UI.column(card, 0)
 		var heading := HBoxContainer.new()
 		heading.add_theme_constant_override("separation", 6)
 		row.add_child(heading)
-		add_squad_icon(heading, person_icon, tint)
 		var microphone := add_voice_icon(heading)
-		var name_label := UI.label(heading, "", 20, tint)
+		var name_label := UI.label(heading, "", 17, tint)
 		name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		name_label.autowrap_mode = TextServer.AUTOWRAP_OFF
 		name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-		var tracking := UI.label(heading, "", 15, UI.MUTED)
+		var tracking := UI.label(heading, "", 13, UI.MUTED)
 		tracking.autowrap_mode = TextServer.AUTOWRAP_OFF
 		tracking.hide()
 		var heart := add_squad_icon(heading, FactoryHUD.HEART, UI.CYAN)
-		var lives := UI.label(heading, "", 16, UI.CYAN)
+		var lives := UI.label(heading, "", 14, UI.CYAN)
 		lives.autowrap_mode = TextServer.AUTOWRAP_OFF
 		lives.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		var health_row := HBoxContainer.new()
 		health_row.add_theme_constant_override("separation", 10)
 		row.add_child(health_row)
-		UI.label(health_row, "HP", 14, UI.MUTED).autowrap_mode = TextServer.AUTOWRAP_OFF
+		UI.label(health_row, "HP", 12, UI.MUTED).autowrap_mode = TextServer.AUTOWRAP_OFF
 		var bar := ProgressBar.new()
-		bar.custom_minimum_size.y = 8.0
+		bar.custom_minimum_size.y = 6.0
 		bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		bar.show_percentage = false
@@ -1396,8 +1394,8 @@ func build_teammate_status() -> void:
 		var fill := UI.profile_frame(Color("72e3a6"), Color.TRANSPARENT, Vector2.ZERO)
 		bar.add_theme_stylebox_override("fill", fill)
 		health_row.add_child(bar)
-		var value := UI.label(health_row, "", 16, UI.WHITE)
-		value.custom_minimum_size.x = 64
+		var value := UI.label(health_row, "", 14, UI.WHITE)
+		value.custom_minimum_size.x = 58
 		value.autowrap_mode = TextServer.AUTOWRAP_OFF
 		value.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		teammate_status.append({"name": name_label, "tracking": tracking, "value": value, "lives": lives,

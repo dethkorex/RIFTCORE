@@ -11,14 +11,15 @@ const PORTRAIT := preload("res://assets/ui/rx07_menu.png")
 const CYAN := UI.CYAN
 const WHITE := Color("f1f8ff")
 const INK := Color("091727f5")
-const PANEL_WIDTH := 354.0
+const PANEL_WIDTH := 292.0
 const OBJECTIVE_WIDTH := 348.0
 const EDGE := 20.0
-const SUIT_TOP := 200.0
-const SUIT_BOTTOM := 241.0
-const PARTY_TOP := 253.0
+const SUIT_TOP := 120.0
+const PARTY_TOP := 160.0
+const GAUGES_LEFT := 97.0
+const GAUGES_RIGHT := EDGE + PANEL_WIDTH - 14.0
 const MINIMAP_HEIGHT := 140.0
-const PORTRAIT_FRAME := Rect2(32, 34, 80, 143)
+const PORTRAIT_FRAME := Rect2(31, 31, 57, 83)
 const PICKUP_HEAD_CLEARANCE := 56.0
 const HEART := preload("res://assets/ui/riftcore_kit/icon_heart.png")
 const SHIELD := preload("res://assets/ui/riftcore_kit/icon_shield.png")
@@ -394,10 +395,10 @@ func segmented_meter(rect: Rect2, ratio: float, tint: Color, count: int) -> void
 			draw_line(pt + slant, pt + span + slant, tint.lightened(.38), 1.15, true)
 
 func gauge(y: float, label: String, ratio: float, tint: Color, values := "") -> void:
-	caption(Vector2(119, y + 13), label, 16, UI.MUTED)
+	caption(Vector2(GAUGES_LEFT, y + 11), label, 14, UI.MUTED)
 	if not values.is_empty():
-		caption(Vector2(358 - text_width(values, 17), y + 13), values, 17)
-	segmented_meter(Rect2(118, y + 18, 237, 8), ratio, tint, 10)
+		caption(Vector2(GAUGES_RIGHT - text_width(values, 15), y + 11), values, 15)
+	segmented_meter(Rect2(GAUGES_LEFT, y + 14, GAUGES_RIGHT - GAUGES_LEFT - 2.0, 5), ratio, tint, 10)
 
 func task(at: Vector2, value: String, done: bool) -> void:
 	var color := Color("8dffe5") if done else WHITE
@@ -407,41 +408,53 @@ func task(at: Vector2, value: String, done: bool) -> void:
 	caption(at + Vector2(23, 0), value, fit_font(value, 17, OBJECTIVE_WIDTH - 58.0), color)
 
 func draw_operator() -> void:
-	plate(Rect2(EDGE, EDGE, PANEL_WIDTH, SUIT_TOP - EDGE - 9.0), 13)
+	var right := EDGE + PANEL_WIDTH
+	var bottom := PARTY_TOP - 9.0
+	var outline := PackedVector2Array([
+		Vector2(EDGE + 12, EDGE), Vector2(right - 16, EDGE), Vector2(right, EDGE + 16),
+		Vector2(right, SUIT_TOP - 9), Vector2(right - 9, SUIT_TOP),
+		Vector2(right - 24, SUIT_TOP), Vector2(right - 54, bottom),
+		Vector2(EDGE + 10, bottom), Vector2(EDGE, bottom - 10), Vector2(EDGE, EDGE + 12),
+	])
+	draw_colored_polygon(outline, INK)
+	outline.append(outline[0])
+	draw_polyline(outline, Color(CYAN, 0.15), 4.1, true)
+	draw_polyline(outline, Color("49adc8"), 1.55, true)
+	draw_line(Vector2(EDGE + 16, EDGE + 3), Vector2(EDGE + 80, EDGE + 3), CYAN, 2, true)
+	draw_polyline(PackedVector2Array([Vector2(EDGE + 10, SUIT_TOP), Vector2(right - 24, SUIT_TOP), Vector2(right - 54, bottom)]),
+		Color(suit_tint, 0.58), 1.5, true)
+
 	draw_rect(PORTRAIT_FRAME, Color("102338"))
 	if not is_instance_valid(portrait):
 		var source_size := PORTRAIT.get_size()
 		draw_texture_rect_region(PORTRAIT, PORTRAIT_FRAME.grow(-2),
 			Rect2(source_size * Vector2(0.415, 0.008), source_size * Vector2(0.17, 0.27)))
 	draw_rect(PORTRAIT_FRAME, Color("386e8d"), false, 1.0)
-	caption(Vector2(119, 48), "RX-07", 23)
-	var current_level := RiftPlayer.level_for_experience(experience)
-	var level := "OPERATOR LV. %02d" % current_level
-	caption(Vector2(359 - text_width(level, 18), 47), level, 18, CYAN)
-	draw_line(Vector2(119, 54), Vector2(358, 54), Color("315979"))
-	gauge(57, "HEALTH", health, Color("7cf287"), "%d / %d" % [roundi(health * health_capacity), roundi(health_capacity)])
-	gauge(87, "ENERGY", energy, Color("4cdcfb"), "%d / %d" % [roundi(energy * energy_capacity), roundi(energy_capacity)])
+	caption(Vector2(GAUGES_LEFT, 42), "RX-07", 20)
+	var level := "LV. %02d" % RiftPlayer.level_for_experience(experience)
+	caption(Vector2(GAUGES_RIGHT - 59.0 - text_width(level, 16), 42), level, 16, CYAN)
+	var life_tint := Color("ff8999") if lives == 0 else Color("9affbc") if lives > 1 else Color("ffd481")
+	var life_count := "%02d" % lives
+	var life_left := GAUGES_RIGHT - text_width(life_count, 18)
+	draw_texture_rect(HEART, Rect2(life_left - 20.0, 29, 14, 14), false, life_tint)
+	caption(Vector2(life_left, 42), life_count, 18, life_tint)
+	draw_line(Vector2(GAUGES_LEFT, 48), Vector2(GAUGES_RIGHT, 48), Color("315979"))
+	gauge(50, "HEALTH", health, Color("7cf287"), "%d / %d" % [roundi(health * health_capacity), roundi(health_capacity)])
+	gauge(72, "ENERGY", energy, Color("4cdcfb"), "%d / %d" % [roundi(energy * energy_capacity), roundi(energy_capacity)])
 	var shown_level := RiftPlayer.level_for_experience(animated_xp)
 	var threshold := RiftPlayer.experience_threshold(shown_level)
 	var next_threshold := RiftPlayer.experience_threshold(shown_level + 1)
-	gauge(117, "OPERATOR XP", (animated_xp - threshold) / float(next_threshold - threshold), Color("b693ff"))
-	var life_tint := Color("ff8999") if lives == 0 else Color("9affbc") if lives > 1 else Color("ffd481")
-	draw_line(Vector2(119, 152), Vector2(358, 152), Color("315979"))
-	draw_texture_rect(HEART, Rect2(120, 158, 17, 17), false, life_tint)
-	caption(Vector2(145, 173), "OPERATOR LIVES", 17, UI.MUTED)
-	var life_count := "%02d" % lives
-	caption(Vector2(358 - text_width(life_count, 22), 173), life_count, 22, life_tint)
+	gauge(94, "OPERATOR XP", (animated_xp - threshold) / float(next_threshold - threshold), Color("b693ff"))
 
-	plate(Rect2(EDGE, SUIT_TOP, 296, SUIT_BOTTOM - SUIT_TOP), 9, suit_tint)
-	draw_texture_rect(SHIELD, Rect2(32, SUIT_TOP + 7.0, 25, 25), false, suit_tint)
+	draw_texture_rect(SHIELD, Rect2(31, SUIT_TOP + 7.0, 17, 17), false, suit_tint)
 	var mode := "SABER" if local_operator is RiftPlayer and local_operator.saber_equipped else "BUSTER"
 	var loadout := "%s  /  %s" % [weapon, mode]
-	caption(Vector2(66, SUIT_TOP + 17.0), loadout, fit_font(loadout, 17, 234.0), suit_tint)
+	caption(Vector2(54, SUIT_TOP + 13.0), loadout, fit_font(loadout, 15, 204.0), suit_tint)
 	var device := "pad" if not Input.get_connected_joypads().is_empty() else "key"
 	var previous := RiftSettings.binding_label("previous_suit", device)
 	var next := RiftSettings.binding_label("swap_weapon", device)
 	var controls := "%s  SWITCH     %s / %s  SUIT" % [RiftSettings.binding_label("melee", device), previous, next]
-	caption(Vector2(66, SUIT_TOP + 33.0), controls, fit_font(controls, 13, 234.0), UI.MUTED)
+	caption(Vector2(54, SUIT_TOP + 25.0), controls, fit_font(controls, 12, 193.0), UI.MUTED)
 
 func objective_height() -> float:
 	return 105.0 if gate_relay_count >= 0 else 83.0

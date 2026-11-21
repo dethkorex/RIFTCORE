@@ -1,4 +1,4 @@
-# RIFTCORE Alpha 6.3.51
+# RIFTCORE Alpha 6.3.52
 
 ## Progression and blueprints
 - Core Shard balances, rewards and Ascension prices use whole numbers. Existing fractional balances round up.
@@ -20,7 +20,7 @@
 - Display mode, resolution, V-Sync, frame limit and graphics quality stay pending until you choose Apply and Accept.
 
 ## Mission HUD and co-op extraction
-- The HUD shows the timer, Bolts and Core Shards in the objective header. The minimap sits directly below it. Each teammate has a compact card with a health bar, lives, and off-screen direction.
+- The HUD shows the timer, Bolts and Core Shards in the objective header. The minimap sits directly below it. The slimmer operator panel combines the portrait, meters, lives, and an angled weapon footer. Compact teammate strips show health, lives, and off-screen direction.
 - Co-op uses the solo Extraction Summary with each operator’s own items, XP, defeats and lives lost. Return to the hub whenever you close your summary. Each teammate returns when they close theirs.
 
 ## Operations Hub
