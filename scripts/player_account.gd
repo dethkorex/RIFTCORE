@@ -7,6 +7,7 @@ const Frames := preload("res://scripts/operator_frames.gd")
 const Difficulty := preload("res://scripts/mission_difficulty.gd")
 
 const PATH := "user://riftcore_player_profile.cfg"
+const CLEAR_XP_MULTIPLIER := 0.5
 
 var path := PATH
 var last_operator := 0
@@ -121,9 +122,9 @@ func remove_local_progress(other_files: Array[String]) -> Error:
 	return OK
 
 static func clear_reward(sector: int, difficulty: int) -> int:
-	var previous_rate := (145 + sector * 30) * (1.0 + Difficulty.index(difficulty) * 0.5)
-	# Keep level gates in step with the increase in extraction purchasing power.
-	return roundi(previous_rate * Difficulty.EXTRACTION_SHARD_PERCENT / Profile.TALENT_PRICE_PERCENT)
+	var base_xp := 145 + sector * 30
+	var difficulty_multiplier := 1.0 + Difficulty.index(difficulty) * 0.5
+	return roundi(base_xp * difficulty_multiplier * CLEAR_XP_MULTIPLIER)
 
 func award_clear(sector: int, difficulty: int, result := {}) -> Dictionary:
 	var previous := experience

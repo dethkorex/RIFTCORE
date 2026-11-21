@@ -206,7 +206,9 @@ func run() -> void:
 	check(first.load_slot() and first.profile.owned_frames.is_empty() and first.profile.credits == 900, "Legacy slot clears frame purchases and keeps its Bolt balance")
 	var clean_run := {"kills": 30, "materials": 10, "bolts": 400, "health": 100, "energy": 100, "seconds": 320, "clean": true}
 	account.award_clear(1, difficulty.NORMAL, clean_run)
-	check(account.experience == 130 + 257, "Profile XP keeps pace with increased extraction purchasing power")
+	check(account.experience == 130 + 88, "Normal clears grant slower Profile XP and preserve XP already earned")
+	check(account.clear_reward(1, difficulty.HARD) == 131 and account.clear_reward(1, difficulty.NIGHTMARE) == 175,
+		"The lower Profile XP rate still rewards higher difficulties")
 	check(account.unlocked_skins.is_empty(), "One high-scoring run cannot unlock a finish")
 	for run_index in 3:
 		account.award_clear(1, difficulty.NORMAL, clean_run)
