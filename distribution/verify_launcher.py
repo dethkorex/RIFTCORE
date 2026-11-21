@@ -32,6 +32,16 @@ def main() -> None:
         }}, "notes": (dist.parent / "CHANGELOG.md").read_text(encoding="utf-8")}
         (root / "fixture.json").write_text(json.dumps(manifest), encoding="utf-8")
         (root / "updates.cfg").write_text('[updates]\nrepository="dethkorex/RIFTCORE"\npreview_channel=true\n', encoding="utf-8")
+        versions = root / "versions"
+        versions.mkdir()
+        sentinel = root / "linked-sentinel"
+        try:
+            (versions / "v6.3.20-preview").symlink_to(sentinel, target_is_directory=True)
+        except OSError:
+            pass  # Windows may require administrator access to create test symlinks.
+        else:
+            sentinel.mkdir()
+            (sentinel / "RIFTCORE.pck").write_text("Do not delete", encoding="utf-8")
         handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=root)
         with http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler) as server:
             thread = Thread(target=server.serve_forever, daemon=True)

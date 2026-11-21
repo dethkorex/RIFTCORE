@@ -98,6 +98,8 @@ func _ready() -> void:
 		var forwarded := latest != running and not latest.is_empty() and updater.compare_tags(latest, running)
 		var started := forwarded and updater.start_version(latest)
 		var install_root: String = updater.install_root
+		if not started and updater.versioned_install:
+			updater.clean_install()
 		updater.free()
 		if started:
 			get_tree().quit()

@@ -2,7 +2,7 @@ extends Control
 
 const UpdateClient := preload("res://update_client.gd")
 
-const LAUNCHER_BUILD := 7
+const LAUNCHER_BUILD := 8
 const SteamArtwork := preload("res://steam_artwork.gd")
 
 var client := UpdateClient.new()
@@ -63,6 +63,8 @@ func _ready() -> void:
 	if installed == config.get_value("updates", "bundled_notes_tag", "") and FileAccess.file_exists(notes_path):
 		bundled_notes = FileAccess.get_file_as_string(notes_path)
 	build_ui()
+	if configured and not installed.is_empty():
+		client.clean_install.call_deferred()
 	if configured and not OS.has_feature("editor") and OS.get_executable_path().get_file() == client.game_filename:
 		clean_retired_launcher.call_deferred()
 	if client.is_match(UpdateClient.REPO_PATTERN, repo):
@@ -82,13 +84,12 @@ func clean_retired_launcher() -> void:
 		directory.remove(backup)
 
 func clean_launcher_download(folder: String) -> void:
-	if not client.is_match("^launcher-[0-9]+-[0-9]+$", folder):
+	if not client.is_match(UpdateClient.LAUNCHER_WORK_PATTERN, folder):
 		return
-	var downloads := install_root.path_join("downloads")
-	var directory := DirAccess.open(downloads)
+	var directory := client.managed_directory("downloads")
 	if directory == null or directory.is_link(folder):
 		return
-	var staging := DirAccess.open(downloads.path_join(folder))
+	var staging := DirAccess.open(directory.get_current_dir().path_join(folder))
 	if staging == null or staging.is_link(client.game_filename):
 		return
 	for attempt in 35:
@@ -155,7 +156,7 @@ func relaunched_arguments() -> PackedStringArray:
 	if not headless and not OS.get_cmdline_user_args().has("--no-autoplay"):
 		args.append("--resume-upgrade")
 	var folder := OS.get_executable_path().get_base_dir().get_file()
-	if client.is_match("^launcher-[0-9]+-[0-9]+$", folder):
+	if client.is_match(UpdateClient.LAUNCHER_WORK_PATTERN, folder):
 		args.append("--cleanup-launcher=" + folder)
 	return args
 

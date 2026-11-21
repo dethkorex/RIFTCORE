@@ -1,7 +1,7 @@
-# RIFTCORE Alpha 6.3.37
+# RIFTCORE Alpha 6.3.38
 
-- Standard buster bolts leave a visible trail. The muzzle flash fades sooner so it’s easier to follow the shot.
-- Fully charged standard buster shots and their charge effects glow yellow. Regular shots stay cyan.
-- Fixed the Extraction Summary so the empty rewards message reads on one line and reward names keep enough room to display.
+- Windows and Linux updates verify the download and unpack the full game into a fresh folder. Replaced assets come from the new build.
+- The launcher removes superseded builds and leftover update files while retaining the current build and one playable fallback. If another copy is running, cleanup waits until the next launch.
+- Saves, settings, and personal files are preserved.
 
 Update through the RIFTCORE Launcher on Windows or Linux.

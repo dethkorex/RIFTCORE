@@ -4,9 +4,16 @@ const MAX_PACKAGE := 1024 * 1024 * 1024
 const LEGACY_MANIFEST := "update.json"
 const LARGE_MANIFEST := "update-v2.json"
 const REPO_PATTERN := "^[A-Za-z0-9][A-Za-z0-9-]{0,38}/[A-Za-z0-9_.-]{1,90}$"
-const TAG_PATTERN := "^v[0-9]{1,5}[.][0-9]{1,5}[.][0-9]{1,5}(-preview)?$"
+const VERSION_NAME := "v[0-9]{1,5}[.][0-9]{1,5}[.][0-9]{1,5}(-preview)?"
+const TAG_PATTERN := "^" + VERSION_NAME + "$"
+const VERSION_WORK_PATTERN := "^" + VERSION_NAME + "-(install-[0-9]+-[0-9]+(-incomplete)?|superseded-[0-9]+)$"
+const GAME_DOWNLOAD_PATTERN := "^" + VERSION_NAME + "-[0-9]+-[0-9]+[.]zip$"
+const LAUNCHER_WORK_PATTERN := "^launcher-[0-9]+-[0-9]+$"
 const LEGACY_MIGRATION_TAG := "v0.4.100"
 const HASH_PATTERN := "^[0-9a-f]{64}$"
+const PACKAGE_FILES := ["RIFTCORE.pck", "GODOT_LICENSE.txt", "GODOT_COPYRIGHT.txt", "GODOTSTEAM_LICENSE.md",
+	"steam_api64.dll", "libgodotsteam.windows.template_release.x86_64.dll",
+	"libsteam_api.so", "libgodotsteam.linux.template_release.x86_64.so"]
 
 const OFFICIAL_REPO := "dethkorex/RIFTCORE"
 
@@ -54,14 +61,13 @@ func compare_tags(a: String, b: String) -> bool:
 
 func newest_installed() -> String:
 	var best := ""
-	var versions := install_root.path_join("versions")
-	var dir := DirAccess.open(versions)
+	var dir := managed_directory("versions")
 	if dir == null:
 		return best
 	for tag in dir.get_directories():
-		if tag == LEGACY_MIGRATION_TAG or not is_match(TAG_PATTERN, tag):
+		if tag == LEGACY_MIGRATION_TAG or not is_match(TAG_PATTERN, tag) or dir.is_link(tag):
 			continue
-		var folder := versions.path_join(tag)
+		var folder := dir.get_current_dir().path_join(tag)
 		if version_is_complete(folder, [game_filename, "RIFTCORE.pck"]) and compare_tags(tag, best):
 			best = tag
 	return best
@@ -165,7 +171,8 @@ func launcher_needs_repair(info: Dictionary) -> bool:
 
 func stage_launcher(info: Dictionary) -> String:
 	var entry := launcher_entry(info)
-	if entry.is_empty():
+	var root := DirAccess.open(install_root)
+	if entry.is_empty() or root == null or root.is_link("downloads"):
 		return ""
 	var folder := install_root.path_join("downloads").path_join("launcher-%d-%d" % [OS.get_process_id(), Time.get_ticks_usec()])
 	if DirAccess.make_dir_recursive_absolute(folder) != OK:
@@ -185,6 +192,9 @@ func install(info: Dictionary) -> String:
 	var tag: String = info.tag
 	if tag == LEGACY_MIGRATION_TAG:
 		return "This release is a launcher migration."
+	var root := DirAccess.open(install_root)
+	if root == null or root.is_link("downloads"):
+		return "The update folder is unavailable or linked."
 	var staging := install_root.path_join("downloads")
 	var result := DirAccess.make_dir_recursive_absolute(staging)
 	if result != OK:
@@ -195,7 +205,7 @@ func install(info: Dictionary) -> String:
 	var error := unpack_version(zip_path, tag)
 	DirAccess.remove_absolute(zip_path)
 	if error.is_empty():
-		prune_versions(tag)
+		clean_install()
 	return error
 
 func download_verified(tag: String, entry: Dictionary, path: String) -> bool:
@@ -224,43 +234,91 @@ func cancel_download() -> void:
 	if not download_path.is_empty() and FileAccess.file_exists(download_path):
 		DirAccess.remove_absolute(download_path)
 
-func prune_versions(current: String) -> void:
-	var versions := install_root.path_join("versions")
-	var directory := DirAccess.open(versions)
-	if directory == null:
+func managed_directory(name: String) -> DirAccess:
+	var installation := DirAccess.open(install_root)
+	if installation == null or installation.is_link(name):
+		return null
+	return DirAccess.open(install_root.path_join(name))
+
+func other_riftcore_running() -> bool:
+	if OS.get_name() == "Windows":
+		var output: Array = []
+		var tasklist := OS.get_environment("SystemRoot").path_join("System32/tasklist.exe")
+		var result := OS.execute(tasklist, ["/FI", "IMAGENAME eq " + game_filename,
+			"/FI", "PID ne %d" % OS.get_process_id(), "/FO", "CSV", "/NH"], output)
+		return result != 0 or output.is_empty() or String(output[0]).to_lower().contains('"%s",' % game_filename.to_lower())
+	var processes := DirAccess.open("/proc")
+	if processes == null:
+		return true
+	for pid in processes.get_directories():
+		if not pid.is_valid_int() or int(pid) == OS.get_process_id():
+			continue
+		var name := FileAccess.open("/proc/%s/comm" % pid, FileAccess.READ)
+		if name != null and name.get_line() == game_filename:
+			return true
+	return false
+
+func clean_install() -> void:
+	if not download_path.is_empty():
 		return
+	var current := newest_installed()
+	if current.is_empty() or other_riftcore_running():
+		return
+	var versions := managed_directory("versions")
+	if versions == null:
+		return
+	var own_folder := OS.get_executable_path().get_base_dir()
 	var rollback := ""
-	for tag in directory.get_directories():
-		if tag != LEGACY_MIGRATION_TAG and is_match(TAG_PATTERN, tag) and compare_tags(current, tag):
-			if version_is_complete(versions.path_join(tag), [game_filename, "RIFTCORE.pck"]) and compare_tags(tag, rollback):
+	for tag in versions.get_directories():
+		if tag != LEGACY_MIGRATION_TAG and is_match(TAG_PATTERN, tag) and not versions.is_link(tag) and compare_tags(current, tag):
+			var path := versions.get_current_dir().path_join(tag)
+			if version_is_complete(path, [game_filename, "RIFTCORE.pck"]) and compare_tags(tag, rollback):
 				rollback = tag
-	# Remove only known package files. Unknown files, links and newer versions are retained.
-	var allowed := [game_filename, "RIFTCORE.pck", "GODOT_LICENSE.txt", "GODOT_COPYRIGHT.txt",
-		"GODOTSTEAM_LICENSE.md", "steam_api64.dll", "libgodotsteam.windows.template_release.x86_64.dll",
-		"libsteam_api.so", "libgodotsteam.linux.template_release.x86_64.so"]
-	for tag in directory.get_directories():
-		if tag == rollback or tag == LEGACY_MIGRATION_TAG or not is_match(TAG_PATTERN, tag) or not compare_tags(current, tag) or directory.is_link(tag):
+	var allowed := [game_filename] + PACKAGE_FILES
+	for folder in versions.get_directories():
+		if folder == rollback or versions.get_current_dir().path_join(folder) == own_folder:
 			continue
-		var folder := DirAccess.open(versions.path_join(tag))
-		if folder == null or not folder.get_directories().is_empty():
-			continue
-		var files := folder.get_files()
-		if not Array(files).all(func(name): return name in allowed and not folder.is_link(name)):
-			continue
-		# Moving first keeps a locked/running Windows version intact.
-		var stale := tag + "-superseded-%d" % Time.get_ticks_usec()
-		if directory.rename(tag, stale) != OK:
-			continue
-		var stale_folder := DirAccess.open(versions.path_join(stale))
-		if stale_folder == null:
-			continue
-		for name in files:
-			stale_folder.remove(name)
-		directory.remove(stale)
+		if is_match(VERSION_WORK_PATTERN, folder) or (is_match(TAG_PATTERN, folder) and compare_tags(current, folder)):
+			remove_package_directory(versions, folder, allowed)
+	var downloads := managed_directory("downloads")
+	if downloads == null:
+		return
+	for file in downloads.get_files():
+		if is_match(GAME_DOWNLOAD_PATTERN, file) and not downloads.is_link(file):
+			downloads.remove(file)
+	for folder in downloads.get_directories():
+		if is_match(LAUNCHER_WORK_PATTERN, folder) and downloads.get_current_dir().path_join(folder) != own_folder:
+			remove_package_directory(downloads, folder, [game_filename])
+
+func remove_package_directory(parent: DirAccess, name: String, allowed: Array) -> void:
+	if parent.is_link(name):
+		return
+	var folder := DirAccess.open(parent.get_current_dir().path_join(name))
+	if folder == null:
+		return
+	folder.include_hidden = true
+	if not folder.get_directories().is_empty():
+		return
+	var files := folder.get_files()
+	if not Array(files).all(func(file): return file in allowed and not folder.is_link(file)):
+		return
+	# Windows can refuse to remove an executable still in use. Leave its assets in place if that happens.
+	if game_filename in files and folder.remove(game_filename) != OK:
+		return
+	for file in files:
+		if file != game_filename and folder.remove(file) != OK:
+			return
+	parent.remove(name)
 
 func unpack_version(zip_path: String, tag: String) -> String:
 	if not is_match(TAG_PATTERN, tag):
 		return "Invalid update version."
+	var root := DirAccess.open(install_root)
+	if root == null or root.is_link("versions"):
+		return "The version folder is unavailable or linked."
+	var installed := managed_directory("versions")
+	if installed != null and installed.is_link(tag):
+		return "The destination version is linked."
 	var zip := ZIPReader.new()
 	if zip.open(zip_path) != OK:
 		return "Could not read the update archive."
@@ -327,7 +385,9 @@ func activate_version(staged: String, destination: String, expected: Array) -> S
 	return "Could not activate the update (%s)." % error_string(result)
 
 func version_is_complete(folder: String, files: Array) -> bool:
-	if not files.all(func(name): return FileAccess.file_exists(folder.path_join(name)) and FileAccess.get_size(folder.path_join(name)) > 0):
+	var directory := DirAccess.open(folder)
+	if directory == null or not files.all(func(name):
+		return directory.file_exists(name) and not directory.is_link(name) and FileAccess.get_size(folder.path_join(name)) > 0):
 		return false
 	return OS.get_name() == "Windows" or (FileAccess.get_unix_permissions(folder.path_join(game_filename)) & FileAccess.UNIX_EXECUTE_OWNER) != 0
 
