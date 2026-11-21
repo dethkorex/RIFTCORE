@@ -1342,35 +1342,49 @@ func build_teammate_status() -> void:
 	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	panel.theme = UI.theme()
 	panel.add_theme_stylebox_override("panel", UI.hud_frame(UI.CYAN, Vector2(10, 8)))
-	panel.custom_minimum_size.x = 326.0
+	panel.custom_minimum_size.x = FactoryHUD.PANEL_WIDTH
 	personal_hud.add_child(panel)
 	personal_hud.coop_party = panel
 	panel.resized.connect(personal_hud.queue_redraw)
 	RiftSettings.hud_scale_changed.connect(personal_hud.place_party)
 	personal_hud.place_party()
-	var content := UI.column(panel, 8)
-	UI.profile_label(content, "//  SQUAD", 17, UI.CYAN)
+	var content := UI.column(panel, 5)
+	var title := HBoxContainer.new()
+	title.add_theme_constant_override("separation", 7)
+	content.add_child(title)
+	var person_icon := preload("res://assets/ui/riftcore_kit/icon_person.png")
+	add_squad_icon(title, person_icon, UI.CYAN)
+	UI.profile_label(title, "SQUAD", 17, UI.CYAN)
 	for index in roster.size():
 		if index == local_index:
 			teammate_status.append({})
 			continue
-		var row := UI.column(content, 3)
+		var tint := UI.operator_tint(roster[index], peer.get_host(), roster)
+		var card := PanelContainer.new()
+		card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		card.add_theme_stylebox_override("panel", UI.profile_frame(Color("102639"), tint.darkened(0.55), Vector2(9, 4)))
+		content.add_child(card)
+		var row := UI.column(card, 1)
 		var heading := HBoxContainer.new()
+		heading.add_theme_constant_override("separation", 6)
 		row.add_child(heading)
+		add_squad_icon(heading, person_icon, tint)
 		var microphone := add_voice_icon(heading)
-		var name_label := UI.label(heading, "", 20, UI.WHITE)
+		var name_label := UI.label(heading, "", 20, tint)
 		name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		name_label.autowrap_mode = TextServer.AUTOWRAP_OFF
 		name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		var tracking := UI.label(heading, "", 15, UI.MUTED)
 		tracking.autowrap_mode = TextServer.AUTOWRAP_OFF
 		tracking.hide()
-		var lives := UI.label(heading, "", 17, UI.CYAN)
+		var heart := add_squad_icon(heading, FactoryHUD.HEART, UI.CYAN)
+		var lives := UI.label(heading, "", 16, UI.CYAN)
 		lives.autowrap_mode = TextServer.AUTOWRAP_OFF
 		lives.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		var health_row := HBoxContainer.new()
 		health_row.add_theme_constant_override("separation", 10)
 		row.add_child(health_row)
+		UI.label(health_row, "HP", 14, UI.MUTED).autowrap_mode = TextServer.AUTOWRAP_OFF
 		var bar := ProgressBar.new()
 		bar.custom_minimum_size.y = 8.0
 		bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -1383,23 +1397,28 @@ func build_teammate_status() -> void:
 		bar.add_theme_stylebox_override("fill", fill)
 		health_row.add_child(bar)
 		var value := UI.label(health_row, "", 16, UI.WHITE)
-		value.custom_minimum_size.x = 85
+		value.custom_minimum_size.x = 64
 		value.autowrap_mode = TextServer.AUTOWRAP_OFF
 		value.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		teammate_status.append({"name": name_label, "tracking": tracking, "value": value, "lives": lives,
-			"bar": bar, "fill": fill, "microphone": microphone})
+			"bar": bar, "fill": fill, "heart": heart, "microphone": microphone})
 	partner_status = UI.label(content, "", 16, UI.CYAN)
 	partner_status.hide()
 
 func add_voice_icon(parent: Control) -> TextureRect:
+	var icon := add_squad_icon(parent, RiftRelay.voice.MIC_ICON, Color.WHITE)
+	icon.hide()
+	return icon
+
+func add_squad_icon(parent: Control, texture: Texture2D, tint: Color) -> TextureRect:
 	var icon := TextureRect.new()
-	icon.texture = RiftRelay.voice.MIC_ICON
+	icon.texture = texture
+	icon.modulate = tint
 	icon.custom_minimum_size = Vector2(16, 16)
 	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	icon.hide()
 	parent.add_child(icon)
 	return icon
 
@@ -1408,14 +1427,15 @@ func update_teammate_status(index: int, display_name: String, status: String) ->
 	var row := teammate_status[index]
 	var fraction := clampf(teammate.health / maxf(teammate.max_health, 1.0), 0.0, 1.0)
 	row.name.text = display_name
-	row.name.add_theme_color_override("font_color", nameplates[index].modulate)
 	row.tracking.visible = status.begins_with("←") or status.begins_with("→")
 	row.tracking.text = status
-	row.value.text = "DOWN" if fraction <= 0.0 else "%d / %d HP" % [ceili(teammate.health), ceili(teammate.max_health)]
+	row.value.text = "DOWN" if fraction <= 0.0 else "%d / %d" % [ceili(teammate.health), ceili(teammate.max_health)]
 	row.value.add_theme_color_override("font_color", Color("ff8991") if fraction <= 0.0 else UI.WHITE)
 	var lives := available_lives(teammate)
 	row.lives.text = "%02d %s" % [lives, "LIFE" if lives == 1 else "LIVES"]
-	row.lives.add_theme_color_override("font_color", Color("ff6c76") if lives == 0 else UI.CYAN)
+	var life_tint := Color("ff8991") if lives == 0 else Color("92efff")
+	row.heart.modulate = life_tint
+	row.lives.add_theme_color_override("font_color", life_tint)
 	row.bar.set_value_no_signal(fraction * 100.0)
 	row.fill.bg_color = Color("ff6c76") if fraction <= 0.25 else Color("ffce75") if fraction <= 0.5 else Color("72e3a6")
 
