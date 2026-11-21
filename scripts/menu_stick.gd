@@ -45,15 +45,17 @@ func _input(event: InputEvent) -> void:
 			if event.button_index == held_pad and event.device == device:
 				reset_stick()
 			return
+		if focused and event.button_index == held_pad and event.device == device:
+			viewport.set_input_as_handled()
+			return
 		reset_stick()
 		if not focused and (PAD_DIRECTIONS.has(event.button_index) or event.is_action_pressed(&"ui_accept")):
 			focused = restore_focus()
 		if focused and PAD_DIRECTIONS.has(event.button_index):
 			held_pad = event.button_index
 			device = event.device
-			direction = PAD_DIRECTIONS[held_pad]
-			repeat_in = FIRST_REPEAT
-			if navigate_scroll(focused, direction):
+			# A D-pad press moves once. Only the analog stick schedules repeated movement.
+			if navigate_scroll(focused, PAD_DIRECTIONS[held_pad]):
 				get_tree().call_group(&"menu_pointer", &"observe_controller", event)
 				viewport.set_input_as_handled()
 		return

@@ -88,11 +88,34 @@ func _ready() -> void:
 	)
 	build_updates(tabs)
 	tabs.tab_changed.connect(func(_tab: int):
+		link_visible_form_rows()
 		if is_visible_in_tree():
 			var focused := get_viewport().gui_get_focus_owner()
 			if focused == null or not focused.is_visible_in_tree():
 				tabs.get_tab_bar().grab_focus()
 	)
+	link_visible_form_rows.call_deferred()
+
+func link_visible_form_rows() -> void:
+	var panel := tabs.get_current_tab_control()
+	var bar := tabs.get_tab_bar()
+	bar.focus_neighbor_bottom = NodePath()
+	if not panel or not panel.is_visible_in_tree():
+		return
+	if panel.name == "Controller":
+		link_controller_focus(bar, SIDE_BOTTOM, controller_layout)
+		return
+	if panel.name == "Update Game":
+		return
+	var previous: Control = bar
+	for row: Control in panel.find_children("*", "Control", true, false):
+		if row.get_viewport() != get_viewport() or not row.is_visible_in_tree() or row.focus_mode != Control.FOCUS_ALL:
+			continue
+		if row is ScrollContainer or row is ScrollBar or (row is BaseButton and row.disabled):
+			continue
+		link_controller_focus(previous, SIDE_BOTTOM, row)
+		previous = row
+	previous.focus_neighbor_bottom = NodePath()
 
 func settings_tab(title: String, heading: String, scrollable := false) -> VBoxContainer:
 	var panel := VBoxContainer.new()
@@ -314,9 +337,6 @@ func build_controller_bindings() -> void:
 	link_controller_column(movement, controller_layout, controller_reset)
 	link_controller_column(combat, vibration, controller_reset)
 	controller_reset.focus_neighbor_top = controller_reset.get_path_to(combat.back())
-	tabs.tab_changed.connect(func(index: int):
-		tabs.get_tab_bar().focus_neighbor_bottom = tabs.get_tab_bar().get_path_to(controller_layout) if index == panel.get_index() else NodePath()
-	)
 
 func build_action_column(parent: HBoxContainer, heading: String, actions: Array) -> Array[Control]:
 	var column := VBoxContainer.new()

@@ -69,9 +69,9 @@ jobs:
           name: riftcore-build-logs
           path: release-tools/build/*.log
           retention-days: 7
-      - name: Verify hub, squad checkpoints and revival
+      - name: Verify menu navigation, hub and co-op
         run: |
-          for test in hub_visuals coop_revival coop_position frozen_sector; do
+          for test in menu_dpad_focus hub_visuals coop_revival coop_position frozen_sector; do
             ./release-tools/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --fixed-fps 60 --script "res://tests/$test.gd" --log-file "$RUNNER_TEMP/$test.log"
             ! grep -E 'SCRIPT ERROR:|^FAIL ' "$RUNNER_TEMP/$test.log"
           done
