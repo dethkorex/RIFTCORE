@@ -191,9 +191,9 @@ const Story := preload("res://scripts/rift_story.gd")
 var memories: Array[int] = []
 var endings: Array[String] = []
 var materials: Dictionary = {}
-var core_shards := 0.0:
+var core_shards := 0:
 	set(value):
-		core_shards = roundf(maxf(0.0, value) * 100.0) / 100.0
+		core_shards = maxi(0, value)
 const COSMETICS := {"Standard": Color("55e7ff"), "Magenta": Color("ff67ce"), "Gold": Color("ffd069")}
 var operator_name := "RX-07"
 var survival_seconds := 0.0
@@ -284,13 +284,13 @@ func decode_from(data: ConfigFile) -> void:
 	var saved_blueprints: Variant = data.get_value("inventory", "blueprints", {})
 	if saved_blueprints is Dictionary:
 		for id in saved_blueprints:
-			if GEAR.has(id) and not blueprints.has(id):
+			if GEAR.has(id):
 				blueprint_items[id] = true
 	blueprint_pouch.clear()
 	var pouch: Variant = data.get_value("inventory", "blueprint_pouch", [])
 	if pouch is Array:
 		for id in pouch:
-			if id is String and can_collect_blueprint(id):
+			if id is String and GEAR.has(id):
 				blueprint_items[id] = true
 	var items: Variant = data.get_value("inventory", "stock", {})
 	var separated := data.has_section_key("inventory", "stored_supplies")
@@ -338,7 +338,7 @@ func decode_from(data: ConfigFile) -> void:
 		for id in saved_materials:
 			materials[id] = maxi(0, int(saved_materials[id]))
 	var legacy_bolts := maxi(0, int(data.get_value("profile", "credits", 0)))
-	core_shards = float(data.get_value("profile", "core_shards", legacy_bolts / 100))
+	core_shards = ceili(float(data.get_value("profile", "core_shards", legacy_bolts / 100)))
 	# Legacy slots retain their original bolt balance and get a one-time scrap grant.
 	if not data.has_section_key("profile", "materials"):
 		materials["scrap"] = legacy_bolts / 50
@@ -637,16 +637,16 @@ static func challenge_shards(sector: int, tier: int) -> int:
 	var sector_bonus := (clampi(sector, 1, Catalog.SECTORS.size()) - 1) / 3
 	return mini(15, 10 + sector_bonus + 2 * (tier - 3))
 
-static func challenge_set_shards(sector: int) -> float:
+static func challenge_set_shards(sector: int) -> int:
 	var base := 3 + (sector - 1) / 3
-	return base * CHALLENGE_SET_SHARD_MULTIPLIER
+	return roundi(base * CHALLENGE_SET_SHARD_MULTIPLIER)
 
 static func rotated_challenge_credits(sector: int, index: int) -> int:
 	return 120 + index * 35 + (sector - 1) * 18
 
 func challenge_rewards(sector: int, cycle: Dictionary) -> Dictionary:
 	var carryover: Dictionary = cycle.get("carryover", {})
-	var reward := {"credits": int(carryover.get("credits", 0)), "shards": float(carryover.get("shards", 0)),
+	var reward := {"credits": int(carryover.get("credits", 0)), "shards": ceili(float(carryover.get("shards", 0))),
 		"lives": int(carryover.get("lives", 0))}
 	for index in 5:
 		if cycle.done.has(index) and not cycle.claimed.has(index):
@@ -882,7 +882,8 @@ func can_receive_hub_item(key: String, amount: int) -> bool:
 	if not valid_hub_item(key, amount):
 		return false
 	if key.begins_with("blueprint/"):
-		return blueprint_pouch.size() < BLUEPRINT_POUCH_SIZE and can_collect_blueprint(key.trim_prefix("blueprint/"))
+		var id := key.trim_prefix("blueprint/")
+		return blueprint_pouch.size() < BLUEPRINT_POUCH_SIZE and not blueprint_items.has(id) and not blueprint_pouch.has(id)
 	return hub_item_count(key) + amount <= STACK_MAX
 
 func change_hub_inventory(key: String, amount: int, persist: Callable) -> bool:
@@ -924,7 +925,7 @@ func refund_hub_item(key: String, amount: int, persist: Callable) -> bool:
 	var id := key
 	if is_blueprint:
 		id = key.trim_prefix("blueprint/")
-		if not can_collect_blueprint(id):
+		if blueprint_items.has(id) or blueprint_pouch.has(id):
 			return true
 		target = blueprint_items
 	else:
@@ -1200,8 +1201,8 @@ func talent_gate(branch: String, tier: int) -> String:
 			return "Requires Tier %d talent" % (earlier + 1)
 	return ""
 
-static func talent_price(item: Dictionary, rank_index: int) -> float:
-	return int(item.prices[rank_index]) * TALENT_PRICE_PERCENT / 100.0
+static func talent_price(item: Dictionary, rank_index: int) -> int:
+	return roundi(int(item.prices[rank_index]) * TALENT_PRICE_PERCENT / 100.0)
 
 func talent_lock(item: Dictionary) -> String:
 	var installed := rank(item.id)

@@ -72,8 +72,6 @@ func load_shared() -> Error:
 	profile.blueprint_hunts = shared.blueprint_hunts
 	profile.owned = shared.owned
 	profile.core_shards = shared.core_shards
-	for id in profile.blueprints:
-		profile.blueprint_items.erase(id)
 	for id in profile.gear.keys():
 		if profile.gear[id] == "stored":
 			profile.gear.erase(id)

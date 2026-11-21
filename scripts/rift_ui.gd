@@ -12,8 +12,8 @@ const PARTY_COLORS := [CYAN, Color("ffd072"), Color("e0a0ff"), Color("7cfac0")]
 const ITEM_SIZE := 48
 const ITEM_GAP := 5
 
-static func shard_amount(amount: float, whole_digits := 0) -> String:
-	return ("%.2f" % amount).trim_suffix("0").trim_suffix("0").trim_suffix(".").pad_zeros(whole_digits)
+static func shard_amount(amount: int, whole_digits := 0) -> String:
+	return str(amount).pad_zeros(whole_digits)
 
 static func operator_tint(id: int, host: int, members: Array) -> Color:
 	if id == host:

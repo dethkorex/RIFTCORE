@@ -399,9 +399,22 @@ func verify_coop_mission(host: bool, smoke_sector: int, wipe_test := false) -> v
 		Input.action_press("move_right")
 		await get_tree().create_timer(0.8).timeout
 		Input.action_release("move_right")
+		profile.blueprints["bp_01_02"] = true
 		RiftRelay.relay.lobby_set_data("coop_guest_in_hub", not RiftRelay.can_deploy())
+		if not await wait_for_relay(func(): return home_hub.hub_item_visuals.size() == 3, 8.0):
+			print("Campaign check did not see the three dropped items")
+			finish_relay_check(false)
+			return
+		Input.action_press("move_right")
+		await get_tree().create_timer(0.56).timeout
+		Input.action_release("move_right")
 		if not await wait_for_relay(func(): return profile.blueprint_pouch.has("bp_01_02") and profile.inventory.get("patch_kit", 0) == 2 and profile.carried_materials.get("scrap", 0) == 3, 12.0):
-			print("Campaign check failed to pick up all three shared item types")
+			print("Campaign check failed to walk over and pick up all three shared item types")
+			finish_relay_check(false)
+			return
+		drop_hub_item("blueprint/bp_01_02", 1)
+		if profile.blueprint_pouch.has("bp_01_02") or not profile.blueprints.has("bp_01_02"):
+			print("Campaign check failed to trade a spare blueprint while keeping the learned recipe")
 			finish_relay_check(false)
 			return
 		RiftRelay.relay.lobby_set_data("coop_hub_items_received", true)
@@ -411,7 +424,7 @@ func verify_coop_mission(host: bool, smoke_sector: int, wipe_test := false) -> v
 			print("Campaign check failed to see the guest move in the hub")
 			finish_relay_check(false)
 			return
-		home_hub.avatar.position.x = home_hub.partners.values()[0].x
+		home_hub.avatar.position.x = home_hub.partners.values()[0].x + 3.1
 		profile.collect_blueprint("bp_01_02")
 		profile.move_blueprint_to_pouch("bp_01_02")
 		profile.inventory["patch_kit"] = 2
@@ -419,8 +432,8 @@ func verify_coop_mission(host: bool, smoke_sector: int, wipe_test := false) -> v
 		drop_hub_item("blueprint/bp_01_02", 1)
 		drop_hub_item("patch_kit", 2)
 		drop_hub_item("material_scrap", 3)
-		if not profile.blueprint_pouch.is_empty() or not await wait_for_relay(func(): return RiftRelay.relay.lobby_get_data("coop_hub_items_received", false), 10.0):
-			print("Campaign check failed to share inventory items")
+		if not profile.blueprint_pouch.is_empty() or not await wait_for_relay(func(): return RiftRelay.relay.lobby_get_data("coop_hub_items_received", false) and profile.blueprint_pouch.has("bp_01_02"), 15.0):
+			print("Campaign check failed to share inventory items in both directions")
 			finish_relay_check(false)
 			return
 		RiftRelay.deploy(smoke_sector)

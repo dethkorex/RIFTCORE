@@ -898,6 +898,8 @@ func _update(message: String) -> void:
 	status = message
 	changed.emit()
 
+const HUB_PICKUP_RADIUS := 1.1
+
 func can_share_hub_items() -> bool:
 	return not connected_room.is_empty() and room_size >= 2 and not mission_active and not counting_down and is_instance_valid(relay)
 
@@ -962,24 +964,26 @@ func _reject_hub_drop(nonce: String) -> void:
 	pending_hub_drops.erase(nonce)
 	hub_item_refund.emit(pending_item[0], pending_item[1])
 
-func pick_up_hub_item(key: String, reclaim := false) -> void:
+func pick_up_hub_item(key: String, x: float, reclaim := false) -> void:
 	if not can_share_hub_items():
 		return
 	if relay.is_host():
-		_grant_hub_item(key, relay.get_client_id(), reclaim)
+		_grant_hub_item(key, relay.get_client_id(), x, reclaim)
 	else:
-		relay.call_func_on(relay.get_host(), _request_hub_pickup, key, reclaim)
+		relay.call_func_on(relay.get_host(), _request_hub_pickup, key, x, reclaim)
 
-func _request_hub_pickup(key: String, reclaim: bool) -> void:
-	_grant_hub_item(key, relay.get_sender_id(), reclaim)
+func _request_hub_pickup(key: String, x: float, reclaim: bool) -> void:
+	_grant_hub_item(key, relay.get_sender_id(), x, reclaim)
 
-func _grant_hub_item(key: String, receiver: int, reclaim: bool) -> void:
-	if not can_share_hub_items() or not relay.is_host() or not _hub_member(receiver):
+func _grant_hub_item(key: String, receiver: int, x: float, reclaim: bool) -> void:
+	if not can_share_hub_items() or not relay.is_host() or not _hub_member(receiver) or not is_finite(x):
 		return
 	var offer: Dictionary = hub_drops.get(key, {})
-	if offer.is_empty() or offer.has("claim") or (receiver == offer.owner) != reclaim or not station_positions.has(receiver):
+	if offer.is_empty() or offer.has("claim") or (receiver == offer.owner) != reclaim:
 		return
-	if absf(float(station_positions[receiver]) - float(offer.x)) > 1.6:
+	# The reliable pickup can arrive before the latest unreliable hub pose.
+	var synced_x := float(station_positions.get(receiver, x))
+	if absf(x) > 19.16 or absf(x - synced_x) > 3.5 or absf(x - float(offer.x)) > HUB_PICKUP_RADIUS:
 		return
 	offer["claim"] = receiver
 	if receiver == relay.get_client_id():

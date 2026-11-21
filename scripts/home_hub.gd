@@ -7,6 +7,7 @@ signal tour_arrived
 
 const UI := preload("res://scripts/rift_ui.gd")
 const PauseMenu := preload("res://scripts/coop_pause_menu.gd")
+const PARTY_DROP := preload("res://assets/pickups/party_drop.tscn")
 const AVATAR := preload("res://scenes/actors/riftcore_player.tscn")
 const END_WALL := preload("res://assets/hub/operations_bulkhead.glb")
 const ARCHITECTURE := preload("res://assets/hub/operations_bay.glb")
@@ -500,7 +501,7 @@ func set_panel_open(open: bool) -> void:
 	if not open:
 		announce_shop_restock.call_deferred()
 
-func set_bank(amount: int, shards: float, level: int) -> void:
+func set_bank(amount: int, shards: int, level: int) -> void:
 	bank_label.text = "RX-07   /   PLAYER %02d" % level
 	bolts_label.text = "%04d BOLTS" % amount
 	shards_label.text = "%s CORE SHARDS" % UI.shard_amount(shards, 4)
@@ -799,30 +800,20 @@ func update_hub_item(key: String, offer: Dictionary) -> void:
 	hub_item_requests.erase(key)
 	if offer.is_empty():
 		return
-	const Icons := preload("res://scripts/equipment_icons.gd")
 	var item: String = offer.item
-	var texture: Texture2D
-	if item.begins_with("blueprint/"):
-		var recipe := item.trim_prefix("blueprint/")
-		texture = Icons.icon(recipe, Profile.GEAR[recipe].slot)
-	else:
-		var stock: Dictionary = Profile.stock[item]
-		texture = Icons.icon(stock.icon, stock.icon) if stock.has("material") else Icons.supply_icon(stock)
-	var marker := Sprite3D.new()
-	marker.texture = texture
-	marker.pixel_size = 0.013
-	marker.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	var marker = PARTY_DROP.instantiate()
+	marker.configure(item)
 	var stack := 0
 	for other in hub_item_visuals.values():
 		if absf(other.position.x - float(offer.x)) < 0.45:
 			stack += 1
-	marker.position = Vector3(offer.x, 1.03 + stack * 0.72, 0.65)
+	marker.position = Vector3(offer.x, 0.52 + stack * 0.75, 0.42)
 	add_child(marker)
 	hub_item_visuals[key] = marker
 	var caption := Profile.hub_item_label(item)
 	if offer.quantity > 1:
 		caption += " ×%d" % offer.quantity
-	var label := label_in_space(marker, caption, Vector3(0, 0.48, 0), 21, UI.CYAN)
+	var label := label_in_space(marker, caption, Vector3(0, 0.42, 0), 24, marker.tint.lightened(0.46))
 	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 
 func check_hub_item_pickups(reclaim := false) -> bool:
@@ -832,12 +823,12 @@ func check_hub_item_pickups(reclaim := false) -> bool:
 		var offer: Dictionary = RiftRelay.hub_drops.get(key, {})
 		if offer.is_empty() or (offer.owner == RiftRelay.relay.get_client_id()) != reclaim:
 			continue
-		if absf(avatar.position.x - float(offer.x)) > 0.72:
+		if absf(avatar.position.x - float(offer.x)) > RiftRelay.HUB_PICKUP_RADIUS:
 			continue
 		var now := Time.get_ticks_msec()
 		if profile.can_receive_hub_item(offer.item, offer.quantity) and now >= int(hub_item_requests.get(key, 0)):
-			hub_item_requests[key] = now + 1000
-			RiftRelay.pick_up_hub_item(key, reclaim)
+			hub_item_requests[key] = now + 300
+			RiftRelay.pick_up_hub_item(key, avatar.position.x, reclaim)
 			return true
 	return false
 

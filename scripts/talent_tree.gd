@@ -266,7 +266,7 @@ func inspect(tile: Button) -> void:
 	next_effect.text = "Rank %s  ·  %s" % [Profile.TALENT_RANKS[installed], Profile.talent_effect(item, installed)] if not maxed else ""
 	var gate: String = profile.talent_gate(item.branch, item.tier)
 	var blocked: String = profile.talent_lock(item)
-	var cost := Profile.talent_price(item, installed) if not maxed else 0.0
+	var cost := Profile.talent_price(item, installed) if not maxed else 0
 	if not maxed and profile.core_shards < cost:
 		gate += "  ·  " if not gate.is_empty() else ""
 		gate += "Need %s more Core Shards" % UI.shard_amount(cost - profile.core_shards)

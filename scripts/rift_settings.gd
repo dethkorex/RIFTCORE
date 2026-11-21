@@ -190,11 +190,23 @@ func set_voice_mode(enabled: bool, push_to_talk: bool) -> void:
 	voice_settings_changed.emit()
 	save()
 
-func set_display(index: int, mode: int) -> void:
-	resolution_index = clampi(index, 0, MODES.size() - 1)
+func set_video(resolution: int, mode: int, vsync: int, limit: int, quality: int) -> Error:
+	var previous := [resolution_index, display_mode, vsync_mode, frame_limit, graphics_quality]
+	resolution_index = clampi(resolution, 0, MODES.size() - 1)
 	display_mode = clampi(mode, 0, DISPLAY_MODES.size() - 1)
+	vsync_mode = clampi(vsync, 0, VSYNC_CHOICES.size() - 1)
+	frame_limit = clampi(limit, 0, FRAME_LIMITS.size() - 1)
+	graphics_quality = clampi(quality, 0, QUALITY_SCALES.size() - 1)
+	var result := save()
+	if result != OK:
+		resolution_index = previous[0]
+		display_mode = previous[1]
+		vsync_mode = previous[2]
+		frame_limit = previous[3]
+		graphics_quality = previous[4]
+		return result
 	apply_video()
-	save()
+	return OK
 
 func apply_video() -> void:
 	Engine.max_fps = FRAME_LIMITS[frame_limit]
@@ -209,8 +221,10 @@ func apply_video() -> void:
 	if display_mode != 0:
 		window.mode = Window.MODE_EXCLUSIVE_FULLSCREEN if display_mode == 2 else Window.MODE_FULLSCREEN
 		var pixels := DisplayServer.screen_get_size(screen)
-		var scale := float(target.y) / maxf(1.0, pixels.y) if extended else float(target.x) / maxf(1.0, pixels.x)
-		window.scaling_3d_scale = clampf(scale, 0.25, 2.0)
+		var display_height := float(pixels.y)
+		if not extended and window.content_scale_size.x > 0:
+			display_height = minf(display_height, float(pixels.x) * window.content_scale_size.y / window.content_scale_size.x)
+		window.scaling_3d_scale = clampf(float(target.y) / maxf(1.0, display_height), 0.25, 2.0)
 	else:
 		window.mode = Window.MODE_WINDOWED
 		var visible_fit := Vector2i(available.size.x, maxi(540, available.size.y - 48))

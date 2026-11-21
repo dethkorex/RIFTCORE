@@ -31,7 +31,7 @@ var energy_capacity := 75.0
 var displayed_health_capacity := 80.0
 var displayed_energy_capacity := 75.0
 var credits := 0
-var core_shards := 0.0
+var core_shards := 0
 var experience := 0
 var animated_xp := 0.0
 var xp_tween: Tween

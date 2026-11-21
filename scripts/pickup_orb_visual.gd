@@ -36,7 +36,11 @@ func _ready() -> void:
 		Mark.SUPPLY:
 			add_text("KIT", Color("eafff9"), 0.00155)
 		Mark.BLUEPRINT:
-			add_text("BP", Color("e9faff"), 0.0020)
+			var schematic := Sprite3D.new()
+			schematic.texture = preload("res://scripts/equipment_icons.gd").icon("blueprint", "blueprint")
+			schematic.pixel_size = 0.0038
+			schematic.position.z = RADIUS + 0.005
+			facing_camera.add_child(schematic)
 
 func _process(_delta: float) -> void:
 	if Engine.is_editor_hint() or not facing_camera:

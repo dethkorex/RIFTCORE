@@ -15,6 +15,7 @@ const PATHS := {
 	"quick_attack": '<path d="M5 25L23 5h5v5L9 28zM5 18l9 9"/>',
 	"quick_defense": '<path d="M16 3l11 5v8c0 5-5 9-11 13C10 25 5 21 5 16V8zM10 16l4 4 8-8"/>',
 	"quick_speed": '<path d="M4 8h7l7 8-7 8H4l7-8zM17 8h5l7 8-7 8h-5l7-8z"/>',
+	"blueprint": '<path d="M6 3h13l7 7v19H6zM19 3v7h7M10 24h12M10 14h4v5h8"/><circle cx="22" cy="19" r="1.6"/><path d="M10 9h4"/>',
 	"armor_plate": '<path d="M5 8l11-4 11 4v14l-11 6-11-6zM9 10l7-2 7 2v8l-7 5-7-5zM16 8v15"/>',
 	"recovery_bearing": '<circle cx="16" cy="16" r="11"/><circle cx="16" cy="16" r="4"/><path d="M16 5v4m0 14v4M5 16h4m14 0h4M8 8l3 3m10 10 3 3m0-16-3 3m-10 10-3 3"/>',
 	"recon_optic": '<path d="M4 16c7-11 17-11 24 0-7 11-17 11-24 0z"/><circle cx="16" cy="16" r="4"/><path d="M16 3v4m0 18v4"/>',
@@ -36,6 +37,7 @@ const PATHS := {
 	"salvage_chip": '<path d="M6 7h6v10a4 4 0 008 0V7h6v10a10 10 0 01-20 0zm0 5h6m8 0h6"/>',
 }
 const COLORS := {
+	"blueprint": Color("c6f6ff"),
 	"quick_heal": Color("69ff8f"), "quick_energy": Color("63bdff"), "quick_hybrid": Color("73ffe1"),
 	"quick_attack": Color("ffb06d"), "quick_defense": Color("b6ccff"), "quick_speed": Color("f1a8ff"),"frame": Color("7ff0ba"), "core": Color("79d8ff"), "utility": Color("e5abff"), "visor": Color("79e6ed"), "arm": Color("ffc98a")}
 const STAT_ICONS := {"xp": "visor", "healing": "vital_weave","resist": "impact_liner", "bolts": "salvage_chip", "dash": "air_jets", "attack": "pulse_lens", "energy": "charge_relay", "hp": "vital_weave"}

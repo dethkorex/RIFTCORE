@@ -51,29 +51,7 @@ func _ready() -> void:
 		add_slider(audio, key + " Volume", RiftSettings.volumes[key] * 100.0, 0, 100, 1,
 			func(value: float): RiftSettings.set_volume(key, value / 100.0))
 	build_voice_settings(audio)
-	var video := settings_tab("Video", "Display")
-	var mode := add_selector(video, "Resolution", RiftSettings.MODES.map(func(size): return "%d × %d" % [size.x, size.y]), RiftSettings.resolution_index)
-	var window_mode := add_selector(video, "Display Mode", RiftSettings.DISPLAY_MODES, RiftSettings.display_mode)
-	window_mode.item_selected.connect(func(index: int): RiftSettings.set_display(RiftSettings.resolution_index, index))
-	mode.item_selected.connect(func(index: int): RiftSettings.set_display(index, RiftSettings.display_mode))
-	var vsync := add_selector(video, "V-Sync", RiftSettings.VSYNC_CHOICES, RiftSettings.vsync_mode)
-	vsync.item_selected.connect(func(index: int):
-		RiftSettings.vsync_mode = index
-		RiftSettings.apply_video()
-		RiftSettings.save()
-	)
-	var fps := add_selector(video, "Frame Limit", RiftSettings.FRAME_LIMITS.map(func(limit): return "%d FPS" % limit if limit > 0 else "Unlimited"), RiftSettings.frame_limit)
-	fps.item_selected.connect(func(index: int):
-		RiftSettings.frame_limit = index
-		RiftSettings.apply_video()
-		RiftSettings.save()
-	)
-	var quality := add_selector(video, "Graphics Quality", ["Performance", "Balanced", "High"], RiftSettings.graphics_quality)
-	quality.item_selected.connect(func(index: int):
-		RiftSettings.graphics_quality = index
-		RiftSettings.apply_video()
-		RiftSettings.save()
-	)
+	build_display_settings()
 	var gameplay := settings_tab("Gameplay", "Interface")
 	add_slider(gameplay, "HUD Scale", RiftSettings.hud_scale * 100.0, 80, 115, 5, func(value: float): RiftSettings.set_hud_scale(value / 100.0))
 	add_toggle(gameplay, "Tutorials & Station Tour", RiftSettings.show_hub_tips, func(enabled: bool):
@@ -95,6 +73,44 @@ func _ready() -> void:
 				tabs.get_tab_bar().grab_focus()
 	)
 	link_visible_form_rows.call_deferred()
+
+func build_display_settings() -> void:
+	var video := settings_tab("Video", "Display", true)
+	var resolutions := RiftSettings.MODES.map(func(size): return "%d × %d" % [size.x, size.y])
+	var limits := RiftSettings.FRAME_LIMITS.map(func(limit): return "%d FPS" % limit if limit > 0 else "Unlimited")
+	var resolution := add_selector(video, "Resolution", resolutions, RiftSettings.resolution_index)
+	var mode := add_selector(video, "Display Mode", RiftSettings.DISPLAY_MODES, RiftSettings.display_mode)
+	var vsync := add_selector(video, "V-Sync", RiftSettings.VSYNC_CHOICES, RiftSettings.vsync_mode)
+	var fps := add_selector(video, "Frame Limit", limits, RiftSettings.frame_limit)
+	var quality := add_selector(video, "Graphics Quality", ["Performance", "Balanced", "High"], RiftSettings.graphics_quality)
+	var status := UI.label(video, "", 16, UI.MUTED)
+	var dialog := ConfirmationDialog.new()
+	dialog.title = "Apply display settings"
+	dialog.ok_button_text = "Accept"
+	dialog.dialog_text = "Apply the selected display settings?"
+	dialog.min_size = Vector2i(360, 125)
+	video.add_child(dialog)
+	UI.style_button(dialog.get_ok_button())
+	UI.style_button(dialog.get_cancel_button())
+	var apply := UI.button(video, "Apply", func(): dialog.popup_centered(), true, 36)
+	apply.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	apply.disabled = true
+	for choice: OptionButton in [resolution, mode, vsync, fps, quality]:
+		choice.item_selected.connect(func(_index: int):
+			apply.disabled = resolution.selected == RiftSettings.resolution_index and mode.selected == RiftSettings.display_mode and \
+				vsync.selected == RiftSettings.vsync_mode and fps.selected == RiftSettings.frame_limit and quality.selected == RiftSettings.graphics_quality
+			status.text = "" if apply.disabled else "Display changes pending"
+			link_visible_form_rows()
+		)
+	dialog.confirmed.connect(func():
+		var result := RiftSettings.set_video(resolution.selected, mode.selected, vsync.selected, fps.selected, quality.selected)
+		status.text = "Display settings applied" if result == OK else "Could not save display settings"
+		if result == OK:
+			apply.disabled = true
+			mode.grab_focus()
+			link_visible_form_rows()
+	)
+	dialog.canceled.connect(func(): apply.grab_focus())
 
 func link_visible_form_rows() -> void:
 	var panel := tabs.get_current_tab_control()

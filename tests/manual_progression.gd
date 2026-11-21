@@ -104,7 +104,7 @@ func run() -> void:
 	check(restored.profile.quick_slots[0].is_empty() and restored.profile.stored_supplies.get("patch_kit") == 4, "Only equipped supplies are lost")
 	check(restored.profile.player_level() == 50 and restored.profile.memories.has(2), "Permanent rank and memory fragments survive")
 	check(restored.profile.hard_unlocked(1) and restored.profile.nightmare_unlocked(), "Difficulty unlocks survive a defeated run and save reload")
-	check(restored.profile.unlocked_sector == catalog.SECTORS.size() and restored.profile.rank("armor") == 1 and restored.profile.core_shards == 12.25, "The exact 15 percent talent discount and fractional balance persist through reconstruction")
+	check(restored.profile.unlocked_sector == catalog.SECTORS.size() and restored.profile.rank("armor") == 1 and restored.profile.core_shards == 12, "The rounded talent price and whole shard balance persist through reconstruction")
 	var player_script = load("res://scripts/player.gd")
 	var milestones := {}
 	for stock_id in restored.profile.stock:
@@ -200,6 +200,14 @@ func run() -> void:
 	first.profile.stored_supplies["patch_kit"] = 2
 	check(first.save_slot() == OK and second.load_slot(), "Second operator picks up the shared changes")
 	check(second.profile.stored_supplies.get("patch_kit") == 2 and second.profile.gear.get("impact_liner") == "stored" and second.run.get_value("checkpoint", "experience") == 120, "Storage stays shared while run XP remains slot-specific")
+	second.profile.blueprints["bp_01_02"] = true
+	check(second.profile.change_hub_inventory("blueprint/bp_01_02", 1, second.save_slot),
+		"A party member can pick up a spare physical copy of a learned recipe")
+	check(first.load_slot() and first.profile.blueprint_pouch.has("bp_01_02") and first.profile.blueprints.has("bp_01_02"),
+		"The spare blueprint and learned recipe both survive an operator reload")
+	check(first.profile.stow_pouch_blueprint("bp_01_02").contains("Storage") and first.save_slot() == OK and
+		second.load_slot() and second.profile.blueprint_items.has("bp_01_02"),
+		"Storage retains spare blueprints for a learned recipe")
 	var third = manual_save.new(3)
 	check(third.load_shared() == OK and third.profile.core_shards == 12 and third.profile.materials.get("scrap") == 3 and third.run.get_sections().is_empty(), "A fresh operator inherits storage and talents with a fresh run")
 	var account = load("res://scripts/player_account.gd").new()

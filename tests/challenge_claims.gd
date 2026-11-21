@@ -16,10 +16,15 @@ func run() -> void:
 	saves.slot_directory = "user://challenge-test-%d" % OS.get_process_id()
 	var session = saves.new(1)
 	var profile = session.profile
+	var prior_wallet := ConfigFile.new()
+	prior_wallet.set_value("profile", "core_shards", 12.5)
+	profile.decode_from(prior_wallet)
+	check(profile.core_shards == 13 and profile.talent_price({"prices": [24]}, 0) == 20,
+		"Old wallets round up and Ascension prices are whole shards")
 	profile.unlocked_sector = 3
 	profile.credits = 200
 	profile.reserve_lives = 6
-	var starting_shards: float = profile.core_shards
+	var starting_shards: int = profile.core_shards
 	check(session.save_slot() == OK, "Scratch operator saved")
 	check(profile.record_challenges(1, {"act": 1, "act_kills": 5}, session.persist_challenge_progress) == 0,
 		"Reaching Act II without the required security defeats does not clear the challenge")
@@ -77,9 +82,9 @@ func run() -> void:
 	run.mode = Difficulty.HARD
 	var payout: int = profile.record_challenges(3, run)
 	var set_reward: Dictionary = profile.challenge_rewards(3, profile.challenge_cycle(3))
-	check(payout == 2 and set_reward.lives == 1 and set_reward.shards == 38.5,
+	check(payout == 2 and set_reward.lives == 1 and set_reward.shards == 39,
 		"Standard and harder goals pay the new amounts and the set bonus pays once")
-	check(Difficulty.extraction_shards(1, Difficulty.NORMAL) == 2.5 and Difficulty.extraction_shards(10, Difficulty.NIGHTMARE) == 7.5,
+	check(Difficulty.extraction_shards(1, Difficulty.NORMAL) == 3 and Difficulty.extraction_shards(10, Difficulty.NIGHTMARE) == 8,
 		"Base shard rewards scale by sector and difficulty")
 
 	check([profile.challenge_shards(1, 0), profile.challenge_shards(1, 1), profile.challenge_shards(1, 2)] == [3, 4, 5]
@@ -107,7 +112,7 @@ func run() -> void:
 		"Last-life death spends a banked life and reflects it on the HUD")
 	check(restored.load_slot() and restored.profile.reserve_lives == 6, "The spent bonus life is saved immediately")
 	await create_timer(1.4, true).timeout
-	var shards_before_extraction: float = profile.core_shards
+	var shards_before_extraction: int = profile.core_shards
 	var bolts_before_extraction: int = profile.credits
 	profile.challenge_cycles.erase(1)
 	game.mission_stats.kills = 12
@@ -116,7 +121,7 @@ func run() -> void:
 	game.boss_defeated = true
 	game.player.global_position = game.game_root.get_node("MARKERS/RoomExit").global_position
 	game._process(0.0)
-	check(game.sector_complete and profile.core_shards == shards_before_extraction + 2.5 and
+	check(game.sector_complete and profile.core_shards == shards_before_extraction + 3 and
 		profile.credits == bolts_before_extraction + 160, "Extraction banks the twenty-five percent reward increase separately from challenges")
 	var pending: Dictionary = profile.challenge_rewards(1, profile.challenge_cycle(1))
 	check(pending.credits > 0 and pending.lives == 0 and profile.reserve_lives == 7,
