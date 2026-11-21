@@ -2,6 +2,7 @@ extends Control
 
 const UI := preload("res://scripts/rift_ui.gd")
 const EquipmentIcons := preload("res://scripts/equipment_icons.gd")
+const EquipmentDisplay := preload("res://scripts/equipment_display.gd")
 const Materials := preload("res://scripts/fabrication_catalog.gd")
 const Profile := preload("res://scripts/rogue_profile.gd")
 const CURRENCY := preload("res://assets/ui/bolt.svg")
@@ -13,8 +14,10 @@ const INK := Color("091727f5")
 const PANEL_WIDTH := 354.0
 const OBJECTIVE_WIDTH := 348.0
 const EDGE := 20.0
-const SUIT_BOTTOM := 214.0
-const PARTY_TOP := 226.0
+const SUIT_TOP := 200.0
+const SUIT_BOTTOM := 241.0
+const PARTY_TOP := 253.0
+const PORTRAIT_FRAME := Rect2(32, 34, 80, 143)
 const HEART := preload("res://assets/ui/riftcore_kit/icon_heart.png")
 const SHIELD := preload("res://assets/ui/riftcore_kit/icon_shield.png")
 const HUD_SCALE := 0.75
@@ -35,11 +38,14 @@ var notice: Label
 var notice_tween: Tween
 var quick_row: HBoxContainer
 var loot_popups: VBoxContainer
+var portrait: EquipmentDisplay
 var local_operator: Node3D:
 	set(value):
 		if local_operator == value:
 			return
 		local_operator = value
+		if is_instance_valid(portrait):
+			portrait.sync_operator(local_operator as RiftPlayer)
 		if is_instance_valid(loot_popups):
 			for popup in loot_popups.get_children():
 				loot_popups.remove_child(popup)
@@ -151,6 +157,16 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	resized.connect(queue_redraw)
 	RiftSettings.hud_scale_changed.connect(queue_redraw)
+	if DisplayServer.get_name() != "headless":
+		portrait = EquipmentDisplay.new()
+		portrait.name = "IdlePortrait"
+		portrait.hud_portrait = true
+		portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(portrait)
+		portrait.set_process(false)
+		portrait.sync_operator(local_operator as RiftPlayer)
+		RiftSettings.hud_scale_changed.connect(place_portrait)
+		place_portrait()
 	notice = UI.hud_readout(self, 151, 386, CYAN, 29)
 	loot_popups = VBoxContainer.new()
 	loot_popups.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -160,6 +176,11 @@ func _ready() -> void:
 	loot_popups.hide()
 	loot_popups.child_order_changed.connect(sync_pickup_stack)
 	set_process(false)
+
+func place_portrait() -> void:
+	var factor := HUD_SCALE * RiftSettings.hud_scale
+	portrait.position = (PORTRAIT_FRAME.position + Vector2.ONE) * factor
+	portrait.size = (PORTRAIT_FRAME.size - Vector2(2, 2)) * factor
 
 func pickup_stack_height() -> float:
 	if not is_instance_valid(loot_popups) or not loot_popups.is_visible_in_tree():
@@ -272,6 +293,8 @@ func set_run_time(seconds: float) -> void:
 	var next := floori(seconds * 10.0)
 	if next != run_tenths:
 		run_tenths = next
+		if is_instance_valid(portrait) and portrait.is_visible_in_tree():
+			portrait.sync_operator(local_operator as RiftPlayer)
 		queue_redraw()
 
 func show_loot(materials: Dictionary, blueprint: String, supply: String, bolts := 0, extra_life := false) -> void:
@@ -369,31 +392,38 @@ func task(at: Vector2, value: String, done: bool) -> void:
 	caption(at + Vector2(23, 0), value, fit_font(value, 17, OBJECTIVE_WIDTH - 58.0), color)
 
 func draw_operator() -> void:
-	plate(Rect2(EDGE, EDGE, PANEL_WIDTH, 144), 13)
-	var source_size := PORTRAIT.get_size()
-	draw_rect(Rect2(32, 34, 76, 114), Color("102338"))
-	draw_texture_rect_region(PORTRAIT, Rect2(34, 36, 72, 110),
-		Rect2(source_size * Vector2(0.415, 0.008), source_size * Vector2(0.17, 0.27)))
-	draw_rect(Rect2(32, 34, 76, 114), Color("386e8d"), false, 1.0)
+	plate(Rect2(EDGE, EDGE, PANEL_WIDTH, SUIT_TOP - EDGE - 9.0), 13)
+	draw_rect(PORTRAIT_FRAME, Color("102338"))
+	if not is_instance_valid(portrait):
+		var source_size := PORTRAIT.get_size()
+		draw_texture_rect_region(PORTRAIT, PORTRAIT_FRAME.grow(-2),
+			Rect2(source_size * Vector2(0.415, 0.008), source_size * Vector2(0.17, 0.27)))
+	draw_rect(PORTRAIT_FRAME, Color("386e8d"), false, 1.0)
 	caption(Vector2(119, 48), "RX-07", 23)
 	var current_level := RiftPlayer.level_for_experience(experience)
 	var level := "OPERATOR LV. %02d" % current_level
 	caption(Vector2(359 - text_width(level, 18), 47), level, 18, CYAN)
 	draw_line(Vector2(119, 54), Vector2(358, 54), Color("315979"))
 	gauge(57, "HEALTH", health, Color("7cf287"), "%d / %d" % [roundi(health * health_capacity), roundi(health_capacity)])
-	gauge(89, "ENERGY", energy, Color("4cdcfb"), "%d / %d" % [roundi(energy * energy_capacity), roundi(energy_capacity)])
+	gauge(87, "ENERGY", energy, Color("4cdcfb"), "%d / %d" % [roundi(energy * energy_capacity), roundi(energy_capacity)])
 	var shown_level := RiftPlayer.level_for_experience(animated_xp)
 	var threshold := RiftPlayer.experience_threshold(shown_level)
 	var next_threshold := RiftPlayer.experience_threshold(shown_level + 1)
-	gauge(121, "OPERATOR XP", (animated_xp - threshold) / float(next_threshold - threshold), Color("b693ff"))
+	gauge(117, "OPERATOR XP", (animated_xp - threshold) / float(next_threshold - threshold), Color("b693ff"))
+	var life_tint := Color("ff8999") if lives == 0 else Color("9affbc") if lives > 1 else Color("ffd481")
+	draw_line(Vector2(119, 152), Vector2(358, 152), Color("315979"))
+	draw_texture_rect(HEART, Rect2(120, 158, 17, 17), false, life_tint)
+	caption(Vector2(145, 173), "OPERATOR LIVES", 17, UI.MUTED)
+	var life_count := "%02d" % lives
+	caption(Vector2(358 - text_width(life_count, 22), 173), life_count, 22, life_tint)
 
-	plate(Rect2(EDGE, 173, 296, SUIT_BOTTOM - 173), 9, suit_tint)
-	draw_texture_rect(SHIELD, Rect2(32, 180, 25, 25), false, suit_tint)
-	caption(Vector2(66, 190), weapon, fit_font(weapon, 17, 234.0), suit_tint)
+	plate(Rect2(EDGE, SUIT_TOP, 296, SUIT_BOTTOM - SUIT_TOP), 9, suit_tint)
+	draw_texture_rect(SHIELD, Rect2(32, SUIT_TOP + 7.0, 25, 25), false, suit_tint)
+	caption(Vector2(66, SUIT_TOP + 17.0), weapon, fit_font(weapon, 17, 234.0), suit_tint)
 	var device := "pad" if not Input.get_connected_joypads().is_empty() else "key"
 	var previous := RiftSettings.binding_label("previous_suit", device)
 	var next := RiftSettings.binding_label("swap_weapon", device)
-	caption(Vector2(66, 206), "%s  ‹  PREV     NEXT  ›  %s" % [previous, next], 13, UI.MUTED)
+	caption(Vector2(66, SUIT_TOP + 33.0), "%s  ‹  PREV     NEXT  ›  %s" % [previous, next], 13, UI.MUTED)
 
 func draw_objective(right: float) -> float:
 	var x := right - OBJECTIVE_WIDTH
@@ -420,12 +450,9 @@ func draw_resources(at: Vector2) -> void:
 	draw_line(at + Vector2(12, 32), at + Vector2(207, 32), Color("284861"))
 	var strip := at + Vector2(0, 71)
 	plate(Rect2(strip, Vector2(219, 34)), 8)
-	draw_texture_rect(HEART, Rect2(strip + Vector2(10, 8), Vector2(17, 17)), false, CYAN)
-	caption(strip + Vector2(32, 22), "LIVES", 15, UI.MUTED)
-	caption(strip + Vector2(69, 23), "%02d" % lives, 18)
-	draw_line(strip + Vector2(96, 7), strip + Vector2(96, 27), Color("284861"))
-	caption(strip + Vector2(105, 22), "TIME", 15, UI.MUTED)
-	caption(strip + Vector2(142, 23), "%02d:%02d.%d" % [run_tenths / 600, run_tenths / 10 % 60, run_tenths % 10], 17)
+	caption(strip + Vector2(14, 22), "RUN TIME", 15, UI.MUTED)
+	var time := "%02d:%02d.%d" % [run_tenths / 600, run_tenths / 10 % 60, run_tenths % 10]
+	caption(strip + Vector2(204 - text_width(time, 18), 23), time, 18)
 
 func _draw() -> void:
 	var hud_scale := HUD_SCALE * RiftSettings.hud_scale

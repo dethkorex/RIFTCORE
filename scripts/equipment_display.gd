@@ -5,6 +5,7 @@ const Pad := preload("res://assets/hub/deploy_pad.tscn")
 
 var actor: RiftPlayer
 var compact := false
+var hud_portrait := false
 var neutral_lighting := false
 var allow_zoom := false
 var camera: Camera3D
@@ -17,13 +18,8 @@ const SkinKit := preload("res://scripts/operator_skins.gd")
 
 func _ready() -> void:
 	stretch = true
-	custom_minimum_size = Vector2(116, 160) if compact else Vector2(225, 270)
-	size_flags_vertical = Control.SIZE_FILL if compact else Control.SIZE_EXPAND_FILL
-	mouse_filter = Control.MOUSE_FILTER_STOP
-	mouse_default_cursor_shape = Control.CURSOR_DRAG
-	focus_mode = Control.FOCUS_ALL
-	add_to_group(&"operator_preview")
-	focus_exited.connect(func(): rotation_axis = 0.0)
+	if not hud_portrait:
+		enable_controls()
 	var view := SubViewport.new()
 	view.own_world_3d = true
 	view.transparent_bg = true
@@ -31,24 +27,39 @@ func _ready() -> void:
 	view.render_target_update_mode = SubViewport.UPDATE_WHEN_VISIBLE
 	if neutral_lighting:
 		view.msaa_3d = Viewport.MSAA_4X
+	elif hud_portrait:
+		view.msaa_3d = Viewport.MSAA_2X
 	add_child(view)
+	build_preview(view)
+
+func enable_controls() -> void:
+	custom_minimum_size = Vector2(116, 160) if compact else Vector2(225, 270)
+	size_flags_vertical = Control.SIZE_FILL if compact else Control.SIZE_EXPAND_FILL
+	mouse_filter = Control.MOUSE_FILTER_STOP
+	mouse_default_cursor_shape = Control.CURSOR_DRAG
+	focus_mode = Control.FOCUS_ALL
+	add_to_group(&"operator_preview")
+	focus_exited.connect(func(): rotation_axis = 0.0)
+
+func build_preview(view: SubViewport) -> void:
 	var environment := WorldEnvironment.new()
 	environment.environment = Environment.new()
 	environment.environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	environment.environment.ambient_light_color = Color("e4ebf8" if neutral_lighting else "a7bce6")
 	environment.environment.ambient_light_energy = 0.75
 	view.add_child(environment)
-	var display_pad := Pad.instantiate() as Node3D
-	display_pad.set("caption", "")
-	display_pad.scale = Vector3(0.78, 0.62, 0.78)
-	view.add_child(display_pad)
+	if not hud_portrait:
+		var display_pad := Pad.instantiate() as Node3D
+		display_pad.set("caption", "")
+		display_pad.scale = Vector3(0.78, 0.62, 0.78)
+		view.add_child(display_pad)
 	camera = Camera3D.new()
 	camera.projection = Camera3D.PROJECTION_ORTHOGONAL
-	camera.size = 2.20
+	camera.size = 0.94 if hud_portrait else 2.20
 	camera.keep_aspect = Camera3D.KEEP_HEIGHT
 	view.add_child(camera)
-	camera.position = Vector3(0, 1.27, 4.2)
-	camera.look_at(Vector3(0, 1.01, 0))
+	camera.position = Vector3(0.03, 1.66, 4.2) if hud_portrait else Vector3(0, 1.27, 4.2)
+	camera.look_at(Vector3(0.03, 1.49, 0) if hud_portrait else Vector3(0, 1.01, 0))
 	camera.make_current()
 	light(view, Vector3(-1.8, 3.0, 2.3), Color("f9fcff" if neutral_lighting else "b9e9ff"), 1.85 if neutral_lighting else 2.2)
 	light(view, Vector3(1.8, 1.8, -1.3), Color("b8c6df" if neutral_lighting else "ec64ff"), 1.85)
@@ -65,7 +76,7 @@ func _ready() -> void:
 	actor.play_character_animation("idle", true)
 	if actor.animation_player:
 		actor.animation_player.advance(0.0)
-	if not compact:
+	if not compact and not hud_portrait:
 		var controls := "Drag to rotate  ·  Scroll to zoom  ·  Focus for right stick" if allow_zoom else "Drag to rotate  ·  Focus for right stick"
 		var hint := preload("res://scripts/rift_ui.gd").profile_label(self, controls, 14, Color("a9c5dd"))
 		hint.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
@@ -75,6 +86,18 @@ func _ready() -> void:
 		hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		focus_entered.connect(func(): hint.modulate = Color("72dcff"))
 		focus_exited.connect(func(): hint.modulate = Color.WHITE)
+
+func sync_operator(source: RiftPlayer) -> void:
+	if not is_instance_valid(source) or not is_instance_valid(actor):
+		return
+	if frame != source.operator_frame or skin != source.armor_finish:
+		frame = source.operator_frame
+		set_appearance(source.armor_finish)
+	var equipped := source.equipped_suit()
+	if actor.equipped_suit() != equipped:
+		if not equipped.is_empty() and equipped not in actor.run_weapon_ids:
+			actor.run_weapon_ids.append(equipped)
+		actor.equip_sector_weapon(equipped)
 
 func _gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
