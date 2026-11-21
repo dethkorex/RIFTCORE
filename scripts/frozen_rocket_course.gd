@@ -1,4 +1,6 @@
 extends Node3D
+
+const UI := preload("res://scripts/rift_ui.gd")
 ## Authored coolant spillway. All movement goes through the rider's CharacterBody.
 const KIT := preload("res://scripts/frozen_kit.gd")
 const ROUTE := preload("res://scripts/rocket_spillway_route.gd")
@@ -43,18 +45,7 @@ func _ready() -> void:
 	var ui := CanvasLayer.new()
 	ui.layer = 12
 	add_child(ui)
-	readout = Label.new()
-	readout.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
-	readout.position = Vector2(-360,94)
-	readout.size = Vector2(720,90)
-	readout.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	readout.add_theme_font_override("font",preload("res://assets/ui/fonts/BarlowCondensed-ExtraBoldItalic.ttf"))
-	readout.add_theme_font_size_override("font_size",26)
-	readout.add_theme_color_override("font_outline_color",Color("061222"))
-	readout.add_theme_constant_override("outline_size",8)
-	readout.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	ui.add_child(readout)
-	readout.hide()
+	readout = UI.hud_readout(ui, 98, 580)
 
 func ground_height(x: float) -> float:
 	return ROUTE.surface_at(x)

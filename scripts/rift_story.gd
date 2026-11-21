@@ -5,6 +5,44 @@ const Catalog := preload("res://scripts/sector_catalog.gd")
 enum Mood { NEUTRAL, CONCERNED, RESOLUTE, WRY }
 
 const GUIDE := "NOVA_GUIDE"
+const HUB_TOUR_INTRO := [[GUIDE, "Before you deploy, I can show you around. Choose Skip Tour at any point. To keep tutorials off for future runs, switch off Tutorials & Station Tour in System > Settings > Gameplay."]]
+# The keys match station destinations, and each entry opens a real menu page.
+const HUB_TOUR := {
+	"Save Game": [
+		["Save Game", "System keeps this operator's equipment, banked Bolts, and deployment on record. Save here before you call it a night."],
+		["Settings", "This is where you can remap controls, adjust audio and video, or turn tutorials off in Gameplay. I won't change any of your settings during the tour."],
+	],
+	"Player Profile": [
+		["Player Profile", "Profile tracks your career across operators. Open an operator slot here if you want to continue a different run."],
+		["Cosmetics", "You can preview armor frames and finishes here. Frames cost Bolts. Finishes come from achievements, and neither changes what your Buster can do."],
+		["Achievements", "Locked entries show what to do and how much Gamer Score you'll earn. Friends can see your score while you're signed in."],
+	],
+	"Shop": [
+		["Shop", "Spend Bolts in the Marketplace on field supplies and crafting materials. More stock opens up as your Operator Level rises."],
+		["Fabrication", "Learn a blueprint in Storage first. Then bring its materials here and choose whether to equip the new part or send it to Storage."],
+		["Upgrades", "Spend Core Shards on permanent talents. Those stay installed if you lose your run, so you can build a stronger start next time."],
+	],
+	"Gear": [
+		["Gear", "Select a gear socket to compare compatible parts with what you're wearing. This is a good stop before you take on a tougher sector."],
+		["Storage", "Inventory travels with you. Storage stays at the station. Move valuable gear here before a risky run, and assign field supplies to the quick slots here."],
+	],
+	"Social": [
+		["Social", "Find friends by their Riftcore username. You can message them while they're online or invite them to your lobby."],
+		["Party", "Host a lobby, browse open lobbies, or join with a code. The host can choose Public, Friends Only, or Invite Only."],
+		["Notifications", "Friend requests and party invitations land here. Check this tab if someone says they sent you one."],
+	],
+	"Challenges": [
+		["Challenges", "Pick an unlocked sector to see today's objectives. Come back here to claim the rewards you earned. The countdown shows when the list refreshes."],
+	],
+	"Collection": [
+		["Collection", "I keep recovered records, enemy intel, and loot information here in the archive, if you want to know what's worth looking for."],
+		["Tutorials", "You can look up controls and field mechanics here any time, even with automatic tutorials turned off."],
+	],
+	"Sector select": [
+		["Sector select", "This pad is your way into the field. Pick an unlocked sector and difficulty, then deploy. In each act, find both Gate Relays to open the boss room. Ember Foundry is your first stop."],
+		["Sector Loot", "Check Loot Intel before you deploy if you're hunting a particular part. Bring what you recover back to Storage. Banked gear and permanent talents survive the end of a run."],
+	],
+}
 const TUTORIAL_TITLE := "Field Tutorial"
 
 const INTRO := "Meridian, Earth, 2189. The Riftcore is failing. Director Soren seizes the district power systems and sends his guardians to enforce the shutdown. Dr. Mara Voss and RX-07 get an evacuation convoy through a collapsing floodgate. When RX-07 wakes without his memories, NOVA helps him track down Voss and recover the controls the city crews need."

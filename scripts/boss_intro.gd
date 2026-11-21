@@ -186,7 +186,7 @@ func make_charge(parent: Node3D, tint: Color, height: float, width: float) -> Py
 func play_dialogue(camera: Camera3D, boss: Combatant, head: Vector3, height: float, title: String, tint: Color, sector: int, act: int, online: bool) -> void:
 	var hint := Story.foundry_boss_hint(act) if sector == 1 else Story.jungle_boss_hint(act) if sector == 2 else ""
 	var beat := "%d_%d" % [sector, act]
-	if not hint.is_empty() and RiftSettings.claim_story_beat("arena_hint_" + beat):
+	if RiftSettings.show_hub_tips and not hint.is_empty() and RiftSettings.claim_story_beat("arena_hint_" + beat):
 		var boss_shot := camera.transform
 		var show_target := sector == 1 and boss.has_method("mechanic_preview_target")
 		if show_target:

@@ -45,6 +45,7 @@ func _ready() -> void:
 	menu.add_child(center)
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	var panel := PanelContainer.new()
+	panel.add_theme_stylebox_override("panel", UI.hud_frame(UI.CYAN, Vector2(16, 12), true))
 	panel.custom_minimum_size.x = 200 if in_mission else 350
 	panel.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	var layout := HBoxContainer.new()
@@ -62,11 +63,12 @@ func _ready() -> void:
 		menu.sections = operator_panel.sections
 		pause_tabs = menu.sections
 	var content := UI.column(panel)
-	UI.label(content, "CO-OP PAUSE", 30, UI.CYAN)
+	UI.profile_label(content, "//  CO-OP PAUSE", 30, UI.CYAN)
 	var hint := "The mission continues. You can still take damage." if in_mission else "Your partner can still move around the station."
 	UI.label(content, hint, 17, UI.MUTED)
 	actions = UI.column(content, 8)
 	resume_button = UI.button(actions, "Resume", close, true)
+	UI.profile_button(resume_button, true)
 	menu.first_focus = resume_button
 	settings_button = UI.button(actions, "Settings", show_settings)
 	UI.button(actions, "Leave Mission…" if in_mission else "Leave Party…", show_confirmation.bind(true))

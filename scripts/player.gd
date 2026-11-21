@@ -210,6 +210,7 @@ var showcase_projectiles: Node3D
 var suit_showcase_active := false
 var muzzle_skeleton: Skeleton3D
 var muzzle_bone := -1
+var popup_head_bone := -1
 var muzzle_offset := Vector3.ZERO
 var buster_pose: SkeletonModifier3D
 var resume_input_guard := 0.0
@@ -297,6 +298,7 @@ func bind_cannon_muzzle() -> void:
 		return
 	muzzle_skeleton = skeleton
 	muzzle_bone = bone
+	popup_head_bone = skeleton.find_bone("mixamorig_Head")
 	# Barrel rim center measured in the imported mesh's rest coordinates.
 	muzzle_offset = skeleton.get_bone_global_rest(bone).affine_inverse() * STANDARD_MUZZLE
 	if animation_player:
@@ -388,6 +390,11 @@ func collect_supply(id: String) -> bool:
 		return false
 	supply_found.emit(id)
 	return true
+
+func popup_head_position() -> Vector3:
+	if is_instance_valid(muzzle_skeleton) and popup_head_bone >= 0:
+		return muzzle_skeleton.to_global(muzzle_skeleton.get_bone_global_pose(popup_head_bone).origin) + Vector3.UP * 0.30
+	return global_position + Vector3.UP * 1.0
 
 func apply_supply(item: Dictionary) -> void:
 	var hp_before := health

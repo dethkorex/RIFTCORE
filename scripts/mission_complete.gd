@@ -7,7 +7,7 @@ const SkinKit := preload("res://scripts/operator_skins.gd")
 
 static func build(stack: VBoxContainer, sector_name: String, stats: Dictionary, materials: Dictionary,
 		blueprints: Array[String], supplies: Dictionary, bolts: int, challenges_completed: int, deaths: int, ending: String, exit: Callable) -> void:
-	UI.label(stack, "DEPLOYMENT COMPLETE", 43, UI.CYAN)
+	UI.profile_label(stack, "//  DEPLOYMENT COMPLETE", 37, UI.CYAN)
 	UI.label(stack, sector_name + "  /  EXTRACTION SUMMARY", 21, UI.WHITE)
 	var body := HBoxContainer.new()
 	body.custom_minimum_size.y = 355
@@ -21,7 +21,8 @@ static func build(stack: VBoxContainer, sector_name: String, stats: Dictionary, 
 	body.add_child(display)
 	var results := UI.column(body, 10)
 	results.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var numbers := UI.equipment_card(UI.CYAN)
+	var numbers := PanelContainer.new()
+	numbers.add_theme_stylebox_override("panel", UI.hud_frame(UI.CYAN, Vector2(14, 9)))
 	results.add_child(numbers)
 	var rows := GridContainer.new()
 	rows.columns = 4
@@ -71,7 +72,9 @@ static func build(stack: VBoxContainer, sector_name: String, stats: Dictionary, 
 		UI.label(stack, "Challenge rewards ready. Claim them in Challenges at the station.", 17, UI.VIOLET)
 	if not ending.is_empty():
 		UI.label(stack, ending, 15, UI.MUTED)
-	UI.button(stack, "Return to Station", exit, true).grab_focus()
+	var return_button := UI.button(stack, "Return to Station", exit, true, 40, false)
+	UI.profile_button(return_button, true)
+	return_button.grab_focus()
 
 static func profile_progress(parent: Control, progress: Dictionary) -> void:
 	var start := int(progress.before)

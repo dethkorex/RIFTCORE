@@ -3,7 +3,7 @@ extends Node3D
 const Door := preload("res://scripts/campaign_door.gd")
 const Fire := preload("res://addons/pyrolux_fx/nodes_3d/pyrolux_fire_3d.gd")
 const LAVA_SHADER := preload("res://assets/neon_factory/foundry/rising_lava.gdshader")
-const DISPLAY_FONT := preload("res://assets/ui/fonts/BarlowCondensed-ExtraBoldItalic.ttf")
+const UI := preload("res://scripts/rift_ui.gd")
 const REST_LEVEL := -1.55
 const TOP_LEVEL := 79.95
 const SHAFT_LEFT := 3.46
@@ -86,20 +86,9 @@ func make_warning() -> void:
 	var overlay := CanvasLayer.new()
 	overlay.layer = 29
 	add_child(overlay)
-	warning = Label.new()
+	warning = UI.hud_readout(overlay, 158.0, 400.0, Color("ff505d"), 67)
 	warning.text = "WARNING\nLAVA SURGE"
-	warning.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	warning.add_theme_font_override("font", DISPLAY_FONT)
-	warning.add_theme_font_size_override("font_size", 76)
-	warning.add_theme_color_override("font_color", Color("ff3341"))
-	warning.add_theme_color_override("font_outline_color", Color("1b030a"))
-	warning.add_theme_constant_override("outline_size", 15)
-	warning.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	overlay.add_child(warning)
-	warning.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
-	warning.offset_left = -230.0
-	warning.offset_right = 230.0
-	warning.offset_top = 158.0
+	warning.add_theme_stylebox_override("normal", UI.hud_frame(Color("ff505d"), Vector2(18, 10), true))
 
 func _physics_process(delta: float) -> void:
 	if not authority:

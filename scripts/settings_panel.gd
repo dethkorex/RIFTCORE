@@ -37,11 +37,13 @@ func _ready() -> void:
 	UI.label(self, "LB / RB   Switch tab", 14, UI.MUTED)
 	tabs = TabContainer.new()
 	tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	tabs.add_theme_stylebox_override("panel", UI.frame(Color("101e32"), Color("365d79"), 1))
-	tabs.add_theme_stylebox_override("tab_focus", StyleBoxEmpty.new())
-	tabs.add_theme_stylebox_override("tab_selected", UI.frame(Color("34244f"), UI.VIOLET))
-	tabs.add_theme_stylebox_override("tab_hovered", UI.frame(Color("34244f"), UI.VIOLET))
-	tabs.add_theme_stylebox_override("tab_unselected", UI.frame(Color("12253d"), Color("3b6384")))
+	tabs.add_theme_stylebox_override("panel", UI.hud_frame(UI.CYAN, Vector2(12, 10)))
+	var tab_focus := UI.profile_frame(Color.TRANSPARENT, UI.VIOLET, Vector2.ZERO)
+	tab_focus.draw_center = false
+	tabs.add_theme_stylebox_override("tab_focus", tab_focus)
+	tabs.add_theme_stylebox_override("tab_selected", UI.profile_frame(Color("103347"), UI.CYAN, Vector2(15, 6), true))
+	tabs.add_theme_stylebox_override("tab_hovered", UI.profile_frame(Color("152e45"), UI.CYAN, Vector2(15, 6)))
+	tabs.add_theme_stylebox_override("tab_unselected", UI.profile_frame(Color("0c2031"), Color("436586"), Vector2(15, 6)))
 	add_child(tabs)
 	var audio := settings_tab("Audio", "Volume", true)
 	for bus_name in RiftSettings.volumes:
@@ -74,7 +76,7 @@ func _ready() -> void:
 	)
 	var gameplay := settings_tab("Gameplay", "Interface")
 	add_slider(gameplay, "HUD Scale", RiftSettings.hud_scale * 100.0, 80, 115, 5, func(value: float): RiftSettings.set_hud_scale(value / 100.0))
-	add_toggle(gameplay, "Show first-visit hub tips", RiftSettings.show_hub_tips, func(enabled: bool):
+	add_toggle(gameplay, "Tutorials & Station Tour", RiftSettings.show_hub_tips, func(enabled: bool):
 		RiftSettings.show_hub_tips = enabled
 		RiftSettings.save()
 	)

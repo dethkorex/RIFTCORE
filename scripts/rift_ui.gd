@@ -76,7 +76,7 @@ static func equipment_card(tint: Color) -> PanelContainer:
 	panel.sort_children.connect(func(): panel.fit_child_in_rect(frame_owner, Rect2(Vector2.ZERO, panel.size)))
 	return panel
 
-static func theme() -> Theme:
+static func theme(station := false) -> Theme:
 	var result := Theme.new()
 	result.default_font = DISPLAY
 	result.default_font_size = 16
@@ -96,6 +96,27 @@ static func theme() -> Theme:
 	result.set_stylebox("focus", "LineEdit", text_focus)
 	result.set_stylebox("read_only", "LineEdit", frame(Color("0b1421"), Color("354257"), 1))
 	result.set_color("caret_color", "LineEdit", CYAN)
+	if station:
+		var surface := hud_frame(CYAN, Vector2(12, 10))
+		result.set_stylebox("panel", "PanelContainer", surface)
+		result.set_stylebox("panel", "Panel", surface)
+		result.set_stylebox("panel", "PopupMenu", profile_frame(Color("0b1a28"), Color("437da1"), Vector2(5, 5)))
+		result.set_stylebox("hover", "PopupMenu", profile_frame(Color("1c3b51"), CYAN, Vector2(8, 3)))
+		result.set_stylebox("normal", "LineEdit", profile_frame(Color("091827"), Color("436586")))
+		result.set_stylebox("focus", "LineEdit", text_focus)
+		for kind in ["HSeparator", "VSeparator"]:
+			var divider := StyleBoxLine.new()
+			divider.color = Color("376686")
+			divider.vertical = kind == "VSeparator"
+			result.set_stylebox("separator", kind, divider)
+		var rail := profile_frame(Color("0a1725"), Color("1b354c"), Vector2(4, 4))
+		var thumb := profile_frame(Color("619ab8"), Color("90cae3"), Vector2(4, 4))
+		for kind in ["VScrollBar", "HScrollBar"]:
+			result.set_stylebox("scroll", kind, rail)
+			result.set_stylebox("grabber", kind, thumb)
+			result.set_stylebox("grabber_highlight", kind, profile_frame(Color("4eafd2"), CYAN, Vector2(4, 4)))
+			result.set_stylebox("grabber_pressed", kind, profile_frame(Color("4592b5"), CYAN, Vector2(4, 4)))
+		result.set_stylebox("station_skin", "Button", surface)
 	return result
 
 static func label(parent: Node, value: String, font_size := 16, color := WHITE) -> Label:
@@ -110,6 +131,9 @@ static func label(parent: Node, value: String, font_size := 16, color := WHITE) 
 	return item
 
 static func style_button(item: Button) -> void:
+	if item.has_theme_stylebox("station_skin", "Button"):
+		profile_button(item)
+		return
 	if item.custom_minimum_size.y < 40:
 		var compact := frame(Color("12253d"), Color("3b6384"))
 		var compact_active := frame(Color("34244f"), VIOLET)
@@ -165,7 +189,10 @@ static func button(parent: Node, value: String, action: Callable, primary := fal
 		item.focus_mode = Control.FOCUS_NONE
 	parent.add_child(item)
 	if apply_default_style:
-		style_button(item)
+		if item.has_theme_stylebox("station_skin", "Button"):
+			profile_button(item, primary)
+		else:
+			style_button(item)
 	return item
 
 static func item_tile(parent: Container, icon: Texture2D, rarity: Color, rarity_index: int, caption: String, action: Callable) -> Button:
@@ -224,6 +251,78 @@ static func make_readable_scroll(scroll: ScrollContainer) -> void:
 	var edge := frame(Color.TRANSPARENT, CYAN, 2)
 	edge.draw_center = false
 	scroll.add_theme_stylebox_override("focus", edge)
+
+static func profile_frame(fill: Color, edge: Color, margins := Vector2(12, 8), glow := false) -> StyleBoxFlat:
+	var style := frame(fill, edge, 1)
+	style.set_corner_radius_all(9)
+	style.corner_detail = 1
+	style.content_margin_left = margins.x
+	style.content_margin_right = margins.x
+	style.content_margin_top = margins.y
+	style.content_margin_bottom = margins.y
+	if glow:
+		style.set_border_width_all(2)
+		style.shadow_color = Color(edge, 0.26)
+		style.shadow_size = 4
+	return style
+
+static func profile_button(item: Button, selected := false) -> void:
+	var normal := profile_frame(Color("0c2031"), CYAN if selected else Color("436586"), Vector2(15, 5), selected)
+	var active := profile_frame(Color("103347"), CYAN, Vector2(15, 5), true)
+	var pressed := profile_frame(Color("173649"), CYAN, Vector2(15, 5))
+	set_button_states(item, normal, active, pressed)
+	item.add_theme_stylebox_override("disabled", profile_frame(Color("0b1727"), Color("2a4056"), Vector2(15, 5)))
+
+static func profile_panel(parent: Container, ratio := 1.0) -> VBoxContainer:
+	var panel := PanelContainer.new()
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	panel.size_flags_stretch_ratio = ratio
+	panel.add_theme_stylebox_override("panel", profile_frame(Color("071522"), Color("4097bd"), Vector2(12, 12), true))
+	parent.add_child(panel)
+	return column(panel, 8)
+
+static func profile_label(parent: Node, value: String, font_size: int, color := WHITE) -> Label:
+	var item := label(parent, value, font_size, color)
+	item.autowrap_mode = TextServer.AUTOWRAP_OFF
+	item.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	return item
+
+static func hud_frame(tint := CYAN, padding := Vector2(14, 8), emphasized := false) -> StyleBoxFlat:
+	return profile_frame(Color("0a1828f2"), tint if emphasized else tint.darkened(0.48), padding, emphasized)
+
+# All overhead notifications use the active gameplay camera and its viewport space.
+static func operator_popup_position(popup: Control, operator: Node3D, rise: float) -> Vector2:
+	var viewport := popup.get_viewport()
+	var visible_area := viewport.get_visible_rect()
+	var head := Vector2(visible_area.get_center().x, visible_area.size.y * 0.42)
+	var camera := viewport.get_camera_3d()
+	if is_instance_valid(operator) and operator.is_inside_tree() and is_instance_valid(camera):
+		var world_head: Vector3 = operator.popup_head_position() if operator is RiftPlayer else operator.global_position + Vector3.UP
+		if not camera.is_position_behind(world_head):
+			head = camera.unproject_position(world_head)
+	var parent := popup.get_parent() as CanvasItem
+	if parent:
+		var to_local := parent.get_global_transform_with_canvas().affine_inverse()
+		head = to_local * head
+		visible_area = to_local * visible_area
+	var left := maxf(visible_area.position.x + 12.0, visible_area.end.x - popup.size.x - 12.0)
+	return Vector2(
+		clampf(head.x - popup.size.x * 0.5, visible_area.position.x + 12.0, left),
+		clampf(head.y - popup.size.y - 12.0 - rise, visible_area.position.y + 12.0, visible_area.end.y - popup.size.y - 12.0)
+	)
+
+static func hud_readout(parent: Node, top: float, width: float, tint := CYAN, font_size := 22) -> Label:
+	var label := profile_label(parent, "", font_size, tint)
+	label.add_theme_stylebox_override("normal", hud_frame(tint, Vector2(14, 7)))
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+	label.offset_left = -width * 0.5
+	label.offset_right = width * 0.5
+	label.offset_top = top
+	label.offset_bottom = top
+	label.hide()
+	return label
 
 static func tile_frame(asset: String) -> StyleBoxTexture:
 	var style := StyleBoxTexture.new()

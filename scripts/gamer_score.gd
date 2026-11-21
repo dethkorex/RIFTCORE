@@ -5,14 +5,14 @@ const SkinKit := preload("res://scripts/operator_skins.gd")
 const Catalog := preload("res://scripts/sector_catalog.gd")
 const Difficulty := preload("res://scripts/mission_difficulty.gd")
 const AWARDS := {
-	"iron_route": ["Iron Route", 40, "Extract on Hard or Expert without losing a life and defeat 12 security units."],
-	"field_partners": ["Field Partners", 65, "Extract in co-op on Hard or Expert with 14 security defeats and no squad lives lost."],
-	"expert_entry": ["Expert Entry", 80, "Clear both acts of any sector on Expert."],
-	"expert_vanguard": ["Expert Vanguard", 105, "Extract on Expert with no lives lost and at least 16 security defeats."],
-	"perfect_condition": ["Perfect Condition", 90, "Extract on Expert with no lives lost, 95% health and 85% energy."],
-	"critical_hour": ["Critical Hour", 110, "Extract on Expert within eight minutes without losing a life."],
-	"guardian_hunter": ["Guardian Hunter", 160, "Clear five different sectors on Expert."],
-	"meridian_reclaimed": ["Meridian Reclaimed", 250, "Clear every sector on Expert."],
+	"iron_route": ["No Second Deployment", 40, "On Hard or Expert, defeat 12 security units and extract without losing a life."],
+	"field_partners": ["Whole Squad Home", 65, "On Hard or Expert, defeat 14 security units as a squad and extract without losing a squad life."],
+	"expert_entry": ["Guardian Breaker", 80, "Clear both acts and extract from any sector on Expert."],
+	"expert_vanguard": ["Sweep and Salvage", 105, "On Expert, defeat 16 security units, recover 3 materials, and extract without losing a life."],
+	"perfect_condition": ["Factory Finish", 90, "On Expert, extract with at least 95% health and 85% energy without losing a life."],
+	"critical_hour": ["Beat the Blackout", 110, "On Expert, extract within eight minutes without losing a life."],
+	"guardian_hunter": ["Five Locks Broken", 160, "Clear five different sectors on Expert."],
+	"meridian_reclaimed": ["Meridian, Back Online", 250, "Clear every sector on Expert."],
 }
 
 static var achievement_catalog: Dictionary = build_catalog()
@@ -107,7 +107,7 @@ func record_clear(sector: int, mode: int, run: Dictionary) -> int:
 		add("expert_entry")
 		if sector not in expert_sectors:
 			expert_sectors.append(sector)
-		if clean and kills >= 16:
+		if clean and kills >= 16 and int(run.get("materials", 0)) >= 3:
 			add("expert_vanguard")
 		if clean and float(run.get("health", 0.0)) >= 95.0 and float(run.get("energy", 0.0)) >= 85.0:
 			add("perfect_condition")

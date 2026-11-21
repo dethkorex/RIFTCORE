@@ -7,9 +7,16 @@ const Profile := preload("res://scripts/rogue_profile.gd")
 const CURRENCY := preload("res://assets/ui/bolt.svg")
 const SHARD := preload("res://assets/ui/core-shard.svg")
 const PORTRAIT := preload("res://assets/ui/rx07_menu.png")
-const CYAN := Color("00caff")
+const CYAN := UI.CYAN
 const WHITE := Color("f1f8ff")
-const INK := Color(0.018, 0.046, 0.13, 0.96)
+const INK := Color("091727f5")
+const PANEL_WIDTH := 354.0
+const OBJECTIVE_WIDTH := 348.0
+const EDGE := 20.0
+const SUIT_BOTTOM := 214.0
+const PARTY_TOP := 226.0
+const HEART := preload("res://assets/ui/riftcore_kit/icon_heart.png")
+const SHIELD := preload("res://assets/ui/riftcore_kit/icon_shield.png")
 const HUD_SCALE := 0.75
 const BOOST_NAMES := {"attack": "ATK", "defense": "DEF", "speed": "SPD"}
 
@@ -26,7 +33,17 @@ var animated_xp := 0.0
 var xp_tween: Tween
 var notice: Label
 var notice_tween: Tween
+var quick_row: HBoxContainer
 var loot_popups: VBoxContainer
+var local_operator: Node3D:
+	set(value):
+		if local_operator == value:
+			return
+		local_operator = value
+		if is_instance_valid(loot_popups):
+			for popup in loot_popups.get_children():
+				loot_popups.remove_child(popup)
+				popup.queue_free()
 var remaining := 0
 var run_tenths := 0
 var status_lines := PackedStringArray()
@@ -55,41 +72,50 @@ var exit_task := "REACH THE FACTORY EXIT"
 func show_quick_slots(profile) -> void:
 	var row := HBoxContainer.new()
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	row.add_theme_constant_override("separation", 5)
+	row.add_theme_constant_override("separation", 6)
 	add_child(row)
+	quick_row = row
 	row.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
-	row.offset_left = -103
-	row.offset_right = 103
-	row.offset_top = -64
-	row.offset_bottom = -16
+	row.offset_left = -105
+	row.offset_right = 105
+	row.offset_top = -67
+	row.offset_bottom = -19
+	row.pivot_offset = Vector2(105, 48)
+	RiftSettings.hud_scale_changed.connect(place_quick_slots)
+	place_quick_slots()
+	var tile_normal := UI.hud_frame(CYAN, Vector2.ZERO)
+	var tile_filled := UI.hud_frame(CYAN, Vector2.ZERO, true)
 	for index in 4:
 		var tile := Control.new()
 		tile.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		tile.custom_minimum_size = Vector2(48, 48)
 		row.add_child(tile)
-		tile.draw.connect(func():
-			tile.draw_style_box(UI.frame(Color("08142af2"), UI.CYAN, 2), Rect2(Vector2.ZERO, tile.size))
-			tile.draw_line(Vector2(4, 4), Vector2(20, 4), UI.CYAN.lightened(.3), 2.0))
 		var key := Label.new()
 		key.text = ["↑", "←", "→", "↓"][index]
 		key.add_theme_font_override("font", UI.DISPLAY)
 		key.add_theme_color_override("font_color", CYAN)
 		key.add_theme_font_size_override("font_size", 21)
-		key.position = Vector2(5, 1)
+		key.position = Vector2(7, 0)
 		key.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		tile.add_child(key)
 		var icon := TextureRect.new()
-		icon.position = Vector2(14, 11)
-		icon.size = Vector2(29, 28)
 		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		tile.add_child(icon)
+		icon.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+		icon.offset_left = -14
+		icon.offset_right = 14
+		icon.offset_top = -14
+		icon.offset_bottom = 14
 		var quantity := Label.new()
-		quantity.theme = UI.theme()
+		quantity.add_theme_font_override("font", UI.DISPLAY)
+		quantity.add_theme_color_override("font_color", UI.WHITE)
 		quantity.add_theme_font_size_override("font_size", 13)
-		quantity.position = Vector2(20, 31)
+		quantity.position = Vector2(19, 29)
 		quantity.size = Vector2(24, 16)
+		quantity.add_theme_color_override("font_outline_color", Color("06111e"))
+		quantity.add_theme_constant_override("outline_size", 4)
 		quantity.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		quantity.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		tile.add_child(quantity)
@@ -99,7 +125,13 @@ func show_quick_slots(profile) -> void:
 				var remaining := int(current.get("count", 0))
 				var item: Dictionary = profile.stock.get(current.get("id", ""), {})
 				icon.texture = EquipmentIcons.supply_icon(item) if remaining > 0 and not item.is_empty() else null
-				quantity.text = "×%d" % remaining if remaining > 0 else "–"
+				quantity.text = str(remaining) if remaining > 0 else "–"
+				key.modulate = Color.WHITE if remaining > 0 else Color("9eb2c7")
+				tile.queue_redraw()
+		tile.draw.connect(func():
+			var frame := tile_filled if icon.texture else tile_normal
+			tile.draw_style_box(frame, Rect2(Vector2.ZERO, tile.size))
+			tile.draw_line(Vector2(8, 4), Vector2(18, 4), CYAN if icon.texture else Color("375873"), 1.5))
 		var refresh_key := func():
 			key.text = ["↑", "←", "→", "↓"][index] if not Input.get_connected_joypads().is_empty() else str(index + 1)
 		refresh.call()
@@ -112,82 +144,79 @@ func show_quick_slots(profile) -> void:
 			Input.joy_connection_changed.disconnect(update_device)
 		, CONNECT_ONE_SHOT)
 
+func place_quick_slots() -> void:
+	quick_row.scale = Vector2.ONE * RiftSettings.hud_scale
+
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	resized.connect(queue_redraw)
 	RiftSettings.hud_scale_changed.connect(queue_redraw)
-	notice = Label.new()
-	add_child(notice)
-	notice.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
-	notice.offset_left = -400
-	notice.offset_right = 400
-	notice.offset_top = 120
-	notice.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	notice.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	notice.add_theme_font_override("font", UI.DISPLAY)
-	notice.add_theme_constant_override("outline_size", 8)
-	notice.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	notice.hide()
+	notice = UI.hud_readout(self, 151, 386, CYAN, 29)
 	loot_popups = VBoxContainer.new()
 	loot_popups.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	loot_popups.add_theme_constant_override("separation", 3)
 	add_child(loot_popups)
-	loot_popups.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
-	loot_popups.offset_left = -230
-	loot_popups.offset_right = 230
-	loot_popups.offset_top = 186
+	loot_popups.name = "PickupPopups"
+	loot_popups.hide()
+	loot_popups.child_order_changed.connect(sync_pickup_stack)
+	set_process(false)
+
+func pickup_stack_height() -> float:
+	if not is_instance_valid(loot_popups) or not loot_popups.is_visible_in_tree():
+		return 0.0
+	return loot_popups.size.y + 5.0
+
+func sync_pickup_stack() -> void:
+	var active := loot_popups.get_child_count() > 0
+	loot_popups.visible = active
+	set_process(active)
+
+func _process(_delta: float) -> void:
+	loot_popups.size = loot_popups.get_combined_minimum_size()
+	loot_popups.position = UI.operator_popup_position(loot_popups, local_operator, 0.0)
 
 func place_party() -> void:
 	var factor := HUD_SCALE * RiftSettings.hud_scale
-	coop_party.position = Vector2(18, 218) * factor
+	coop_party.position = Vector2(EDGE, PARTY_TOP) * factor
 	coop_party.scale = Vector2.ONE * factor
 	queue_redraw()
 
-func draw_boss_readout(hud_size: Vector2) -> void:
-	var width := clampf(hud_size.x - 560.0, 294.0, 590.0)
-	var top := 12.0 if hud_size.x >= 1120.0 else 132.0
-	var at := Vector2((hud_size.x - width) * .5, top)
+func draw_boss_readout(hud_size: Vector2, right_start: float, lower_top: float) -> void:
+	var center_left := EDGE + PANEL_WIDTH + 18.0
+	var center_right := right_start - 18.0
+	var available := center_right - center_left
+	var width := minf(560.0, available)
+	var at := Vector2(center_left + (available - width) * 0.5, EDGE)
+	if available < 340.0:
+		width = minf(490.0, hud_size.x - EDGE * 2.0)
+		at = Vector2((hud_size.x - width) * 0.5, lower_top)
+	var tint := boss_tint.lightened(.25) if boss_act == 1 else boss_tint.lightened(.1)
+	plate(Rect2(at, Vector2(width, 84)), 13, tint)
+	draw_rect(Rect2(at + Vector2(13, 51), Vector2(width - 26, 1)), tint.darkened(.55))
+	caption(at + Vector2(18, 23), BOSS_SIGILS[clampi(boss_sector - 1, 0, BOSS_SIGILS.size() - 1)], 18, tint)
+	caption(at + Vector2(42, 21), "SECTOR %02d  /  %s" % [boss_sector, "MINIBOSS" if boss_act == 1 else "GUARDIAN"], 13, tint)
 	var values := "%d / %d" % [roundi(boss_health), roundi(boss_max_health)]
-	var tint := boss_tint.lightened(.19) if boss_act == 1 else boss_tint
-	plate(Rect2(at, Vector2(width, 87)), 15 if boss_act == 2 else 9, tint)
-	plate(Rect2(at + Vector2(12, 11), Vector2(48, 43)), 11, tint)
-	caption(at + Vector2(22, 43), BOSS_SIGILS[clampi(boss_sector - 1, 0, BOSS_SIGILS.size() - 1)], 27, tint)
-	var value_font := 20
-	var value_width := UI.DISPLAY.get_string_size(values, HORIZONTAL_ALIGNMENT_LEFT, -1, value_font).x
-	caption(at + Vector2(width - value_width - 17, 43), values, value_font)
-	caption(at + Vector2(72, 25), "SECTOR %02d   /   %s" % [boss_sector, "MINIBOSS" if boss_act == 1 else "GUARDIAN"], 13, tint)
-	var name_font := 27
-	var available := width - value_width - 93.0
-	while name_font > 13 and UI.DISPLAY.get_string_size(boss_name, HORIZONTAL_ALIGNMENT_LEFT, -1, name_font).x > available:
-		name_font -= 1
-	caption(at + Vector2(72, 47), boss_name, name_font)
-	var fill := clampf(boss_health / maxf(1.0, boss_max_health), 0.0, 1.0)
-	var meter := Rect2(at + Vector2(14, 60), Vector2(width - 28, 17))
-	draw_rect(meter, tint.darkened(.82))
-	var segments := 12 if boss_act == 2 else 8
-	for index in segments:
-		var span := meter.size.x / segments
-		var part := clampf(fill * segments - index, 0.0, 1.0)
-		var segment := Rect2(meter.position + Vector2(span * index, 0), Vector2((span - 2.0) * part, meter.size.y))
-		draw_rect(segment, tint.lerp(Color.WHITE, .14 + (index % 2) * .14))
-
-	if not boss_mechanic.is_empty():
-		for remaining in [0.64, 0.30]:
-			var x := meter.position.x + meter.size.x * float(remaining)
-			draw_line(Vector2(x, meter.position.y), Vector2(x, meter.end.y), Color("fbfbff"), 2.0)
-		var mechanic_at := at + Vector2(0, 90)
-		var status_tint := Color("8dffe5") if boss_core_exposed else Color("ffbd78")
-		plate(Rect2(mechanic_at, Vector2(width, 51)), 7, status_tint)
-		var lines := boss_mechanic.split("\n", false)
-		for index in lines.size():
-			var font_size := 21 if index == 0 else 15
-			var text_width := UI.DISPLAY.get_string_size(lines[index], HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
-			while font_size > 11 and text_width > width - 24.0:
-				font_size -= 1
-				text_width = UI.DISPLAY.get_string_size(lines[index], HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
-			var ink := status_tint if index == 0 else WHITE
-			caption(mechanic_at + Vector2((width - text_width) * 0.5, 21 + index * 21), lines[index], font_size, ink)
-
+	var value_width := text_width(values, 18)
+	caption(at + Vector2(width - value_width - 16, 44), values, 18)
+	var name_font := fit_font(boss_name, 26, width - value_width - 62.0)
+	caption(at + Vector2(18, 46), boss_name, name_font)
+	var fraction := clampf(boss_health / maxf(1.0, boss_max_health), 0.0, 1.0)
+	var meter := Rect2(at + Vector2(16, 59), Vector2(width - 35, 13))
+	segmented_meter(meter, fraction, tint, 12 if boss_act == 2 else 8)
+	if boss_mechanic.is_empty():
+		return
+	for threshold: float in [0.64, 0.30]:
+		var x := meter.position.x + meter.size.x * threshold
+		draw_line(Vector2(x, meter.position.y - 1), Vector2(x, meter.end.y + 1), WHITE, 1.6, true)
+	var status_at := at + Vector2(0, 91)
+	var status_tint := Color("8dffe5") if boss_core_exposed else Color("ffbd78")
+	var lines := boss_mechanic.split("\n", false)
+	plate(Rect2(status_at, Vector2(width, 13.0 + 19.0 * lines.size())), 9, status_tint)
+	for index in lines.size():
+		var font_size := fit_font(lines[index], 18 if index == 0 else 15, width - 29.0)
+		var line_width := text_width(lines[index], font_size)
+		caption(status_at + Vector2((width - line_width) * 0.5, 20 + index * 19), lines[index], font_size,
+			status_tint if index == 0 else WHITE)
 
 func update_boss_mechanic(boss: Combatant) -> void:
 	var status: String = boss.encounter_status() if is_instance_valid(boss) and boss.has_method("encounter_status") else ""
@@ -219,7 +248,10 @@ func announce(message: String, tint: Color, font_size := 36) -> void:
 		notice_tween.kill()
 	notice.text = message
 	notice.add_theme_font_size_override("font_size", font_size)
-	notice.add_theme_color_override("font_color", tint)
+	notice.add_theme_color_override("font_color", tint.lightened(.1))
+	notice.add_theme_stylebox_override("normal", UI.hud_frame(tint, Vector2(16, 8), true))
+	notice.offset_top = 180 if boss_visible else 151
+	notice.offset_bottom = notice.offset_top
 	notice.show()
 	notice.pivot_offset = notice.size * 0.5
 	notice.scale = Vector2.ONE * 0.72
@@ -259,16 +291,11 @@ func add_loot_popup(message: String, tint: Color) -> void:
 		var oldest := loot_popups.get_child(0)
 		loot_popups.remove_child(oldest)
 		oldest.queue_free()
-	var popup := Label.new()
-	popup.text = message
+	var popup := UI.profile_label(loot_popups, message, 20, tint)
+	popup.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	popup.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	popup.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	popup.add_theme_font_override("font", UI.DISPLAY)
-	popup.add_theme_font_size_override("font_size", 24)
-	popup.add_theme_color_override("font_color", tint)
-	popup.add_theme_color_override("font_outline_color", Color("020817"))
-	popup.add_theme_constant_override("outline_size", 7)
-	loot_popups.add_child(popup)
+	popup.add_theme_stylebox_override("normal", UI.hud_frame(tint, Vector2(12, 4)))
 	var fade := popup.create_tween()
 	fade.tween_interval(1.6)
 	fade.tween_property(popup, "modulate:a", 0.0, 0.32)
@@ -298,103 +325,138 @@ func plate(rect: Rect2, cut := 9.0, edge := CYAN) -> void:
 	])
 	draw_colored_polygon(outline, INK)
 	outline.append(outline[0])
-	draw_polyline(outline, Color("103f7a"), 7.0)
-	draw_polyline(outline, edge, 2.5)
-	draw_line(Vector2(x + cut + 3, y + 3), Vector2(r - cut - 3, y + 3), WHITE, 1.0)
+	draw_polyline(outline, Color(edge, 0.16), 4.2, true)
+	draw_polyline(outline, Color(edge.lerp(Color("1a3b5c"), .32), .95), 1.65, true)
+	draw_line(Vector2(x + cut + 4, y + 3), Vector2(x + cut + minf(rect.size.x * .31, 76.0), y + 3), edge, 2, true)
+	draw_line(Vector2(r - cut - 24, b - 3), Vector2(r - cut - 2, b - 3), Color(edge, .54), 1.4, true)
+
+func text_width(value: String, font_size: int) -> float:
+	return UI.DISPLAY.get_string_size(value, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
+
+func fit_font(value: String, preferred: int, available: float) -> int:
+	var font_size := preferred
+	while font_size > 11 and text_width(value, font_size) > available:
+		font_size -= 1
+	return font_size
 
 func caption(at: Vector2, value: String, font_size := 18, color := WHITE) -> void:
-	var face := UI.DISPLAY
-	draw_string(face, at + Vector2(1, 2), value, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, Color("020817"))
-	draw_string(face, at, value, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, color)
+	draw_string(UI.DISPLAY, at, value, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, color)
 
-func gauge(y: float, label: String, ratio: float, tint: Color, values := "") -> void:
-	caption(Vector2(117, y + 13), label, 15, WHITE)
-	if not values.is_empty():
-		var width := UI.DISPLAY.get_string_size(values, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x
-		caption(Vector2(361 - width, y + 13), values, 16, WHITE)
-	for i in 10:
-		var amount := clampf(ratio * 10.0 - i, 0.0, 1.0)
-		var start := Vector2(116 + i * 24.4, y + 25)
-		var slant := Vector2(4, -7)
-		var span := Vector2(21.8, 0)
-		draw_colored_polygon(PackedVector2Array([start, start + span, start + span + slant, start + slant]), Color("1e3354"))
+func segmented_meter(rect: Rect2, ratio: float, tint: Color, count: int) -> void:
+	var step := rect.size.x / count
+	for index in count:
+		var pt := rect.position + Vector2(index * step, rect.size.y)
+		var slant := Vector2(minf(rect.size.y * .48, 5.0), -rect.size.y)
+		var span := Vector2(step - 3.0, 0)
+		draw_colored_polygon(PackedVector2Array([pt, pt + span, pt + span + slant, pt + slant]), Color("1c324a"))
+		var amount := clampf(ratio * count - index, 0.0, 1.0)
 		if amount > 0.0:
 			span *= amount
-			draw_colored_polygon(PackedVector2Array([start, start + span, start + span + slant, start + slant]), tint)
+			draw_colored_polygon(PackedVector2Array([pt, pt + span, pt + span + slant, pt + slant]), tint)
+			draw_line(pt + slant, pt + span + slant, tint.lightened(.38), 1.15, true)
+
+func gauge(y: float, label: String, ratio: float, tint: Color, values := "") -> void:
+	caption(Vector2(119, y + 13), label, 16, UI.MUTED)
+	if not values.is_empty():
+		caption(Vector2(358 - text_width(values, 17), y + 13), values, 17)
+	segmented_meter(Rect2(118, y + 18, 237, 8), ratio, tint, 10)
 
 func task(at: Vector2, value: String, done: bool) -> void:
-	var color := CYAN if done else WHITE
-	draw_rect(Rect2(at + Vector2(0, -13), Vector2(14, 14)), color, false, 2.0)
+	var color := Color("8dffe5") if done else WHITE
+	draw_rect(Rect2(at + Vector2(0, -13), Vector2(13, 13)), Color(color, .64), false, 1.4)
 	if done:
-		draw_polyline(PackedVector2Array([at + Vector2(3, -6), at + Vector2(6, -3), at + Vector2(12, -10)]), CYAN, 2.0)
-	caption(at + Vector2(23, 0), value, 16, color)
+		draw_polyline(PackedVector2Array([at + Vector2(2, -6), at + Vector2(5, -3), at + Vector2(11, -10)]), color, 1.8, true)
+	caption(at + Vector2(23, 0), value, fit_font(value, 17, OBJECTIVE_WIDTH - 58.0), color)
+
+func draw_operator() -> void:
+	plate(Rect2(EDGE, EDGE, PANEL_WIDTH, 144), 13)
+	var source_size := PORTRAIT.get_size()
+	draw_rect(Rect2(32, 34, 76, 114), Color("102338"))
+	draw_texture_rect_region(PORTRAIT, Rect2(34, 36, 72, 110),
+		Rect2(source_size * Vector2(0.415, 0.008), source_size * Vector2(0.17, 0.27)))
+	draw_rect(Rect2(32, 34, 76, 114), Color("386e8d"), false, 1.0)
+	caption(Vector2(119, 48), "RX-07", 23)
+	var current_level := RiftPlayer.level_for_experience(experience)
+	var level := "OPERATOR LV. %02d" % current_level
+	caption(Vector2(359 - text_width(level, 18), 47), level, 18, CYAN)
+	draw_line(Vector2(119, 54), Vector2(358, 54), Color("315979"))
+	gauge(57, "HEALTH", health, Color("7cf287"), "%d / %d" % [roundi(health * health_capacity), roundi(health_capacity)])
+	gauge(89, "ENERGY", energy, Color("4cdcfb"), "%d / %d" % [roundi(energy * energy_capacity), roundi(energy_capacity)])
+	var shown_level := RiftPlayer.level_for_experience(animated_xp)
+	var threshold := RiftPlayer.experience_threshold(shown_level)
+	var next_threshold := RiftPlayer.experience_threshold(shown_level + 1)
+	gauge(121, "OPERATOR XP", (animated_xp - threshold) / float(next_threshold - threshold), Color("b693ff"))
+
+	plate(Rect2(EDGE, 173, 296, SUIT_BOTTOM - 173), 9, suit_tint)
+	draw_texture_rect(SHIELD, Rect2(32, 180, 25, 25), false, suit_tint)
+	caption(Vector2(66, 190), weapon, fit_font(weapon, 17, 234.0), suit_tint)
+	var device := "pad" if not Input.get_connected_joypads().is_empty() else "key"
+	var previous := RiftSettings.binding_label("previous_suit", device)
+	var next := RiftSettings.binding_label("swap_weapon", device)
+	caption(Vector2(66, 206), "%s  ‹  PREV     NEXT  ›  %s" % [previous, next], 13, UI.MUTED)
+
+func draw_objective(right: float) -> float:
+	var x := right - OBJECTIVE_WIDTH
+	var height := 121.0 if gate_relay_count >= 0 else 96.0
+	plate(Rect2(x, EDGE, OBJECTIVE_WIDTH, height), 13)
+	caption(Vector2(x + 17, 46), "//  ACT %s   /   OBJECTIVE" % ("II" if act == 2 else "I"), 22, CYAN)
+	draw_line(Vector2(x + 16, 53), Vector2(right - 16, 53), Color("315979"))
+	task(Vector2(x + 17, 76), exit_task, reached_exit)
+	task(Vector2(x + 17, 99), "OPTIONAL: SECURITY  %d LEFT" % remaining, remaining == 0)
+	if gate_relay_count >= 0:
+		task(Vector2(x + 17, 123), "GATE RELAYS   %d / 2" % gate_relay_count, gate_relay_count == 2)
+	return EDGE + height
+
+func draw_resources(at: Vector2) -> void:
+	plate(Rect2(at, Vector2(219, 63)), 9)
+	draw_texture_rect(CURRENCY, Rect2(at + Vector2(12, 7), Vector2(20, 20)), false)
+	draw_texture_rect(SHARD, Rect2(at + Vector2(12, 36), Vector2(20, 20)), false)
+	caption(at + Vector2(40, 23), "BOLTS", 17, UI.MUTED)
+	caption(at + Vector2(40, 51), "CORE SHARDS", 17, UI.MUTED)
+	var bolt_count := "%04d" % credits
+	var shard_count := "%04d" % core_shards
+	caption(at + Vector2(204 - text_width(bolt_count, 19), 24), bolt_count, 19, Color("ffd481"))
+	caption(at + Vector2(204 - text_width(shard_count, 19), 52), shard_count, 19, Color("d7b0ff"))
+	draw_line(at + Vector2(12, 32), at + Vector2(207, 32), Color("284861"))
+	var strip := at + Vector2(0, 71)
+	plate(Rect2(strip, Vector2(219, 34)), 8)
+	draw_texture_rect(HEART, Rect2(strip + Vector2(10, 8), Vector2(17, 17)), false, CYAN)
+	caption(strip + Vector2(32, 22), "LIVES", 15, UI.MUTED)
+	caption(strip + Vector2(69, 23), "%02d" % lives, 18)
+	draw_line(strip + Vector2(96, 7), strip + Vector2(96, 27), Color("284861"))
+	caption(strip + Vector2(105, 22), "TIME", 15, UI.MUTED)
+	caption(strip + Vector2(142, 23), "%02d:%02d.%d" % [run_tenths / 600, run_tenths / 10 % 60, run_tenths % 10], 17)
 
 func _draw() -> void:
 	var hud_scale := HUD_SCALE * RiftSettings.hud_scale
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE * hud_scale)
 	var hud_size := size / hud_scale
-	plate(Rect2(20, 22, 355, 142), 12)
-	var source_size := PORTRAIT.get_size()
-	draw_texture_rect_region(PORTRAIT, Rect2(28, 31, 77, 104),
-		Rect2(source_size * Vector2(0.415, 0.008), source_size * Vector2(0.17, 0.27)))
-	caption(Vector2(117, 48), "RX-07", 21)
-	var current_level := RiftPlayer.level_for_experience(experience)
-	caption(Vector2(218, 48), "OPERATOR LV. %02d" % current_level, 17, CYAN)
-	draw_line(Vector2(117, 54), Vector2(361, 54), Color("315979"))
-	gauge(57, "HEALTH", health, Color("6df536"), "%d / %d" % [roundi(health * health_capacity), roundi(health_capacity)])
-	gauge(89, "ENERGY", energy, Color("04dafa"), "%d / %d" % [roundi(energy * energy_capacity), roundi(energy_capacity)])
-	var shown_level := RiftPlayer.level_for_experience(animated_xp)
-	var threshold := RiftPlayer.experience_threshold(shown_level)
-	var next_threshold := RiftPlayer.experience_threshold(shown_level + 1)
-	gauge(121, "OPERATOR XP", (animated_xp - threshold) / (next_threshold - threshold), Color("ab72ff"))
-	var right := hud_size.x - 20.0
+	var right := hud_size.x - EDGE
+	var right_start := right - OBJECTIVE_WIDTH
+	var counters_top := EDGE + 127.0
+	draw_operator()
 	if not coop:
-		var x := right - 348.0
-		var panel_height := 128 if gate_relay_count >= 0 else 105
-		plate(Rect2(x, 21, 348, panel_height), 14)
-		for y in range(56, panel_height + 15, 5):
-			draw_line(Vector2(x + 5, y), Vector2(right - 5, y), Color("102752"), 1.0)
-		caption(Vector2(x + 18, 49), "ACT %s  /  OBJECTIVE" % ("II" if act == 2 else "I"), 22)
-		draw_line(Vector2(x + 12, 55), Vector2(right - 12, 55), CYAN, 1.0)
-		task(Vector2(x + 20, 80), exit_task, reached_exit)
-		task(Vector2(x + 20, 106), "OPTIONAL: SECURITY   %d LEFT" % remaining, remaining == 0)
-		if gate_relay_count >= 0:
-			task(Vector2(x + 20, 130), "GATE RELAYS   %d/2" % gate_relay_count, gate_relay_count == 2)
-	var counters := Vector2(right - 222, 162 if not coop and gate_relay_count >= 0 else 139)
-	if coop and is_instance_valid(coop_objective):
-		counters.y = maxf(counters.y, coop_objective.get_rect().end.y / hud_scale + 12.0)
-	plate(Rect2(counters, Vector2(222, 65)), 11)
-	draw_texture_rect(CURRENCY, Rect2(counters + Vector2(13, 5), Vector2(24, 24)), false)
-	caption(counters + Vector2(47, 25), "BOLTS  %04d" % credits, 19)
-	draw_line(counters + Vector2(13, 34), counters + Vector2(208, 34), Color("346681"))
-	draw_texture_rect(SHARD, Rect2(counters + Vector2(13, 37), Vector2(24, 24)), false)
-	caption(counters + Vector2(47, 55), "%04d CORE SHARDS" % core_shards, 17)
-	plate(Rect2(counters + Vector2(0, 71), Vector2(222, 33)), 9)
-	var life_text := "RX   LIVES   %02d" % lives
-	caption(counters + Vector2(15, 94), life_text, 17)
-	plate(Rect2(counters + Vector2(0, 111), Vector2(222, 33)), 9)
-	var time_text := "%02d:%02d.%d" % [run_tenths / 600, run_tenths / 10 % 60, run_tenths % 10]
-	caption(counters + Vector2(15, 134), "TIME     " + time_text, 17)
-	if boss_visible:
-		draw_boss_readout(hud_size)
-	if failed:
-		plate(Rect2(hud_size.x * 0.5 - 168, hud_size.y * 0.72, 336, 44), 10, Color("ff536c"))
-		caption(Vector2(hud_size.x * 0.5 - 151, hud_size.y * 0.72 + 28), "RUN OVER   /   BANKING CREDITS" if lives <= 0 else "SYSTEM FAILURE   /   RESPAWNING", 17)
+		counters_top = draw_objective(right) + 9.0
+	elif is_instance_valid(coop_objective):
+		var objective := coop_objective.get_global_rect()
+		right_start = objective.position.x / hud_scale
+		counters_top = objective.end.y / hud_scale + 9.0
+	var counters_at := Vector2(right - 219, counters_top)
+	draw_resources(counters_at)
 
-	plate(Rect2(18, 164, 280, 43), 9, suit_tint)
-	var visor := PackedVector2Array([Vector2(33, 174), Vector2(40, 171), Vector2(48, 171),
-		Vector2(55, 174), Vector2(54, 189), Vector2(44, 200), Vector2(34, 189), Vector2(33, 174)])
-	draw_polyline(visor, suit_tint, 2.0, true)
-	draw_line(Vector2(36, 182), Vector2(52, 182), suit_tint, 2.0, true)
-	caption(Vector2(64, 182), weapon, 16, suit_tint)
-	var device := "pad" if not Input.get_connected_joypads().is_empty() else "key"
-	var previous := RiftSettings.binding_label("previous_suit", device)
-	var next := RiftSettings.binding_label("swap_weapon", device)
-	caption(Vector2(64, 199), "%s  ‹  PREV     NEXT  ›  %s" % [previous, next], 12, Color("a8c6db"))
-	var status_y := 218.0
+	var status_y := PARTY_TOP
 	if coop and is_instance_valid(coop_party):
-		status_y += coop_party.size.y + 12.0
+		status_y += coop_party.size.y + 11.0
 	for line in status_lines:
-		plate(Rect2(20, status_y, 222, 33), 9, UI.VIOLET)
-		caption(Vector2(35, status_y + 24), line, 22)
-		status_y += 39.0
+		var tint := Color("ff918b") if line.begins_with("!") else UI.VIOLET
+		plate(Rect2(EDGE, status_y, 222, 30), 8, tint)
+		caption(Vector2(34, status_y + 21), line, fit_font(line, 18, 192.0), tint)
+		status_y += 36.0
+	if boss_visible:
+		draw_boss_readout(hud_size, right_start, maxf(status_y, counters_top + 108.0) + 16.0)
+	if failed:
+		var width := 340.0
+		var at := Vector2((hud_size.x - width) * 0.5, hud_size.y * 0.72)
+		var message := "RUN OVER   /   BANKING CREDITS" if lives <= 0 else "SYSTEM FAILURE   /   RESPAWNING"
+		plate(Rect2(at, Vector2(width, 42)), 10, Color("ff627d"))
+		caption(at + Vector2((width - text_width(message, 18)) * .5, 27), message, 18)

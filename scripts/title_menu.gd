@@ -83,6 +83,12 @@ var item_origin: Button
 var navigation_state := {}
 var menu_body: Control
 var station_panel := false
+var station_tour_preview := false
+const STATION_TAB_ICONS := {
+	"Shop": "currency", "Fabrication": "craft", "Upgrades": "lightning", "Save Game": "save", "Settings": "gear",
+	"Gear": "shield", "Storage": "storage", "Player Profile": "person", "Cosmetics": "gear", "Achievements": "leaderboard",
+	"Collection": "archive", "Tutorials": "play", "Social": "person", "Party": "home", "Notifications": "warning",
+}
 var deploy_error := ""
 
 const SocialPanel := preload("res://scripts/social_panel.gd")
@@ -90,6 +96,7 @@ const CoopSetup := preload("res://scripts/coop_setup.gd")
 const Story := preload("res://scripts/rift_story.gd")
 const FieldManual := preload("res://scripts/field_manual.gd")
 const EquipmentDisplay := preload("res://scripts/equipment_display.gd")
+const WardrobeStage := preload("res://scripts/wardrobe_stage.gd")
 const EquipmentStats := preload("res://scripts/equipment_stats.gd")
 const UI := preload("res://scripts/rift_ui.gd")
 const SkinKit := preload("res://scripts/operator_skins.gd")
@@ -113,7 +120,7 @@ const StoryDialogue := preload("res://scripts/story_dialogue.gd")
 var hub_tip: StoryDialogue
 const HUB_TIPS := {
 	"Sector select": ["Deploy", "Pick a sector and difficulty, or resume your last mission. Activate both Gate Relays in each act to open its boss room."],
-	"Shop": ["Shop", "Spend Bolts on repair supplies, energy cells, buffs and materials. Better stock unlocks as your Operator Level rises."],
+	"Shop": ["Marketplace", "Spend Bolts on repair supplies, energy cells, buffs and materials. Better stock unlocks as your Operator Level rises."],
 	"Fabrication": ["Crafting", "Learn a blueprint in Storage first. Then bring its materials here. Pick Craft & Equip to wear it now, or Craft to Storage to save it for later."],
 	"Upgrades": ["Core Ascension", "Spend Core Shards to install talents. Take at least one talent in each earlier tier to unlock the next tier in that branch. Installed talents survive reconstruction."],
 	"Save Game": ["Save", "Save here to keep this operator's progress. Use the Settings tab to change controls, audio or video."],
@@ -126,7 +133,7 @@ const HUB_TIPS := {
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	theme = UI.theme()
+	theme = UI.theme(true)
 	RiftRelay.changed.connect(refresh_online_room)
 	RiftSocial.invites_changed.connect(update_social_tabs)
 	RiftRelay.directory.changed.connect(update_social_tabs)
@@ -186,7 +193,11 @@ func show_page(next: String) -> void:
 		layout.add_child(strip)
 		for tab_page in tabs:
 			var label: String = tabs[tab_page]
-			var button := UI.button(strip, label, show_page.bind(tab_page), false, 35)
+			var button := UI.button(strip, label, show_page.bind(tab_page), page == tab_page, 36)
+			var icon: String = STATION_TAB_ICONS[tab_page]
+			button.icon = load(UI.KIT + "icon_" + icon + ".png")
+			button.add_theme_constant_override("icon_max_width", 18)
+			button.custom_minimum_size.x = 104
 			if page == tab_page:
 				button.add_theme_color_override("font_color", UI.CYAN)
 				selected_tab = button
@@ -306,7 +317,13 @@ func show_page(next: String) -> void:
 			portrait(card(columns))
 		"Settings":
 			var settings := UI.settings(card(columns), not station_panel)
-			settings.initial_focus.grab_focus()
+			if station_tour_preview:
+				for index in settings.tabs.get_tab_count():
+					if settings.tabs.get_tab_title(index) == "Gameplay":
+						settings.tabs.current_tab = index
+						break
+			else:
+				settings.initial_focus.grab_focus()
 	if not checking_cloud_save and page not in ["Title", "Co-op Setup Guide", "Set up Player Profile", "Save Reset Error"]:
 		var back_title := "Back to Title"
 		if page in ["Create Account", "Sign In", "Offline Setup"]:
@@ -326,13 +343,15 @@ func show_page(next: String) -> void:
 		if page in ["Directory Account", "Directory Registration"] and not directory_return_page.is_empty():
 			back_title = "Back to Account Settings"
 		var back := UI.button(layout, back_title, leave_page)
+		back.icon = preload("res://assets/ui/riftcore_kit/icon_back.png")
+		back.add_theme_constant_override("icon_max_width", 17)
 		back.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 		if get_viewport().gui_get_focus_owner() == null:
 			if selected_tab:
 				selected_tab.grab_focus()
 			else:
 				back.grab_focus()
-	if station_panel and page == "Upgrades" and RiftSettings.show_hub_tips and not RiftSettings.seen_hub_tips.has(page):
+	if station_panel and not station_tour_preview and page == "Upgrades" and RiftSettings.show_hub_tips and not RiftSettings.seen_hub_tips.has(page):
 		show_station_tip(page)
 	elif navigation_state.has(page):
 		restore_navigation.call_deferred(page, margins)
@@ -371,7 +390,7 @@ func station_tabs() -> Dictionary:
 	if not station_panel:
 		return {}
 	if page in ["Shop", "Fabrication", "Upgrades"]:
-		return {"Shop": "Buy", "Fabrication": "Crafting", "Upgrades": "Core Ascension"}
+		return {"Shop": "Marketplace", "Fabrication": "Crafting", "Upgrades": "Core Ascension"}
 	if page in ["Save Game", "Settings"]:
 		return {"Save Game": "Save Game", "Settings": "Settings"}
 	if page in ["Gear", "Storage"]:
@@ -385,7 +404,7 @@ func station_tabs() -> Dictionary:
 	return {}
 
 func build_station_header(header: HBoxContainer) -> void:
-	header.add_theme_constant_override("separation", 9)
+	header.add_theme_constant_override("separation", 16)
 	var wordmark := TextureRect.new()
 	wordmark.texture = preload("res://assets/ui/riftcore-wordmark.svg")
 	wordmark.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -407,22 +426,25 @@ func build_station_header(header: HBoxContainer) -> void:
 		station_name = "SOCIAL"
 	elif page in ["Sector select", "Level select", "Co-op Sectors", "New run", "Sector Loot"]:
 		station_name = "DEPLOY"
-	var heading := UI.label(header, station_name, 25, UI.CYAN)
+	var heading := UI.profile_label(header, station_name, 28, UI.CYAN)
 	heading.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	if page == "Challenges":
 		heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		return
-	if page == "Upgrades":
-		TalentTree.add_chip(header, "%04d BOLTS" % profile.credits, TalentTree.BOLT, UI.CYAN.darkened(0.22), 16, 27)
-		TalentTree.add_chip(header, "%04d CORE SHARDS" % profile.core_shards, TalentTree.SHARD, UI.VIOLET, 16, 27)
-		return
-	var wallet := UI.column(header, 2)
-	wallet_bolts = UI.currency_row(wallet, "%04d BOLTS" % profile.credits)
-	wallet.add_child(HSeparator.new())
-	UI.currency_row(wallet, "%04d CORE SHARDS" % profile.core_shards, true)
+	var wallet := PanelContainer.new()
+	wallet.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	wallet.add_theme_stylebox_override("panel", UI.hud_frame(UI.CYAN, Vector2(12, 5)))
+	header.add_child(wallet)
+	var funds := HBoxContainer.new()
+	funds.add_theme_constant_override("separation", 12)
+	wallet.add_child(funds)
+	wallet_bolts = UI.currency_row(funds, "%04d BOLTS" % profile.credits)
+	funds.add_child(VSeparator.new())
+	UI.currency_row(funds, "%04d CORE SHARDS" % profile.core_shards, true)
 
-func open_station(next: String) -> void:
+func open_station(next: String, tour_preview := false) -> void:
 	station_panel = true
+	station_tour_preview = tour_preview
 	deploy_error = ""
 	inventory_status = ""
 	shop_item = ""
@@ -431,8 +453,13 @@ func open_station(next: String) -> void:
 	shop_category = "All Items"
 	show()
 	show_page(next)
-	if not is_instance_valid(hub_tip) and RiftSettings.show_hub_tips and HUB_TIPS.has(next) and not RiftSettings.seen_hub_tips.has(next):
+	if not station_tour_preview and not is_instance_valid(hub_tip) and RiftSettings.show_hub_tips and HUB_TIPS.has(next) and not RiftSettings.seen_hub_tips.has(next):
 		show_station_tip(next)
+
+func close_tour_preview() -> void:
+	station_tour_preview = false
+	station_panel = false
+	hide()
 
 func show_station_tip(station: String) -> void:
 	var previous_focus := get_viewport().gui_get_focus_owner()
@@ -525,7 +552,7 @@ func show_deploy_error() -> void:
 	show_page("Level select")
 
 func card(parent: Container, ratio := 1.0) -> VBoxContainer:
-	return UI.card(parent, ratio)
+	return UI.profile_panel(parent, ratio)
 
 func portrait(parent: VBoxContainer) -> void:
 	var hero := EquipmentDisplay.new()
@@ -557,7 +584,7 @@ func add_menu_art(dimmed: bool) -> void:
 func build_start_screen() -> void:
 	add_menu_art(false)
 	var panel := PanelContainer.new()
-	panel.add_theme_stylebox_override("panel", UI.texture_frame("panel_base_large", 40, Vector2(28, 20)))
+	panel.add_theme_stylebox_override("panel", UI.hud_frame(UI.CYAN, Vector2(28, 20), true))
 	add_child(panel)
 	panel.anchor_left = 0.60
 	panel.anchor_right = 0.96
@@ -687,18 +714,29 @@ func describe_profile_save(panel: VBoxContainer, data: Dictionary, source: Strin
 		UI.label(panel, "%d / %d operator slots in use" % [ops.size(), ManualSave.SLOT_COUNT], 17, UI.MUTED)
 
 func build_cosmetics(columns: HBoxContainer) -> void:
+	var left := UI.profile_panel(columns)
+	var stage_heading := UI.profile_label(left, "", 23, UI.CYAN)
+	var stage := Control.new()
+	stage.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	stage.custom_minimum_size = Vector2(225, 270)
+	stage.clip_contents = true
+	left.add_child(stage)
+	var backdrop := WardrobeStage.new()
+	stage.add_child(backdrop)
+	backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	var finish_model := EquipmentDisplay.new()
 	finish_model.neutral_lighting = true
-	card(columns).add_child(finish_model)
-	var wardrobe := card(columns, 1.18)
-	UI.label(wardrobe, "Operator Appearance", 27, UI.CYAN)
+	finish_model.allow_zoom = true
+	stage.add_child(finish_model)
+	finish_model.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+
+	var wardrobe := UI.profile_panel(columns, 1.21)
+	var heading := wardrobe_section(wardrobe, "OPERATOR APPEARANCE")
+	UI.profile_label(heading, "Choose a frame and preview its finishes.", 15, UI.MUTED)
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 10)
+	row.add_theme_constant_override("separation", 12)
 	wardrobe.add_child(row)
-	var slot := OptionButton.new()
-	slot.custom_minimum_size.y = 35
-	UI.style_button(slot)
-	row.add_child(slot)
+	var slot := wardrobe_picker(row, "Operator")
 	for number in range(1, ManualSave.SLOT_COUNT + 1):
 		if number != active_slot and not ManualSave.read_slot(number):
 			continue
@@ -708,53 +746,105 @@ func build_cosmetics(columns: HBoxContainer) -> void:
 	if slot.item_count == 0:
 		slot.add_item("No operator")
 		slot.disabled = true
-	var frame_picker := OptionButton.new()
-	frame_picker.custom_minimum_size.y = 35
-	UI.style_button(frame_picker)
-	row.add_child(frame_picker)
+	var frame_picker := wardrobe_picker(row, "Frame")
 	var frames: Array[String] = []
 	for id: String in Frames.NAMES:
 		if Frames.available(id):
 			frames.append(id)
 			frame_picker.add_item(Frames.label(id))
-	frame_picker.visible = frames.size() > 1
 	frame_picker.select(maxi(0, frames.find(account.display_frame(slot.get_selected_id()))))
-	var equipped := UI.label(wardrobe, "", 17, UI.MUTED)
-	var frame_access := UI.label(wardrobe, "", 17, UI.MUTED)
-	wardrobe.add_child(HSeparator.new())
+
+	var loadout := PanelContainer.new()
+	loadout.add_theme_stylebox_override("panel", UI.profile_frame(Color("10283c"), Color("345f7a"), Vector2(9, 3)))
+	wardrobe.add_child(loadout)
+	var info := HBoxContainer.new()
+	loadout.add_child(info)
+	var equipped := UI.profile_label(info, "", 15, UI.WHITE)
+	equipped.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var frame_access := UI.profile_label(info, "", 15, UI.CYAN)
+	var shortcuts := VBoxContainer.new()
+	shortcuts.add_theme_constant_override("separation", 6)
+	stage.add_child(shortcuts)
+	shortcuts.position = Vector2(9, 32)
+	shortcuts.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var appearance := UI.button(shortcuts, "Appearance", frame_picker.grab_focus, false, 34, false)
+	UI.profile_button(appearance, true)
 	var options := scroll_entries(wardrobe)
-	UI.make_readable_scroll(options.get_parent() as ScrollContainer)
+	options.add_theme_constant_override("separation", 5)
+	var scroll := options.get_parent() as ScrollContainer
+	UI.make_readable_scroll(scroll)
+	var scrollbar := scroll.get_v_scroll_bar()
+	for style in ["grabber", "grabber_highlight", "grabber_pressed"]:
+		scrollbar.add_theme_stylebox_override(style, UI.profile_frame(Color("659fbb") if style == "grabber" else UI.CYAN, Color.TRANSPARENT, Vector2(3, 0)))
 	var actions := HBoxContainer.new()
-	actions.add_theme_constant_override("separation", 10)
+	actions.add_theme_constant_override("separation", 8)
 	wardrobe.add_child(actions)
-	var previewed := {"id": ""}
-	var equip := UI.button(actions, "Equip Appearance" if frames.size() > 1 else "Equip Finish", Callable(), true, 38)
-	equip.focus_mode = Control.FOCUS_ALL
+	var status := UI.profile_label(wardrobe, "", 15, UI.MUTED)
+	status.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	var previewed := {"id": "", "compare": false}
+	var entries: Dictionary = {}
+	var equip := UI.button(actions, "Equip Appearance", Callable(), true, 38)
 	var purchase := UI.button(actions, "", Callable(), true, 38)
-	var status := UI.label(actions, "", 17, UI.MUTED)
-	status.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	status.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	var preview := func(id: String):
-		previewed.id = id
-		finish_model.frame = frames[frame_picker.selected]
-		finish_model.set_appearance(id)
-		var current_frame: String = account.display_frame(slot.get_selected_id())
-		var current: String = account.display_skin(slot.get_selected_id())
-		equipped.text = "Equipped  ·  %s / %s" % [Frames.label(current_frame), finish_label(current)] if not slot.disabled else ""
+	var compare := UI.button(actions, "View Equipped", Callable(), false, 38)
+	var reset := UI.button(actions, "Default Finish", Callable(), false, 38)
+	for action: Button in [equip, purchase, compare, reset]:
+		action.focus_mode = Control.FOCUS_ALL
+		action.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		UI.profile_button(action, action == equip or action == purchase)
+
+	var refresh := func():
 		var selected_slot := slot.get_selected_id()
-		var frame_id: String = finish_model.frame
-		var owns_frame := Frames.owned(frame_id, ManualSave.read_slot(selected_slot))
-		var price := int(Frames.PRICES.get(frame_id, 0))
-		var active := selected_slot == active_slot and profile != null and persist_frame_purchase.is_valid()
+		var selected_frame := frames[frame_picker.selected]
+		var id: String = previewed.id
+		var current_frame: String = account.display_frame(selected_slot)
+		var current_finish: String = account.display_skin(selected_slot)
+		var same_appearance: bool = id == current_finish and selected_frame == current_frame
+		finish_model.frame = current_frame if previewed.compare else selected_frame
+		finish_model.set_appearance(current_finish if previewed.compare else id)
+		stage_heading.text = "//  %s" % slot.get_item_text(slot.selected).to_upper()
+		equipped.text = "Equipped  /  %s · %s" % [Frames.label(current_frame), finish_label(current_finish)] if not slot.disabled else "No operator created"
+		var save := ManualSave.read_slot(selected_slot)
+		var owns_frame := Frames.owned(selected_frame, save)
+		var owned_count := 0
+		for available_frame: String in frames:
+			owned_count += int(Frames.owned(available_frame, save))
+		var price := int(Frames.PRICES.get(selected_frame, 0))
+		var can_purchase := selected_slot == active_slot and profile != null and persist_frame_purchase.is_valid()
 		var owns_finish: bool = id.is_empty() or account.unlocked_skins.has(id)
 		purchase.visible = not slot.disabled and not owns_frame
 		purchase.text = "Unlock for %d Bolts" % price
-		purchase.disabled = not active or int(profile.credits) < price
-		equip.disabled = slot.disabled or not owns_frame or not owns_finish or (id == current and frame_id == current_frame)
-		frame_access.text = "Frame owned" if owns_frame else "%d Bolts to unlock" % price
-		if not owns_frame and not active:
-			frame_access.text += " · Load this operator to purchase"
-		status.text = "Preview  ·  " + finish_label(id)
+		purchase.disabled = not can_purchase or int(profile.credits) < price
+		equip.visible = owns_frame
+		equip.disabled = slot.disabled or not owns_finish or same_appearance
+		frame_access.text = "Frames owned  %d / %d" % [owned_count, frames.size()]
+		compare.text = "Preview Selection" if previewed.compare else "View Equipped"
+		compare.disabled = slot.disabled or same_appearance
+		reset.disabled = id.is_empty() and not previewed.compare
+		status.text = "Viewing equipped appearance" if previewed.compare else "Preview  /  %s · %s" % [Frames.label(selected_frame), finish_label(id)]
+		if not owns_frame and not can_purchase:
+			status.text = "Load this operator to purchase the frame."
+		for finish: String in entries:
+			var entry: Button = entries[finish]
+			var badge := entry.get_node("Badge") as Label
+			var is_equipped := not slot.disabled and current_frame == selected_frame and finish == current_finish
+			var is_selected: bool = finish == id and not previewed.compare
+			var is_owned: bool = finish.is_empty() or account.unlocked_skins.has(finish)
+			badge.text = "EQUIPPED" if is_equipped else ("OWNED" if is_owned else "LOCKED")
+			badge.add_theme_color_override("font_color", UI.CYAN if is_equipped else (UI.WHITE if is_owned else UI.MUTED))
+			entry.button_pressed = is_selected
+
+	var preview := func(id: String):
+		previewed.id = id
+		previewed.compare = false
+		refresh.call()
+	compare.pressed.connect(func():
+		previewed.compare = not previewed.compare
+		refresh.call()
+	)
+	reset.pressed.connect(func():
+		preview.call("")
+		scroll.scroll_vertical = 0
+	)
 	purchase.pressed.connect(func():
 		if purchase.disabled:
 			return
@@ -777,15 +867,19 @@ func build_cosmetics(columns: HBoxContainer) -> void:
 		frame_picker.select(maxi(0, frames.find(account.display_frame(slot.get_selected_id()))))
 		preview.call(account.display_skin(slot.get_selected_id()))
 	)
-	add_finish_entry(options, "", "Available", preview)
-	UI.label(options, "Milestone Finishes", 23, UI.CYAN)
+	var group := ButtonGroup.new()
+	var add_finish := func(id: String, requirement: String):
+		entries[id] = add_finish_entry(options, group, id, requirement, preview)
+
+	var milestone := wardrobe_section(options, "MILESTONE FINISHES")
+	add_finish.call("", "Standard operator finish.")
 	for number in range(1, SkinKit.FIELD_VARIANTS.size() + 1):
 		var id := SkinKit.field_finish(number)
-		add_finish_entry(options, id, SkinKit.palette(id)[5], preview)
-	UI.label(options, "Expert Finishes", 23, UI.CYAN)
+		add_finish.call(id, SkinKit.palette(id)[5])
+	var expert := wardrobe_section(options, "EXPERT FINISHES")
 	for number in range(1, Catalog.SECTORS.size() + 1):
 		var id := SkinKit.expert_finish(number)
-		add_finish_entry(options, id, "Clear both acts of %s on Expert" % Catalog.info(number).title, preview)
+		add_finish.call(id, "Clear both acts of %s on Expert." % Catalog.info(number).title)
 	var suits: Array[String] = []
 	var legacy: Array[String] = []
 	for id: String in account.unlocked_skins:
@@ -794,78 +888,175 @@ func build_cosmetics(columns: HBoxContainer) -> void:
 		elif not Catalog.weapon(id).is_empty():
 			suits.append(id)
 	if not suits.is_empty():
-		UI.label(options, "Boss Appearances", 23, UI.CYAN)
+		wardrobe_section(options, "BOSS APPEARANCES")
 		for id in suits:
-			add_finish_entry(options, id, "Earned on Hard or Expert", preview)
+			add_finish.call(id, "Earned on Hard or Expert.")
 	if not legacy.is_empty():
-		UI.label(options, "Previously Owned Finishes", 23, UI.CYAN)
+		wardrobe_section(options, "PREVIOUSLY OWNED FINISHES")
 		for id in legacy:
-			add_finish_entry(options, id, "Unlocked", preview)
+			add_finish.call(id, "Previously unlocked.")
+	for section: VBoxContainer in [milestone, expert]:
+		var jump := UI.button(shortcuts, "Milestone" if section == milestone else "Expert", func(): scroll.ensure_control_visible(section), false, 34, false)
+		jump.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		UI.profile_button(jump)
 	preview.call(account.display_skin(slot.get_selected_id()))
 	if not slot.disabled:
 		slot.grab_focus()
 
+func wardrobe_picker(parent: HBoxContainer, caption: String) -> OptionButton:
+	var field := UI.column(parent, 3)
+	field.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	UI.profile_label(field, caption, 16, UI.MUTED)
+	var picker := OptionButton.new()
+	picker.custom_minimum_size.y = 34
+	UI.profile_button(picker)
+	field.add_child(picker)
+	return picker
+
+func wardrobe_section(parent: VBoxContainer, caption: String) -> VBoxContainer:
+	var ribbon := PanelContainer.new()
+	ribbon.add_theme_stylebox_override("panel", UI.profile_frame(Color("102740"), Color("2c789b"), Vector2(8, 4)))
+	parent.add_child(ribbon)
+	var content := UI.column(ribbon, 2)
+	UI.profile_label(content, "//  " + caption, 22, UI.WHITE)
+	return content
+
 func finish_label(id: String) -> String:
 	return "Default Finish" if id.is_empty() else SkinKit.label(id)
 
-func add_finish_entry(parent: VBoxContainer, id: String, requirement: String, preview: Callable) -> void:
-	var entry := HBoxContainer.new()
-	entry.add_theme_constant_override("separation", 9)
-	parent.add_child(entry)
-	var colors := SkinKit.palette(id)
-	for color_index in [1, 2]:
-		var swatch := ColorRect.new()
-		swatch.color = Color(colors[color_index]) if not colors.is_empty() else Color("344866")
-		swatch.custom_minimum_size = Vector2(12, 24)
-		swatch.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		swatch.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		entry.add_child(swatch)
-	var text := UI.column(entry, 2)
-	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var unlocked: bool = id.is_empty() or account.unlocked_skins.has(id)
-	var pick := UI.button(text, finish_label(id), preview.bind(id), false, 35)
-	pick.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+func add_finish_entry(parent: VBoxContainer, group: ButtonGroup, id: String, requirement: String, preview: Callable) -> Button:
+	var pick := UI.button(parent, finish_label(id), preview.bind(id), false, 48, false)
 	pick.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	pick.focus_entered.connect(preview.bind(id))
-	var detail := UI.label(text, requirement, 15, UI.MUTED)
-	detail.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pick.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	pick.tooltip_text = requirement
-	if not SkinKit.finish_achievement(id).is_empty():
-		var badge := UI.label(entry, "Unlocked" if unlocked else "Locked", 15, Color("9de4ba") if unlocked else UI.MUTED)
-		badge.autowrap_mode = TextServer.AUTOWRAP_OFF
-		badge.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	pick.toggle_mode = true
+	pick.button_group = group
+	pick.add_theme_font_size_override("font_size", 18)
+	var idle := UI.profile_frame(Color("0b1b2c"), Color("385a79"), Vector2(66, 3))
+	var hover := UI.profile_frame(Color("0e2538"), Color("6eabc9"), Vector2(66, 3))
+	var selected := UI.profile_frame(Color("10344a"), UI.CYAN, Vector2(66, 3), true)
+	for style in [idle, hover, selected]:
+		style.content_margin_bottom = 18
+	UI.set_button_states(pick, idle, hover, selected)
+	pick.add_theme_stylebox_override("hover_pressed", selected)
+	pick.focus_entered.connect(preview.bind(id))
+
+	var swatch := Panel.new()
+	var colors := SkinKit.palette(id)
+	var primary := Color(colors[1]) if not colors.is_empty() else Color("c8d9ec")
+	var trim := Color(colors[2]) if not colors.is_empty() else Color("304970")
+	swatch.add_theme_stylebox_override("panel", UI.profile_frame(primary.lightened(0.12), Color("6888a5"), Vector2.ZERO))
+	swatch.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pick.add_child(swatch)
+	swatch.set_anchors_and_offsets_preset(Control.PRESET_CENTER_LEFT)
+	swatch.offset_left = 12
+	swatch.offset_right = 54
+	swatch.offset_top = -14
+	swatch.offset_bottom = 14
+	swatch.draw.connect(func():
+		var rect := Rect2(Vector2(2, 2), swatch.size - Vector2(4, 4))
+		var start := rect.position + Vector2(rect.size.x * 0.7, 0)
+		draw_swatch_trim(swatch, rect, start, trim)
+	)
+	var detail := UI.profile_label(pick, requirement, 14, UI.MUTED)
+	detail.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	detail.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
+	detail.offset_left = 66
+	detail.offset_right = -105
+	detail.offset_top = -21
+	detail.offset_bottom = -4
+	var badge := UI.profile_label(pick, "", 15, UI.MUTED)
+	badge.name = "Badge"
+	badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	badge.set_anchors_and_offsets_preset(Control.PRESET_CENTER_RIGHT)
+	badge.offset_left = -101
+	badge.offset_right = -13
+	badge.offset_top = -12
+	badge.offset_bottom = 12
+	return pick
+
+func draw_swatch_trim(swatch: Control, rect: Rect2, start: Vector2, trim: Color) -> void:
+	var points := PackedVector2Array([start, Vector2(rect.end.x - 3, rect.position.y), Vector2(rect.end.x, rect.position.y + 3), Vector2(rect.end.x, rect.end.y - 3), Vector2(rect.end.x - 3, rect.end.y), Vector2(rect.position.x + rect.size.x * 0.42, rect.end.y)])
+	swatch.draw_colored_polygon(points, trim)
 
 func build_achievements(columns: HBoxContainer) -> void:
 	var ledger = RiftRelay.directory.gamer_score
-	var pane := card(columns)
+	var pane := UI.profile_panel(columns)
 	var header := HBoxContainer.new()
+	header.add_theme_constant_override("separation", 12)
 	pane.add_child(header)
-	var title := UI.label(header, "ACHIEVEMENTS", 28, UI.CYAN)
-	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var score := UI.label(header, "", 23, UI.VIOLET)
+	var heading := UI.column(header, 1)
+	heading.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	UI.profile_label(heading, "//  ACHIEVEMENTS", 29, UI.CYAN)
+	var progress := UI.profile_label(heading, "", 17, UI.MUTED)
+	var score_panel := PanelContainer.new()
+	score_panel.add_theme_stylebox_override("panel", UI.profile_frame(Color("221a36"), UI.VIOLET.darkened(0.27), Vector2(14, 6)))
+	header.add_child(score_panel)
+	var score_copy := UI.column(score_panel, 0)
+	var score_caption := UI.profile_label(score_copy, "GAMER SCORE", 13, UI.MUTED)
+	score_caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	var score := UI.profile_label(score_copy, "", 22, UI.VIOLET)
+	score.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	pane.add_child(HSeparator.new())
 	var rows := scroll_entries(pane)
+	rows.add_theme_constant_override("separation", 6)
+	var scroll := rows.get_parent() as ScrollContainer
+	UI.make_readable_scroll(scroll)
+	var displayed := {"state": []}
 	var rebuild := func():
+		var online := RiftRelay.directory.online()
+		var local_finishes: Array = account.unlocked_skins if account != null else []
+		var state: Array = [online, ledger.earned.duplicate() if online else [], local_finishes.duplicate()]
+		if displayed.state == state:
+			return
+		displayed.state = state
+		var previous_offset := scroll.scroll_vertical
+		var focused := get_viewport().gui_get_focus_owner()
+		var focused_id: String = focused.get_meta(&"achievement_id", "") if focused else ""
 		for child in rows.get_children():
 			rows.remove_child(child)
 			child.queue_free()
-		var online := RiftRelay.directory.online()
-		score.text = "%d GAMER SCORE" % ledger.score() if online else ""
-		if not online:
-			UI.label(rows, "Sign in to earn account achievements and share your score with friends.", 19, UI.MUTED)
+		score_panel.visible = online
+		score.text = "%d / %d G" % [ledger.score(), ledger.score_limit] if online else ""
+		score.tooltip_text = "Gamer Score"
+		var total_earned := 0
 		for id in ledger.achievement_catalog:
 			var record: Array = ledger.achievement_catalog[id]
-			var earned: bool = (online and ledger.earned.has(id)) or (account != null and account.unlocked_skins.has(id))
-			var tile := UI.equipment_card(UI.CYAN if earned else UI.MUTED)
+			var earned: bool = (online and ledger.earned.has(id)) or local_finishes.has(id)
+			total_earned += int(earned)
+			var tile := PanelContainer.new()
+			var accent := UI.CYAN if earned else Color("365978")
+			var fill := Color("102b3b") if earned else Color("0c1d30")
+			var style := UI.profile_frame(fill, accent, Vector2(12, 7))
+			var highlighted := UI.profile_frame(fill.lightened(0.06), UI.CYAN, Vector2(12, 7), true)
+			tile.add_theme_stylebox_override("panel", style)
+			tile.focus_mode = Control.FOCUS_ALL
+			tile.set_meta(&"achievement_id", id)
+			tile.focus_entered.connect(func(): tile.add_theme_stylebox_override("panel", highlighted))
+			tile.focus_exited.connect(func(): tile.add_theme_stylebox_override("panel", style))
 			rows.add_child(tile)
+			if focused_id == id:
+				tile.grab_focus.call_deferred()
 			var row := HBoxContainer.new()
+			row.add_theme_constant_override("separation", 12)
 			tile.add_child(row)
-			var copy := UI.column(row, 2)
+			var icon := TextureRect.new()
+			icon.texture = preload("res://assets/ui/riftcore_kit/icon_leaderboard.png")
+			icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			icon.custom_minimum_size = Vector2(33, 33)
+			icon.modulate = UI.CYAN if earned else UI.MUTED
+			row.add_child(icon)
+			var copy := UI.column(row, 1)
 			copy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			UI.label(copy, record[0], 21, UI.WHITE)
-			UI.label(copy, record[2], 17, UI.MUTED)
-			var status := UI.label(row, "%d G  ·  %s" % [record[1], "EARNED" if earned else "LOCKED"], 17, UI.CYAN if earned else UI.MUTED)
-			status.autowrap_mode = TextServer.AUTOWRAP_OFF
-			status.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			UI.profile_label(copy, record[0], 21)
+			UI.label(copy, record[2], 16, UI.MUTED)
+			var badge := UI.profile_label(row, "%d G  /  %s" % [record[1], "EARNED" if earned else "LOCKED"], 16, UI.CYAN if earned else UI.MUTED)
+			badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		progress.text = "%d / %d earned" % [total_earned, ledger.achievement_catalog.size()]
+		if not online:
+			progress.text += "  ·  Sign in to earn Gamer Score"
+		scroll.set_deferred("scroll_vertical", previous_offset)
 	SocialPanel.watch(pane, RiftRelay.directory.changed, rebuild)
 	rebuild.call()
 
@@ -1368,7 +1559,7 @@ func build_shop(columns: HBoxContainer) -> void:
 	var heading := HBoxContainer.new()
 	heading.add_theme_constant_override("separation", 20)
 	catalog.add_child(heading)
-	UI.label(heading, "Station Shop", 31, UI.CYAN).autowrap_mode = TextServer.AUTOWRAP_OFF
+	UI.label(heading, "Marketplace", 31, UI.CYAN).autowrap_mode = TextServer.AUTOWRAP_OFF
 	var subtitle := UI.label(heading, "Operator Lv. %d" % operator_level, 16, Color("ffd079"))
 	subtitle.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	subtitle.autowrap_mode = TextServer.AUTOWRAP_OFF
@@ -1380,7 +1571,7 @@ func build_shop(columns: HBoxContainer) -> void:
 		var tab := UI.button(filters, category, func():
 			shop_category = category
 			show_page("Shop")
-		, false, 34)
+		, category == shop_category, 34)
 		if category == shop_category:
 			tab.add_theme_color_override("font_color", UI.CYAN)
 			active_filter = tab
@@ -1565,7 +1756,7 @@ func shop_fact(parent: VBoxContainer, caption: String) -> Label:
 func build_challenges(columns: HBoxContainer, header: HBoxContainer) -> void:
 	var clock_panel := PanelContainer.new()
 	clock_panel.custom_minimum_size.x = 196
-	clock_panel.add_theme_stylebox_override("panel", UI.frame(Color("241438"), UI.VIOLET))
+	clock_panel.add_theme_stylebox_override("panel", UI.hud_frame(UI.VIOLET, Vector2(13, 7), true))
 	header.add_child(clock_panel)
 	var clock_text := UI.column(clock_panel, 1)
 	UI.label(clock_text, "CHALLENGES RESET IN:", 15, UI.VIOLET).horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -2351,21 +2542,43 @@ func apply_storage_item(id: String) -> void:
 		inventory_status = profile.move_gear(id)
 	show_page(page)
 
-func build_quick_assignments(parent: VBoxContainer) -> Array[Button]:
+func build_quick_assignments(parent: VBoxContainer) -> void:
 	var row := HBoxContainer.new()
-	var buttons: Array[Button] = []
 	row.add_theme_constant_override("separation", UI.ITEM_GAP)
 	parent.add_child(row)
 	for index in 4:
 		var stack: Dictionary = profile.quick_slots[index]
 		var id: String = stack.get("id", "")
-		var icon := EquipmentIcons.icon("utility", "utility") if id.is_empty() else EquipmentIcons.icon(profile.stock[id].icon, profile.stock[id].icon)
+		var item: Dictionary = profile.stock.get(id, {})
+		var icon := EquipmentIcons.supply_icon(item) if not item.is_empty() else null
 		var direction: String = ["↑", "←", "→", "↓"][index]
-		var button := UI.item_tile(row, icon, UI.CYAN, 0, "%s  %d/%d" % [direction, stack.get("count", 0), Profile.QUICK_MAX], Callable())
-		button.focus_mode = Control.FOCUS_NONE
-		button.mouse_default_cursor_shape = Control.CURSOR_ARROW
-		button.tooltip_text = "Select a supply to assign it to %s." % direction if id.is_empty() else "%s  ·  %s" % [direction, profile.stock[id].name]
-		buttons.append(button)
+		var tile := PanelContainer.new()
+		tile.custom_minimum_size = Vector2(56, 56)
+		tile.add_theme_stylebox_override("panel", UI.hud_frame(UI.CYAN, Vector2.ZERO, icon != null))
+		row.add_child(tile)
+		var surface := Control.new()
+		surface.tooltip_text = "Select a supply to assign it to %s." % direction if item.is_empty() else "%s  ·  %s" % [direction, item.name]
+		tile.add_child(surface)
+		var picture := TextureRect.new()
+		picture.texture = icon
+		picture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		picture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		picture.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		surface.add_child(picture)
+		picture.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+		picture.offset_left = -14
+		picture.offset_right = 14
+		picture.offset_top = -14
+		picture.offset_bottom = 14
+		var key := UI.profile_label(surface, direction, 17, UI.CYAN)
+		key.position = Vector2(6, 1)
+		var count := UI.profile_label(surface, "%d/%d" % [stack.get("count", 0), Profile.QUICK_MAX], 13, UI.MUTED)
+		count.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+		count.offset_left = -30
+		count.offset_right = -5
+		count.offset_top = -17
+		count.offset_bottom = -3
+		count.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	var clear := OptionButton.new()
 	clear.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	clear.custom_minimum_size.y = 31
@@ -2381,7 +2594,6 @@ func build_quick_assignments(parent: VBoxContainer) -> Array[Button]:
 		inventory_status = profile.clear_quick(index - 1)
 		show_page("Storage")
 	)
-	return buttons
 
 func add_stat_group(parent: VBoxContainer, category: String, values: String) -> void:
 	var row := HBoxContainer.new()
@@ -2444,6 +2656,9 @@ func deploy() -> void:
 	start_requested.emit()
 
 func _unhandled_input(event: InputEvent) -> void:
+	if station_tour_preview:
+		get_viewport().set_input_as_handled()
+		return
 	if is_instance_valid(hub_tip):
 		var selected := get_viewport().gui_get_focus_owner()
 		if selected == null or not hub_tip.is_ancestor_of(selected):

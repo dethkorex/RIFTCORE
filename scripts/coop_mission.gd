@@ -115,6 +115,7 @@ var reboot_health := 0.0
 var reboot_offset := Vector3.ZERO
 var reboot_duration := 4.0
 var revive_meter: ProgressBar
+var revive_panel: PanelContainer
 var revive_caption: Label
 var safe_corpses := {}
 var shared_checkpoints := {}
@@ -505,6 +506,8 @@ func load_stage(packed: PackedScene = null) -> void:
 	var level_camera := stage.get_node("CameraRig") as SideCameraRig
 	camera = level_camera
 	camera.target = operators[local_index]
+	if is_instance_valid(personal_hud):
+		personal_hud.local_operator = camera.target
 	var bounds := stage.get_node("MARKERS/CameraBounds")
 	camera.min_x = bounds.get_meta("min_x")
 	camera.max_x = bounds.get_meta("max_x")
@@ -1156,12 +1159,14 @@ func build_hud() -> void:
 	add_child(layer)
 	personal_hud = FactoryHUD.new()
 	personal_hud.coop = true
+	personal_hud.local_operator = operators[local_index]
 	layer.add_child(personal_hud)
 	personal_hud.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	personal_hud.show_quick_slots(local_profile)
 	build_revive_meter(layer)
 	var panel := PanelContainer.new()
 	panel.theme = UI.theme()
+	panel.add_theme_stylebox_override("panel", UI.hud_frame(UI.CYAN, Vector2(13, 9), true))
 	layer.add_child(panel)
 	panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
 	panel.offset_left = -288
@@ -1169,13 +1174,14 @@ func build_hud() -> void:
 	panel.offset_top = 16
 	personal_hud.coop_objective = panel
 	panel.item_rect_changed.connect(personal_hud.queue_redraw)
-	var content := UI.column(panel, 5)
-	stage_title = UI.label(content, "", 27, UI.CYAN)
+	var content := UI.column(panel, 4)
+	stage_title = UI.label(content, "", 24, UI.CYAN)
+	content.add_child(HSeparator.new())
 	objective = UI.label(content, "", 17, UI.WHITE)
 	update_hud_title()
 	stats = UI.label(content, "", 16)
 	build_teammate_status()
-	room_status = UI.label(content, "%.2f× enemy health and damage  /  1.5× shared XP" % difficulty, 16, UI.MUTED)
+	room_status = UI.label(content, "Enemy HP/DMG %.2f×  ·  Shared XP 1.5×" % difficulty, 16, UI.MUTED)
 	rewards_status = UI.label(content, "", 15, UI.CYAN)
 	rewards_status.hide()
 	return_button = UI.button(content, "Pause", func():
@@ -1185,6 +1191,7 @@ func build_hud() -> void:
 			exit_requested.emit()
 	, false, 34)
 	return_button.focus_mode = Control.FOCUS_NONE
+	UI.profile_button(return_button)
 	pause_menu = PauseMenu.new()
 	pause_menu.in_mission = true
 	pause_menu.profile = local_profile
@@ -1201,12 +1208,7 @@ func build_teammate_status() -> void:
 	panel.name = "PartyHUD"
 	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	panel.theme = UI.theme()
-	var style := UI.frame(Color("09182ce8"), Color("47748d"), 2)
-	style.content_margin_left = 10
-	style.content_margin_right = 10
-	style.content_margin_top = 6
-	style.content_margin_bottom = 8
-	panel.add_theme_stylebox_override("panel", style)
+	panel.add_theme_stylebox_override("panel", UI.hud_frame(UI.CYAN, Vector2(10, 8)))
 	panel.custom_minimum_size.x = 246.0
 	personal_hud.add_child(panel)
 	personal_hud.coop_party = panel
@@ -1214,6 +1216,7 @@ func build_teammate_status() -> void:
 	RiftSettings.hud_scale_changed.connect(personal_hud.place_party)
 	personal_hud.place_party()
 	var content := UI.column(panel, 8)
+	UI.profile_label(content, "//  SQUAD", 17, UI.CYAN)
 	for index in roster.size():
 		if index == local_index:
 			teammate_status.append({})
@@ -1233,11 +1236,9 @@ func build_teammate_status() -> void:
 		bar.custom_minimum_size.y = 7.0
 		bar.show_percentage = false
 		bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		var background := StyleBoxFlat.new()
-		background.bg_color = Color("1d3046")
+		var background := UI.profile_frame(Color("1c324a"), Color.TRANSPARENT, Vector2.ZERO)
 		bar.add_theme_stylebox_override("background", background)
-		var fill := StyleBoxFlat.new()
-		fill.bg_color = Color("72e3a6")
+		var fill := UI.profile_frame(Color("72e3a6"), Color.TRANSPARENT, Vector2.ZERO)
 		bar.add_theme_stylebox_override("fill", fill)
 		row.add_child(bar)
 		teammate_status.append({"name": name_label, "value": value, "bar": bar, "fill": fill, "microphone": microphone})
@@ -2142,44 +2143,33 @@ func _unhandled_input(event: InputEvent) -> void:
 			peer.call_func_on(peer.get_host(), receive_gate_relay_request, act)
 
 func build_revive_meter(layer: CanvasLayer) -> void:
-	revive_meter=ProgressBar.new()
-	layer.add_child(revive_meter)
-	revive_meter.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
-	revive_meter.offset_left=-200
-	revive_meter.offset_right=200
-	revive_meter.offset_top=-180
-	revive_meter.offset_bottom=-150
-	revive_meter.mouse_filter=Control.MOUSE_FILTER_IGNORE
-	revive_meter.theme=UI.theme()
-	var track := UI.frame(Color("081426"), UI.CYAN, 2)
-	track.set_content_margin_all(3)
-	var fill := StyleBoxFlat.new()
-	fill.bg_color=Color("55e7ff")
-	fill.set_corner_radius_all(4)
-	revive_meter.add_theme_stylebox_override("background",track)
-	revive_meter.add_theme_stylebox_override("fill",fill)
-	revive_meter.show_percentage=false
+	revive_panel = PanelContainer.new()
+	revive_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	revive_panel.add_theme_stylebox_override("panel", UI.hud_frame(UI.CYAN, Vector2(16, 9), true))
+	layer.add_child(revive_panel)
+	revive_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
+	revive_panel.offset_left = -188
+	revive_panel.offset_right = 188
+	revive_panel.offset_top = -178
+	revive_panel.offset_bottom = -118
+	var content := UI.column(revive_panel, 5)
+	content.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	revive_caption = UI.profile_label(content, "", 21, UI.CYAN)
+	revive_caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	revive_meter = ProgressBar.new()
+	content.add_child(revive_meter)
+	revive_meter.custom_minimum_size.y = 8
+	revive_meter.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	revive_meter.add_theme_stylebox_override("background", UI.profile_frame(Color("1c324a"), Color.TRANSPARENT, Vector2.ZERO))
+	revive_meter.add_theme_stylebox_override("fill", UI.profile_frame(UI.CYAN, Color.TRANSPARENT, Vector2.ZERO))
+	revive_meter.show_percentage = false
 	revive_meter.hide()
-	revive_caption=Label.new()
-	layer.add_child(revive_caption)
-	revive_caption.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
-	revive_caption.offset_left=-280
-	revive_caption.offset_right=280
-	revive_caption.offset_top=-215
-	revive_caption.offset_bottom=-182
-	revive_caption.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
-	revive_caption.add_theme_font_override("font",UI.DISPLAY)
-	revive_caption.add_theme_font_size_override("font_size",24)
-	revive_caption.add_theme_color_override("font_color",UI.CYAN)
-	revive_caption.add_theme_color_override("font_outline_color",Color("081426"))
-	revive_caption.add_theme_constant_override("outline_size",5)
-	revive_caption.mouse_filter=Control.MOUSE_FILTER_IGNORE
-	revive_caption.hide()
+	revive_panel.hide()
 
 func update_revive_meter() -> void:
 	if not is_instance_valid(revive_meter): return
 	revive_meter.visible=reboot_left>0 and (reboot_from==local_index or reboot_target==local_index)
-	revive_caption.visible=revive_meter.visible
+	revive_panel.visible = revive_meter.visible
 	if revive_meter.visible:
 		revive_meter.value=100.0*(1.0-reboot_left/maxf(reboot_duration,.1))
 		revive_caption.text="REVIVING TEAMMATE · %d%%"%revive_meter.value if reboot_from==local_index else "TEAMMATE IS REVIVING YOU"

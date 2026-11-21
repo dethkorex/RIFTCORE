@@ -2,6 +2,7 @@ extends Node3D
 
 signal station_requested(page: String)
 signal title_requested
+signal tour_arrived
 
 const UI := preload("res://scripts/rift_ui.gd")
 const PauseMenu := preload("res://scripts/coop_pause_menu.gd")
@@ -46,6 +47,12 @@ var nova_iris: Node3D
 var nova_hover_time := 0.0
 var nova_hover_height := 0.0
 var nova_transitioning := false
+var tour_active := false
+var tour_skipped := false
+var tour_destination := NAN
+var tour_skip: Button
+const TOUR_ORDER := [0, 1, 2, 4, 5, 6, 7, 3]
+const TOUR_BEAT := "operations_hub_tour"
 const Story := preload("res://scripts/rift_story.gd")
 const StoryDialogue := preload("res://scripts/story_dialogue.gd")
 var pads: Array[Dictionary] = []
@@ -151,6 +158,91 @@ func materialize_operator(sequence := "") -> void:
 	update_station()
 	announce_shop_restock()
 
+func play_station_tour(menu: RiftTitleMenu) -> void:
+	if tour_active or not RiftSettings.show_hub_tips or RiftSettings.seen_story_beats.has(TOUR_BEAT):
+		return
+	tour_active = true
+	tour_skipped = false
+	update_station()
+	await fade_nova(true)
+
+	var transit := CanvasLayer.new()
+	transit.layer = 39
+	add_child(transit)
+	tour_skip = UI.button(transit, "Skip Tour", skip_station_tour, false, 36, false)
+	UI.profile_button(tour_skip)
+	tour_skip.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+	tour_skip.offset_left = -144
+	tour_skip.offset_right = -22
+	tour_skip.offset_top = -66
+	tour_skip.offset_bottom = -24
+	tour_skip.hide()
+
+	await describe_station("Station Tour", Story.HUB_TOUR_INTRO, "Show me around", true)
+	for stop in TOUR_ORDER.size():
+		if tour_skipped:
+			break
+		var station: Dictionary = STATIONS[TOUR_ORDER[stop]]
+		await lead_to_station(float(station.x))
+		if tour_skipped:
+			break
+		var caption := "%s  /  %d OF %d" % [station.name, stop + 1, TOUR_ORDER.size()]
+		set_panel_open(true)
+		var pages: Array = Story.HUB_TOUR[station.page]
+		for step in pages.size():
+			var entry: Array = pages[step]
+			menu.open_station(entry[0], true)
+			var action := "Next screen" if step < pages.size() - 1 else ("Finish tour" if stop == TOUR_ORDER.size() - 1 else "Next station")
+			await describe_station(caption, [[Story.GUIDE, entry[1]]], action)
+			if tour_skipped:
+				break
+		menu.close_tour_preview()
+		set_panel_open(false)
+
+	transit.queue_free()
+	tour_skip = null
+	for station in Story.HUB_TOUR:
+		for entry in Story.HUB_TOUR[station]:
+			if not RiftSettings.seen_hub_tips.has(entry[0]):
+				RiftSettings.seen_hub_tips.append(entry[0])
+	RiftSettings.claim_story_beat(TOUR_BEAT)
+	await fade_nova(false)
+	tour_active = false
+	update_station()
+
+func describe_station(caption: String, lines: Array, action: String, introduction := false) -> void:
+	story = StoryDialogue.new()
+	story.name = "StationTourDialogue"
+	story.tutorial_title = caption
+	story.skip_text = "Skip Tour"
+	story.preview_underlay = not introduction
+	if introduction:
+		story.disable_tips = func():
+			RiftSettings.show_hub_tips = false
+			RiftSettings.save()
+	add_child(story)
+	await story.play(lines, action)
+	tour_skipped = story.was_skipped
+	story.queue_free()
+
+func lead_to_station(x: float) -> void:
+	if is_equal_approx(avatar.position.x, x):
+		return
+	tour_destination = x
+	tour_skip.show()
+	await tour_arrived
+	tour_skip.hide()
+
+func skip_station_tour() -> void:
+	tour_skipped = true
+	finish_tour_walk()
+
+func finish_tour_walk() -> void:
+	tour_destination = NAN
+	velocity_x = 0.0
+	avatar.play_character_animation("idle", true)
+	tour_arrived.emit()
+
 func play_opening_arrival() -> void:
 	await fade_nova(true)
 	story = StoryDialogue.new()
@@ -159,7 +251,7 @@ func play_opening_arrival() -> void:
 	board.layer = 37
 	add_child(board)
 	var display := PanelContainer.new()
-	display.add_theme_stylebox_override("panel", hud_frame(Vector2(22, 10)))
+	display.add_theme_stylebox_override("panel", UI.hud_frame(UI.CYAN, Vector2(22, 10), true))
 	board.add_child(display)
 	display.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
 	display.position += Vector2(-170, 113)
@@ -192,7 +284,7 @@ func has_dialogue() -> bool:
 	return nova_transitioning or (is_instance_valid(story) and story.visible and not story.is_queued_for_deletion())
 
 func announce_shop_restock() -> void:
-	if not profile or panel_open or reconstructing or has_dialogue() or DisplayServer.get_name() == "headless":
+	if not profile or panel_open or reconstructing or tour_active or has_dialogue() or DisplayServer.get_name() == "headless":
 		return
 	var milestone: int = profile.shop_milestone()
 	if milestone <= profile.shop_announced_through:
@@ -263,11 +355,16 @@ func set_chat_open(open: bool) -> void:
 func _physics_process(delta: float) -> void:
 	if panel_open or chat_open or reconstructing or has_dialogue():
 		return
-	var input_axis := Input.get_axis("move_left", "move_right")
-	if absf(input_axis) < 0.15:
+	var walking_tour := not is_nan(tour_destination)
+	if tour_active and not walking_tour:
+		return
+	var input_axis := signf(tour_destination - avatar.position.x) if walking_tour else Input.get_axis("move_left", "move_right")
+	if absf(input_axis) < 0.15 and not walking_tour:
 		input_axis = Input.get_axis("ui_left", "ui_right")
 	velocity_x = move_toward(velocity_x, RiftPlayer.locomotion_speed(input_axis, HUB_RUN_SPEED), delta * 38.0)
 	var next_x := clampf(avatar.position.x + velocity_x * delta, -19.15, 19.15)
+	if walking_tour:
+		next_x = move_toward(avatar.position.x, tour_destination, absf(velocity_x) * delta)
 	var moving := absf(next_x - avatar.position.x) > 0.003
 	avatar.position.x = next_x
 	avatar.position.y = lerpf(avatar.position.y, 1.11 if absf(next_x) < 1.25 else 0.89, 1.0 - exp(-18.0 * delta))
@@ -276,10 +373,17 @@ func _physics_process(delta: float) -> void:
 	avatar.play_ground_locomotion(input_axis, velocity_x if moving else 0.0, HUB_RUN_SPEED)
 	camera.position.x = lerpf(camera.position.x, clampf(next_x * 0.88, -15.3, 15.3), 1.0 - exp(-6.5 * delta))
 	update_station()
+	if walking_tour and is_equal_approx(next_x, tour_destination):
+		finish_tour_walk()
 
 func _process(delta: float) -> void:
 	if nova.visible:
 		nova_hover_time += delta
+		if tour_active and not is_nan(tour_destination):
+			var lead := signf(tour_destination - avatar.position.x) * 1.55
+			var follow := 1.0 - exp(-8.0 * delta)
+			nova.position.x = lerpf(nova.position.x, avatar.position.x + lead, follow)
+			nova_hover_height = lerpf(nova_hover_height, avatar.position.y + 0.81, follow)
 		nova.position.y = nova_hover_height + sin(nova_hover_time * 2.6) * 0.085
 		nova.rotation.y = lerpf(nova.rotation.y, clampf((avatar.position.x - nova.position.x) * 0.19, -0.48, 0.48), minf(1.0, delta * 4.0))
 		nova.rotation.z = sin(nova_hover_time * 2.6 + 1.2) * 0.10
@@ -370,10 +474,10 @@ func update_station() -> void:
 		if absf(avatar.position.x - float(STATIONS[index].x)) <= 1.14:
 			nearest = index
 			break
-	if nearest != current_station and nearest >= 0:
+	if nearest != current_station and nearest >= 0 and not tour_active:
 		RiftAudio.play_effect(&"menu_move")
 	current_station = nearest
-	station_notice.visible = nearest >= 0 and not panel_open and not reconstructing and not has_dialogue()
+	station_notice.visible = nearest >= 0 and not panel_open and not reconstructing and not tour_active and not has_dialogue()
 	if nearest >= 0:
 		station_notice.text = "%s   /   %s INTERACT" % [STATIONS[nearest].name.to_upper(), interact_hint()]
 		station_notice.add_theme_color_override("font_color", STATIONS[nearest].color.lerp(Color.WHITE, 0.32))
@@ -404,6 +508,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		pad_prompt = false
 	if event is InputEventMouse and not is_pause_open():
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	if tour_active:
+		var pressed_start: bool = event is InputEventJoypadButton and event.pressed and event.button_index == JOY_BUTTON_START
+		if not is_nan(tour_destination) and (event.is_action_pressed("ui_cancel") or pressed_start):
+			skip_station_tour()
+		get_viewport().set_input_as_handled()
+		return
 	if panel_open or chat_open or reconstructing or has_dialogue():
 		return
 	if not RiftRelay.connected_room.is_empty() and (event.is_action_pressed("pause") or event.is_action_pressed("ui_cancel")):
@@ -424,7 +534,7 @@ func is_pause_open() -> bool:
 	return is_instance_valid(pause_menu) and pause_menu.is_open()
 
 func activate_station() -> void:
-	if panel_open or reconstructing or has_dialogue() or current_station < 0:
+	if panel_open or reconstructing or tour_active or has_dialogue() or current_station < 0:
 		return
 	var destination: String = STATIONS[current_station].page
 	if destination == "Title":
@@ -593,49 +703,40 @@ func build_hud() -> void:
 	interface.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hud_layer.add_child(interface)
 	interface.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	interface.theme = UI.theme()
+	interface.theme = UI.theme(true)
 	var heading := PanelContainer.new()
-	heading.position = Vector2(26, 27)
-	heading.custom_minimum_size = Vector2(320, 52)
-	heading.add_theme_stylebox_override("panel", hud_frame(Vector2(16, 5)))
+	heading.position = Vector2(22, 22)
+	heading.custom_minimum_size = Vector2(284, 46)
+	heading.add_theme_stylebox_override("panel", UI.hud_frame(UI.CYAN, Vector2(18, 6), true))
 	interface.add_child(heading)
-	UI.label(heading, "OPERATIONS HUB", 30, UI.CYAN)
+	UI.profile_label(heading, "//  OPERATIONS HUB", 28, UI.CYAN)
 	var wallet := PanelContainer.new()
 	interface.add_child(wallet)
-	wallet.add_theme_stylebox_override("panel", hud_frame(Vector2(17, 6)))
-	var funds := UI.column(wallet, 2)
-	bank_label = UI.label(funds, "", 16, UI.MUTED)
-	bolts_label = UI.currency_row(funds, "")
-	funds.add_child(HSeparator.new())
-	shards_label = UI.currency_row(funds, "", true)
+	wallet.add_theme_stylebox_override("panel", UI.hud_frame(UI.CYAN, Vector2(14, 8), true))
+	var funds := UI.column(wallet, 4)
+	bank_label = UI.profile_label(funds, "", 17, UI.MUTED)
+	var amounts := HBoxContainer.new()
+	amounts.add_theme_constant_override("separation", 10)
+	funds.add_child(amounts)
+	bolts_label = UI.currency_row(amounts, "")
+	amounts.add_child(VSeparator.new())
+	shards_label = UI.currency_row(amounts, "", true)
+	bolts_label.add_theme_color_override("font_color", Color("ffd481"))
+	shards_label.add_theme_color_override("font_color", Color("d7b0ff"))
 	wallet.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
-	wallet.offset_left = -350
-	wallet.offset_right = -28
-	wallet.offset_top = 27
+	wallet.offset_right = -22
+	wallet.offset_left = -22
+	wallet.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	wallet.offset_top = 22
 	station_notice = UI.button(interface, "", activate_station, false, 34, false)
 	station_notice.focus_mode = Control.FOCUS_NONE
 	station_notice.add_theme_font_size_override("font_size", 18)
 	station_notice.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
 	station_notice.offset_left = -190
 	station_notice.offset_right = 190
-	station_notice.offset_top = -70
-	station_notice.offset_bottom = -27
-	var idle := hud_frame(Vector2(18, 4))
-	idle.modulate_color = Color("81ffff")
-	var active := idle.duplicate() as StyleBoxTexture
-	active.modulate_color = UI.VIOLET
-	var down := active.duplicate() as StyleBoxTexture
-	down.modulate_color = UI.VIOLET.darkened(0.22)
-	UI.set_button_states(station_notice, idle, active, down)
-
-func hud_frame(padding: Vector2) -> StyleBoxTexture:
-	var style := StyleBoxTexture.new()
-	style.texture = preload("res://assets/hub/hud_glass.svg")
-	for side in [SIDE_LEFT, SIDE_RIGHT, SIDE_TOP, SIDE_BOTTOM]:
-		var horizontal: bool = side in [SIDE_LEFT, SIDE_RIGHT]
-		style.set_texture_margin(side, 31 if horizontal else 19)
-		style.set_content_margin(side, padding.x if horizontal else padding.y)
-	return style
+	station_notice.offset_top = -64
+	station_notice.offset_bottom = -22
+	UI.profile_button(station_notice, true)
 
 func paint(tint: Color, emission: float, metallic := 0.0) -> StandardMaterial3D:
 	var finish := StandardMaterial3D.new()
@@ -689,7 +790,7 @@ func update_blueprint_drop(key: String, id: String, _owner: int, x: float) -> vo
 	title.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 
 func check_blueprint_pickups() -> void:
-	if not profile or panel_open or not RiftRelay.can_share_blueprints():
+	if not profile or panel_open or tour_active or not RiftRelay.can_share_blueprints():
 		return
 	for key in RiftRelay.blueprint_drops.keys():
 		var drop: Dictionary = RiftRelay.blueprint_drops[key]

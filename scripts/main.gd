@@ -20,6 +20,8 @@ const GateRelays := preload("res://scripts/gate_relays.gd")
 const WhisperOverlay := preload("res://scripts/whisper_overlay.gd")
 const PlaytestReset := preload("res://scripts/playtest_reset.gd")
 const PlayerAccount := preload("res://scripts/player_account.gd")
+const AchievementToast := preload("res://scripts/achievement_toast.gd")
+const GamerScore := preload("res://scripts/gamer_score.gd")
 const HOME_HUB := preload("res://scenes/home_hub.tscn")
 var sector_complete := false
 var deploying := false
@@ -81,6 +83,7 @@ var recovery_button: Button
 var invite_overlay: CanvasLayer
 var chat: WhisperOverlay
 var account: PlayerAccount
+var achievement_toast: AchievementToast
 var progress_reset_error := OK
 var coop_mission: Node3D
 var coop_join_loading: CanvasLayer
@@ -101,6 +104,8 @@ func _ready() -> void:
 			return
 		preload("res://scripts/steam_artwork.gd").apply.call_deferred(install_root)
 	add_build_version()
+	achievement_toast = AchievementToast.new()
+	add_child(achievement_toast)
 	chat = WhisperOverlay.new()
 	chat.available = can_open_chat
 	chat.toggled.connect(set_chat_open)
@@ -111,7 +116,7 @@ func _ready() -> void:
 	pointer.menu_open = func(): return (is_instance_valid(menu) and menu.is_visible_in_tree()
 		or is_instance_valid(pause_menu) and pause_menu.is_visible_in_tree()
 		or is_instance_valid(coop_mission) and coop_mission.is_pause_open()
-		or is_instance_valid(home_hub) and (home_hub.is_pause_open() or home_hub.has_dialogue())
+		or is_instance_valid(home_hub) and (home_hub.is_pause_open() or home_hub.has_dialogue() or home_hub.tour_active)
 		or has_node("CampaignPrologue")
 		or chat.is_open()
 		or is_instance_valid(recovery_menu)
@@ -208,7 +213,7 @@ func show_friend_invite(display_name: String, code: String, password: String) ->
 	UI.label(content, "%s invited you to a game" % display_name, 20, UI.CYAN)
 	var can_enter_station: bool = is_instance_valid(menu) and not menu.checking_cloud_save \
 		and not RiftRelay.directory.progress.conflict and not is_instance_valid(player) and menu.preferred_operator() > 0
-	if RiftRelay.can_receive_invite() and (is_instance_valid(home_hub) or can_enter_station):
+	if RiftRelay.can_receive_invite() and ((is_instance_valid(home_hub) and not home_hub.tour_active) or can_enter_station):
 		var buttons := HBoxContainer.new()
 		buttons.add_theme_constant_override("separation", 8)
 		content.add_child(buttons)
@@ -216,7 +221,7 @@ func show_friend_invite(display_name: String, code: String, password: String) ->
 			if RiftRelay.can_receive_invite():
 				if not is_instance_valid(home_hub) and can_enter_station:
 					menu.play_local_save()
-				if not is_instance_valid(home_hub):
+				if not is_instance_valid(home_hub) or home_hub.tour_active:
 					return
 				RiftSocial.remove_invite(code)
 				RiftRelay.join_room(code, password)
@@ -1277,7 +1282,10 @@ func select_save_slot(number: int, fresh: bool, operator_name := "") -> void:
 		prologue.queue_free()
 	open_home_hub()
 	if fresh:
-		home_hub.materialize_operator("arrival" if show_arrival else "")
+		var arrival_hub := home_hub
+		await arrival_hub.materialize_operator("arrival" if show_arrival else "")
+		if play_prologue and is_instance_valid(arrival_hub) and home_hub == arrival_hub:
+			await arrival_hub.play_station_tour(menu)
 
 func reset_player_profile() -> void:
 	if not account or account.display_name.is_empty() or is_instance_valid(coop_mission):
@@ -1763,6 +1771,7 @@ func overlay(sidebar := false, wide := false) -> VBoxContainer:
 		center.offset_left = 22
 	var panel := PanelContainer.new()
 	panel.custom_minimum_size.x = 348 if sidebar else 460
+	panel.add_theme_stylebox_override("panel", UI.hud_frame(UI.CYAN, Vector2(18, 14), true))
 	center.add_child(panel)
 	if wide:
 		center.remove_child(panel)
@@ -1947,6 +1956,7 @@ func build_hud() -> void:
 	hud = CanvasLayer.new()
 	add_child(hud)
 	factory_hud = FactoryHUD.new()
+	factory_hud.local_operator = player
 	factory_hud.exit_task = Story.objective(sector, act, false, Miniboss.TITLES[sector - 1])
 	factory_hud.set_gate_relays(gate_relays.count())
 	factory_hud.boss_name = String(Miniboss.TITLES[sector - 1] if act == 1 else Catalog.info(sector).boss).to_upper()
@@ -2062,7 +2072,23 @@ func award_profile_clear(number: int, difficulty: int, seconds := 0.0, kills := 
 		var progress := account.award_clear(number, difficulty, run)
 		profile.player_xp = account.experience
 		run["finish_achievements"] = account.unlocked_skins
-		progress["gamer_points"] = RiftRelay.directory.record_gamer_score(number, difficulty, run)
+		var awarded := RiftRelay.directory.record_gamer_score(number, difficulty, run)
+		progress["gamer_points"] = awarded.points
+		var new_achievements: Array[String] = []
+		var announced_points := 0
+		for id: String in awarded.awards:
+			if id not in account.unlocked_skins:
+				new_achievements.append(id)
+				announced_points += int(GamerScore.achievement_catalog[id][1])
+		for id: String in progress.new_finish_ids:
+			new_achievements.append(id)
+			if id in awarded.awards:
+				announced_points += int(GamerScore.achievement_catalog[id][1])
+		var field_hud := factory_hud
+		if online and is_instance_valid(coop_mission):
+			field_hud = coop_mission.personal_hud
+		var local_operator: Node3D = field_hud.local_operator if is_instance_valid(field_hud) else null
+		achievement_toast.show_unlocks(new_achievements, announced_points, local_operator, field_hud)
 		return progress
 	var before: int = profile.player_xp
 	profile.award_player_xp(PlayerAccount.clear_reward(number, difficulty))
@@ -2531,7 +2557,7 @@ func can_open_chat() -> bool:
 	if is_instance_valid(coop_mission):
 		return coop_mission.can_open_chat()
 	if is_instance_valid(home_hub):
-		return not home_hub.panel_open and not home_hub.reconstructing and not home_hub.has_dialogue()
+		return not home_hub.panel_open and not home_hub.reconstructing and not home_hub.tour_active and not home_hub.has_dialogue()
 	return is_instance_valid(player) and player.visible and not deploying and not advancing_act and not arena_intro and not suit_reveal_active and not sector_complete and not respawning
 
 func set_chat_open(open: bool) -> void:

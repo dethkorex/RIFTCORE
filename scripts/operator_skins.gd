@@ -15,18 +15,25 @@ const VARIANTS := [
 	["Chalk and Ink", "eeeff3", "292a30", "e6e8ef"],
 ]
 
+const EXPERT_TITLES := [
+	"Quench the Furnace", "Uproot the Colossus", "Shatter the Cold",
+	"Tame the Undertow", "Unseal the Archives", "Clear for Landing",
+	"Quarantine Lifted", "Lights Out in Orbit", "Nothing Left to Rust",
+	"Break the Override",
+]
+
 # Albedo, inset enamel, lamp color, and the named achievement for each finish.
 const FIELD_VARIANTS := [
-	["Rivet Copper", "b3b3b8", "79492f", "ffdfb7", "First Extraction", "Extract from any sector."],
-	["Claystorm", "c78b7c", "354458", "ffebd9", "Security Detail", "Defeat 6 security units in a run and extract."],
-	["Blue Hour", "3f527a", "c5aa79", "fff0cf", "Cache Runner", "Extract with at least 3 recovered materials."],
-	["Ivory Alloy", "d7c9b3", "5e453a", "fdeadd", "Field Payout", "Earn 80 Bolts in one run and extract."],
-	["Iron Plum", "62536f", "c6a18e", "ffd9e8", "Hull Check", "Extract with at least 50% health."],
-	["Juniper Pearl", "4c7165", "c2b7d2", "eedbff", "Charged Return", "Extract with at least 50% energy."],
-	["Solar Graphite", "575d64", "e0be84", "fff1cb", "Scout’s Pace", "Extract within 15 minutes."],
-	["Oyster Violet", "c2b8d3", "483955", "fce8ff", "Spare in the Bank", "Extract with at least one life remaining."],
-	["Merlot Slate", "692f4a", "8fa9be", "ffe2db", "Second Shift", "Extract twice."],
-	["Fossil Brass", "a38d5c", "384544", "fff1ce", "New Ground", "Extract from two different sectors."],
+	["Rivet Copper", "b3b3b8", "79492f", "ffdfb7", "Signal Received", "Extract from any sector."],
+	["Claystorm", "c78b7c", "354458", "ffebd9", "Patrol Offline", "Defeat 6 security units in a run and extract."],
+	["Blue Hour", "3f527a", "c5aa79", "fff0cf", "Nothing Goes to Scrap", "Extract with at least 3 recovered materials."],
+	["Ivory Alloy", "d7c9b3", "5e453a", "fdeadd", "Hazard Pay", "Earn 80 Bolts in one run and extract."],
+	["Iron Plum", "62536f", "c6a18e", "ffd9e8", "Armor Still Holding", "Extract with at least 50% health."],
+	["Juniper Pearl", "4c7165", "c2b7d2", "eedbff", "Power to Spare", "Extract with at least 50% energy."],
+	["Solar Graphite", "575d64", "e0be84", "fff1cb", "Before Shift Change", "Extract within 15 minutes."],
+	["Oyster Violet", "c2b8d3", "483955", "fce8ff", "One More Reboot", "Extract with at least one life remaining."],
+	["Merlot Slate", "692f4a", "8fa9be", "ffe2db", "Back on the Roster", "Extract twice."],
+	["Fossil Brass", "a38d5c", "384544", "fff1ce", "District Hopper", "Extract from two different sectors."],
 ]
 
 const LEGACY_FINISHES := {
@@ -73,7 +80,7 @@ static func finish_achievement(id: String) -> Array:
 	if id.begins_with("variant:"):
 		var sector := int(id.trim_prefix("variant:"))
 		var title: String = Catalog.info(sector).title
-		return ["Expert · " + title, 30, "Clear both acts of %s on Expert. Unlocks %s." % [title, paint[0]]]
+		return [EXPERT_TITLES[sector - 1], 30, "Clear both acts of %s on Expert. Unlocks %s." % [title, paint[0]]]
 	return []
 
 static func palette(id: String) -> Array:

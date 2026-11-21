@@ -21,6 +21,8 @@ const TINTS := {"NOVA": UI.VIOLET, "VOSS": Color("76ded5"), "SOREN": Color("f280
 const PITCHES := {"NOVA": 1.32, "VOSS": 1.14, "SOREN": 0.87}
 
 var tutorial_title := ""
+var skip_text := "Skip"
+var preview_underlay := false
 var disable_tips: Callable
 var portrait_image: TextureRect
 var portrait_style: StyleBoxFlat
@@ -51,7 +53,7 @@ func play(lines: Array, finish_label: String, automatic := false, boss_name := "
 	if not automatic:
 		add_to_group(&"interactive_dialogue")
 	var backdrop := ColorRect.new()
-	backdrop.color = Color("03071070")
+	backdrop.color = Color("03071012") if preview_underlay else Color("03071070")
 	backdrop.mouse_filter = Control.MOUSE_FILTER_STOP if not automatic else Control.MOUSE_FILTER_IGNORE
 	backdrop.theme = UI.theme()
 	add_child(backdrop)
@@ -64,26 +66,20 @@ func play(lines: Array, finish_label: String, automatic := false, boss_name := "
 	row.anchor_right = 0.90
 	row.anchor_top = 1.0
 	row.anchor_bottom = 1.0
-	row.offset_top = -71
-	row.offset_bottom = -71
+	row.offset_top = -24 if preview_underlay else -71
+	row.offset_bottom = row.offset_top
 	row.grow_vertical = Control.GROW_DIRECTION_BEGIN
 
 	var page := PanelContainer.new()
 	page.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var panel_style := UI.frame(Color("0c182c"), UI.CYAN, 4)
-	panel_style.border_width_top = 2
-	panel_style.content_margin_left = 24
-	panel_style.content_margin_right = 22
-	panel_style.content_margin_top = 14
-	panel_style.content_margin_bottom = 13
-	panel_style.shadow_color = Color("030710d8")
-	panel_style.shadow_size = 9
+	var panel_style := UI.hud_frame(UI.CYAN, Vector2(22, 13), true)
 	page.add_theme_stylebox_override("panel", panel_style)
 	row.add_child(page)
 	var content := UI.column(page, 6)
 	var speaker := UI.label(content, "", 25, UI.CYAN)
 	speaker.name = "Speaker"
 	speaker.autowrap_mode = TextServer.AUTOWRAP_OFF
+	content.add_child(HSeparator.new())
 	var speech := UI.label(content, "", 24, UI.WHITE)
 	speech.name = "Speech"
 	speech.add_theme_font_override("font", BODY_FONT)
@@ -98,14 +94,17 @@ func play(lines: Array, finish_label: String, automatic := false, boss_name := "
 	add_child(reader)
 	reader.body = speech
 	reader.next = UI.button(actions, "Next", reader.advance, true, 34)
+	UI.profile_button(reader.next, true)
 	reader.lettering_changed.connect(set_speaking)
 	if not automatic:
-		var skip := UI.button(actions, "Skip", reader.skip, false, 34)
+		var skip := UI.button(actions, skip_text, reader.skip, false, 34)
+		UI.profile_button(skip)
 		if disable_tips.is_valid():
-			UI.button(actions, "Turn off tips", func():
+			var disable := UI.button(actions, "Turn Off Tutorials", func():
 				disable_tips.call()
 				reader.skip()
 			, false, 34)
+			UI.profile_button(disable)
 		skip.focus_neighbor_left = skip.get_path_to(reader.next)
 		reader.next.focus_neighbor_right = reader.next.get_path_to(skip)
 		reader.next.grab_focus()
@@ -176,7 +175,7 @@ func crop(texture: Texture2D, region: Rect2) -> AtlasTexture:
 func build_portrait(row: HBoxContainer) -> void:
 	var card := Panel.new()
 	card.name = "PortraitCard"
-	card.custom_minimum_size = Vector2(172, 166)
+	card.custom_minimum_size = Vector2(130, 126) if preview_underlay else Vector2(172, 166)
 	row.add_child(card)
 	var aperture := Control.new()
 	aperture.clip_contents = true
@@ -213,11 +212,10 @@ func build_portrait(row: HBoxContainer) -> void:
 	border.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card.add_child(border)
 	border.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	portrait_style = UI.frame(Color("0b1528"), UI.CYAN, 4)
+	portrait_style = UI.hud_frame(UI.CYAN, Vector2.ZERO, true)
 	card.add_theme_stylebox_override("panel", portrait_style.duplicate())
 	portrait_style.draw_center = false
-	portrait_style.set_border_width_all(4)
-	portrait_style.set_corner_radius_all(5)
+	portrait_style.set_border_width_all(3)
 	border.add_theme_stylebox_override("panel", portrait_style)
 
 	meter = HBoxContainer.new()
@@ -260,6 +258,7 @@ func show_nova() -> void:
 		nova_material.shader = NOVA_EFFECT
 		nova_image.material = nova_material
 		nova_image.texture = nova_view.get_texture()
+	set_nova_signal(0.0)
 	nova_view.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 	nova_image.show()
 	portrait_image.hide()

@@ -138,7 +138,7 @@ func build_floor_light(tint: Color) -> OmniLight3D:
 
 func ability_card(hud: CanvasLayer, reward: Dictionary, tint: Color) -> PanelContainer:
 	var plate := PanelContainer.new()
-	plate.add_theme_stylebox_override("panel", UI.frame(Color(0.03, 0.08, 0.15, 0.94), tint, 4))
+	plate.add_theme_stylebox_override("panel", UI.hud_frame(tint, Vector2(16, 12), true))
 	plate.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hud.add_child(plate)
 	plate.anchor_left = 0.64

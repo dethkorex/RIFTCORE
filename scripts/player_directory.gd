@@ -332,13 +332,17 @@ func _process(delta: float) -> void:
 		refresh_elapsed = 0.0
 		poll()
 
-func record_gamer_score(sector: int, mode: int, run: Dictionary) -> int:
+func record_gamer_score(sector: int, mode: int, run: Dictionary) -> Dictionary:
 	if not online():
-		return 0
+		return {"points": 0, "awards": []}
 	gamer_score.use_account(username)
+	var before := gamer_score.earned.duplicate()
 	var points := gamer_score.record_clear(sector, mode, run)
 	gamer_sync_elapsed = 30.0
-	return points
+	var awards := gamer_score.earned.filter(func(id: String): return id not in before)
+	if not awards.is_empty():
+		changed.emit()
+	return {"points": points, "awards": awards}
 
 func register_gamer_finishes(finishes: Array) -> void:
 	if online():

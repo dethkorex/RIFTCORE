@@ -156,7 +156,8 @@ func award_clear(sector: int, difficulty: int, result := {}) -> Dictionary:
 		total_clears -= 1
 		total_kills -= kills
 		push_warning("Could not save completed-sector Player Profile XP.")
-	return {"before": previous, "after": experience, "unlocked_finish": new_finish}
+	var new_finish_ids := unlocked_skins.filter(func(id: String): return id not in before_skins and not SkinKit.finish_achievement(id).is_empty())
+	return {"before": previous, "after": experience, "unlocked_finish": new_finish, "new_finish_ids": new_finish_ids}
 
 func track_survival(seconds: float, operator: String) -> bool:
 	if not is_finite(seconds) or seconds <= longest_run:

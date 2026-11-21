@@ -22,14 +22,15 @@ func choose() -> void:
 	var panel := PanelContainer.new()
 	panel.theme = UI.theme()
 	panel.custom_minimum_size.x = 480
-	panel.add_theme_stylebox_override("panel", UI.texture_frame("panel_base_large", 40, Vector2(20, 17)))
+	panel.add_theme_stylebox_override("panel", UI.hud_frame(UI.CYAN, Vector2(20, 17), true))
 	center.add_child(panel)
 	var rows := UI.column(panel, 10)
 	UI.label(rows, "Kiln Warden reclaimed", 30, UI.CYAN)
 	UI.label(rows, "Choose one module for this run.", 17, UI.MUTED)
 	for id in MODULES:
 		var data: Array = MODULES[id]
-		var button := UI.button(rows, data[0], func(): selected.emit(id), false, 36)
+		var button := UI.button(rows, data[0], func(): selected.emit(id), false, 36, false)
+		UI.profile_button(button)
 		button.size_flags_horizontal = Control.SIZE_FILL
 		UI.label(rows, data[1], 16, UI.MUTED)
 		if id == MODULES.keys()[0]:

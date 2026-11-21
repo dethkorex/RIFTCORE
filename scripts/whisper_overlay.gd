@@ -72,7 +72,7 @@ func open() -> void:
 		channel = recent_sender
 	card = PanelContainer.new()
 	card.theme = UI.theme()
-	card.add_theme_stylebox_override("panel", UI.frame(Color("09172af2"), UI.CYAN, 6))
+	card.add_theme_stylebox_override("panel", UI.hud_frame(UI.CYAN, Vector2(12, 8), true))
 	add_child(card)
 	card.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
 	card.offset_left = 16
@@ -82,18 +82,19 @@ func open() -> void:
 	var content := UI.column(card, 5)
 	var header := HBoxContainer.new()
 	content.add_child(header)
-	var title := UI.label(header, "COMMS", 19, UI.CYAN)
+	var title := UI.profile_label(header, "//  COMMS", 19, UI.CYAN)
 	title.autowrap_mode = TextServer.AUTOWRAP_OFF
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var shortcuts := UI.label(header, "Enter to send  ·  Esc to close", 13, UI.MUTED)
 	shortcuts.autowrap_mode = TextServer.AUTOWRAP_OFF
 	shortcuts.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	selector = OptionButton.new()
-	UI.style_button(selector)
+	UI.profile_button(selector)
 	selector.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	selector.fit_to_longest_item = false
 	selector.item_selected.connect(select_channel)
 	content.add_child(selector)
+	content.add_child(HSeparator.new())
 	history = RichTextLabel.new()
 	history.custom_minimum_size.y = 54
 	history.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -113,6 +114,7 @@ func open() -> void:
 	composer.text_submitted.connect(func(_value): send_message())
 	row.add_child(composer)
 	send_button = UI.button(row, "Send", send_message, false, 31)
+	UI.profile_button(send_button, true)
 	refresh_channels()
 	composer.grab_focus()
 	composer.caret_column = composer.text.length()

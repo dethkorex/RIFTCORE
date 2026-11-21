@@ -15,7 +15,10 @@ func show_loading(sector_title: String, title := "LOADING ACT II") -> void:
 	var center := CenterContainer.new()
 	shade.add_child(center)
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	var column := UI.column(center, 16)
+	var panel := PanelContainer.new()
+	panel.add_theme_stylebox_override("panel", UI.hud_frame(UI.CYAN, Vector2(28, 22), true))
+	center.add_child(panel)
+	var column := UI.column(panel, 12)
 	column.custom_minimum_size.x = 490.0
 	var sector := UI.label(column, sector_title.to_upper(), 20, Color("9db5ce"))
 	sector.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -25,8 +28,8 @@ func show_loading(sector_title: String, title := "LOADING ACT II") -> void:
 	progress.custom_minimum_size.y = 6
 	progress.show_percentage = false
 	progress.max_value = 1.0
-	progress.add_theme_stylebox_override("background", UI.frame(Color("182842"), Color("284765"), 1))
-	progress.add_theme_stylebox_override("fill", UI.frame(Color("68d9ef"), Color("acf2ff"), 1))
+	progress.add_theme_stylebox_override("background", UI.profile_frame(Color("1c324a"), Color.TRANSPARENT, Vector2.ZERO))
+	progress.add_theme_stylebox_override("fill", UI.profile_frame(UI.CYAN, Color.TRANSPARENT, Vector2.ZERO))
 	column.add_child(progress)
 	create_tween().tween_property(shade, "modulate:a", 1.0, 0.20)
 

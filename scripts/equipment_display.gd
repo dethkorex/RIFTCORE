@@ -6,6 +6,8 @@ const Pad := preload("res://assets/hub/deploy_pad.tscn")
 var actor: RiftPlayer
 var compact := false
 var neutral_lighting := false
+var allow_zoom := false
+var camera: Camera3D
 var skin := ""
 var frame := ""
 var customized: Dictionary = {}
@@ -40,7 +42,7 @@ func _ready() -> void:
 	display_pad.set("caption", "")
 	display_pad.scale = Vector3(0.78, 0.62, 0.78)
 	view.add_child(display_pad)
-	var camera := Camera3D.new()
+	camera = Camera3D.new()
 	camera.projection = Camera3D.PROJECTION_ORTHOGONAL
 	camera.size = 2.20
 	camera.keep_aspect = Camera3D.KEEP_HEIGHT
@@ -64,7 +66,8 @@ func _ready() -> void:
 	if actor.animation_player:
 		actor.animation_player.advance(0.0)
 	if not compact:
-		var hint := preload("res://scripts/rift_ui.gd").label(self, "Drag to rotate  ·  Focus for right stick", 14, Color("96abc2"))
+		var controls := "Drag to rotate  ·  Scroll to zoom  ·  Focus for right stick" if allow_zoom else "Drag to rotate  ·  Focus for right stick"
+		var hint := preload("res://scripts/rift_ui.gd").profile_label(self, controls, 14, Color("a9c5dd"))
 		hint.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
 		hint.offset_top = -25.0
 		hint.offset_bottom = -5.0
@@ -87,6 +90,13 @@ func _gui_input(event: InputEvent) -> void:
 	elif event is InputEventJoypadMotion and event.axis == JOY_AXIS_RIGHT_X:
 		rotation_axis = event.axis_value if absf(event.axis_value) >= .20 else 0.0
 		accept_event()
+	elif allow_zoom and event is InputEventMouseButton and event.pressed:
+		if event.button_index == MOUSE_BUTTON_WHEEL_UP:
+			camera.size = maxf(1.77, camera.size - 0.09)
+			accept_event()
+		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+			camera.size = minf(2.65, camera.size + 0.09)
+			accept_event()
 
 func _process(delta: float) -> void:
 	if has_focus() and not is_zero_approx(rotation_axis):

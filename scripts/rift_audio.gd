@@ -29,6 +29,7 @@ const EFFECTS := {
 	&"enemy_break": [preload("res://assets/audio/enemy_break.ogg"), -15.0, 2],
 	&"pickup": [preload("res://assets/audio/pickup.ogg"), -14.0, 2],
 	&"level_up": [preload("res://assets/audio/level_up.ogg"), -9.0, 1],
+	&"achievement_unlocked": [preload("res://assets/audio/achievement_unlocked.wav"), -7.0, 1],
 	&"checkpoint": [preload("res://assets/audio/checkpoint.ogg"), -10.0, 1],
 }
 

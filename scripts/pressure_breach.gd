@@ -1,4 +1,6 @@
 extends Node3D
+
+const UI := preload("res://scripts/rift_ui.gd")
 ## Host-owned valves and pressure lock; clients render/predict the same clock.
 const VENT_SECONDS := 90.0
 const HOLD_SECONDS := 1.8
@@ -33,22 +35,7 @@ func _ready() -> void:
 	layer.add_child(screen)
 	screen.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	screen.mouse_filter=Control.MOUSE_FILTER_IGNORE
-	readout=Label.new()
-	screen.add_child(readout)
-	readout.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
-	readout.offset_left=-330
-	readout.offset_right=330
-	readout.offset_top=145
-	readout.offset_bottom=240
-	readout.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
-	readout.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
-	readout.add_theme_font_override("font",preload("res://assets/ui/fonts/BarlowCondensed-ExtraBoldItalic.ttf"))
-	readout.add_theme_font_size_override("font_size",24)
-	readout.add_theme_color_override("font_color",Color("a5e9ef"))
-	readout.add_theme_color_override("font_outline_color",Color("031423"))
-	readout.add_theme_constant_override("outline_size",8)
-	readout.mouse_filter=Control.MOUSE_FILTER_IGNORE
-	readout.hide()
+	readout = UI.hud_readout(screen, 146, 610)
 
 func actors() -> Array[RiftPlayer]:
 	var result: Array[RiftPlayer]=[]

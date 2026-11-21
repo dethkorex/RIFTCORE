@@ -127,6 +127,8 @@ func deployment_dialogue(profile: RefCounted, sector: int, act: int) -> Array:
 	return story.deployment(sector, act, tell_story, teach)
 
 func claim_deployment_briefing(profile: RefCounted, sector: int, act: int) -> bool:
+	if not show_hub_tips:
+		return false
 	# Keep legacy slot history, but save this visit even if the player loses the run before saving.
 	var previously_seen: bool = not profile.claim_briefing(sector, act)
 	return claim_story_beat("briefing_%d" % ((sector - 1) * 2 + act), previously_seen)

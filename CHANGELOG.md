@@ -1,10 +1,9 @@
-# RIFTCORE Alpha 6.3.30
+# RIFTCORE Alpha 6.3.31
 
-- Choose five new operator frames in Cosmetics. Unlock them with Bolts and rotate the model with the mouse or controller.
-- Earn ten milestone finishes and ten Expert sector finishes. All 20 finishes work across every frame.
-- Track achievements and Gamer Score in your profile and see your friends' scores.
-- Host public, friends-only, or invite-only parties and browse open public lobbies. Duplicate friend entries have been cleaned up.
-- Daily challenges now offer tougher objectives. Earn a bonus life from the hardest challenge and the first defeat of each main sector boss.
-- RX-07 runs across the loading screen, hub interaction labels are cleaner, and combat animation and navigation improvements are included.
+- NOVA now guides new players through all eight Operations Hub stations after the opening. She walks you to each station, opens its real menus, and explains what to do there.
+- Skip the tour at any point, or turn off automatic tutorials under System → Settings → Gameplay. The NOVA Archive still has the field guides.
+- Marketplace, Inventory and Storage, Social, Challenges, and the rest of the hub now use the same panels, tabs, and selection highlights as Cosmetics. The Cosmetics and Achievements screens have also been refreshed.
+- Quick-slot icons now sit in the center of their tiles. Pickups and achievement notices appear above your operator and fade out, and new achievements play a distinct sound.
+- The mission HUD, co-op readouts, and hazard warnings have clearer layouts.
 
-Co-op players should update together. Windows and Linux players can update through the RIFTCORE Launcher.
+Update through the RIFTCORE Launcher on Windows or Linux. Start a new operator to see the opening and, on your first visit with tutorials enabled, the station tour. Co-op players should update together.
