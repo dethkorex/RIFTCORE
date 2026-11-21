@@ -32,6 +32,7 @@ signal hurt
 const START_HEALTH := 80.0
 const START_ENERGY := 75.0
 const HEALTH_GAIN_PER_LEVEL := 8.0
+const ENERGY_GAIN_PER_LEVEL := 6.0
 const LEVEL_HEAL_FRACTION := 0.50
 const LEVEL_UP_TINT := Color("ffcb48")
 const BOSS_DEBUFFS := ["", "BURN", "VENOM", "FROST", "SHOCK", "SIGNAL JAM", "TURBULENCE", "CORROSION", "GRAVITY LOCK", "MAGNETIZED", "RIFT SILENCE"]
@@ -57,7 +58,9 @@ var recovery_item_multiplier := 1.0
 var low_health_resistance := 0.0
 var contact_recoil_scale := 1.0
 var extra_hit_immunity := 0.0
-var impact_energy := 0.0
+var impact_energy_fraction := 0.0
+var max_health_multiplier := 1.0
+var max_energy_multiplier := 1.0
 var dash_guard_time := 0.0
 var phoenix_recovery := 0.0
 var phoenix_spent := false
@@ -1140,11 +1143,12 @@ func gain_experience(amount: int, earned := true) -> void:
 	var gained_levels := level_for_experience(experience) - previous_level
 	if gained_levels > 0:
 		var previous_max := max_health
-		max_health += gained_levels * HEALTH_GAIN_PER_LEVEL
-		max_energy += gained_levels * 6.0
+		var health_per_level := HEALTH_GAIN_PER_LEVEL * max_health_multiplier
+		max_health += gained_levels * health_per_level
+		max_energy += gained_levels * ENERGY_GAIN_PER_LEVEL * max_energy_multiplier
 		if earned and health > 0.0:
 			# Each level heals half of the maximum HP at that level.
-			var average_max := previous_max + HEALTH_GAIN_PER_LEVEL * (gained_levels + 1) * 0.5
+			var average_max := previous_max + health_per_level * (gained_levels + 1) * 0.5
 			health = minf(max_health, health + average_max * gained_levels * LEVEL_HEAL_FRACTION)
 			play_level_up_feedback.call_deferred()
 		health_changed.emit(health, max_health)
@@ -2225,8 +2229,8 @@ func react_to_hit(previous_health: float) -> bool:
 	if health <= 0.0:
 		return false
 	invulnerable_time = 0.65 + extra_hit_immunity
-	if impact_energy > 0.0:
-		restore_energy(impact_energy, true)
+	if impact_energy_fraction > 0.0:
+		restore_energy(max_energy * impact_energy_fraction, true)
 	return true
 
 func play_hurt_feedback(local_feedback: bool) -> void:

@@ -31,7 +31,7 @@ const EFFECTS := {
 	"charge": "%.0f%% lower boss-weapon energy cost", "bolts": "+%.0f%% bolts from pickups",
 }
 const Difficulty := preload("res://scripts/mission_difficulty.gd")
-const CACHE_RATE := 0.085
+const CACHE_RATES := [0.18, 0.27, 0.38]
 
 static func rarity_for(part: int) -> int:
 	return 0 if part == 14 else int(PARTS[part][3])
@@ -64,7 +64,7 @@ static func drop_pool(sector: int, mode: int, level: int, boss_cache: bool) -> A
 	return pool
 
 static func roll_cache(sector: int, mode: int, level: int, boss_cache: bool, rng: RandomNumberGenerator) -> String:
-	if not boss_cache and rng.randf() >= CACHE_RATE * Difficulty.LOOT[mode]:
+	if not boss_cache and rng.randf() >= CACHE_RATES[mode]:
 		return ""
 	var pool := drop_pool(sector, mode, level, boss_cache)
 	if pool.is_empty():
@@ -75,7 +75,7 @@ static func roll_cache(sector: int, mode: int, level: int, boss_cache: bool, rng
 	for part in pool:
 		var rarity := rarity_for(part)
 		var improvement := pow(Difficulty.LOOT[mode], rarity)
-		weights.append(float([1.0, .26, .085, .024][rarity]) * improvement)
+		weights.append(float([1.0, .36, .13, .038][rarity]) * improvement)
 	return blueprint_id(sector, pool[rng.rand_weighted(weights)])
 
 static func all_gear(legacy: Dictionary) -> Dictionary:

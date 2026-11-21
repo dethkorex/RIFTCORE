@@ -5,14 +5,8 @@ static func apply(operator: RiftPlayer, profile) -> void:
 	var capacitor_rank: int = profile.rank("capacitor")
 	var buster_rank: int = profile.rank("buster")
 	var dash_rank: int = profile.rank("dash")
-	if armor_rank > 0:
-		operator.max_health += [0.0, 12.0, 28.0, 46.0][armor_rank]
-		operator.health = operator.max_health
-		operator.armor_resistance = [0.0, 0.0, 0.10, 0.14][armor_rank]
-	if capacitor_rank > 0:
-		operator.max_energy += [0.0, 15.0, 32.0, 50.0][capacitor_rank]
-		operator.energy = operator.max_energy
-		operator.charge_cost_multiplier = [1.0, 1.0, 0.80, 0.70][capacitor_rank]
+	operator.armor_resistance = [0.0, 0.0, 0.10, 0.14][armor_rank]
+	operator.charge_cost_multiplier = [1.0, 1.0, 0.80, 0.70][capacitor_rank]
 	if buster_rank > 0:
 		operator.buster_damage_multiplier = 1.0 + profile.talent_bonus("buster") / 100.0
 	if dash_rank > 0:
@@ -21,7 +15,7 @@ static func apply(operator: RiftPlayer, profile) -> void:
 	operator.low_health_resistance = profile.talent_bonus("last_stand") / 100.0
 	operator.contact_recoil_scale = 1.0 - profile.talent_bonus("shock_dampers") / 100.0
 	operator.extra_hit_immunity = profile.talent_bonus("phase_lining")
-	operator.impact_energy = profile.talent_bonus("impact_converter")
+	operator.impact_energy_fraction = profile.talent_bonus("impact_converter") / 100.0
 	operator.dash_guard_time = profile.talent_bonus("ghost_drive")
 	operator.phoenix_recovery = profile.talent_bonus("phoenix_protocol") / 100.0
 	operator.recovery_item_multiplier = 1.0 + profile.talent_bonus("recovery_circuit") / 100.0
@@ -42,6 +36,10 @@ static func apply(operator: RiftPlayer, profile) -> void:
 		var id: String = profile.equipped_for(slot)
 		if not id.is_empty():
 			apply_modifiers(operator, profile.GEAR[id].stats)
+	operator.max_health_multiplier = 1.0 + profile.talent_bonus("armor") / 100.0
+	operator.max_energy_multiplier = 1.0 + profile.talent_bonus("capacitor") / 100.0
+	operator.max_health *= operator.max_health_multiplier
+	operator.max_energy *= operator.max_energy_multiplier
 	operator.health = operator.max_health
 	operator.energy = operator.max_energy
 

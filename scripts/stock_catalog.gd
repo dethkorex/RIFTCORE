@@ -2,10 +2,10 @@ extends RefCounted
 
 const Materials := preload("res://scripts/fabrication_catalog.gd")
 const RARITIES := ["Common", "Rare", "Epic", "Legendary"]
-const PRICES := [175, 425, 1050, 2400]
-const COMMON_MEDICAL_PRICES := {1: 90, 5: 115, 10: 145}
+const MATERIAL_PRICES := {"scrap": 75, "components": 80, "circuits": 135, "cells": 105}
+const SECTOR_BUNDLE_PRICES := [125, 190, 320, 490]
 const MATERIAL_STOCK := [
-	["scrap", 20, 0, 1], ["components", 12, 0, 1], ["circuits", 8, 1, 10], ["cells", 10, 1, 5],
+	["scrap", 12, 0, 1], ["components", 8, 0, 1], ["circuits", 6, 1, 10], ["cells", 8, 1, 5],
 	["core", 1, 2, 30], ["legendary", 1, 3, 50], ["sector_1", 4, 0, 1], ["sector_2", 4, 0, 5],
 	["sector_3", 4, 1, 10], ["sector_4", 4, 1, 15], ["sector_5", 4, 1, 20], ["sector_6", 4, 1, 25],
 	["sector_7", 4, 2, 30], ["sector_8", 4, 2, 35], ["sector_9", 4, 2, 40], ["sector_10", 4, 3, 45],
@@ -36,8 +36,9 @@ const BOOSTS := [
 static func catalog() -> Dictionary:
 	var stock := {}
 	for entry in MATERIAL_STOCK:
+		var price: int = MATERIAL_PRICES.get(entry[0], SECTOR_BUNDLE_PRICES[entry[2]])
 		stock["material_" + entry[0]] = {"name": Materials.label(entry[0]), "material": entry[0], "quantity": entry[1],
-			"rarity": entry[2], "price": PRICES[entry[2]], "shop_level": entry[3],
+			"rarity": entry[2], "price": price, "shop_level": entry[3],
 			"detail": "%d crafting materials" % entry[1], "icon": "core"}
 	for entry in MEDICAL:
 		var parts := PackedStringArray()
@@ -45,13 +46,14 @@ static func catalog() -> Dictionary:
 			parts.append("Restore %d HP" % entry[3])
 		if entry[4] > 0:
 			parts.append("Restore %d energy" % entry[4])
-		var price: int = PRICES[entry[2]]
-		if entry[2] == 0:
-			price = 125 if entry[3] > 0 and entry[4] > 0 else COMMON_MEDICAL_PRICES[entry[5]]
+		var recovery: float = entry[3] + entry[4] * .86
+		var price := maxi(30, roundi(recovery * [1.20, 1.42, 1.72, 2.0][entry[2]] / 5.0) * 5)
 		stock[entry[0]] = {"name": entry[1], "rarity": entry[2], "price": price, "hp": entry[3],
 			"energy": entry[4], "shop_level": entry[5], "detail": "  ·  ".join(parts), "icon": "frame" if entry[3] > 0 else "core"}
 	for entry in BOOSTS:
-		stock[entry[0]] = {"name": entry[1], "rarity": entry[2], "price": 115 if entry[2] == 0 else PRICES[entry[2]], "stat": entry[3],
+		var strength: float = entry[4] * entry[5]
+		var price := roundi(([20, 36, 62, 115][entry[2]] + strength * 6.0) / 5.0) * 5
+		stock[entry[0]] = {"name": entry[1], "rarity": entry[2], "price": price, "stat": entry[3],
 			"gain": entry[4], "duration": entry[5], "shop_level": entry[6],
 			"detail": "+%d%% %s for %d seconds" % [roundi(entry[4] * 100), entry[3], entry[5]],
 			"icon": {"attack": "arm", "defense": "frame", "speed": "utility"}[entry[3]]}

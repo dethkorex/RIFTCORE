@@ -1650,7 +1650,7 @@ func build_shop(columns: HBoxContainer) -> void:
 	, true, 51)
 	buy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	buy.add_theme_font_size_override("font_size", 24)
-	var hint := "Purchases go to Inventory. Stow them under Operator → Storage."
+	var hint := "Buy 5+ for 10% off or 10+ for 15% off. Purchases go to Inventory."
 	var message := UI.label(info, hint, 15, UI.MUTED)
 	message.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	var buttons: Dictionary[String, Button] = {}
@@ -1660,8 +1660,9 @@ func build_shop(columns: HBoxContainer) -> void:
 		var limit: int = profile.supply_purchase_limit(focused_item)
 		var count := clampi(int(quantity.text) + step, 1, maxi(1, limit))
 		quantity.text = str(count)
-		var cost: int = profile.supply_price(focused_item) * count
-		total.text = "%d bolts" % cost
+		var cost: int = profile.supply_order_price(focused_item, count)
+		var contents: int = int(Profile.stock[focused_item].get("quantity", 1)) * count
+		total.text = "%d bolts  ·  %d items" % [cost, contents]
 		buy.text = "BUY  /  %d BOLTS" % cost
 		buy.disabled = limit == 0 or profile.credits < cost
 		buy.tooltip_text = "Inventory stack is full." if limit == 0 else ("Not enough Bolts." if buy.disabled else "")
@@ -1671,8 +1672,14 @@ func build_shop(columns: HBoxContainer) -> void:
 		message.text = (buy.tooltip_text if buy.disabled else hint) if inventory_status.is_empty() else inventory_status
 	var minus := UI.button(quantity_row, "−", adjust.bind(-1), false, 35)
 	var plus := UI.button(quantity_row, "+", adjust.bind(1), false, 35)
+	var max_button := UI.button(quantity_row, "Max", func():
+		var count: int = profile.supply_purchase_limit(focused_item)
+		while count > 1 and profile.supply_order_price(focused_item, count) > profile.credits:
+			count -= 1
+		adjust.call(count - int(quantity.text))
+	, false, 35)
 	quantity_row.move_child(minus, 0)
-	for button in [minus, plus]:
+	for button in [minus, plus, max_button]:
 		button.custom_minimum_size.x = 46
 		button.add_theme_font_size_override("font_size", 23)
 		button.focus_neighbor_bottom = button.get_path_to(buy)
@@ -1696,7 +1703,7 @@ func build_shop(columns: HBoxContainer) -> void:
 		price_value.text = "%d bolts" % profile.supply_price(id)
 		owned.text = str(profile.supply_owned(id))
 		quantity.text = "1"
-		for control in [minus, plus, buy]:
+		for control in [minus, plus, max_button, buy]:
 			control.focus_neighbor_left = control.get_path_to(rows[id])
 		adjust.call(0)
 

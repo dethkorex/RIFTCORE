@@ -1,5 +1,7 @@
 extends RefCounted
 
+const Difficulty := preload("res://scripts/mission_difficulty.gd")
+
 const COMMON := {"scrap": "Industrial Scrap", "components": "Mechanical Components",
 	"circuits": "Advanced Circuits", "cells": "Energy Cells", "core": "Boss Core", "legendary": "Fracture Crystal"}
 const SECTOR_MATERIALS := [
@@ -28,14 +30,32 @@ static func component_sources(sector: int) -> Array:
 static func pool(sector: int) -> Array:
 	return ["scrap", "core", "legendary", sector_key(sector)] + component_sources(sector)
 
-static func roll(sector: int, source: String, rng: RandomNumberGenerator, loot_scale := 1.0) -> Dictionary:
-	var result := {"scrap": rng.randi_range(1, 3)}
+static func roll(sector: int, budget: int, mode: int, level: int, rng: RandomNumberGenerator, boss := false) -> Dictionary:
+	var difficulty := Difficulty.index(mode)
+	var level_bonus := clampi(level - 1, 0, Difficulty.PLAYER_LEVEL_CAP - 1) * .003
+	var bonus: float = level_bonus + [0.0, .12, .25][difficulty]
+	var sector_part := sector_key(sector)
 	var components := component_sources(sector)
-	result[components[0 if rng.randf() < 0.67 else 1]] = 1 if source == "enemy" else 2
-	if source != "enemy" or rng.randf() < 0.16 * loot_scale:
-		result[sector_key(sector)] = 1
-	if source == "boss":
+	var keys := ["scrap", components[0], components[1], sector_part]
+	var drops: Array[String] = []
+	for key: String in keys:
+		var chance: float = {"scrap": .87, "components": .73, "cells": .61, "circuits": .54}.get(key, .48)
+		if rng.randf() < minf(.97, chance + bonus + (.10 if boss else 0.0)):
+			drops.append(key)
+	if drops.is_empty():
+		drops.append(keys[rng.randi_range(0, keys.size() - 1)])
+	if boss and sector_part not in drops:
+		drops.append(sector_part)
+	var result := {}
+	while result.size() < budget and not drops.is_empty():
+		var key: String = drops.pop_at(rng.randi_range(0, drops.size() - 1))
+		result[key] = 1
+	# Larger caches can add an extra unit to a part they already rolled.
+	if budget > keys.size() and result.size() > 1 and rng.randf() < .40 + bonus:
+		var picked: Array = result.keys()
+		result[picked[rng.randi_range(0, picked.size() - 1)]] += 1
+	if boss:
 		result["core"] = 1
-	if source in ["boss", "elite"] and rng.randf() < (0.22 if source == "boss" else 0.06) * loot_scale:
-		result["legendary"] = 1
+		if rng.randf() < [0.22, 0.36, 0.55][difficulty] + level_bonus:
+			result["legendary"] = 1
 	return result

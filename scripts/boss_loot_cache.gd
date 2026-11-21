@@ -53,10 +53,7 @@ func finish_open() -> void:
 	queue_free()
 
 static func roll_loot(sector: int, mode: int, level: int) -> Dictionary:
-	var loot_scale: float = Difficulty.LOOT[mode]
-	var bonus := Materials.roll(sector, "boss", rng, loot_scale)
-	for item in ["scrap", Materials.sector_key(sector)]:
-		bonus[item] = int(bonus.get(item, 0)) + 2
+	var bonus := Materials.roll(sector, 6, mode, level, rng, true)
 	return {"materials": bonus, "blueprint": Blueprints.roll_cache(sector, mode, level, true, rng),
 		"supply": Orbs.supply_roll(rng, 1.0, mode != Difficulty.NORMAL), "life": rng.randf() < Orbs.EXTRA_LIFE_CHANCE}
 

@@ -49,22 +49,22 @@ const CHALLENGE_SETS := [
 
 const UPGRADES := [
 	{"id": "armor", "branch": "Survivability", "tier": 0, "name": "Ceramic Armor", "icon": "aegis",
-		"prices": [15, 28, 54], "levels": [1, 9, 16], "effects": ["+12 starting HP", "+28 starting HP and 10% damage resistance", "+46 starting HP and 14% damage resistance"]},
+		"prices": [15, 28, 54], "levels": [1, 9, 16], "values": [12, 35, 58], "effects": ["+12% maximum HP", "+35% maximum HP and 10% damage resistance", "+58% maximum HP and 14% damage resistance"]},
 	{"id": "field_reboot", "branch": "Survivability", "tier": 1, "name": "Field Reboot", "icon": "quick_heal",
 		"prices": [85, 145, 220], "levels": [8, 14, 22],
 		"effects": ["Revive allies 20% faster: hold Field Interact for 3.2 seconds.", "Revive allies 35% faster: hold Field Interact for 2.6 seconds.", "Revive allies 50% faster: hold Field Interact for 2 seconds."]},
 	{"id": "last_stand", "branch": "Survivability", "tier": 1, "name": "Last Stand", "icon": "impact_liner",
-		"prices": [65, 110, 175], "levels": [5, 12, 20], "values": [12, 20, 30], "effect": "Take %d%% less damage when below 30%% HP."},
+		"prices": [65, 110, 175], "levels": [5, 12, 20], "values": [15, 25, 35], "effect": "Take %d%% less damage when below 30%% HP."},
 	{"id": "shock_dampers", "branch": "Survivability", "tier": 2, "name": "Shock Dampers", "icon": "armor_plate",
-		"prices": [85, 135, 200], "levels": [10, 17, 25], "values": [20, 35, 50], "effect": "Direct hits knock you back %d%% less."},
+		"prices": [85, 135, 200], "levels": [10, 17, 25], "values": [25, 40, 60], "effect": "Direct hits knock you back %d%% less."},
 	{"id": "phase_lining", "branch": "Survivability", "tier": 2, "name": "Phase Lining", "icon": "visor",
-		"prices": [88, 140, 215], "levels": [10, 17, 25], "values": [0.15, 0.28, 0.42], "effect": "Gain %.2f extra seconds of invulnerability after taking a hit."},
+		"prices": [88, 140, 215], "levels": [10, 17, 25], "values": [0.20, 0.35, 0.50], "effect": "Gain %.2f extra seconds of invulnerability after taking a hit."},
 	{"id": "capacitor", "branch": "Survivability", "tier": 2, "name": "Flux Capacitor", "icon": "charge_relay",
-		"prices": [85, 135, 205], "levels": [10, 17, 25], "effects": ["+15 starting energy", "+32 starting energy and 20% cheaper boss-weapon charge shots", "+50 starting energy and 30% cheaper boss-weapon charge shots"]},
+		"prices": [85, 135, 205], "levels": [10, 17, 25], "values": [20, 43, 67], "effects": ["+20% maximum energy", "+43% maximum energy and 20% cheaper boss-weapon charge shots", "+67% maximum energy and 30% cheaper boss-weapon charge shots"]},
 	{"id": "recovery_circuit", "branch": "Survivability", "tier": 3, "name": "Recovery Circuit", "icon": "quick_hybrid",
-		"prices": [120, 200, 300], "levels": [15, 23, 32], "values": [15, 30, 50], "effect": "Health and energy items restore %d%% more."},
+		"prices": [120, 200, 300], "levels": [15, 23, 32], "values": [20, 40, 65], "effect": "Health and energy items restore %d%% more."},
 	{"id": "impact_converter", "branch": "Survivability", "tier": 3, "name": "Impact Converter", "icon": "quick_energy",
-		"prices": [130, 215, 325], "levels": [15, 23, 32], "values": [4, 7, 10], "effect": "Restore %d energy when you survive a damaging hit."},
+		"prices": [130, 215, 325], "levels": [15, 23, 32], "values": [6, 9, 13], "effect": "Restore %d%% of maximum energy when you survive a damaging hit."},
 	{"id": "ghost_drive", "branch": "Survivability", "tier": 3, "name": "Ghost Drive", "icon": "air_jets",
 		"prices": [125, 205, 310], "levels": [15, 23, 32], "values": [0.08, 0.12, 0.16], "effect": "Avoid damage for the first %.2f seconds of a dash."},
 	{"id": "phoenix_protocol", "branch": "Survivability", "tier": 4, "name": "Phoenix Protocol", "icon": "quick_defense",
@@ -76,7 +76,7 @@ const UPGRADES := [
 	{"id": "accelerator", "branch": "Damage", "tier": 1, "name": "Rail Accelerator", "icon": "quick_speed",
 		"prices": [63, 108, 170], "levels": [5, 12, 20], "values": [15, 30, 50], "effect": "Standard Buster shots travel %d%% faster."},
 	{"id": "snap_charge", "branch": "Damage", "tier": 2, "name": "Snap Charge", "icon": "pulse_lens",
-		"prices": [92, 150, 220], "levels": [10, 17, 25], "values": [10, 20, 32], "effect": "Buster and saber need %d%% less time to fully charge."},
+		"prices": [92, 150, 220], "levels": [10, 17, 25], "values": [12, 24, 35], "effect": "Buster and saber need %d%% less time to fully charge."},
 	{"id": "magma_catalyst", "branch": "Damage", "tier": 2, "name": "Magma Catalyst", "icon": "talent_flame",
 		"prices": [88, 145, 215], "levels": [10, 17, 25], "values": [20, 40, 65], "effect": "Magma attacks deal %d%% more burn damage."},
 	{"id": "trigger_relay", "branch": "Damage", "tier": 2, "name": "Trigger Relay", "icon": "charge_regulator",
@@ -90,17 +90,17 @@ const UPGRADES := [
 	{"id": "echo_arsenal", "branch": "Damage", "tier": 4, "name": "Echo Arsenal", "icon": "talent_echo",
 		"prices": [250, 420, 690], "levels": [28, 40, 50], "values": [45, 70, 100], "effect": "Charged Buster and saber attacks fire a second volley at %d%% power. The echo costs no energy."},
 	{"id": "salvage_appraisal", "branch": "Scavenger", "tier": 0, "name": "Salvage Appraisal", "icon": "salvage_chip",
-		"prices": [24, 47, 80], "levels": [1, 9, 16], "values": [12, 25, 45], "effect": "Find %d%% more bolts in currency pickups."},
+		"prices": [24, 47, 80], "levels": [1, 9, 16], "values": [18, 33, 55], "effect": "Find %d%% more bolts in currency pickups."},
 	{"id": "storage", "branch": "Scavenger", "tier": 1, "name": "Storage Expansion", "icon": "recovery_bearing",
 		"prices": [20, 36, 68], "levels": [5, 13, 21], "effects": ["+7 gear storage positions", "+14 gear storage positions", "+21 gear storage positions"]},
 	{"id": "fabrication", "branch": "Scavenger", "tier": 1, "name": "Fabrication Efficiency", "icon": "repair_actuator",
 		"prices": [20, 36, 68], "levels": [5, 13, 21], "effects": ["20% scrap discount when crafting", "40% scrap discount when crafting", "60% scrap discount when crafting"]},
 	{"id": "vendor_license", "branch": "Scavenger", "tier": 2, "name": "Vendor License", "icon": "salvage_optic",
-		"prices": [82, 136, 210], "levels": [10, 17, 25], "values": [8, 16, 25], "effect": "Save %d%% on supplies and materials at the Station Shop."},
+		"prices": [82, 136, 210], "levels": [10, 17, 25], "values": [10, 20, 30], "effect": "Save %d%% on supplies and materials at the Station Shop."},
 	{"id": "recipe_decoder", "branch": "Scavenger", "tier": 2, "name": "Recipe Decoder", "icon": "core",
 		"prices": [88, 145, 220], "levels": [10, 17, 25], "values": [2, 4, 6], "effect": "Craft learned blueprints up to %d Player Levels early."},
 	{"id": "combat_telemetry", "branch": "Scavenger", "tier": 2, "name": "Combat Telemetry", "icon": "recon_optic",
-		"prices": [75, 120, 180], "levels": [10, 17, 25], "values": [6, 12, 20], "effect": "+%d%% Operator XP from defeating enemies and bosses."},
+		"prices": [75, 120, 180], "levels": [10, 17, 25], "values": [10, 20, 32], "effect": "+%d%% Operator XP from defeating enemies and bosses."},
 	{"id": "recovery_crew", "branch": "Scavenger", "tier": 3, "name": "Recovery Crew", "icon": "arm",
 		"prices": [100, 180, 270], "levels": [15, 23, 32], "values": [2, 4, 7], "effect": "Extract with %d extra sector materials."},
 	{"id": "shard_reclaimer", "branch": "Scavenger", "tier": 3, "name": "Shard Reclaimer", "icon": "talent_shard",
@@ -980,6 +980,10 @@ func supply_purchase_limit(id: String) -> int:
 func supply_price(id: String) -> int:
 	return maxi(1, ceili(stock[id].price * (1.0 - talent_bonus("vendor_license") / 100.0)))
 
+func supply_order_price(id: String, bundles: int) -> int:
+	var bulk_rate := 85 if bundles >= 10 else (90 if bundles >= 5 else 100)
+	return ceili(supply_price(id) * bundles * bulk_rate / 100.0)
+
 static func sold_at_shop(id: String) -> bool:
 	return stock.has(id) and stock[id].get("material", "") not in ["core", "legendary"]
 
@@ -1007,7 +1011,7 @@ func buy_supply(id: String, bundles := 1) -> String:
 		return "Unlocks at Operator Lv. %d." % item.shop_level
 	if bundles > supply_purchase_limit(id):
 		return "Stack full."
-	var cost := supply_price(id) * bundles
+	var cost := supply_order_price(id, bundles)
 	if credits < cost:
 		return "Not enough bolts."
 	var quantity: int = int(item.get("quantity", 1)) * bundles

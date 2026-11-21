@@ -37,7 +37,7 @@ func burst(operator: RiftPlayer) -> void:
 	finish_open()
 
 func roll_loot(level: int) -> Dictionary:
-	var salvage := {"scrap": materials, Materials.sector_key(sector): materials}
+	var salvage := Materials.roll(sector, materials, difficulty, level, rng)
 	if not fixed_blueprint.is_empty() or not fixed_supply.is_empty():
 		return {"materials": salvage, "blueprint": fixed_blueprint, "supply": fixed_supply, "life": rng.randf() < Orbs.EXTRA_LIFE_CHANCE}
 	var blueprint := Blueprints.roll_cache(sector, difficulty, level, false, rng)
