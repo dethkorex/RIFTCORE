@@ -3,7 +3,7 @@ extends CanvasLayer
 const UI := preload("res://scripts/rift_ui.gd")
 const Score := preload("res://scripts/gamer_score.gd")
 const TROPHY := preload("res://assets/ui/riftcore_kit/icon_leaderboard.png")
-const HEAD_CLEARANCE := 33.0
+const HEAD_CLEARANCE := 88.0
 
 var card: PanelContainer
 var transition: Tween

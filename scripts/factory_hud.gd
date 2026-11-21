@@ -18,6 +18,7 @@ const SUIT_TOP := 200.0
 const SUIT_BOTTOM := 241.0
 const PARTY_TOP := 253.0
 const PORTRAIT_FRAME := Rect2(32, 34, 80, 143)
+const PICKUP_HEAD_CLEARANCE := 56.0
 const HEART := preload("res://assets/ui/riftcore_kit/icon_heart.png")
 const SHIELD := preload("res://assets/ui/riftcore_kit/icon_shield.png")
 const HUD_SCALE := 0.75
@@ -185,7 +186,7 @@ func place_portrait() -> void:
 func pickup_stack_height() -> float:
 	if not is_instance_valid(loot_popups) or not loot_popups.is_visible_in_tree():
 		return 0.0
-	return loot_popups.size.y + 5.0
+	return PICKUP_HEAD_CLEARANCE + loot_popups.size.y + 8.0
 
 func sync_pickup_stack() -> void:
 	var active := loot_popups.get_child_count() > 0
@@ -194,7 +195,7 @@ func sync_pickup_stack() -> void:
 
 func _process(_delta: float) -> void:
 	loot_popups.size = loot_popups.get_combined_minimum_size()
-	loot_popups.position = UI.operator_popup_position(loot_popups, local_operator, 0.0)
+	loot_popups.position = UI.operator_popup_position(loot_popups, local_operator, PICKUP_HEAD_CLEARANCE)
 
 func place_party() -> void:
 	var factor := HUD_SCALE * RiftSettings.hud_scale
