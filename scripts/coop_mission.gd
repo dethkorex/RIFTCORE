@@ -1305,6 +1305,7 @@ func build_hud() -> void:
 	personal_hud.coop_objective = panel
 	panel.item_rect_changed.connect(personal_hud.update_right_column)
 	var content := UI.column(panel, 4)
+	personal_hud.install_telemetry(content)
 	stage_title = UI.label(content, "", 21, UI.CYAN)
 	objective = UI.label(content, "", 17, UI.WHITE)
 	update_hud_title()
