@@ -22,12 +22,15 @@ static func label(id: String) -> String:
 			return SECTOR_MATERIALS[number - 1]
 	return COMMON.get(id, id.capitalize())
 
+static func component_sources(sector: int) -> Array:
+	return COMPONENT_POOLS[clampi(sector, 1, COMPONENT_POOLS.size()) - 1]
+
 static func pool(sector: int) -> Array:
-	return ["scrap", "core", "legendary", sector_key(sector)] + COMPONENT_POOLS[clampi(sector, 1, COMPONENT_POOLS.size()) - 1]
+	return ["scrap", "core", "legendary", sector_key(sector)] + component_sources(sector)
 
 static func roll(sector: int, source: String, rng: RandomNumberGenerator, loot_scale := 1.0) -> Dictionary:
 	var result := {"scrap": rng.randi_range(1, 3)}
-	var components: Array = COMPONENT_POOLS[clampi(sector, 1, COMPONENT_POOLS.size()) - 1]
+	var components := component_sources(sector)
 	result[components[0 if rng.randf() < 0.67 else 1]] = 1 if source == "enemy" else 2
 	if source != "enemy" or rng.randf() < 0.16 * loot_scale:
 		result[sector_key(sector)] = 1

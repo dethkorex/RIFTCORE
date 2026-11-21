@@ -32,7 +32,7 @@ func run() -> void:
 	check(restored.load_slot() and restored.profile.challenge_cycle(1).done == [0],
 		"Ready-to-claim progress survives a reload before extraction")
 	var before: Dictionary = profile.challenge_rewards(1, profile.challenge_cycle(1))
-	check(before.shards == 1.5, "A base challenge earns exactly fifty percent more Core Shards")
+	check(before.shards == 3, "The first standard goal earns three Core Shards")
 	check(profile.claim_challenge_rewards(1, func(): return ERR_CANT_CREATE) == ERR_CANT_CREATE and
 		profile.credits == 200 and profile.challenge_rewards(1, profile.challenge_cycle(1)) == before,
 		"A failed write rolls back both the claim and currency")
@@ -77,11 +77,14 @@ func run() -> void:
 	run.mode = Difficulty.HARD
 	var payout: int = profile.record_challenges(3, run)
 	var set_reward: Dictionary = profile.challenge_rewards(3, profile.challenge_cycle(3))
-	check(payout == 2 and set_reward.lives == 1 and set_reward.shards == 15.0,
-		"Five boosted rewards and the fifty-percent set bonus pay out once")
+	check(payout == 2 and set_reward.lives == 1 and set_reward.shards == 38.5,
+		"Standard and harder goals pay the new amounts and the set bonus pays once")
 	check(Difficulty.extraction_shards(1, Difficulty.NORMAL) == 2.5 and Difficulty.extraction_shards(10, Difficulty.NIGHTMARE) == 7.5,
 		"Base shard rewards scale by sector and difficulty")
 
+	check([profile.challenge_shards(1, 0), profile.challenge_shards(1, 1), profile.challenge_shards(1, 2)] == [3, 4, 5]
+		and [profile.challenge_shards(1, 3), profile.challenge_shards(1, 4), profile.challenge_shards(10, 4)] == [10, 12, 15],
+		"Standard goals pay 3 to 5 shards and harder goals pay 10 to 15")
 	var catalog := Stock.catalog()
 	check(catalog.patch_kit.hp == 30 and catalog.patch_kit.price == 90 and
 		catalog.spark_cell.energy == 25 and catalog.field_pack.hp >= 20 and catalog.guard_film.duration == 24,

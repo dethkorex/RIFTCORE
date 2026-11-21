@@ -118,6 +118,15 @@ func run() -> void:
 	root.push_input(inventory_key)
 	await frames(2)
 	check(menu.page == "Inventory" and hub.panel_open, "Tab opens the carried Inventory directly from the hub")
+	check(not is_instance_valid(control(menu, "Storage")) and menu.station_tabs().is_empty(),
+		"The shortcut Inventory has no Operator station tabs")
+	for button in menu.find_children("*", "Button", true, false):
+		if button.get_meta(&"return_focus", "") == "inventory/patch_kit":
+			button.pressed.emit()
+			break
+	check(not is_instance_valid(control(menu, "Stow Stack")) and is_instance_valid(control(menu, "Assign Quick Slot")),
+		"Shortcut Inventory keeps quick-slot actions and excludes storage actions")
+	menu.leave_page()
 	menu.leave_page()
 	var inventory_pad := InputEventJoypadButton.new()
 	inventory_pad.button_index = JOY_BUTTON_BACK

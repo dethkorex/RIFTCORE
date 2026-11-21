@@ -53,6 +53,21 @@ func run() -> void:
 	session.profile.memories.append(2)
 	check(session.profile.player_level() == 50, "Permanent rank stops at level 50")
 	var id := "bp_01_00"
+	check(session.profile.recipe_materials(id) == {"scrap": 3, "components": 1},
+		"An early Forge plan crafts with common salvage from its own sector")
+	check(session.profile.recipe_materials("bp_01_03") == {"scrap": 3, "cells": 1},
+		"An early energy plan uses cells available in Ember Foundry")
+	check(session.profile.recipe_materials("bp_01_04") == {"scrap": 6, "components": 2, "sector_1": 1},
+		"Rare Forge plans use a single local material without advanced boss ingredients")
+	check(session.profile.recipe_materials("survey_optics") == {"scrap": 3, "components": 1},
+		"Older starter plans stay craftable without advanced circuits")
+	var legendary: Dictionary = session.profile.recipe_materials("bp_10_15")
+	check(legendary.get("sector_10") == 3 and legendary.get("core") == 2 and legendary.get("legendary") == 1,
+		"Legendary plans still require their local material, boss cores and a fracture crystal")
+	check(is_equal_approx(session.profile.GEAR[id].stats.resist, 0.08)
+		and session.profile.GEAR["bp_01_01"].stats.hp == 14
+		and is_equal_approx(session.profile.GEAR["bp_01_02"].stats.attack, 1.10),
+		"Early Forge blueprints give meaningful armor, HP and damage bonuses")
 	session.profile.materials.merge(session.profile.recipe_materials(id), true)
 	check(session.profile.craft(id) == "Blueprint undiscovered.", "Undiscovered recipes cannot be crafted")
 	session.profile.blueprints[id] = true

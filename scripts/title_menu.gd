@@ -389,7 +389,7 @@ func restore_navigation(destination: String, container: Control) -> void:
 			return
 
 func station_tabs() -> Dictionary:
-	if not station_panel:
+	if not station_panel or inventory_shortcut:
 		return {}
 	if page in ["Shop", "Fabrication", "Upgrades"]:
 		return {"Shop": "Marketplace", "Fabrication": "Crafting", "Upgrades": "Core Ascension"}
@@ -444,7 +444,10 @@ func build_station_header(header: HBoxContainer) -> void:
 	funds.add_child(VSeparator.new())
 	UI.currency_row(funds, "%s CORE SHARDS" % UI.shard_amount(profile.core_shards, 4), true)
 
-func open_station(next: String, tour_preview := false) -> void:
+var inventory_shortcut := false
+
+func open_station(next: String, tour_preview := false, inventory_only := false) -> void:
+	inventory_shortcut = inventory_only
 	station_panel = true
 	station_tour_preview = tour_preview
 	deploy_error = ""
@@ -2437,12 +2440,12 @@ func open_storage_item(parent: VBoxContainer, origin: Button, id: String, item: 
 		first = UI.button(row, "Drop for Party" if amount == 1 else "Drop 1", func(): hub_drop_requested.emit(id, 1), true, 33)
 		if amount > 1:
 			UI.button(row, "Drop Stack (%d)" % amount, func(): hub_drop_requested.emit(id, amount), false, 33)
-	if carried:
+	if carried and not inventory_shortcut:
 		var stow: Callable = profile.stow_pouch_blueprint.bind(id.trim_prefix("blueprint/")) if item.kind == "Blueprints" else profile.stow_purchase.bind(id)
 		var button := UI.button(row, "Stow Stack", reopen.bind(stow), first == null, 33)
 		if not first:
 			first = button
-	elif item.kind != "Equipment":
+	elif not carried and item.kind != "Equipment":
 		first = UI.button(row, "Move to Inventory", reopen.bind(profile.withdraw_inventory.bind(id)), true, 33)
 	if item.kind == "Blueprints" and not carried:
 		UI.button(row, "Learn Blueprint", func():

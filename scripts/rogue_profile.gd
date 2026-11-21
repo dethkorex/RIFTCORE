@@ -116,7 +116,7 @@ const FORMER_ROOTS := ["capacitor", "dash", "trigger_relay", "combat_telemetry"]
 const LEGACY_TALENT_LEVELS := [1, 5, 10, 15]
 const TALENT_RANKS := ["I", "II", "III"]
 const TALENT_PRICE_PERCENT := 85
-const CHALLENGE_SHARD_MULTIPLIER := 1.5
+const CHALLENGE_SET_SHARD_MULTIPLIER := 1.5
 const FIELD_REBOOT := "field_reboot"
 const HUNT_CLEARS := 3
 
@@ -459,12 +459,28 @@ func crafting_level(id: String) -> int:
 	return maxi(1, recipe_level(id) - int(talent_bonus("recipe_decoder")))
 
 func recipe_materials(id: String) -> Dictionary:
-	var index := id.get_slice("_", 2).to_int() if GEAR[id].has("sector") else LEGACY_GEAR.keys().find(id)
-	var rarity := int(GEAR[id].rarity)
-	var bill := {"scrap": ceili((4 + rarity * 4) * (1.0 - rank("fabrication") * 0.2)),
-		["components", "circuits", "cells"][index % 3]: 2 + rarity * 2}
+	var item: Dictionary = GEAR[id]
+	var rarity: int = item.rarity
+	var sector := int(item.get("sector", 0))
+	var stats: Dictionary = item.stats
+	var preferred := "components"
+	if stats.has("energy") or stats.has("charge") or stats.has("healing"):
+		preferred = "cells"
+	elif item.slot == "visor":
+		preferred = "circuits"
+	var parts := Materials.component_sources(sector)
+	if sector == 0 and rarity >= 2:
+		parts = ["components", "cells", "circuits"]
+	var component: String = preferred if preferred in parts else parts[0]
+	var scrap: float = [3, 6, 10, 14][rarity] * (1.0 - rank("fabrication") * 0.2)
+	var bill := {"scrap": ceili(scrap), component: [1, 2, 4, 6][rarity]}
 	if rarity > 0:
-		bill[Materials.sector_key(int(GEAR[id].get("sector", index % 10 + 1)))] = rarity
+		if sector > 0:
+			bill[Materials.sector_key(sector)] = rarity
+		else:
+			# Older blueprints have no home sector.
+			var secondary := "circuits" if rarity >= 2 and component != "circuits" else ("cells" if component != "cells" else "components")
+			bill[secondary] = rarity
 	if rarity >= 2:
 		bill["core"] = rarity - 1
 	if rarity == 3:
@@ -615,12 +631,15 @@ static func challenge_seconds_left(clock := Time.get_datetime_dict_from_system()
 static func challenge_life(index: int) -> int:
 	return int(index == 4)
 
-static func challenge_shards(_sector: int, tier: int) -> float:
-	return (1 if tier < 3 else 2) * CHALLENGE_SHARD_MULTIPLIER
+static func challenge_shards(sector: int, tier: int) -> int:
+	if tier < 3:
+		return 3 + clampi(tier, 0, 2)
+	var sector_bonus := (clampi(sector, 1, Catalog.SECTORS.size()) - 1) / 3
+	return mini(15, 10 + sector_bonus + 2 * (tier - 3))
 
 static func challenge_set_shards(sector: int) -> float:
 	var base := 3 + (sector - 1) / 3
-	return base * CHALLENGE_SHARD_MULTIPLIER
+	return base * CHALLENGE_SET_SHARD_MULTIPLIER
 
 static func rotated_challenge_credits(sector: int, index: int) -> int:
 	return 120 + index * 35 + (sector - 1) * 18

@@ -1525,11 +1525,8 @@ func open_home_hub() -> void:
 	home_hub.persist_hub_inventory = persist_hub_inventory
 	add_child(home_hub)
 	home_hub.set_bank(profile.credits, profile.core_shards, profile.player_level())
-	home_hub.station_requested.connect(func(page: String):
-		home_hub.set_panel_open(true)
-		menu.process_mode = Node.PROCESS_MODE_INHERIT
-		menu.open_station(page)
-	)
+	home_hub.station_requested.connect(open_station_panel)
+	home_hub.inventory_requested.connect(open_station_panel.bind("Inventory", true))
 	home_hub.title_requested.connect(func():
 		if not RiftRelay.connected_room.is_empty() or not RiftRelay.pending.is_empty():
 			RiftRelay.leave()
@@ -1570,6 +1567,11 @@ func persist_hub_inventory() -> Error:
 	if save_session and save_session.owns_slot:
 		return persist_operator_save()
 	return profile.save()
+
+func open_station_panel(page: String, inventory_only := false) -> void:
+	home_hub.set_panel_open(true)
+	menu.process_mode = Node.PROCESS_MODE_INHERIT
+	menu.open_station(page, false, inventory_only)
 
 func close_station_panel() -> void:
 	if is_instance_valid(home_hub):

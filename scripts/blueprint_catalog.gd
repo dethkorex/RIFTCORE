@@ -2,24 +2,24 @@ extends RefCounted
 
 const SECTOR_NAMES := ["Forge", "Canopy", "Cryo", "Abyss", "Cipher", "Jetstream", "Splice", "Orbital", "Scrap", "Nexus"]
 const PARTS := [
-	["Reactive Liner", "frame", "resist", 0, 0.040, 0.003],
-	["Reinforced Plating", "frame", "hp", 0, 7, 1],
-	["Pulse Calibrator", "core", "attack", 0, 1.04, 0.005],
-	["Reserve Capacitor", "core", "energy", 0, 7, 1],
-	["Traversal Jets", "utility", "dash", 1, 1.06, 0.006],
-	["Recovery Bearings", "utility", "cooldown", 1, 0.94, -0.007],
-	["Recon Optics", "visor", "xp", 1, 1.12, 0.012],
-	["Repair Actuator", "arm", "healing", 2, 1.18, 0.013],
-	["Charge Regulator", "core", "charge", 2, 0.92, -0.011],
-	["Aegis Chassis", "frame", "resist", 3, 0.12, 0.008],
-	["Overdrive Arm", "arm", "attack", 3, 1.14, 0.014],
-	["Salvage Optics", "visor", "bolts", 2, 1.22, 0.022],
-	["Commander Plating", "frame", "resist", 2, 0.105, 0.006],
-	["Overseer Core", "core", "attack", 3, 1.18, 0.014],
-	["Boss Relay", "utility", "dash", 1, 1.13, 0.008],
-	["Riftbreaker Core", "core", "attack", 3, 1.58, 0.016],
-	["Singularity Shell", "frame", "resist", 3, 0.27, 0.010],
-	["Phase Runner", "utility", "dash", 3, 1.39, 0.016],
+	["Reactive Liner", "frame", "resist", 0, 0.080, 0.003],
+	["Reinforced Plating", "frame", "hp", 0, 14, 1],
+	["Pulse Calibrator", "core", "attack", 0, 1.10, 0.005],
+	["Reserve Capacitor", "core", "energy", 0, 14, 1],
+	["Traversal Jets", "utility", "dash", 1, 1.11, 0.006],
+	["Recovery Bearings", "utility", "cooldown", 1, 0.86, -0.007],
+	["Recon Optics", "visor", "xp", 1, 1.18, 0.012],
+	["Repair Actuator", "arm", "healing", 2, 1.30, 0.013],
+	["Charge Regulator", "core", "charge", 2, 0.87, -0.011],
+	["Aegis Chassis", "frame", "resist", 3, 0.15, 0.008],
+	["Overdrive Arm", "arm", "attack", 3, 1.19, 0.014],
+	["Salvage Optics", "visor", "bolts", 2, 1.32, 0.022],
+	["Commander Plating", "frame", "resist", 2, 0.135, 0.006],
+	["Overseer Core", "core", "attack", 3, 1.22, 0.014],
+	["Boss Relay", "utility", "dash", 1, 1.16, 0.008],
+	["Riftbreaker Core", "core", "attack", 3, 1.61, 0.016],
+	["Singularity Shell", "frame", "resist", 3, 0.29, 0.010],
+	["Phase Runner", "utility", "dash", 3, 1.43, 0.016],
 ]
 const FIRST_BOSS_PART := 12
 const FIRST_NIGHTMARE_PART := 15
@@ -28,7 +28,7 @@ const EFFECTS := {
 	"attack": "+%.0f%% Buster and saber damage", "energy": "+%.0f maximum energy",
 	"dash": "+%.0f%% dash speed", "cooldown": "%.0f%% shorter dash cooldown",
 	"xp": "+%.0f%% XP from kills", "healing": "+%.0f%% healing from pickups",
-	"charge": "%.0f%% cheaper charged shots", "bolts": "+%.0f%% bolts from pickups",
+	"charge": "%.0f%% lower boss-weapon energy cost", "bolts": "+%.0f%% bolts from pickups",
 }
 const Difficulty := preload("res://scripts/mission_difficulty.gd")
 const CACHE_RATE := 0.085

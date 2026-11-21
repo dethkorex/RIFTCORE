@@ -1,6 +1,7 @@
 extends Node3D
 
 signal station_requested(page: String)
+signal inventory_requested
 signal title_requested
 signal tour_arrived
 
@@ -523,7 +524,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	var inventory_pad: bool = event is InputEventJoypadButton and event.pressed and event.button_index == JOY_BUTTON_BACK
 	if inventory_key or inventory_pad:
 		get_viewport().set_input_as_handled()
-		station_requested.emit("Inventory")
+		inventory_requested.emit()
 		return
 	if not RiftRelay.connected_room.is_empty() and (event.is_action_pressed("pause") or event.is_action_pressed("ui_cancel")):
 		get_viewport().set_input_as_handled()
