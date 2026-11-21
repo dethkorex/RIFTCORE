@@ -94,7 +94,7 @@ func run() -> void:
 		and [profile.challenge_shards(1, 3), profile.challenge_shards(1, 4), profile.challenge_shards(10, 4)] == [10, 12, 15],
 		"Standard goals pay 3 to 5 shards and harder goals pay 10 to 15")
 	var catalog := Stock.catalog()
-	check(catalog.patch_kit.hp == 30 and catalog.patch_kit.price == 90 and
+	check(catalog.patch_kit.hp == 30 and catalog.patch_kit.price == 35 and
 		catalog.spark_cell.energy == 25 and catalog.field_pack.hp >= 20 and catalog.guard_film.duration == 24,
 		"Starter supplies give better recovery and longer buffs at lower prices")
 
