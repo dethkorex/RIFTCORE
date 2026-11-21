@@ -161,8 +161,8 @@ func materialize_operator(sequence := "") -> void:
 	update_station()
 	announce_shop_restock()
 
-func play_station_tour(menu: RiftTitleMenu) -> void:
-	if tour_active or not RiftSettings.show_hub_tips or RiftSettings.seen_story_beats.has(TOUR_BEAT):
+func play_station_tour(menu: RiftTitleMenu, replay := false) -> void:
+	if tour_active or not RiftSettings.show_hub_tips or (not replay and RiftSettings.seen_story_beats.has(TOUR_BEAT)):
 		return
 	tour_active = true
 	tour_skipped = false

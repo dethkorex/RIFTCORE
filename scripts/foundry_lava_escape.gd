@@ -7,13 +7,13 @@ const UI := preload("res://scripts/rift_ui.gd")
 const REST_LEVEL := -1.55
 const TOP_LEVEL := 79.95
 const SHAFT_LEFT := 3.46
-const SHAFT_RIGHT := 19.75
-const EXIT_CLEARANCE := 20.75
+const SHAFT_RIGHT := 25.55
+const EXIT_CLEARANCE := 26.55
 const ENTRY_CLEARANCE := 1.0
 const TUNNEL_CEILING := 3.16
-const RISE_SPEED := 2.14
-const RISE_ACCELERATION := 0.028
-const MAX_RISE_SPEED := 3.12
+const RISE_SPEED := 2.461
+const RISE_ACCELERATION := 0.0322
+const MAX_RISE_SPEED := 3.588
 const RISE_DELAY := 1.65
 const WARNING_SECONDS := 3.6
 const SURFACE_CONTACT := 0.10 # Includes the crest of the visible surface waves.
@@ -26,6 +26,7 @@ var phase := Phase.READY
 var surface := REST_LEVEL
 var elapsed := 0.0
 var door: Door
+var relays: Node
 var actors: Node
 var camera_rig: SideCameraRig
 var lava: MeshInstance3D
@@ -33,17 +34,14 @@ var lava_column: MeshInstance3D
 var lava_light: OmniLight3D
 var surface_fire: PyroluxFire3D
 var surface_fire_active := false
-var prompt: Label3D
 var warning: Label
-var party_size := 1
 
 func _ready() -> void:
 	door = Door.new($Entrance)
-	door.apply(Door.MAX_LIFT, true)
+	door.reset()
 	var stage := get_parent().get_parent()
 	actors = stage.get_node("Actors")
 	camera_rig = stage.get_node("CameraRig")
-	prompt = $Prompt
 	lava = make_lava(SHAFT_RIGHT)
 	lava_column = make_lava(SHAFT_RIGHT - SHAFT_LEFT)
 	lava_light = OmniLight3D.new()
@@ -94,11 +92,13 @@ func _physics_process(delta: float) -> void:
 	if not authority:
 		return
 	var party := actors.get_children().filter(func(actor): return actor is RiftPlayer and actor.health > 0.0)
-	party_size = party.size()
+	if not is_instance_valid(relays):
+		relays = get_parent().get_parent().get_node_or_null("GateRelays")
+	var unlocked: bool = is_instance_valid(relays) and relays.complete()
 	var inside := party.filter(is_inside)
 	match phase:
 		Phase.READY:
-			if not inside.is_empty() and party.all(past_entrance):
+			if unlocked and door.passable and not inside.is_empty() and party.all(past_entrance):
 				elapsed = 0.0
 				set_phase(Phase.SEALED)
 		Phase.SEALED:
@@ -124,7 +124,7 @@ func _physics_process(delta: float) -> void:
 	for operator: RiftPlayer in party:
 		if touches_lava(operator):
 			operator.die_in_pit()
-	door.step(delta, phase == Phase.READY or phase == Phase.DRAINING, party)
+	door.step(delta, unlocked and phase in [Phase.READY, Phase.DRAINING], party)
 	present()
 
 func touches_lava(operator: RiftPlayer) -> bool:
@@ -161,11 +161,6 @@ func present() -> void:
 	lava_column.material_override.set_shader_parameter("visible_depth", minf(surface - TUNNEL_CEILING, 14.0))
 	lava_light.visible = lava.visible
 	lava_light.position = Vector3(shaft_center, surface + 0.22, 0)
-	match phase:
-		Phase.READY: prompt.text = "ESCAPE SHAFT\nENTER TOGETHER" if not authority or party_size > 1 else "ESCAPE SHAFT"
-		Phase.SEALED: prompt.text = "DOOR SEALED\nCLIMB TO THE GANTRY"
-		Phase.RISING: prompt.text = "LAVA RISING\nKEEP CLIMBING"
-		Phase.DRAINING: prompt.text = "SHAFT DRAINING"
 	var viewer := camera_rig.target
 	surface_fire.position = Vector3(shaft_center, surface + 0.04, -0.55)
 	var show_fire := lava_column.visible and is_instance_valid(viewer) and absf(to_local(viewer.global_position).y - surface) < 12.0

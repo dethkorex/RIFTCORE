@@ -76,6 +76,15 @@ const BOSS_SIGILS := ["◆", "✿", "❄", "◈", "⌘", "≋", "⬢", "⊙", "�
 var gate_relay_count := -1
 var exit_task := "REACH THE FACTORY EXIT"
 
+func add_field_lessons(sector: int, mission_act: int, can_teach: Callable) -> void:
+	if sector != 1 or mission_act != 1:
+		return
+	var lessons := preload("res://scripts/foundry_field_lessons.gd").new()
+	lessons.hud = self
+	lessons.available = can_teach
+	lessons.name = "FoundryFieldLessons"
+	add_child(lessons)
+
 func show_quick_slots(profile) -> void:
 	var row := HBoxContainer.new()
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -420,11 +429,14 @@ func draw_operator() -> void:
 
 	plate(Rect2(EDGE, SUIT_TOP, 296, SUIT_BOTTOM - SUIT_TOP), 9, suit_tint)
 	draw_texture_rect(SHIELD, Rect2(32, SUIT_TOP + 7.0, 25, 25), false, suit_tint)
-	caption(Vector2(66, SUIT_TOP + 17.0), weapon, fit_font(weapon, 17, 234.0), suit_tint)
+	var mode := "SABER" if local_operator is RiftPlayer and local_operator.saber_equipped else "BUSTER"
+	var loadout := "%s  /  %s" % [weapon, mode]
+	caption(Vector2(66, SUIT_TOP + 17.0), loadout, fit_font(loadout, 17, 234.0), suit_tint)
 	var device := "pad" if not Input.get_connected_joypads().is_empty() else "key"
 	var previous := RiftSettings.binding_label("previous_suit", device)
 	var next := RiftSettings.binding_label("swap_weapon", device)
-	caption(Vector2(66, SUIT_TOP + 33.0), "%s  ‹  PREV     NEXT  ›  %s" % [previous, next], 13, UI.MUTED)
+	var controls := "%s  SWITCH     %s / %s  SUIT" % [RiftSettings.binding_label("melee", device), previous, next]
+	caption(Vector2(66, SUIT_TOP + 33.0), controls, fit_font(controls, 13, 234.0), UI.MUTED)
 
 func draw_objective(right: float) -> float:
 	var x := right - OBJECTIVE_WIDTH

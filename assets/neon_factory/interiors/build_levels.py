@@ -509,18 +509,18 @@ height = 0.44
             node("BoulderLamp"+str(x),"DECOR","OmniLight3D",(x,2.86,-1.43),light_color="Color(1, 0.19, 0.052, 1)",light_energy="1.65",omni_range="4.8")
         node("SlagBoulder","TERRAIN","AnimatableBody3D",(416.4,1.4,0),
              script=e("Boulder"),group=["foundry_boulder"],runway_length=10.6)
-        hazard("SlagFerryReliefVent",450.85,.6,1,1.35,purge="SlagFerryRelay")
+        hazard("CastingLineReliefVent",450.85,.6,1,1.35,purge="CastingBridgeCoupler")
         deck("SlagBridgeLanding",427.4,431.4,0)
         ramp("SlagBridgeRiser",431.4,435.2,0,.92)
         ramp("SlagBridgeReturn",435.2,441,.92,-.92)
         spikes("SmelterSpikes",418,427.4,-4.25)
         spikes("SlagGapSpikes",441,448.7,-4.15)
         deck("SlagVentIsland",448.7,454,.6)
-        relay("SlagFerryRelay","SlagFerry",436.65,4.62,432.10,3.62,2.60,True,
-              operation="SEND SLAG FERRY",dx=15.6,projectile_only=True,delay=.46)
+        relay("CastingBridgeCoupler","CastingServiceBridge",437.2,4.65,450.25,3.42,0,False,
+              operation="EXTEND CASTING BRIDGE",dx=-6.55,projectile_only=True,delay=.46)
         deck("SlagVaultWestboundLedge",441.8,444.25,8.32,drop=True)
         deck("SlagVaultTurn",429.1,435.87,9.25,drop=True)
-        chest("SlagFerryCache",431.7,9.25,3)
+        chest("CastingLoftCache",431.7,9.25,3)
         for i,(x,y,k) in enumerate([(37,-.94,2),(57,-1.35,1),(99.45,-.52,0),(135,6.15,2),(177,-8.5,1),(223,-2.6,2),(333,6.15,0),(391.0,-1.35,1),(401,-.6,2)]):
             hazard("FoundryFlare"+str(i+1),x,y,k,i*.42)
         for name,x,y,reward in [

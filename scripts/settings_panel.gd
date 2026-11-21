@@ -300,7 +300,7 @@ func build_controller_bindings() -> void:
 	groups.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	panel.add_child(groups)
 	var movement := build_action_column(groups, "Movement and interaction", ["move_left", "move_right", "jump", "crouch", "climb_up", "climb_down", "field_interact"])
-	var combat := build_action_column(groups, "Combat and communication", ["dash", "shoot", "suit_fire", "melee", "swap_weapon", "previous_suit", "pause", "push_to_talk"])
+	var combat := build_action_column(groups, "Combat and communication", ["dash", "shoot", "suit_fire", "melee", "guard", "swap_weapon", "previous_suit", "pause", "push_to_talk"])
 	var shortcuts := build_controller_buttons(groups)
 
 	var footer := HBoxContainer.new()

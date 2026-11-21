@@ -32,7 +32,6 @@ func _ready() -> void:
 		make_leaf_deck("RootPerch", Vector3(22.7, 3.85, 0.0), 3.0)
 		make_leaf_deck("CanopyLanding", Vector3(33.7, 5.7, 0.0), 5.0)
 		make_mist()
-	make_instructions()
 	set_physics_process(not practice)
 
 func hang_vine(at: Vector3, reach: float) -> void:
@@ -121,17 +120,6 @@ func make_mist() -> void:
 		density.shader = MIST
 		density.set_shader_parameter("drift", float(index) * 5.7)
 		RiftProjectile.part(cloud, layer, density, Vector3(18.0, -1.06 - index * 0.26, -1.35 + index * 0.59), Vector3.ONE)
-
-func make_instructions() -> void:
-	var prompt := Label3D.new()
-	prompt.font = preload("res://assets/ui/fonts/BarlowCondensed-ExtraBoldItalic.ttf")
-	prompt.font_size = 47
-	prompt.outline_size = 12
-	prompt.pixel_size = 0.0065
-	prompt.modulate = Color("e6ffac")
-	prompt.position = Vector3(-0.25, 2.18, -0.86)
-	prompt.text = "CANOPY LIFT\nHold Up to grab a vine · Jump to release" if practice else "CANOPY ESCAPE\nRise to the high vine · Use the low leaf to line up the last grab"
-	add_child(prompt)
 
 func launch_rider(operator: CharacterBody3D) -> void:
 	if practice:

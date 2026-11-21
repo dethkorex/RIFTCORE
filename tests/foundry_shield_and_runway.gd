@@ -89,7 +89,7 @@ func check_fracture(game) -> void:
 	for charged in [false, true]:
 		var rock := make_test_boulder(terrain, Vector3(30, 18, 0))
 		rock.set_physics_process(false)
-		var required := 4 if charged else 6
+		var required := 2 if charged else 3
 		for attempt in required:
 			var shot = load("res://scripts/projectile.gd").new()
 			shot.is_charged = charged

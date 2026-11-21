@@ -29,9 +29,13 @@ func run() -> void:
 		if body is StaticBody3D and not body.is_in_group(&"no_wall_kick"):
 			bands.append(body.name)
 	check(bands == [&"West02", &"West10", &"East07", &"East15"], "only the four grip bands support wall kicks")
-	for body in shaft.get_node("ReturnChute").get_children():
-		if body is StaticBody3D:
-			check(body.is_in_group(&"no_wall_kick"), str(body.name) + " prevents climbing the return chute")
+	for flags in [0, 1, 2, 3]:
+		game.gate_relays.set_active(flags)
+		for tick in 30:
+			shaft._physics_process(1.0 / 60.0)
+		await physics_frame
+		check(shaft.door.passable == (flags == 3) and shaft.door.blocker.disabled == (flags == 3),
+			"escape entrance enforces relay mask %d" % flags)
 	for sample in [["West02",-1], ["West01",-1], ["West05",-1], ["East07",1], ["East04",1], ["East12",1]]:
 		var surface: StaticBody3D = shaft.get_node("SideWalls/" + sample[0])
 		var side: float = sample[1]

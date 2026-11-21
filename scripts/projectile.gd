@@ -206,8 +206,12 @@ func _on_body_entered(body: Node) -> void:
 		return
 	if body.has_method("take_damage") and body.get("faction") != owner_faction:
 		struck[body.get_instance_id()] = true
-		if body is RiftPlayer and boss_status_sector > 0:
-			body.take_boss_hit(damage, global_position, boss_status_sector)
+		if body is RiftPlayer:
+			var incoming_from: Vector3 = body.global_position - direction.normalized()
+			if boss_status_sector > 0:
+				body.take_boss_hit(damage, incoming_from, boss_status_sector)
+			else:
+				body.take_projectile_damage(damage, incoming_from)
 		elif body.has_method("take_projectile_damage"):
 			body.take_projectile_damage(damage)
 		else:

@@ -77,7 +77,7 @@ func simulate(actor,delta: float) -> void:
 	if actor.shock_stun>0:
 		axis=0
 		vertical=0
-	if absf(axis)>.1: actor.facing=signf(axis)
+	if not actor.guarding and absf(axis)>.1: actor.facing=signf(axis)
 	if not actor.local_prediction:
 		if actor.melee_lock<=0:
 			if actor.action_pressed("swap_weapon"): actor.cycle_weapon()

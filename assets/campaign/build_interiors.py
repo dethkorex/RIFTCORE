@@ -55,7 +55,7 @@ JUNCTION_FIELDS = {
     "CORRUPTION": (10, "CORRUPTION"), "LASER": (-1, "LASER"), "PHASE": (-2, "PHASE CYCLE"),
 }
 DEVICE_NAMES = [
-    ("ROOT FERRY", "SEED HOIST"), ("THAW BRIDGE", "COOLANT LIFT"),
+    ("ROOT TRANSFER", "SEED HOIST"), ("THAW BRIDGE", "COOLANT LIFT"),
     ("SLUICE BRIDGE", "BALLAST LIFT"), ("RECORD TRANSFER", "STACK HOIST"),
     ("TRUSS BRIDGE", "CARGO ELEVATOR"), ("CONTAINMENT SPAN", "SPECIMEN HOIST"),
     ("ALIGN ARRAY", "CALIBRATION LIFT"), ("SCRAP TRANSFER", "MAGNETIC CRANE"),
@@ -541,7 +541,7 @@ size = Vector3(1.52, 1.25, 1.5)"""
             # rise well beyond the takeoff of the measured middle jump.
             split = start+space*.40
             link_end = start+space*.77
-            y = middle - (.95 if beat in ("echo","ferry") else .62)
+            y = middle - (.95 if beat in ("echo","transfer") else .62)
             self.deck("CompactApproach",start,split,middle,thin=True)
             self.deck("CompactTransfer",split,link_end,middle,y,thin=True)
             self.deck("CompactMerge",link_end,end,y,middle,thin=True)
@@ -572,12 +572,12 @@ size = Vector3(1.52, 1.25, 1.5)"""
             self.deck("SwitchLowerLanding",start+4.3,start+7.3,middle-1.32,thin=True)
             self.deck("SwitchLowerExit",start+8.7,start+12.0,middle-.92,thin=True)
             self.stretch("SwitchMerge",start+12.4,end,middle,thin=True)
-        elif beat == "ferry":
+        elif beat == "transfer":
             # The lift travels across as well as up. The exposed staggered
             # ledges are an alternate route for players who skip the switch.
             self.deck("FerryDock",start,start+3.4,middle,thin=True)
             self.deck("DiagonalFerry",start+3.6,start+6.7,middle-.72,thin=True,moving=True)
-            self.relay(start+1.8,middle,"DiagonalFerry",1.74,True,"SEND FERRY",dx=7.2)
+            self.relay(start+1.8,middle,"DiagonalFerry",1.74,True,"ENGAGE TRANSFER LIFT",dx=7.2)
             self.deck("FerryFallback",start+7.25,start+10.1,middle-1.1,thin=True)
             self.deck("FerryLanding",start+9.95,start+14.4,middle-1.1,thin=True)
             if end > start+14.4:

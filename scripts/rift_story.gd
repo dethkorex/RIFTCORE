@@ -80,8 +80,8 @@ const BRIEFINGS := [
 	"The Titan's dispatch log shows where the rest of the power went. Machine Jungle got a trickle. Enough to keep the security drones awake. Not enough to water a seed.",
 	"South District says the taps froze last night. The reactor is still making heat. It's sending every degree it can spare back to the Nexus.",
 	"Voss's call came through over the sound of a flood siren. These pumps used to hold the river back. Somebody told the Kraken to flood the escape channel.",
-	"Voss left a note in the boat roster. Soren's public order and the one he actually sent are both in this archive. She wants us to hear them side by side.",
-	"Now we know Soren kept the load on the Nexus on purpose. Voss's boats made it as far as Sky Dock. Their tags went dark right under the control tower.",
+	"Voss left a note in the evacuation manifest. Soren's public order and the one he actually sent are both in this archive. She wants us to hear them side by side.",
+	"Now we know Soren kept the load on the Nexus on purpose. The last evacuation team reached Sky Dock. Their tags went dark right under the control tower.",
 	"Flight recorder says the convoy got away. I found something else in it. The Nexus filed a claim on your core the night you were built.",
 	"Your core kept the sluice from collapsing at the gate. The Biolab log has the convoy's real call sign. I've found a reply in the array's hold queue.",
 	"Voss named Rust Revenant in her message. He used to repair the district regulators. He's kept copies of the crews' control records in the scrapyard.",
@@ -92,7 +92,7 @@ const SECOND_ACT := [
 	"The Warden sent the generators to Forge Titan. The Titan's a rolling load regulator. They put a drill on him and told him to tear up the old district lines.",
 	"Found a bypass under Briar's roots. Verdant Colossus has been keeping one nursery alive on the water the Nexus didn't notice.",
 	"The heat mains are fine. Cryo Warden shut them by hand. It would rather freeze the shelter inlet than risk one more surge going down that line.",
-	"The diver marked a gate they wedged open for the boats. The Kraken's still holding the sluice under pressure. The convoy roster's in its control room.",
+	"The diver marked a gate the crews wedged open during the evacuation. The Kraken's still holding the sluice under pressure. The convoy roster's in its control room.",
 	"The purge started when we entered. Sand Cipher has the only witness copy with Soren's voice on it. Everything else is a rewritten transcript.",
 	"Aerowyrm's recorder has the last two flights of the night. Both carry the same tracking tag. Let's hear which one it actually chased.",
 	"Chimera has Voss's first six core tests and the last log from your frame. If you want me to hold off playing it, say so now.",
@@ -129,7 +129,7 @@ const FIELD_ADVICE := [
 
 const ACT_TWO_ADVICE := [
 	"Step on the lower gallery's pressure plate to open the return shutter. Break the cracked wall beyond it.",
-	"Jump near the front of the swing to reach the high vine. Use the low leaf to line up the last grab. One relay is past the crossing. The ferry leads to the other.",
+	"Jump near the front of the swing to reach the high vine. Use the low leaf to line up the last grab. One relay is past the crossing. The irrigation lift leads to the other.",
 	"Hold Up beside the board. Jump floor spikes and crouch under overhead spikes. Hold Jump after boost pads to glide across long gaps. The exit activates Relay A.",
 	"Hold Interact at each of the three pressure valves. Wait for the pressure to drop to zero before heading through the release lock.",
 	"When Cipher dives under the sand, move clear. Use Tidal Arc when it surfaces.",
@@ -146,7 +146,7 @@ const WARDEN_EXCHANGES := [
 	["I welded this door shut for a reason. The heat line buckles every time it opens.", "The south shelters are freezing. I can carry the surge if you let me through.", "The last crew said they could carry it. I had to weld the door myself."],
 	["The pumps are above their limit. Get off my deck.", "I'm looking for the convoy that went through here when the water came up.", "Look in the gate log. The crew pulled that lever by hand."],
 	["I have orders to delete the audio and keep the transcript.", "Whose voice is on it?", "Soren's. The original's in Cipher's vault. The copy you've heard has pieces missing."],
-	["Flight clearance suspended. Identify yourself.", "RX-07. Voss sent boats to this dock. What did you launch?", "We launched everyone we could. I turned the runway lights off so they could leave."],
+	["Flight clearance suspended. Identify yourself.", "RX-07. Voss sent the evacuees here. Who got out?", "We launched everyone we could. I turned the runway lights off so they could leave."],
 	["Stand behind the yellow line. Visitors may contaminate the test.", "I was built here. Who locked the file on my core?", "Director Soren. He put in the transfer request before you came online."],
 	["The broadcast ring is full. No new messages will go through.", "I'm looking for the reply you held from Voss.", "I heard her answer days ago. Try the uplink before the ring cycles."],
 	["Put the cannon down. I need that antenna above you to stay in one piece.", "We're here for the district control records. Voss sent us.", "Revenant has a bench on the maintenance frequency. Let him finish talking before you grab anything."],
@@ -157,10 +157,10 @@ const GUARDIAN_EXCHANGES := [
 	["I built three generators. The Nexus ordered me to melt them down and cut the district feeders.", "Those shelters asked you for help. Give me the route they made you cut.", "It's in the work order. Watch my drill. It hasn't been mine since the lockdown."],
 	["I've been feeding the seedlings on one valve. They'll die if I open it any further.", "Shut the poisoned feed. I can hold the pump steady.", "The Nexus took my controls. Look for the drains when it opens the flood line."],
 	["I heard the pipe buckle. I closed the valve, and everything went quiet.", "Listen to this. Those knocks are the shelter crew. They're on the other side.", "I can hear them. Stand back. The Nexus just overrode my valve."],
-	["I closed that sluice three times. They wedged it back open with a boat hook.", "Voss was with them. How far did they get?", "Sky Dock. Her name is in the log. I logged you too. Last one in the water."],
+	["I closed that sluice three times. They wedged it back open with a broken jack.", "Voss was with them. How far did they get?", "Sky Dock. Her name is in the log. I logged you too. Last one in the water."],
 	["He sent two versions of that order. Voss asked me to save the one he actually gave.", "Send that recording to every district that still has a radio.", "I can make you a copy. The purge is in the room with us."],
-	["I followed that shuttle till it burned out. I thought I'd killed the convoy.", "That cockpit was empty. Look at the boats behind it.", "They made it through. If you've got their tags, you can still call them."],
-	["Soren wanted you hardwired into the Nexus. Voss built your core to carry the load and hand it back to the crews.", "Is that what I did at the gate? I remember my arms giving out.", "You held it until every boat cleared. The last person you lifted aboard kept asking for you."],
+	["I followed that shuttle till it burned out. I thought I'd killed the convoy.", "That cockpit was empty. Look at the other signals. Where did they go?", "They made it through. If you've got their tags, you can still call them."],
+	["Soren wanted you hardwired into the Nexus. Voss built your core to carry the load and hand it back to the crews.", "Is that what I did at the gate? I remember my arms giving out.", "You held it until everyone was through. The last person you carried through kept asking for you."],
 	["She keeps sending the same reply. I kept one copy before the ring could wipe it.", "NOVA, get her voice out of here. I'll hold the uplink open.", "I can clear the channel when the ring slows. Until then, keep moving."],
 	["I used to tune those regulators with the crews standing next to me. I kept what they signed.", "Send the signatures to NOVA. It's time the crews had their stations back.", "Sending. Get behind something. The Nexus just put my own trigger out of reach."],
 	["When the Riftcore cracked, I shed nine districts to keep one feed alive. Disconnect me and the city goes dark.", "The crews are on this channel. Let them draw together, and I'll carry the surge.", "I have orders to preserve the Nexus. The district lines are locked under my control."],
@@ -225,9 +225,9 @@ static func deployment(sector: int, act: int, tell_story := true, teach := true)
 		lines.append([GUIDE, ACT_TWO_ADVICE[index] if second_act else FIELD_ADVICE[index]])
 		if sector == 1:
 			if second_act:
-				lines.append([GUIDE, "If you hear slag rolling, wait outside the chute. Six regular Buster shots will break the boulder."])
+				lines.append([GUIDE, "If you hear slag rolling, wait outside the chute. Three regular Buster shots will break the boulder."])
 			else:
-				lines.append([GUIDE, "There's a module terminal ahead. At the furnace fork, the upper gantry has a blueprint and the service deck below has a Patch Kit."])
+				lines.append([GUIDE, "I'll radio you as we go. You can switch off my field tips in Gameplay settings anytime."])
 	return lines
 
 static func boss_exchange(sector: int, act: int) -> Array:

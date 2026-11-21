@@ -4,8 +4,67 @@ var mode := ""
 var windup_target := 0.0
 var windup := 0.0
 
+# The attack clip supplies the torso and sword arm. Sample only the locomotion
+# tracks below the waist during a moving cut so the feet keep their cadence.
+var actor
+var leg_clips := {}
+var leg_tracks := {}
+var stride_phase := 0.0
+var leg_weight := 0.0
+
+func configure_stride(operator: CharacterBody3D, player: AnimationPlayer) -> void:
+	actor = operator
+	if not player:
+		return
+	var rig := get_skeleton()
+	for key: StringName in [&"walk", &"run", &"jump", &"fall"]:
+		if not player.has_animation(key):
+			continue
+		var clip := player.get_animation(key)
+		leg_clips[key] = clip
+		var tracks := {}
+		for track in clip.get_track_count():
+			if clip.track_get_type(track) != Animation.TYPE_ROTATION_3D:
+				continue
+			var path := clip.track_get_path(track)
+			if path.get_subname_count() != 1:
+				continue
+			var bone := String(path.get_subname(0))
+			if not (bone.ends_with("Leg") or bone.ends_with("Foot") or bone.ends_with("ToeBase") or bone.ends_with("_Hips")):
+				continue
+			var index := rig.find_bone(bone)
+			if index >= 0:
+				tracks[index] = track
+		leg_tracks[key] = tracks
+
+func moving_swing(rig: Skeleton3D, delta: float) -> void:
+	if not actor:
+		return
+	var speed := absf(actor.velocity.x)
+	var air: bool = not actor.grounded() if actor.is_physics_processing() else absf(actor.velocity.y) > 0.35
+	var key := &"run" if speed >= 4.5 else &"walk"
+	if air:
+		key = &"jump" if actor.velocity.y >= 0.0 else &"fall"
+	if not leg_clips.has(key):
+		return
+	leg_weight = move_toward(leg_weight, 1.0 if air or speed > 0.35 else 0.0, delta * 18.0)
+	var clip: Animation = leg_clips[key]
+	var phase := stride_phase
+	if air:
+		phase = clampf(1.0 - actor.velocity.y / actor.jump_velocity, 0.05, 0.95) if key == &"jump" else 0.45
+	for index: int in leg_tracks[key]:
+		var rot := clip.rotation_track_interpolate(leg_tracks[key][index], clip.length * phase)
+		rig.set_bone_pose_rotation(index, rig.get_bone_pose_rotation(index).slerp(rot, leg_weight))
+
 func _process_modification_with_delta(delta: float) -> void:
 	var rig := get_skeleton()
+	if actor:
+		if mode in ["walk", "run"] and leg_clips.has(StringName(mode)):
+			stride_phase = fposmod(actor.animation_player.current_animation_position / leg_clips[StringName(mode)].length, 1.0)
+		else:
+			stride_phase = fposmod(stride_phase + absf(actor.velocity.x) * delta / 4.0, 1.0)
+	if mode not in ["saber_cut", "saber_return", "slash_finisher"]:
+		leg_weight = 0.0
 	windup = move_toward(windup, windup_target, delta * 19.0)
 	match mode:
 		"dash":
@@ -14,10 +73,14 @@ func _process_modification_with_delta(delta: float) -> void:
 			wall_slide(rig)
 		"slide":
 			ground_slide(rig)
+			if actor and actor.saber_equipped:
+				orient_saber(rig, Vector3(.12, .19, -.97), 1.0)
+				grip_saber(rig, 1.0)
 		"saber_cut", "saber_return", "slash_finisher":
+			moving_swing(rig, delta)
 			grip_saber(rig, 1.0)
 		_:
-			if windup > 0.0:
+			if actor and (actor.saber_equipped or windup > 0.0):
 				saber_charge(rig)
 
 func ground_slide(rig: Skeleton3D) -> void:
@@ -34,6 +97,21 @@ func ground_slide(rig: Skeleton3D) -> void:
 	aim(rig, "LeftForeArm", "LeftHand", Vector3(.28, -.77, -.56))
 	aim(rig, "RightArm", "RightForeArm", Vector3(-.58, .32, .71))
 	aim(rig, "RightForeArm", "RightHand", Vector3(-.22, .66, .72))
+
+	# Seat the boots on the sliding contact plane; the crouch clip's root was
+	# authored for bent legs and otherwise leaves a gap under the extended heel.
+	var hips := rig.find_bone("mixamorig_Hips")
+	var heel := rig.find_bone("mixamorig_LeftFoot")
+	var back_heel := rig.find_bone("mixamorig_RightFoot")
+	if hips >= 0 and heel >= 0 and back_heel >= 0 and actor:
+		var lowest := minf(rig.to_global(rig.get_bone_global_pose(heel).origin).y, rig.to_global(rig.get_bone_global_pose(back_heel).origin).y)
+		var floor_y: float = actor.global_position.y - actor.standing_capsule.height * .5
+		var correction := Vector3.UP * clampf(floor_y + .12 - lowest, -.28, 0.0)
+		var local_shift := rig.global_basis.inverse() * correction
+		var parent := rig.get_bone_parent(hips)
+		if parent >= 0:
+			local_shift = rig.get_bone_global_pose(parent).basis.inverse() * local_shift
+		rig.set_bone_pose_position(hips, rig.get_bone_pose_position(hips) + local_shift)
 
 func air_dash(rig: Skeleton3D) -> void:
 	aim(rig, "Spine", "Spine1", Vector3(0, .49, .87))
@@ -68,13 +146,28 @@ func wall_slide(rig: Skeleton3D) -> void:
 	aim(rig, "RightFoot", "RightToeBase", Vector3(0, -.78, .63))
 
 func saber_charge(rig: Skeleton3D) -> void:
-	# The left hand holds the blade. Leave the run and jump tracks on the legs.
-	aim(rig, "Spine1", "Spine2", Vector3(-.14, .98, -.12), windup * .55)
-	aim(rig, "LeftArm", "LeftForeArm", Vector3(.60, .46, -.66), windup)
-	aim(rig, "LeftForeArm", "LeftHand", Vector3(-.27, .91, .31), windup)
-	aim(rig, "RightArm", "RightForeArm", Vector3(-.41, -.68, .61), windup * .75)
-	aim(rig, "RightForeArm", "RightHand", Vector3(.24, -.23, .94), windup * .75)
-	grip_saber(rig, windup)
+	# Keep the hilt ahead of the belt and the elbow below the shoulder.
+	# Positive Z is forward in the rig on both world-facing directions.
+	var grip := 1.0 if actor.saber_equipped else windup
+	var blocking := bool(actor.guarding)
+	aim(rig, "Spine", "Spine1", Vector3(-.05, .98, .18), windup * .48)
+	aim(rig, "LeftArm", "LeftForeArm", Vector3(.30, -.82, .42) if blocking else Vector3(.30, -.93, -.17), grip)
+	aim(rig, "LeftForeArm", "LeftHand", Vector3(-.30, .65, .69) if blocking else Vector3(-.22, .06, .974), grip)
+	aim(rig, "RightArm", "RightForeArm", Vector3(-.35, -.90, -.24), windup * .82)
+	aim(rig, "RightForeArm", "RightHand", Vector3(-.10, -.35, .93), windup * .82)
+	var direction := Vector3(-.23, .94, .26) if blocking else Vector3(.09, lerpf(.22, .51, windup), lerpf(.97, .855, windup))
+	orient_saber(rig, direction, grip)
+	grip_saber(rig, grip)
+
+func orient_saber(rig: Skeleton3D, direction: Vector3, amount: float) -> void:
+	var hand := rig.find_bone("mixamorig_LeftHand")
+	if hand < 0 or not is_instance_valid(actor.sword_pivot):
+		return
+	var palm := rig.get_bone_global_pose(hand).basis.orthonormalized()
+	var blade: Vector3 = (palm * actor.sword_pivot.basis.x).normalized()
+	var wrist_parent := rig.get_bone_global_pose(rig.get_bone_parent(hand)).basis.orthonormalized().get_rotation_quaternion()
+	var turn := Quaternion.IDENTITY.slerp(Quaternion(blade, direction.normalized()), amount)
+	rig.set_bone_pose_rotation(hand, (wrist_parent.inverse() * turn * wrist_parent * rig.get_bone_pose_rotation(hand)).normalized())
 
 func grip_saber(rig: Skeleton3D, amount: float) -> void:
 	if amount <= 0.0:

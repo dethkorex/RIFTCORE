@@ -4,7 +4,7 @@ const MODES := [Vector2i(1280, 720), Vector2i(1600, 900), Vector2i(1920, 1080), 
 const ACTIONS := {
 	"move_left": "Move left", "move_right": "Move right", "jump": "Jump",
 	"crouch": "Crouch", "climb_up": "Climb up", "climb_down": "Climb down",
-	"dash": "Dash", "shoot": "Buster", "suit_fire": "Suit Weapon", "melee": "Sword", "swap_weapon": "Next suit", "previous_suit": "Previous suit", "pause": "Pause",
+	"dash": "Dash", "shoot": "Attack / charge", "suit_fire": "Suit Weapon", "melee": "Switch buster / saber", "guard": "Block with saber", "swap_weapon": "Next suit", "previous_suit": "Previous suit", "pause": "Pause",
 	"field_interact": "Field interact", "push_to_talk": "Push-to-talk",
 }
 const QUICK_DEFAULTS := [JOY_BUTTON_DPAD_UP, JOY_BUTTON_DPAD_LEFT, JOY_BUTTON_DPAD_RIGHT, JOY_BUTTON_DPAD_DOWN]
@@ -120,10 +120,10 @@ func claim_story_beat(key: String, previously_seen := false) -> bool:
 		push_warning("Could not remember story dialogue (%s)." % error_string(error))
 	return not previously_seen
 
-func deployment_dialogue(profile: RefCounted, sector: int, act: int) -> Array:
+func deployment_dialogue(profile: RefCounted, sector: int, act: int, allow_tutorial := true) -> Array:
 	var story := preload("res://scripts/rift_story.gd")
 	var tell_story := claim_story_beat("campaign_story_v3_%d_%d" % [sector, act])
-	var teach := claim_deployment_briefing(profile, sector, act)
+	var teach := allow_tutorial and claim_deployment_briefing(profile, sector, act)
 	return story.deployment(sector, act, tell_story, teach)
 
 func claim_deployment_briefing(profile: RefCounted, sector: int, act: int) -> bool:

@@ -4,7 +4,7 @@
 ROUTES = {
     "machine_jungle": [
         [("gallery",42,"ROOT NURSERY"),("loop",42,"ROOT CELLAR"),("shaft",45,"CANOPY RISER"),("gallery",48,"SPORE TERRACES"),("fall",33,"DRAIN ROOTS"),("lift",34,"SEED HOIST"),("branch",41,"VELVET GROVE"),("hall",30,"GROVE ACCESS")],
-        [("loop",39,"FLOODED SEED BANK"),("gallery",43,"VINE VIADUCT"),("fall",32,"HOLLOW TRUNK"),("shaft",47,"POLLEN SHAFT"),("loop",49,"UNDERGROWTH"),("bridge",36,"ROOT FERRY"),("gallery",37,"GUARDIAN NURSERY"),("hall",33,"GROVE ANTECHAMBER")],
+        [("loop",39,"FLOODED SEED BANK"),("gallery",43,"VINE VIADUCT"),("fall",32,"HOLLOW TRUNK"),("shaft",47,"POLLEN SHAFT"),("loop",49,"UNDERGROWTH"),("bridge",36,"ROOT TRANSFER"),("gallery",37,"GUARDIAN NURSERY"),("hall",33,"GROVE ANTECHAMBER")],
     ],
     "frozen_reactor": [
         [("slope",38,"ICE INTAKE"),("shaft",42,"COOLANT RISER"),("branch",42,"CONDENSER VAULT"),("fall",39,"FROST STEP DOWN"),("loop",54,"COOLANT RETURN"),("bridge",35,"HEAT EXCHANGER"),("slope",36,"GLACIER TUNNEL"),("hall",36,"REACTOR ACCESS")],
@@ -12,7 +12,7 @@ ROUTES = {
     ],
     "abyssal_plant": [
         [("fall",41,"FLOODGATE DESCENT"),("loop",55,"PRESSURE MANIFOLD"),("bridge",39,"SLUICE CROSSING"),("gallery",41,"PUMP SERVICE DECK"),("shaft",39,"BILGE STACK"),("branch",35,"PRESSURE VAULT"),("lift",42,"BALLAST LIFT"),("hall",33,"DRY AIRLOCK")],
-        [("loop",51,"RESERVOIR BYPASS"),("lift",36,"BALLAST FERRY"),("gallery",46,"BUS BAR BALCONY"),("bridge",35,"ELECTRODE BAY"),("fall",34,"DRAINAGE SPILLWAY"),("branch",45,"FLOOD CONTROL"),("shaft",43,"PRESSURE RELEASE"),("hall",39,"KRAKEN LOCK")],
+        [("loop",51,"RESERVOIR BYPASS"),("lift",36,"BALLAST LIFT"),("gallery",46,"BUS BAR BALCONY"),("bridge",35,"ELECTRODE BAY"),("fall",34,"DRAINAGE SPILLWAY"),("branch",45,"FLOOD CONTROL"),("shaft",43,"PRESSURE RELEASE"),("hall",39,"KRAKEN LOCK")],
     ],
     "buried_archives": [
         [("branch",40,"WITNESS STACKS"),("fall",42,"BURIED STACKS"),("loop",47,"DEAD LETTER ROUTE"),("gallery",38,"INDEX BALCONY"),("shaft",44,"GLYPH SHAFT"),("bridge",39,"BRIDGE OF RECORDS"),("branch",44,"RECORD VAULT"),("hall",31,"CIPHER GATE")],

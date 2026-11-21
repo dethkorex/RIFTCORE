@@ -21,7 +21,7 @@ const Story := preload("res://scripts/rift_story.gd")
 const StoryDialogue := preload("res://scripts/story_dialogue.gd")
 const CampaignDoor := preload("res://scripts/campaign_door.gd")
 const GateRelays := preload("res://scripts/gate_relays.gd")
-const INPUTS := [&"jump", &"dash", &"crouch", &"crouch_stick", &"shoot", &"melee", &"climb_down", &"swap_weapon", &"previous_suit", &"quick_0", &"quick_1", &"quick_2", &"quick_3", &"suit_fire", &"field_interact"]
+const INPUTS := [&"jump", &"dash", &"crouch", &"crouch_stick", &"shoot", &"melee", &"climb_down", &"swap_weapon", &"previous_suit", &"quick_0", &"quick_1", &"quick_2", &"quick_3", &"suit_fire", &"field_interact", &"guard"]
 const INPUT_ACT_SHIFT := 28
 const INPUT_ACT_MASK := 3 << INPUT_ACT_SHIFT
 const INPUT_SUSPENDED := 1 << 30
@@ -44,6 +44,11 @@ const PREDICTION_LAYER := 1 << 6
 const DIFFICULTY_PER_GUEST := 0.25
 const XP_BONUS := 1.5
 const Profile := preload("res://scripts/rogue_profile.gd")
+
+const ManualSave := preload("res://scripts/manual_save_session.gd")
+var active_operator_slot := 0
+var next_operator_slot := 0
+var replacement_picker: PanelContainer
 
 var host := false
 var roster: Array = []
@@ -128,6 +133,7 @@ var rewards_status: Label
 var stats: Label
 var clock := 0.0
 var update_pending := false
+var last_saber_states: Array[int] = []
 var hud_clock := HUD_INTERVAL
 var outcome := ""
 var team_xp := 0
@@ -331,6 +337,7 @@ func stage_path(number: int) -> String:
 	return info.level if number == 1 else "res://scenes/levels/%s_act_2.tscn" % info.id
 
 func load_stage(packed: PackedScene = null) -> void:
+	last_saber_states.clear()
 	update_pending = false
 	hud_clock = HUD_INTERVAL
 	cancel_reboot()
@@ -341,7 +348,7 @@ func load_stage(packed: PackedScene = null) -> void:
 	checkpoint_index=-1
 	var previous := []
 	for operator in operators:
-		previous.append([operator.health, operator.energy, operator.lives, operator.equipped_suit(), operator.recovered_supplies, operator.salvage, operator.recovered_blueprints, operator.experience, operator.run_weapon_ids, operator.run_module])
+		previous.append([operator.health, operator.energy, operator.lives, operator.equipped_suit(), operator.recovered_supplies, operator.salvage, operator.recovered_blueprints, operator.experience, operator.run_weapon_ids, operator.run_module, operator.saber_equipped])
 	if is_instance_valid(stage):
 		remove_child(stage)
 		stage.queue_free()
@@ -423,6 +430,8 @@ func load_stage(packed: PackedScene = null) -> void:
 			operator.salvage = previous[index][5]
 			operator.recovered_blueprints = previous[index][6]
 			operator.run_module = previous[index][9]
+			if previous[index][10]:
+				operator.switch_combat_mode()
 		operator.set_physics_process(operator.health > 0.0 and (host or index == local_index))
 		if not host:
 			operator.set_process(false)
@@ -509,6 +518,9 @@ func load_stage(packed: PackedScene = null) -> void:
 	camera.target = operators[local_index]
 	if is_instance_valid(personal_hud):
 		personal_hud.local_operator = camera.target
+		var lessons := personal_hud.get_node_or_null("FoundryFieldLessons")
+		if act != 1 and lessons:
+			lessons.queue_free()
 	var bounds := stage.get_node("MARKERS/CameraBounds")
 	camera.min_x = bounds.get_meta("min_x")
 	camera.max_x = bounds.get_meta("max_x")
@@ -1149,7 +1161,7 @@ func set_module(index: int, id: String) -> void:
 func show_field_briefing() -> void:
 	if DisplayServer.get_name() == "headless":
 		return
-	var lines := RiftSettings.deployment_dialogue(local_profile, sector, act)
+	var lines := RiftSettings.deployment_dialogue(local_profile, sector, act, false)
 	if lines.is_empty():
 		return
 	var dialogue := StoryDialogue.new()
@@ -1291,7 +1303,7 @@ func set_chat_open(open: bool) -> void:
 	set_local_controls_suspended(chat_open or is_pause_open() or suit_reveal_playing)
 
 func local_input_blocked() -> bool:
-	return chat_open or is_pause_open() or window_input_blocked
+	return chat_open or is_pause_open() or window_input_blocked or is_instance_valid(replacement_picker)
 
 func open_pause() -> void:
 	if local_input_blocked() or not outcome.is_empty() or changing_act or boss_intro_active or suit_reveal_playing:
@@ -1544,6 +1556,7 @@ func award_team_experience(base_xp: int) -> void:
 
 func broadcast_state(reliable_operators := false) -> void:
 	var players := []
+	var saber_states: Array[int] = []
 	var security := PackedFloat32Array()
 	security.resize(enemies.size() * 6)
 	var guards := PackedByteArray()
@@ -1552,6 +1565,15 @@ func broadcast_state(reliable_operators := false) -> void:
 	for operator in operators:
 		players.append([operator.global_position, operator.model_root.rotation, operator.health, operator.energy, operator.current_animation, operator.facing, operator.equipped_suit(), operator.lives, operator.max_health, operator.max_energy, operator.velocity, operator.fire_lock, operator.charge_held, operator.melee_lock, operator.quick_profile.quick_slots if operator.quick_profile else [], operator.supplies, operator.charge_elapsed if operator.charge_held else 0.0, operator.saber_hold, remote_players.get(roster[players.size()], {}).get("quick_revision", 0), operator.recovered_supplies, operator.experience, Vector4(operator.boss_debuff, operator.debuff_left, operator.debuff_tick, operator.shock_stun), Vector3(1.0 if is_instance_valid(operator.rocket_course) else 0.0, operator.rocket_speed, operator.rocket_seconds)])
 		players.back().append(operator.run_module)
+		var flags := int(operator.saber_equipped) | (int(operator.guarding) << 1)
+		players.back().append(flags)
+		var swing := RiftPlayer.SWING_CLIPS.find(operator.current_animation) + 1
+		saber_states.append(flags | (int(operator.saber_hold >= 0.0) << 2) | (swing << 3))
+	# A short swing or guard transition can fit entirely between delivered UDP snapshots.
+	# Send transitions reliably, while movement and charge intensity continue at the normal rate.
+	if saber_states != last_saber_states:
+		reliable_operators = true
+		last_saber_states = saber_states
 	for index in enemies.size():
 		var enemy := enemies[index]
 		if is_instance_valid(enemy) and enemy.health > 0:
@@ -1605,7 +1627,7 @@ func broadcast_state(reliable_operators := false) -> void:
 		var snapshot := players.duplicate()
 		for other in players.size():
 			if other != index:
-				snapshot[other] = players[other].slice(0, 11) + [players[other][16], players[other][17], players[other].slice(20, 23)]
+				snapshot[other] = players[other].slice(0, 11) + [players[other][16], players[other][17], players[other].slice(20, 23), players[other][24]]
 		var totals := [personal_rewards[index].bolts, operators[index].recovered_blueprints.size(), sector_seconds, remote_players[roster[index]].input, operators[index].get_meta(&"coop_position_revision", 0)]
 		totals.append_array([reported_reserves_used.get(index, 0), remote_players[roster[index]].profile.reserve_lives])
 		if reliable_operators:
@@ -1796,6 +1818,9 @@ func apply_operator_state(operator: RiftPlayer, data: Array, is_local: bool) -> 
 	operator.max_health = data[8]
 	operator.max_energy = data[9]
 	operator.lives = data[7]
+	var combat_flags := int(data[24]) if data.size() > 24 else (int(data[14]) if data.size() == 15 else 0)
+	operator.saber_equipped = bool(combat_flags & 1)
+	operator.guarding = bool(combat_flags & 2)
 	if data.size() > 23:
 		operator.run_module = String(data[23])
 	if not (is_local and suit_reveal_playing) and operator.equipped_suit() != data[6]:
@@ -1809,7 +1834,7 @@ func apply_operator_state(operator: RiftPlayer, data: Array, is_local: bool) -> 
 		operator.remove_meta("coop_down")
 	preload("res://scripts/coop_corpse.gd").present(operator)
 	# Remote actors omit inventory/input detail but still need level, debuff and board visuals.
-	var presentation: Array = data.slice(20, 23) if data.size() > 22 else (data[13] if data.size() == 14 and data[13] is Array else [])
+	var presentation: Array = data.slice(20, 23) if data.size() > 22 else (data[13] if data.size() in [14, 15] and data[13] is Array else [])
 	operator.experience = int(presentation[0]) if presentation.size() == 3 else team_xp
 	if presentation.size() == 3:
 		var effect: Vector4 = presentation[1]
@@ -1859,10 +1884,10 @@ func _process(delta: float) -> void:
 				operator.global_position = projected
 			if fresh:
 				operator.model_root.rotation = data[1]
+				apply_operator_state(operator, data, false)
 				operator.reflect_saber_pose(data[4], float(data[12]) if data.size() > 12 else -1.0)
 				operator.play_character_animation(data[4])
 				operator.facing = data[5]
-				apply_operator_state(operator, data, false)
 				operator.present_charge(float(data[11]), data[3] >= operator.charged_shot_cost())
 		presented_snapshot = latest_operators
 		var fresh_world := latest_state > presented_world
@@ -1884,6 +1909,7 @@ func _process(delta: float) -> void:
 		preload("res://scripts/coop_corpse.gd").present(actor)
 	update_revive_meter()
 	var local := operators[local_index]
+	update_replacement_picker(local)
 	if sector == 1 and act == 1:
 		FoundryModule.update_prompt(stage, local)
 	if not boss_intro_active and not changing_act and not suit_reveal_playing:
@@ -2161,6 +2187,45 @@ func _unhandled_input(event: InputEvent) -> void:
 				get_viewport().set_input_as_handled()
 		else:
 			peer.call_func_on(peer.get_host(), receive_gate_relay_request, act)
+
+func update_replacement_picker(local: RiftPlayer) -> void:
+	if local.health > 0 or local.lives > 0 or not outcome.is_empty():
+		if local.health > 0 or local.lives > 0:
+			next_operator_slot = 0
+		if is_instance_valid(replacement_picker):
+			replacement_picker.queue_free()
+			replacement_picker = null
+		return
+	if next_operator_slot > 0 or is_instance_valid(replacement_picker) or active_operator_slot <= 0:
+		return
+	replacement_picker = PanelContainer.new()
+	replacement_picker.theme = UI.theme()
+	replacement_picker.add_theme_stylebox_override("panel", UI.hud_frame(UI.CYAN, Vector2(16, 9), true))
+	personal_hud.get_parent().add_child(replacement_picker)
+	replacement_picker.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	replacement_picker.offset_left = -205
+	replacement_picker.offset_right = 205
+	replacement_picker.offset_top = -110
+	var stack := UI.column(replacement_picker, 6)
+	UI.label(stack, "SELECT NEXT OPERATOR", 25, UI.CYAN)
+	UI.label(stack, "Choose a slot for the next deployment. Your squad can still revive you.", 17)
+	var first: Button
+	for number in range(1, ManualSave.SLOT_COUNT + 1):
+		if number == active_operator_slot:
+			continue
+		var saved := ManualSave.read_slot(number)
+		var caption := "Use Operator %02d" % number if saved else "Create Operator in Slot %02d" % number
+		var button := UI.button(stack, caption, select_replacement.bind(number), false, 34)
+		if not first:
+			first = button
+	if first:
+		first.grab_focus()
+
+func select_replacement(number: int) -> void:
+	next_operator_slot = number
+	if is_instance_valid(replacement_picker):
+		replacement_picker.queue_free()
+		replacement_picker = null
 
 func build_revive_meter(layer: CanvasLayer) -> void:
 	revive_panel = PanelContainer.new()

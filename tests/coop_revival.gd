@@ -156,6 +156,21 @@ func run() -> void:
 	mission.record_guest_lives_spent(1)
 	mission.record_guest_lives_spent(1)
 	check(mission.local_profile.reserve_lives == 1, "Repeated reserve confirmations charge the guest only once")
+	mission.active_operator_slot = 1
+	var overlay := CanvasLayer.new()
+	mission.add_child(overlay)
+	mission.personal_hud = load("res://scripts/factory_hud.gd").new()
+	mission.personal_hud.local_operator = fallen
+	overlay.add_child(mission.personal_hud)
+	fallen.health = 0
+	fallen.lives = 0
+	mission.update_replacement_picker(fallen)
+	check(is_instance_valid(mission.replacement_picker), "Last local life opens the operator slots")
+	mission.select_replacement(2)
+	check(mission.next_operator_slot == 2 and fallen.health == 0, "Selecting a replacement preserves the current squad mission")
+	fallen.health = 10
+	mission.update_replacement_picker(fallen)
+	check(mission.next_operator_slot == 0, "A successful teammate reboot keeps the active operator")
 	mission.peer.free()
 	mission.queue_free()
 	await process_frame

@@ -1,0 +1,19 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/foundry_slag_pool.gd" id="Pool"]
+[ext_resource type="Shader" path="res://assets/neon_factory/foundry/rising_lava.gdshader" id="Lava"]
+
+[sub_resource type="ShaderMaterial" id="MoltenSurface"]
+shader = ExtResource("Lava")
+
+[node name="SlagPool" type="Area3D"]
+collision_layer = 0
+collision_mask = 1
+script = ExtResource("Pool")
+
+[node name="Surface" type="MeshInstance3D" parent="."]
+position = Vector3(0, -7, -2.05)
+material_override = SubResource("MoltenSurface")
+
+[node name="Contact" type="CollisionShape3D" parent="."]
+position = Vector3(0, -0.68, 0)

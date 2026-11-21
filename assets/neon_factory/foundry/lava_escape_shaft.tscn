@@ -6,7 +6,6 @@
 [ext_resource type="PackedScene" path="res://assets/neon_factory/foundry/interior_deck.tscn" id="Deck"]
 [ext_resource type="PackedScene" path="res://assets/neon_factory/foundry/shaft_column.tscn" id="Wall"]
 [ext_resource type="PackedScene" path="res://assets/neon_factory/foundry/interior_bulkhead.tscn" id="Panel"]
-[ext_resource type="FontFile" path="res://assets/ui/fonts/BarlowCondensed-ExtraBoldItalic.ttf" id="Font"]
 
 [sub_resource type="BoxShape3D" id="DoorShape"]
 size = Vector3(0.58, 3.3, 4.75)
@@ -35,7 +34,6 @@ scale = Vector3(1, 0.84, 1)
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Entrance/Blocker"]
 position = Vector3(0, 1.65, 0)
 shape = SubResource("DoorShape")
-disabled = true
 
 [node name="LoadIn" parent="." instance=ExtResource("Deck")]
 position = Vector3(-1.25, 0, 0)
@@ -57,158 +55,138 @@ scale = Vector3(0.934, 1, 1)
 position = Vector3(17.2, 0, 0)
 scale = Vector3(0.934, 1, 1)
 
+[node name="ShaftFloor3" parent="." instance=ExtResource("Deck")]
+position = Vector3(22.9, 0, 0)
+scale = Vector3(0.968, 1, 1)
+
 [node name="Climb" type="Node3D" parent="."]
 
 [node name="Ledge01" parent="Climb" instance=ExtResource("Ledge")]
-position = Vector3(8.6, 2.18, 0)
-scale = Vector3(0.68333, 1, 1)
+position = Vector3(9.1, 2.5, 0)
+scale = Vector3(0.84, 1, 1)
 
 [node name="Ledge02" parent="Climb" instance=ExtResource("Ledge")]
-position = Vector3(14, 4.5, 0)
-scale = Vector3(0.633333, 1, 1)
+position = Vector3(15.8, 5.05, 0)
+scale = Vector3(0.76, 1, 1)
 
 [node name="Ledge03" parent="Climb" instance=ExtResource("Ledge")]
-position = Vector3(17.7, 6.5, 0)
-scale = Vector3(0.591667, 1, 1)
+position = Vector3(11.8, 7.6, 0)
+scale = Vector3(0.76, 1, 1)
 
 [node name="Ledge04" parent="Climb" instance=ExtResource("Ledge")]
-position = Vector3(12.5, 8.12, 0)
-scale = Vector3(0.61667, 1, 1)
+position = Vector3(5.9, 10.2, 0)
+scale = Vector3(0.76, 1, 1)
 
-[node name="Ledge05" parent="Climb" instance=ExtResource("Ledge")]
-position = Vector3(6.1, 10.25, 0)
-scale = Vector3(0.71667, 1, 1)
-
-[node name="Ledge06WallKick" parent="Climb" instance=ExtResource("Ledge")]
-position = Vector3(6.9, 13.8, 0)
-scale = Vector3(0.78333, 1, 1)
+[node name="Ledge05WallKick" parent="Climb" instance=ExtResource("Ledge")]
+position = Vector3(7.0, 13.8, 0)
+scale = Vector3(0.84, 1, 1)
 metadata/wall_kick = -1
+
+[node name="Ledge06" parent="Climb" instance=ExtResource("Ledge")]
+position = Vector3(13.5, 16.36, 0)
+scale = Vector3(0.76, 1, 1)
 
 [node name="Ledge07" parent="Climb" instance=ExtResource("Ledge")]
-position = Vector3(12.6, 15.76, 0)
-scale = Vector3(0.71667, 1, 1)
+position = Vector3(20.5, 18.96, 0)
+scale = Vector3(0.76, 1, 1)
 
 [node name="Ledge08" parent="Climb" instance=ExtResource("Ledge")]
-position = Vector3(17.6, 17.89, 0)
-scale = Vector3(0.64167, 1, 1)
+position = Vector3(14.5, 21.55, 0)
+scale = Vector3(0.76, 1, 1)
 
 [node name="Ledge09" parent="Climb" instance=ExtResource("Ledge")]
-position = Vector3(11.45, 20.2, 0)
-scale = Vector3(0.608333, 1, 1)
+position = Vector3(18.9, 24.05, 0)
+scale = Vector3(0.76, 1, 1)
 
 [node name="Ledge10" parent="Climb" instance=ExtResource("Ledge")]
-position = Vector3(5.85, 22.35, 0)
-scale = Vector3(0.641667, 1, 1)
+position = Vector3(23.4, 26.6, 0)
+scale = Vector3(0.76, 1, 1)
 
-[node name="Ledge11" parent="Climb" instance=ExtResource("Ledge")]
-position = Vector3(12.05, 24.05, 0)
-scale = Vector3(0.633333, 1, 1)
+[node name="Ledge11WallKick" parent="Climb" instance=ExtResource("Ledge")]
+position = Vector3(21.7, 30.15, 0)
+scale = Vector3(0.84, 1, 1)
+metadata/wall_kick = 1
 
 [node name="Ledge12" parent="Climb" instance=ExtResource("Ledge")]
-position = Vector3(17.25, 26.22, 0)
-scale = Vector3(0.725, 1, 1)
+position = Vector3(15, 32.65, 0)
+scale = Vector3(0.76, 1, 1)
 
-[node name="Ledge13WallKick" parent="Climb" instance=ExtResource("Ledge")]
-position = Vector3(15.95, 29.78, 0)
-scale = Vector3(0.75, 1, 1)
-metadata/wall_kick = 1
+[node name="Ledge13" parent="Climb" instance=ExtResource("Ledge")]
+position = Vector3(8.5, 35.15, 0)
+scale = Vector3(0.76, 1, 1)
 
 [node name="Ledge14" parent="Climb" instance=ExtResource("Ledge")]
-position = Vector3(10.1, 31.9, 0)
-scale = Vector3(0.70833, 1, 1)
+position = Vector3(15.3, 37.7, 0)
+scale = Vector3(0.76, 1, 1)
 
 [node name="Ledge15" parent="Climb" instance=ExtResource("Ledge")]
-position = Vector3(5.3, 34.09, 0)
-scale = Vector3(0.575, 1, 1)
+position = Vector3(11.3, 40.05, 0)
+scale = Vector3(0.76, 1, 1)
 
 [node name="Ledge16" parent="Climb" instance=ExtResource("Ledge")]
-position = Vector3(10.65, 36.3, 0)
-scale = Vector3(0.65, 1, 1)
+position = Vector3(5.8, 42.5, 0)
+scale = Vector3(0.76, 1, 1)
 
-[node name="Ledge17" parent="Climb" instance=ExtResource("Ledge")]
-position = Vector3(17.15, 38.35, 0)
-scale = Vector3(0.641667, 1, 1)
-
-[node name="Ledge18" parent="Climb" instance=ExtResource("Ledge")]
-position = Vector3(12.1, 40.22, 0)
-scale = Vector3(0.6, 1, 1)
-
-[node name="Ledge19" parent="Climb" instance=ExtResource("Ledge")]
-position = Vector3(5.6, 42.19, 0)
-scale = Vector3(0.68333, 1, 1)
-
-[node name="Ledge20WallKick" parent="Climb" instance=ExtResource("Ledge")]
-position = Vector3(7.25, 45.77, 0)
-scale = Vector3(0.78333, 1, 1)
+[node name="Ledge17WallKick" parent="Climb" instance=ExtResource("Ledge")]
+position = Vector3(7.2, 46.05, 0)
+scale = Vector3(0.84, 1, 1)
 metadata/wall_kick = -1
 
+[node name="Ledge18" parent="Climb" instance=ExtResource("Ledge")]
+position = Vector3(14.25, 48.55, 0)
+scale = Vector3(0.76, 1, 1)
+
+[node name="Ledge19" parent="Climb" instance=ExtResource("Ledge")]
+position = Vector3(20.85, 51.1, 0)
+scale = Vector3(0.76, 1, 1)
+
+[node name="Ledge20" parent="Climb" instance=ExtResource("Ledge")]
+position = Vector3(14.65, 53.55, 0)
+scale = Vector3(0.76, 1, 1)
+
 [node name="Ledge21" parent="Climb" instance=ExtResource("Ledge")]
-position = Vector3(13.25, 47.7, 0)
-scale = Vector3(0.70833, 1, 1)
+position = Vector3(18.35, 56.05, 0)
+scale = Vector3(0.76, 1, 1)
 
 [node name="Ledge22" parent="Climb" instance=ExtResource("Ledge")]
-position = Vector3(17.55, 49.99, 0)
-scale = Vector3(0.58333, 1, 1)
+position = Vector3(23.6, 58.55, 0)
+scale = Vector3(0.76, 1, 1)
 
-[node name="Ledge23" parent="Climb" instance=ExtResource("Ledge")]
-position = Vector3(10.85, 52.25, 0)
-scale = Vector3(0.616667, 1, 1)
-
-[node name="Ledge24" parent="Climb" instance=ExtResource("Ledge")]
-position = Vector3(5.8, 54.18, 0)
-scale = Vector3(0.666667, 1, 1)
-
-[node name="Ledge25" parent="Climb" instance=ExtResource("Ledge")]
-position = Vector3(11.6, 56.06, 0)
-scale = Vector3(0.66667, 1, 1)
-
-[node name="Ledge26" parent="Climb" instance=ExtResource("Ledge")]
-position = Vector3(17.65, 58.24, 0)
-scale = Vector3(0.64167, 1, 1)
-
-[node name="Ledge27WallKick" parent="Climb" instance=ExtResource("Ledge")]
-position = Vector3(15.95, 61.89, 0)
-scale = Vector3(0.81667, 1, 1)
+[node name="Ledge23WallKick" parent="Climb" instance=ExtResource("Ledge")]
+position = Vector3(21.65, 62.15, 0)
+scale = Vector3(0.84, 1, 1)
 metadata/wall_kick = 1
 
+[node name="Ledge24" parent="Climb" instance=ExtResource("Ledge")]
+position = Vector3(14.85, 64.8, 0)
+scale = Vector3(0.76, 1, 1)
+
+[node name="Ledge25" parent="Climb" instance=ExtResource("Ledge")]
+position = Vector3(8.15, 67.45, 0)
+scale = Vector3(0.76, 1, 1)
+
+[node name="Ledge26" parent="Climb" instance=ExtResource("Ledge")]
+position = Vector3(14.75, 70.08, 0)
+scale = Vector3(0.76, 1, 1)
+
+[node name="Ledge27" parent="Climb" instance=ExtResource("Ledge")]
+position = Vector3(21.45, 72.7, 0)
+scale = Vector3(0.76, 1, 1)
+
 [node name="Ledge28" parent="Climb" instance=ExtResource("Ledge")]
-position = Vector3(10.45, 63.84, 0)
-scale = Vector3(0.7, 1, 1)
+position = Vector3(14.95, 75.35, 0)
+scale = Vector3(0.76, 1, 1)
 
 [node name="Ledge29" parent="Climb" instance=ExtResource("Ledge")]
-position = Vector3(5.65, 66.07, 0)
-scale = Vector3(0.7, 1, 1)
-
-[node name="Ledge30" parent="Climb" instance=ExtResource("Ledge")]
-position = Vector3(10.5, 68.3, 0)
-scale = Vector3(0.633333, 1, 1)
-
-[node name="Ledge31" parent="Climb" instance=ExtResource("Ledge")]
-position = Vector3(16.65, 70.14, 0)
-scale = Vector3(0.7, 1, 1)
-
-[node name="Ledge32" parent="Climb" instance=ExtResource("Ledge")]
-position = Vector3(11.65, 72.55, 0)
-scale = Vector3(0.625, 1, 1)
-
-[node name="Ledge33" parent="Climb" instance=ExtResource("Ledge")]
-position = Vector3(6.45, 74.32, 0)
-scale = Vector3(0.76667, 1, 1)
-
-[node name="Ledge34" parent="Climb" instance=ExtResource("Ledge")]
-position = Vector3(12.65, 76.5, 0)
-scale = Vector3(0.73333, 1, 1)
-
-[node name="Ledge35" parent="Climb" instance=ExtResource("Ledge")]
-position = Vector3(17.2, 78.76, 0)
-scale = Vector3(0.75, 1, 1)
+position = Vector3(21.25, 78.0, 0)
+scale = Vector3(0.84, 1, 1)
 
 [node name="ExitBridge" parent="." instance=ExtResource("Deck")]
-position = Vector3(23.8, 80.8, 0)
+position = Vector3(29.6, 80.8, 0)
 scale = Vector3(1.24, 1, 1)
 
 [node name="ExitGantry" parent="." instance=ExtResource("Ledge")]
-position = Vector3(27.75, 80.8, 0)
+position = Vector3(33.55, 80.8, 0)
 scale = Vector3(0.32, 1, 1)
 
 [node name="SideWalls" type="Node3D" parent="."]
@@ -334,234 +312,124 @@ position = Vector3(3.07, 80.38, 0)
 scale = Vector3(1, 0.21, 1.08)
 
 [node name="East00" parent="SideWalls" groups=["no_wall_kick"] instance=ExtResource("Wall")]
-position = Vector3(20.15, 2.02, 0)
+position = Vector3(25.95, 2.02, 0)
 scale = Vector3(1, 1.01, 1.08)
 
 [node name="EastLight00" type="MeshInstance3D" parent="SideWalls"]
-position = Vector3(19.73, 1.5, 0)
+position = Vector3(25.53, 1.5, 0)
 mesh = SubResource("WallLight")
 
 [node name="East01" parent="SideWalls" groups=["no_wall_kick"] instance=ExtResource("Wall")]
-position = Vector3(20.15, 6.06, 0)
+position = Vector3(25.95, 6.06, 0)
 scale = Vector3(1, 1.01, 1.08)
 
 [node name="East02" parent="SideWalls" groups=["no_wall_kick"] instance=ExtResource("Wall")]
-position = Vector3(20.15, 10.1, 0)
+position = Vector3(25.95, 10.1, 0)
 scale = Vector3(1, 1.01, 1.08)
 
 [node name="EastLight02" type="MeshInstance3D" parent="SideWalls"]
-position = Vector3(19.73, 9.58, 0)
+position = Vector3(25.53, 9.58, 0)
 mesh = SubResource("WallLight")
 
 [node name="East03" parent="SideWalls" groups=["no_wall_kick"] instance=ExtResource("Wall")]
-position = Vector3(20.15, 14.14, 0)
+position = Vector3(25.95, 14.14, 0)
 scale = Vector3(1, 1.01, 1.08)
 
 [node name="East04" parent="SideWalls" groups=["no_wall_kick"] instance=ExtResource("Wall")]
-position = Vector3(20.15, 18.18, 0)
+position = Vector3(25.95, 18.18, 0)
 scale = Vector3(1, 1.01, 1.08)
 
 [node name="EastLight04" type="MeshInstance3D" parent="SideWalls"]
-position = Vector3(19.73, 17.66, 0)
+position = Vector3(25.53, 17.66, 0)
 mesh = SubResource("WallLight")
 
 [node name="East05" parent="SideWalls" groups=["no_wall_kick"] instance=ExtResource("Wall")]
-position = Vector3(20.15, 22.22, 0)
+position = Vector3(25.95, 22.22, 0)
 scale = Vector3(1, 1.01, 1.08)
 
 [node name="East06" parent="SideWalls" groups=["no_wall_kick"] instance=ExtResource("Wall")]
-position = Vector3(20.15, 26.26, 0)
+position = Vector3(25.95, 26.26, 0)
 scale = Vector3(1, 1.01, 1.08)
 
 [node name="EastLight06" type="MeshInstance3D" parent="SideWalls"]
-position = Vector3(19.73, 25.74, 0)
+position = Vector3(25.53, 25.74, 0)
 mesh = SubResource("WallLight")
 
 [node name="East07" parent="SideWalls" instance=ExtResource("Wall")]
-position = Vector3(20.15, 30.3, 0)
+position = Vector3(25.95, 30.3, 0)
 scale = Vector3(1, 1.01, 1.08)
 
 [node name="East08" parent="SideWalls" groups=["no_wall_kick"] instance=ExtResource("Wall")]
-position = Vector3(20.15, 34.34, 0)
+position = Vector3(25.95, 34.34, 0)
 scale = Vector3(1, 1.01, 1.08)
 
 [node name="EastLight08" type="MeshInstance3D" parent="SideWalls"]
-position = Vector3(19.73, 33.82, 0)
+position = Vector3(25.53, 33.82, 0)
 mesh = SubResource("WallLight")
 
 [node name="East09" parent="SideWalls" groups=["no_wall_kick"] instance=ExtResource("Wall")]
-position = Vector3(20.15, 38.38, 0)
+position = Vector3(25.95, 38.38, 0)
 scale = Vector3(1, 1.01, 1.08)
 
 [node name="East10" parent="SideWalls" groups=["no_wall_kick"] instance=ExtResource("Wall")]
-position = Vector3(20.15, 42.42, 0)
+position = Vector3(25.95, 42.42, 0)
 scale = Vector3(1, 1.01, 1.08)
 
 [node name="EastLight10" type="MeshInstance3D" parent="SideWalls"]
-position = Vector3(19.73, 41.9, 0)
+position = Vector3(25.53, 41.9, 0)
 mesh = SubResource("WallLight")
 
 [node name="East11" parent="SideWalls" groups=["no_wall_kick"] instance=ExtResource("Wall")]
-position = Vector3(20.15, 46.46, 0)
+position = Vector3(25.95, 46.46, 0)
 scale = Vector3(1, 1.01, 1.08)
 
 [node name="East12" parent="SideWalls" groups=["no_wall_kick"] instance=ExtResource("Wall")]
-position = Vector3(20.15, 50.5, 0)
+position = Vector3(25.95, 50.5, 0)
 scale = Vector3(1, 1.01, 1.08)
 
 [node name="EastLight12" type="MeshInstance3D" parent="SideWalls"]
-position = Vector3(19.73, 49.98, 0)
+position = Vector3(25.53, 49.98, 0)
 mesh = SubResource("WallLight")
 
 [node name="East13" parent="SideWalls" groups=["no_wall_kick"] instance=ExtResource("Wall")]
-position = Vector3(20.15, 54.54, 0)
+position = Vector3(25.95, 54.54, 0)
 scale = Vector3(1, 1.01, 1.08)
 
 [node name="East14" parent="SideWalls" groups=["no_wall_kick"] instance=ExtResource("Wall")]
-position = Vector3(20.15, 58.58, 0)
+position = Vector3(25.95, 58.58, 0)
 scale = Vector3(1, 1.01, 1.08)
 
 [node name="EastLight14" type="MeshInstance3D" parent="SideWalls"]
-position = Vector3(19.73, 58.06, 0)
+position = Vector3(25.53, 58.06, 0)
 mesh = SubResource("WallLight")
 
 [node name="East15" parent="SideWalls" instance=ExtResource("Wall")]
-position = Vector3(20.15, 62.62, 0)
+position = Vector3(25.95, 62.62, 0)
 scale = Vector3(1, 1.01, 1.08)
 
 [node name="East16" parent="SideWalls" groups=["no_wall_kick"] instance=ExtResource("Wall")]
-position = Vector3(20.15, 66.66, 0)
+position = Vector3(25.95, 66.66, 0)
 scale = Vector3(1, 1.01, 1.08)
 
 [node name="EastLight16" type="MeshInstance3D" parent="SideWalls"]
-position = Vector3(19.73, 66.14, 0)
+position = Vector3(25.53, 66.14, 0)
 mesh = SubResource("WallLight")
 
 [node name="East17" parent="SideWalls" groups=["no_wall_kick"] instance=ExtResource("Wall")]
-position = Vector3(20.15, 70.7, 0)
+position = Vector3(25.95, 70.7, 0)
 scale = Vector3(1, 1.01, 1.08)
 
 [node name="East18" parent="SideWalls" groups=["no_wall_kick"] instance=ExtResource("Wall")]
-position = Vector3(20.15, 74.74, 0)
+position = Vector3(25.95, 74.74, 0)
 scale = Vector3(1, 1.01, 1.08)
 
 [node name="EastLight18" type="MeshInstance3D" parent="SideWalls"]
-position = Vector3(19.73, 74.22, 0)
+position = Vector3(25.53, 74.22, 0)
 mesh = SubResource("WallLight")
 
 [node name="East19" parent="SideWalls" groups=["no_wall_kick"] instance=ExtResource("Wall")]
-position = Vector3(20.15, 78.78, 0)
+position = Vector3(25.95, 78.78, 0)
 scale = Vector3(1, 1.01, 1.08)
-
-[node name="ReturnChute" type="Node3D" parent="."]
-
-[node name="Inner00" parent="ReturnChute" groups=["no_wall_kick"] instance=ExtResource("Wall")]
-position = Vector3(28.23, 17.8500, 0)
-scale = Vector3(1, 1.2750, 1.08)
-
-[node name="Inner01" parent="ReturnChute" groups=["no_wall_kick"] instance=ExtResource("Wall")]
-position = Vector3(28.23, 22.9500, 0)
-scale = Vector3(1, 1.2750, 1.08)
-
-[node name="Inner02" parent="ReturnChute" groups=["no_wall_kick"] instance=ExtResource("Wall")]
-position = Vector3(28.23, 28.0500, 0)
-scale = Vector3(1, 1.2750, 1.08)
-
-[node name="Inner03" parent="ReturnChute" groups=["no_wall_kick"] instance=ExtResource("Wall")]
-position = Vector3(28.23, 33.1500, 0)
-scale = Vector3(1, 1.2750, 1.08)
-
-[node name="Inner04" parent="ReturnChute" groups=["no_wall_kick"] instance=ExtResource("Wall")]
-position = Vector3(28.23, 38.2500, 0)
-scale = Vector3(1, 1.2750, 1.08)
-
-[node name="Inner05" parent="ReturnChute" groups=["no_wall_kick"] instance=ExtResource("Wall")]
-position = Vector3(28.23, 43.3500, 0)
-scale = Vector3(1, 1.2750, 1.08)
-
-[node name="Inner06" parent="ReturnChute" groups=["no_wall_kick"] instance=ExtResource("Wall")]
-position = Vector3(28.23, 48.4500, 0)
-scale = Vector3(1, 1.2750, 1.08)
-
-[node name="Inner07" parent="ReturnChute" groups=["no_wall_kick"] instance=ExtResource("Wall")]
-position = Vector3(28.23, 53.5500, 0)
-scale = Vector3(1, 1.2750, 1.08)
-
-[node name="Inner08" parent="ReturnChute" groups=["no_wall_kick"] instance=ExtResource("Wall")]
-position = Vector3(28.23, 58.6500, 0)
-scale = Vector3(1, 1.2750, 1.08)
-
-[node name="Inner09" parent="ReturnChute" groups=["no_wall_kick"] instance=ExtResource("Wall")]
-position = Vector3(28.23, 63.7500, 0)
-scale = Vector3(1, 1.2750, 1.08)
-
-[node name="Inner10" parent="ReturnChute" groups=["no_wall_kick"] instance=ExtResource("Wall")]
-position = Vector3(28.23, 68.8500, 0)
-scale = Vector3(1, 1.2750, 1.08)
-
-[node name="Inner11" parent="ReturnChute" groups=["no_wall_kick"] instance=ExtResource("Wall")]
-position = Vector3(28.23, 73.9500, 0)
-scale = Vector3(1, 1.2750, 1.08)
-
-[node name="Inner12" parent="ReturnChute" groups=["no_wall_kick"] instance=ExtResource("Wall")]
-position = Vector3(28.23, 78.1400, 0)
-scale = Vector3(1, 0.8200, 1.08)
-
-[node name="Outer00" parent="ReturnChute" groups=["no_wall_kick"] instance=ExtResource("Wall")]
-position = Vector3(32.2, 17.8500, 0)
-scale = Vector3(1, 1.2750, 1.08)
-
-[node name="Outer01" parent="ReturnChute" groups=["no_wall_kick"] instance=ExtResource("Wall")]
-position = Vector3(32.2, 22.9500, 0)
-scale = Vector3(1, 1.2750, 1.08)
-
-[node name="Outer02" parent="ReturnChute" groups=["no_wall_kick"] instance=ExtResource("Wall")]
-position = Vector3(32.2, 28.0500, 0)
-scale = Vector3(1, 1.2750, 1.08)
-
-[node name="Outer03" parent="ReturnChute" groups=["no_wall_kick"] instance=ExtResource("Wall")]
-position = Vector3(32.2, 33.1500, 0)
-scale = Vector3(1, 1.2750, 1.08)
-
-[node name="Outer04" parent="ReturnChute" groups=["no_wall_kick"] instance=ExtResource("Wall")]
-position = Vector3(32.2, 38.2500, 0)
-scale = Vector3(1, 1.2750, 1.08)
-
-[node name="Outer05" parent="ReturnChute" groups=["no_wall_kick"] instance=ExtResource("Wall")]
-position = Vector3(32.2, 43.3500, 0)
-scale = Vector3(1, 1.2750, 1.08)
-
-[node name="Outer06" parent="ReturnChute" groups=["no_wall_kick"] instance=ExtResource("Wall")]
-position = Vector3(32.2, 48.4500, 0)
-scale = Vector3(1, 1.2750, 1.08)
-
-[node name="Outer07" parent="ReturnChute" groups=["no_wall_kick"] instance=ExtResource("Wall")]
-position = Vector3(32.2, 53.5500, 0)
-scale = Vector3(1, 1.2750, 1.08)
-
-[node name="Outer08" parent="ReturnChute" groups=["no_wall_kick"] instance=ExtResource("Wall")]
-position = Vector3(32.2, 58.6500, 0)
-scale = Vector3(1, 1.2750, 1.08)
-
-[node name="Outer09" parent="ReturnChute" groups=["no_wall_kick"] instance=ExtResource("Wall")]
-position = Vector3(32.2, 63.7500, 0)
-scale = Vector3(1, 1.2750, 1.08)
-
-[node name="Outer10" parent="ReturnChute" groups=["no_wall_kick"] instance=ExtResource("Wall")]
-position = Vector3(32.2, 68.8500, 0)
-scale = Vector3(1, 1.2750, 1.08)
-
-[node name="Outer11" parent="ReturnChute" groups=["no_wall_kick"] instance=ExtResource("Wall")]
-position = Vector3(32.2, 73.9500, 0)
-scale = Vector3(1, 1.2750, 1.08)
-
-[node name="Outer12" parent="ReturnChute" groups=["no_wall_kick"] instance=ExtResource("Wall")]
-position = Vector3(32.2, 79.0500, 0)
-scale = Vector3(1, 1.2750, 1.08)
-
-[node name="Outer13" parent="ReturnChute" groups=["no_wall_kick"] instance=ExtResource("Wall")]
-position = Vector3(32.2, 82.0500, 0)
-scale = Vector3(1, 0.2250, 1.08)
 
 [node name="Cladding" type="Node3D" parent="."]
 
@@ -581,6 +449,10 @@ scale = Vector3(0.945, 1.41, 1)
 position = Vector3(22.5, 1.6, -2.8)
 scale = Vector3(0.945, 1.41, 1)
 
+[node name="Panel00_4" parent="Cladding" instance=ExtResource("Panel")]
+position = Vector3(28.1, 1.6, -2.8)
+scale = Vector3(0.945, 1.41, 1)
+
 [node name="Panel01_0" parent="Cladding" instance=ExtResource("Panel")]
 position = Vector3(5.7, 7.15, -2.8)
 scale = Vector3(0.945, 1.41, 1)
@@ -595,6 +467,10 @@ scale = Vector3(0.945, 1.41, 1)
 
 [node name="Panel01_3" parent="Cladding" instance=ExtResource("Panel")]
 position = Vector3(22.5, 7.15, -2.8)
+scale = Vector3(0.945, 1.41, 1)
+
+[node name="Panel01_4" parent="Cladding" instance=ExtResource("Panel")]
+position = Vector3(28.1, 7.15, -2.8)
 scale = Vector3(0.945, 1.41, 1)
 
 [node name="Panel02_0" parent="Cladding" instance=ExtResource("Panel")]
@@ -613,6 +489,10 @@ scale = Vector3(0.945, 1.41, 1)
 position = Vector3(22.5, 12.7, -2.8)
 scale = Vector3(0.945, 1.41, 1)
 
+[node name="Panel02_4" parent="Cladding" instance=ExtResource("Panel")]
+position = Vector3(28.1, 12.7, -2.8)
+scale = Vector3(0.945, 1.41, 1)
+
 [node name="Panel03_0" parent="Cladding" instance=ExtResource("Panel")]
 position = Vector3(5.7, 18.25, -2.8)
 scale = Vector3(0.945, 1.41, 1)
@@ -627,6 +507,10 @@ scale = Vector3(0.945, 1.41, 1)
 
 [node name="Panel03_3" parent="Cladding" instance=ExtResource("Panel")]
 position = Vector3(22.5, 18.25, -2.8)
+scale = Vector3(0.945, 1.41, 1)
+
+[node name="Panel03_4" parent="Cladding" instance=ExtResource("Panel")]
+position = Vector3(28.1, 18.25, -2.8)
 scale = Vector3(0.945, 1.41, 1)
 
 [node name="Panel04_0" parent="Cladding" instance=ExtResource("Panel")]
@@ -645,6 +529,10 @@ scale = Vector3(0.945, 1.41, 1)
 position = Vector3(22.5, 23.8, -2.8)
 scale = Vector3(0.945, 1.41, 1)
 
+[node name="Panel04_4" parent="Cladding" instance=ExtResource("Panel")]
+position = Vector3(28.1, 23.8, -2.8)
+scale = Vector3(0.945, 1.41, 1)
+
 [node name="Panel05_0" parent="Cladding" instance=ExtResource("Panel")]
 position = Vector3(5.7, 29.35, -2.8)
 scale = Vector3(0.945, 1.41, 1)
@@ -659,6 +547,10 @@ scale = Vector3(0.945, 1.41, 1)
 
 [node name="Panel05_3" parent="Cladding" instance=ExtResource("Panel")]
 position = Vector3(22.5, 29.35, -2.8)
+scale = Vector3(0.945, 1.41, 1)
+
+[node name="Panel05_4" parent="Cladding" instance=ExtResource("Panel")]
+position = Vector3(28.1, 29.35, -2.8)
 scale = Vector3(0.945, 1.41, 1)
 
 [node name="Panel06_0" parent="Cladding" instance=ExtResource("Panel")]
@@ -677,6 +569,10 @@ scale = Vector3(0.945, 1.41, 1)
 position = Vector3(22.5, 34.9, -2.8)
 scale = Vector3(0.945, 1.41, 1)
 
+[node name="Panel06_4" parent="Cladding" instance=ExtResource("Panel")]
+position = Vector3(28.1, 34.9, -2.8)
+scale = Vector3(0.945, 1.41, 1)
+
 [node name="Panel07_0" parent="Cladding" instance=ExtResource("Panel")]
 position = Vector3(5.7, 40.45, -2.8)
 scale = Vector3(0.945, 1.41, 1)
@@ -691,6 +587,10 @@ scale = Vector3(0.945, 1.41, 1)
 
 [node name="Panel07_3" parent="Cladding" instance=ExtResource("Panel")]
 position = Vector3(22.5, 40.45, -2.8)
+scale = Vector3(0.945, 1.41, 1)
+
+[node name="Panel07_4" parent="Cladding" instance=ExtResource("Panel")]
+position = Vector3(28.1, 40.45, -2.8)
 scale = Vector3(0.945, 1.41, 1)
 
 [node name="Panel08_0" parent="Cladding" instance=ExtResource("Panel")]
@@ -709,6 +609,10 @@ scale = Vector3(0.945, 1.41, 1)
 position = Vector3(22.5, 46, -2.8)
 scale = Vector3(0.945, 1.41, 1)
 
+[node name="Panel08_4" parent="Cladding" instance=ExtResource("Panel")]
+position = Vector3(28.1, 46, -2.8)
+scale = Vector3(0.945, 1.41, 1)
+
 [node name="Panel09_0" parent="Cladding" instance=ExtResource("Panel")]
 position = Vector3(5.7, 51.55, -2.8)
 scale = Vector3(0.945, 1.41, 1)
@@ -723,6 +627,10 @@ scale = Vector3(0.945, 1.41, 1)
 
 [node name="Panel09_3" parent="Cladding" instance=ExtResource("Panel")]
 position = Vector3(22.5, 51.55, -2.8)
+scale = Vector3(0.945, 1.41, 1)
+
+[node name="Panel09_4" parent="Cladding" instance=ExtResource("Panel")]
+position = Vector3(28.1, 51.55, -2.8)
 scale = Vector3(0.945, 1.41, 1)
 
 [node name="Panel10_0" parent="Cladding" instance=ExtResource("Panel")]
@@ -741,6 +649,10 @@ scale = Vector3(0.945, 1.41, 1)
 position = Vector3(22.5, 57.1, -2.8)
 scale = Vector3(0.945, 1.41, 1)
 
+[node name="Panel10_4" parent="Cladding" instance=ExtResource("Panel")]
+position = Vector3(28.1, 57.1, -2.8)
+scale = Vector3(0.945, 1.41, 1)
+
 [node name="Panel11_0" parent="Cladding" instance=ExtResource("Panel")]
 position = Vector3(5.7, 62.65, -2.8)
 scale = Vector3(0.945, 1.41, 1)
@@ -755,6 +667,10 @@ scale = Vector3(0.945, 1.41, 1)
 
 [node name="Panel11_3" parent="Cladding" instance=ExtResource("Panel")]
 position = Vector3(22.5, 62.65, -2.8)
+scale = Vector3(0.945, 1.41, 1)
+
+[node name="Panel11_4" parent="Cladding" instance=ExtResource("Panel")]
+position = Vector3(28.1, 62.65, -2.8)
 scale = Vector3(0.945, 1.41, 1)
 
 [node name="Panel12_0" parent="Cladding" instance=ExtResource("Panel")]
@@ -773,6 +689,10 @@ scale = Vector3(0.945, 1.41, 1)
 position = Vector3(22.5, 68.2, -2.8)
 scale = Vector3(0.945, 1.41, 1)
 
+[node name="Panel12_4" parent="Cladding" instance=ExtResource("Panel")]
+position = Vector3(28.1, 68.2, -2.8)
+scale = Vector3(0.945, 1.41, 1)
+
 [node name="Panel13_0" parent="Cladding" instance=ExtResource("Panel")]
 position = Vector3(5.7, 73.75, -2.8)
 scale = Vector3(0.945, 1.41, 1)
@@ -787,6 +707,10 @@ scale = Vector3(0.945, 1.41, 1)
 
 [node name="Panel13_3" parent="Cladding" instance=ExtResource("Panel")]
 position = Vector3(22.5, 73.75, -2.8)
+scale = Vector3(0.945, 1.41, 1)
+
+[node name="Panel13_4" parent="Cladding" instance=ExtResource("Panel")]
+position = Vector3(28.1, 73.75, -2.8)
 scale = Vector3(0.945, 1.41, 1)
 
 [node name="Panel14_0" parent="Cladding" instance=ExtResource("Panel")]
@@ -805,16 +729,9 @@ scale = Vector3(0.945, 1.41, 1)
 position = Vector3(22.5, 79.3, -2.8)
 scale = Vector3(0.945, 1.41, 1)
 
-[node name="Prompt" type="Label3D" parent="."]
-position = Vector3(9.5, 3.8, -1.94)
-text = "ESCAPE SHAFT"
-font = ExtResource("Font")
-font_size = 62
-pixel_size = 0.007
-billboard = 1
-modulate = Color(1, 0.76, 0.47, 1)
-outline_size = 10
-outline_modulate = Color(0.17, 0.06, 0.03, 1)
+[node name="Panel14_4" parent="Cladding" instance=ExtResource("Panel")]
+position = Vector3(28.1, 79.3, -2.8)
+scale = Vector3(0.945, 1.41, 1)
 
 [node name="West02Grip0" type="MeshInstance3D" parent="SideWalls"]
 position = Vector3(3.18, 12.63, 2.08)
@@ -847,31 +764,31 @@ scale = Vector3(4.4, 1.8, 0.33)
 mesh = SubResource("WallLight")
 
 [node name="East07Grip0" type="MeshInstance3D" parent="SideWalls"]
-position = Vector3(20.04, 29.63, 2.08)
+position = Vector3(25.84, 29.63, 2.08)
 scale = Vector3(4.4, 1.8, 0.33)
 mesh = SubResource("WallLight")
 
 [node name="East07Grip1" type="MeshInstance3D" parent="SideWalls"]
-position = Vector3(20.04, 30.3, 2.08)
+position = Vector3(25.84, 30.3, 2.08)
 scale = Vector3(4.4, 1.8, 0.33)
 mesh = SubResource("WallLight")
 
 [node name="East07Grip2" type="MeshInstance3D" parent="SideWalls"]
-position = Vector3(20.04, 30.97, 2.08)
+position = Vector3(25.84, 30.97, 2.08)
 scale = Vector3(4.4, 1.8, 0.33)
 mesh = SubResource("WallLight")
 
 [node name="East15Grip0" type="MeshInstance3D" parent="SideWalls"]
-position = Vector3(20.04, 61.95, 2.08)
+position = Vector3(25.84, 61.95, 2.08)
 scale = Vector3(4.4, 1.8, 0.33)
 mesh = SubResource("WallLight")
 
 [node name="East15Grip1" type="MeshInstance3D" parent="SideWalls"]
-position = Vector3(20.04, 62.62, 2.08)
+position = Vector3(25.84, 62.62, 2.08)
 scale = Vector3(4.4, 1.8, 0.33)
 mesh = SubResource("WallLight")
 
 [node name="East15Grip2" type="MeshInstance3D" parent="SideWalls"]
-position = Vector3(20.04, 63.29, 2.08)
+position = Vector3(25.84, 63.29, 2.08)
 scale = Vector3(4.4, 1.8, 0.33)
 mesh = SubResource("WallLight")

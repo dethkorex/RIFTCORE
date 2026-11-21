@@ -137,6 +137,8 @@ var shot_buffer_left := 0.0
 var queued_charged := false
 var queued_pose := false
 var combo_hot := false
+var saber_equipped := false
+var guarding := false
 var melee_lock := 0.0
 var run_module := ""
 var charged_damage_multiplier := 1.0
@@ -150,7 +152,7 @@ var combo_facing := 1.0
 var combo_duration := 0.0
 const SABER_CLIPS := preload("res://assets/animations/rx07_saber_combo.res")
 const SWING_CLIPS := [&"saber_cut", &"saber_return", &"slash_finisher"]
-const SWING_DURATIONS := [0.35, 0.34, 0.49]
+const SWING_DURATIONS := [0.42, 0.41, 0.56]
 const SWING_IMPACT := [0.52, 0.49, 0.56]
 const SWEEP_START := [0.35, 0.32, 0.43]
 const SWEEP_END := 0.78
@@ -158,6 +160,9 @@ const SABER_CHARGE_TIME := 0.52
 var saber_hold := -1.0
 var saber_primed := false
 var displayed_saber_charge := -1.0
+var saber_shell: ShaderMaterial
+var saber_glowing := false
+var charge_sparks: Node3D
 var combo_wave := false
 var combo_trail := false
 var sword_pivot: Node3D
@@ -242,6 +247,7 @@ func _ready() -> void:
 		slide_pose = preload("res://scripts/ground_slide_pose.gd").new()
 		slide_pose.influence = 0.0
 		skeleton.add_child(slide_pose)
+		slide_pose.configure_stride(self, animation_player)
 		var swim_pose := preload("res://scripts/swim_pose.gd").new()
 		swim_pose.actor=self
 		swim_pose.influence=0.0
@@ -427,6 +433,7 @@ func set_controls_suspended(suspended: bool) -> void:
 		return
 	controls_suspended = suspended
 	if suspended:
+		guarding = false
 		cancel_charge()
 		shot_buffer_left = 0.0
 		jump_buffer = 0.0
@@ -479,9 +486,14 @@ func simulate_movement(delta: float) -> void:
 	if suit_showcase_active:
 		return
 	if health <= 0.0:
+		guarding = false
 		cancel_charge()
 		cancel_saber_charge()
 		return
+	if not local_prediction:
+		if action_pressed("melee"):
+			switch_combat_mode()
+		guarding = saber_equipped and action_held("guard") and melee_lock <= 0.0 and dash_left <= 0.0 and contact_recoil <= 0.0 and shock_stun <= 0.0 and not wall_sliding and not is_instance_valid(ladder) and not is_instance_valid(rocket_course)
 	if is_instance_valid(rocket_course):
 		rocket_course.simulate(self,delta)
 		return
@@ -516,7 +528,7 @@ func simulate_movement(delta: float) -> void:
 	if contact_recoil > 0.0:
 		contact_recoil = maxf(0.0, contact_recoil - delta)
 		axis = 0.0
-	if dash_left <= 0.0 and absf(axis) > 0.1:
+	if not guarding and dash_left <= 0.0 and absf(axis) > 0.1:
 		var next_facing := signf(axis)
 		facing = next_facing
 	if dropping:
@@ -532,7 +544,13 @@ func simulate_movement(delta: float) -> void:
 		jump_buffer = jump_buffer_duration
 	else:
 		jump_buffer = maxf(0.0, jump_buffer - delta)
-	if not drop_command and not dropping and shock_stun <= 0.0 and boss_debuff != 9 and resume_input_guard <= 0.0 and contact_recoil <= 0.0 and action_pressed("dash") and dash_lock <= 0.0 and (grounded() or air_dash_available):
+	if not dropping and shock_stun <= 0.0 and boss_debuff != 9 and resume_input_guard <= 0.0 and contact_recoil <= 0.0 and action_pressed("dash") and dash_lock <= 0.0 and (grounded() or air_dash_available):
+		if melee_lock > 0.0:
+			melee_lock = 0.0
+			combo_queued = 0
+			combo_grace = 0.0
+			cancel_saber_charge()
+		guarding = false
 		dash_left = dash_duration
 		dash_elapsed = 0.0
 		dash_evade_used = false
@@ -565,10 +583,8 @@ func simulate_movement(delta: float) -> void:
 		elif not grounded() and absf(axis) < 0.08:
 			accel = air_braking
 		if contact_recoil <= 0.0 and wall_launch_lock <= 0.0:
-			if grounded() and melee_lock > 0.0:
-				accel = maxf(accel, 115.0)
 			var speed_scale := .66 if boss_debuff == 3 else 1.0
-			velocity.x = move_toward(velocity.x, 0.0 if crouching or (grounded() and melee_lock > 0.0) else locomotion_speed(axis, move_speed * speed_scale * (1.0 + supply_bonus("speed"))), accel * delta)
+			velocity.x = move_toward(velocity.x, 0.0 if crouching else locomotion_speed(axis, move_speed * speed_scale * (1.10 if saber_equipped else 1.0) * (.48 if guarding else 1.0) * (1.0 + supply_bonus("speed"))), accel * delta)
 		if not grounded():
 			var gravity_scale := fall_gravity_multiplier if velocity.y < 0.0 else 1.0
 			velocity.y = maxf(-max_fall_speed * clampf(terrain.y * 1.4, 0.36, 1.0), velocity.y - gravity * gravity_scale * terrain.y * delta)
@@ -694,6 +710,7 @@ func die_in_pit() -> void:
 	if health <= 0.0:
 		return
 	health = 0.0
+	cancel_saber_charge()
 	clear_boss_debuff()
 	cancel_charge()
 	health_changed.emit(health, max_health)
@@ -886,11 +903,13 @@ func update_wall_contact(delta: float, axis: float) -> void:
 		return
 	for i in range(get_slide_collision_count()):
 		var collision := get_slide_collision(i)
-		var barrier := collision.get_collider() as StaticBody3D
+		var barrier := collision.get_collider() as Node3D
 		var normal := collision.get_normal()
-		if not barrier or absf(normal.x) < 0.77 or absf(normal.y) > 0.53:
+		if not (barrier is StaticBody3D or barrier is CSGShape3D) or absf(normal.x) < 0.77 or absf(normal.y) > 0.53:
 			continue
-		if barrier.is_in_group(&"no_wall_kick") or barrier.name in ["Blocker", "ExitBarrier"]:
+		if barrier.name in ["Blocker", "ExitBarrier"]:
+			continue
+		if barrier.is_in_group(&"no_wall_kick") and not (barrier.is_in_group(&"cave_grip_lip") and barrier.to_local(collision.get_position()).y >= -3.0):
 			continue
 		var side := -signf(normal.x)
 		if absf(axis) > 0.14 and axis * side < 0.0:
@@ -1193,7 +1212,15 @@ func show_restore_number(scene: Node, amount: float, hp: bool, offset: float, ti
 var hurt_shell: ShaderMaterial
 var hurt_flash: Tween
 func refresh_suit_overlay() -> void:
-	var material := hurt_shell if hurt_shell else (restore_shell if restore_shell else (charge_shell if full_charge_visual else reward_coating))
+	var material := reward_coating
+	if full_charge_visual:
+		material = charge_shell
+	if saber_glowing:
+		material = saber_shell
+	if restore_shell:
+		material = restore_shell
+	if hurt_shell:
+		material = hurt_shell
 	for mesh in base_suit_meshes:
 		mesh.material_overlay = material
 	for mesh in reward_suit_meshes.values():
@@ -1230,7 +1257,20 @@ func cancel_charge() -> void:
 		RiftAudio.stop_effect(&"buster_charge")
 	present_charge(0.0, false)
 
+func switch_combat_mode() -> void:
+	cancel_charge()
+	shot_buffer_left = 0.0
+	queued_suit_shot = false
+	combo_queued = 0
+	combo_grace = 0.0
+	melee_lock = 0.0
+	guarding = false
+	saber_equipped = not saber_equipped
+	cancel_saber_charge()
+
 func update_charge(delta: float) -> void:
+	if saber_equipped:
+		return
 	if wall_sliding:
 		shot_buffer_left = 0.0
 		cancel_charge()
@@ -1262,7 +1302,7 @@ func update_charge(delta: float) -> void:
 	present_charge(charge_elapsed, boss_debuff != 5 and energy >= charged_shot_cost())
 
 func queue_buster_shot(charged: bool, pose_held: bool, suit_shot := false) -> void:
-	if melee_lock > 0.0:
+	if saber_equipped or melee_lock > 0.0:
 		return
 	if fire_lock <= 0.0:
 		shoot(charged, pose_held, suit_shot)
@@ -1271,6 +1311,12 @@ func queue_buster_shot(charged: bool, pose_held: bool, suit_shot := false) -> vo
 		queued_charged = charged
 		queued_pose = pose_held
 		queued_suit_shot = suit_shot
+
+func show_charge_sparks(amount: float, tint: Color, blade: Node3D, muzzle: Vector3) -> void:
+	if not charge_sparks:
+		charge_sparks = preload("res://scripts/operator_charge_sparks.gd").new()
+		add_child(charge_sparks)
+	charge_sparks.energize(amount, tint, blade, muzzle)
 
 func present_charge(held_time: float, has_energy: bool) -> void:
 	var required_time := charge_time * charge_time_scale
@@ -1283,6 +1329,8 @@ func present_charge(held_time: float, has_energy: bool) -> void:
 			charge_shell.set_shader_parameter("charge_color", RiftProjectile.BUSTER_CHARGED_COLOR)
 		refresh_suit_overlay()
 	if held_time < .18:
+		if charge_sparks and not saber_glowing:
+			charge_sparks.stop()
 		if is_instance_valid(charge_orb):
 			charge_orb.queue_free()
 			charge_orb = null
@@ -1299,6 +1347,7 @@ func present_charge(held_time: float, has_energy: bool) -> void:
 		tint = Color(Catalog.weapon(special_weapon).color)
 	elif thorn_active:
 		tint = Color("a8ff64")
+	show_charge_sparks(clampf(held_time / required_time, 0.0, 1.0), tint, null, cannon_muzzle(facing))
 	charge_orb.charge(clampf(held_time / required_time, 0.0, 1.0), tint, primed)
 	charge_orb.global_position = cannon_muzzle(facing)
 
@@ -1323,6 +1372,8 @@ func suit_shot_cost() -> float:
 
 func shoot(charged := false, pose_held := false, suit_shot := false) -> void:
 	var showcase := is_instance_valid(showcase_projectiles)
+	if saber_equipped and not showcase:
+		return
 	var suit := equipped_suit()
 	var uses_suit := suit_shot and not suit.is_empty() and (showcase or (boss_debuff != 10 and energy >= suit_shot_cost()))
 	var magma := uses_suit and magma_active
@@ -1664,24 +1715,20 @@ func cancel_saber_charge() -> void:
 	present_saber_charge(-1.0, melee_lock > 0.0)
 
 func update_melee(delta: float) -> void:
+	if not saber_equipped:
+		return
 	var released_tap := false
-	var can_use_saber := contact_recoil <= 0.0 and dash_left <= 0.0 and not wall_sliding
+	var can_use_saber := not guarding and contact_recoil <= 0.0 and dash_left <= 0.0 and not wall_sliding and not low_profile
 	if not can_use_saber:
 		cancel_saber_charge()
-	elif action_pressed("melee"):
-		if equipped_suit().is_empty():
-			saber_hold = 0.0
-		else:
-			cancel_saber_charge()
-			released_tap = true
+	elif action_pressed("shoot"):
+		saber_hold = 0.0
 	if saber_hold >= 0.0:
-		if action_held("melee") and not action_released("melee"):
+		if action_held("shoot") and not action_released("shoot"):
 			saber_hold += delta
 			if saber_hold >= SABER_CHARGE_TIME * charge_time_scale and not saber_primed:
 				saber_primed = true
-				var ready := preload("res://scripts/attack_fx.gd")
-				ready.charge(get_parent(), global_position + Vector3(0, .7, .2),
-					Color("ff6525") if magma_active else Color("35beff"), .20)
+
 		else:
 			released_tap = not saber_primed
 			if saber_primed:
@@ -1707,8 +1754,6 @@ func update_melee(delta: float) -> void:
 				combo_queued -= 1
 				perform_melee(combo_step + 1)
 			else:
-				if sword_pivot:
-					sword_pivot.hide()
 				combo_grace = 0.19 if combo_step < 3 else 0.0
 	elif released_tap:
 		perform_melee(combo_step + 1 if combo_grace > 0.0 and combo_step < 3 else 1)
@@ -1750,6 +1795,24 @@ func emit_saber_trail(duration: float, finisher: bool) -> void:
 		RiftAudio.play_effect(&"saber_swing")
 
 func present_saber_charge(held_time: float, swinging: bool) -> void:
+	var charge_duration := SABER_CHARGE_TIME * charge_time_scale
+	var was_glowing := saber_glowing
+	saber_glowing = not swinging and held_time >= .075 and is_instance_valid(sword_pivot) and health > 0.0
+	if saber_glowing:
+		var tint := saber_tint()
+		var ratio := clampf(held_time / charge_duration, 0.0, 1.0)
+		if not saber_shell:
+			saber_shell = ShaderMaterial.new()
+			saber_shell.shader = CHARGE_SHELL
+		saber_shell.set_shader_parameter("charge_color", tint)
+		saber_shell.set_shader_parameter("intensity", lerpf(.3, 1.25, ratio) if ratio < 1.0 else 1.85)
+		show_charge_sparks(ratio, tint, sword_pivot, Vector3.ZERO)
+		if held_time >= charge_duration and displayed_saber_charge < charge_duration:
+			preload("res://scripts/attack_fx.gd").charge(sword_pivot, sword_pivot.to_global(Vector3(.62, 0, 0)), tint, .20)
+	elif was_glowing and charge_sparks:
+		charge_sparks.stop()
+	if was_glowing != saber_glowing:
+		refresh_suit_overlay()
 	displayed_saber_charge = held_time
 	if slide_pose:
 		var amount := smoothstep(0.07, SABER_CHARGE_TIME * charge_time_scale * 0.86, held_time) if not swinging else 0.0
@@ -1757,7 +1820,7 @@ func present_saber_charge(held_time: float, swinging: bool) -> void:
 		if amount > 0.0:
 			slide_pose.influence = 1.0
 	if sword_pivot:
-		sword_pivot.visible = swinging
+		sword_pivot.visible = health > 0.0 and (saber_equipped or swinging or held_time >= 0.0)
 
 func reflect_saber_pose(clip: String, held_time: float) -> void:
 	var step := SWING_CLIPS.find(StringName(clip))
@@ -1870,7 +1933,7 @@ func update_character_visuals(axis: float) -> void:
 	var bracing := wall_sliding and not grounded() and dash_left <= 0.0 and melee_lock <= 0.0
 	var in_water:=swim_volume()!=null
 	if model_root:
-		var visual_facing := signf(velocity.x) if absf(velocity.x) > 0.65 and fire_lock <= 0.0 and melee_lock <= 0.0 else facing
+		var visual_facing := signf(velocity.x) if absf(velocity.x) > 0.65 and fire_lock <= 0.0 and melee_lock <= 0.0 and not guarding else facing
 		if bracing:
 			visual_facing = -wall_side
 		elif is_instance_valid(charge_orb):
@@ -1892,11 +1955,11 @@ func update_character_visuals(axis: float) -> void:
 		buster_pose.ladder_direction = 0.0
 		buster_pose.water_direction=Vector3.RIGHT*facing if in_water else Vector3.ZERO
 		buster_pose.crouched = low_profile
-		var aiming: bool = not bracing and not swinging and displayed_saber_charge < 0.10 and not (ground_dash and dash_left > 0.0) and (charge_held or is_instance_valid(charge_orb) or fire_lock > 0.0 or buster_pose.has_recoil())
+		var aiming: bool = not saber_equipped and not bracing and not swinging and displayed_saber_charge < 0.10 and not (ground_dash and dash_left > 0.0) and (charge_held or is_instance_valid(charge_orb) or fire_lock > 0.0 or buster_pose.has_recoil())
 		buster_pose.influence = 0.0 if bracing else move_toward(buster_pose.influence, 1.0 if aiming else 0.0, 0.30)
 	if is_instance_valid(charge_orb):
 		charge_orb.global_position = cannon_muzzle(facing)
-	if swinging:
+	if swinging and dash_left <= 0.0:
 		return
 	if in_water:
 		play_character_animation("idle")
@@ -1908,7 +1971,7 @@ func update_character_visuals(axis: float) -> void:
 	elif not is_on_floor():
 		play_character_animation("fall" if velocity.y < -0.6 else "jump")
 	elif low_profile:
-		play_character_animation("crouch")
+		play_character_animation("slide" if absf(velocity.x) > 0.75 else "crouch")
 	elif landing_left > 0.0:
 		play_character_animation("land")
 	else:
@@ -1946,7 +2009,18 @@ func defense_rating() -> float:
 	var last_stand := low_health_resistance if health < max_health * 0.30 else 0.0
 	return 1.0 - (1.0 - defense_for_experience(experience)) * (1.0 - armor_resistance) * (1.0 - supply_bonus("defense")) * (1.0 - last_stand)
 
-func take_damage(amount: float, source_position := Vector3.ZERO) -> void:
+func blocks_hit(source: Vector3) -> bool:
+	if not saber_equipped or not guarding or not source.is_finite() or health <= 0.0 or (source.x - global_position.x) * facing <= .01:
+		return false
+	if sword_pivot:
+		PACK_VFX.saber_hit(get_parent(), sword_pivot.to_global(Vector3(.75, 0, 0)), facing, saber_tint())
+	return true
+
+func take_damage(amount: float, source_position := Vector3.INF) -> void:
+	if blocks_hit(source_position):
+		return
+	if not source_position.is_finite():
+		source_position = Vector3.ZERO
 	# A patrol hit costs health without changing a mounted rider's jump timing.
 	if receive_hit(amount, source_position) and not is_instance_valid(rocket_course):
 		var away := signf(global_position.x - source_position.x)
@@ -1958,7 +2032,9 @@ func take_damage(amount: float, source_position := Vector3.ZERO) -> void:
 		ladder = null
 		ladder_lock = 0.24
 
-func take_projectile_damage(amount: float) -> void:
+func take_projectile_damage(amount: float, source := Vector3.INF) -> void:
+	if blocks_hit(source):
+		return
 	if run_module == "slipstream" and not dash_evade_used and health > 0.0 and dash_left > 0.0 and dash_elapsed < 0.09:
 		dash_evade_used = true
 		restore_energy(4.0, true)
@@ -1970,7 +2046,7 @@ func take_boss_hit(amount: float, source: Vector3, sector: int, recoil := false)
 	if recoil:
 		take_damage(amount, source)
 	else:
-		take_projectile_damage(amount)
+		take_projectile_damage(amount, source)
 	if health <= 0.0 or health >= previous or sector < 1 or sector >= BOSS_DEBUFFS.size():
 		return
 	if boss_debuff != sector:

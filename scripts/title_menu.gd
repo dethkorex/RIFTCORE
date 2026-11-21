@@ -453,7 +453,7 @@ func open_station(next: String, tour_preview := false) -> void:
 	shop_category = "All Items"
 	show()
 	show_page(next)
-	if not station_tour_preview and not is_instance_valid(hub_tip) and RiftSettings.show_hub_tips and HUB_TIPS.has(next) and not RiftSettings.seen_hub_tips.has(next):
+	if not station_tour_preview and RiftRelay.connected_room.is_empty() and not is_instance_valid(hub_tip) and RiftSettings.show_hub_tips and HUB_TIPS.has(next) and not RiftSettings.seen_hub_tips.has(next):
 		show_station_tip(next)
 
 func close_tour_preview() -> void:

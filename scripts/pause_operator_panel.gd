@@ -7,6 +7,8 @@ const EquipmentBody := preload("res://scripts/equipment_body.gd")
 const EquipmentIcons := preload("res://scripts/equipment_icons.gd")
 const Catalog := preload("res://scripts/sector_catalog.gd")
 
+signal quick_assigned(id: String)
+
 var operator: Callable
 var life_total: Callable
 var profile
@@ -172,6 +174,7 @@ func edit_slot(index: int) -> void:
 	if previous != profile.quick_slots[index]:
 		if quick_edited.is_valid():
 			quick_edited.call()
+		quick_assigned.emit(selected_supply)
 		cancel_quick_assignment(false)
 	refresh()
 

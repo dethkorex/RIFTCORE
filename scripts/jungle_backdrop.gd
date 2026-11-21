@@ -2,6 +2,7 @@
 extends Node3D
 
 var skyline: MeshInstance3D
+@export_range(0.0, 1.0) var vertical_parallax := 0.0
 @export var panorama_texture: Texture2D
 @export var shadow_tint := Vector3(0.016, 0.036, 0.093)
 @export var panorama_filter := Vector3(0.66, 0.74, 0.84)
@@ -30,3 +31,4 @@ func _process(_delta: float) -> void:
 	var camera := get_viewport().get_camera_3d()
 	if camera:
 		skyline.global_position.x = camera.global_position.x
+		skyline.global_position.y = global_position.y + 14.0 + maxf(camera.global_position.y - 5.0, 0.0) * vertical_parallax

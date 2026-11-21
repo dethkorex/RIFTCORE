@@ -4,12 +4,14 @@ const COMPLETE := 3
 const TERMINAL := preload("res://assets/neon_factory/gate_relay_terminal.tscn")
 const STATIONS := ["TERRAIN/MidpointCheckpoint", "TERRAIN/ForgeHallCheckpoint"]
 
+var return_shutters: Dictionary[int, StaticBody3D] = {}
 var active: int
 var terminals: Array[Node3D] = []
 var return_points: Dictionary[int, Vector3] = {}
 var landmarks: Array[String] = []
 var prompts: Array[Label3D] = []
 var door_prompt: Label3D
+var escape_door: Node3D
 var lit: StandardMaterial3D
 
 func install(stage: Node3D, tint: Color) -> void:
@@ -21,6 +23,9 @@ func install(stage: Node3D, tint: Color) -> void:
 		var station := stage.get_node(STATIONS[index]) as Node3D
 		var position_marker := stage.get_node_or_null("MARKERS/GateRelay" + str(index + 1)) as Marker3D
 		var ground := position_marker if position_marker else station
+		if ground.has_meta("return_shutter"):
+			var shutter := stage.get_node(ground.get_meta("return_shutter")) as StaticBody3D
+			return_shutters[index] = shutter
 		landmarks.append(str(ground.get_meta("landmark", "")))
 		add_child(terminal)
 		terminal.global_position = ground.global_position
@@ -36,6 +41,7 @@ func install(stage: Node3D, tint: Color) -> void:
 		var prompt := make_label(terminal, Vector3(0, 1.97, -0.49), 0.0047)
 		terminals.append(terminal)
 		prompts.append(prompt)
+	escape_door = stage.get_node_or_null("TERRAIN/LavaEscape/Entrance")
 	var portal := stage.get_node("Gate") as Node3D
 	door_prompt = make_label(self, Vector3.ZERO, 0.006)
 	door_prompt.no_depth_test = true
@@ -68,6 +74,11 @@ func set_active(flags: int) -> void:
 		var bit := 1 << index
 		if (active & bit) == (next & bit):
 			continue
+		if return_shutters.has(index):
+			var shutter := return_shutters[index]
+			var unlocked := (next & bit) != 0
+			shutter.visible = not unlocked
+			shutter.set_deferred("process_mode", Node.PROCESS_MODE_DISABLED if unlocked else Node.PROCESS_MODE_INHERIT)
 		var socket := terminals[index].get_node("Signal") as MeshInstance3D
 		if next & bit:
 			socket.set_meta("off_material", socket.material_override)
@@ -91,8 +102,11 @@ func update_prompt(operator: RiftPlayer, at_gate: bool) -> void:
 		if prompt.visible:
 			interact = interact if not interact.is_empty() else interaction_binding()
 			prompt.text = "%s  ·  ACTIVATE" % interact
-	door_prompt.visible = at_gate and not complete()
+	var at_escape := near_escape(operator)
+	door_prompt.visible = (at_gate or at_escape) and not complete()
 	if door_prompt.visible:
+		var portal: Node3D = escape_door if at_escape else get_parent().get_node("Gate")
+		door_prompt.global_position = portal.global_position + Vector3(-2.65, 2.85, 0.85)
 		var index := 0 if (active & 1) == 0 else 1
 		var relay := "A" if index == 0 else "B"
 		var missing := "FIND RELAY " + relay
@@ -102,6 +116,12 @@ func update_prompt(operator: RiftPlayer, at_gate: bool) -> void:
 			interact = interact if not interact.is_empty() else interaction_binding()
 			missing += "\n%s  ·  RETURN TO APPROACH" % interact
 		door_prompt.text = "DOOR LOCKED  ·  GATE RELAYS %d/2\n%s" % [count(), missing]
+
+func near_escape(operator: RiftPlayer) -> bool:
+	if not is_instance_valid(escape_door):
+		return false
+	var offset := escape_door.to_local(operator.global_position)
+	return offset.x >= -4.8 and offset.x <= 0.6 and absf(offset.y - 0.85) < 2.0
 
 func interaction_binding() -> String:
 	return "%s / %s" % [RiftSettings.binding_label("field_interact", "key"), RiftSettings.binding_label("field_interact", "pad")]
@@ -117,7 +137,7 @@ func interact(operator: RiftPlayer, at_gate: bool) -> bool:
 			RiftAudio.play_effect(&"checkpoint")
 			return true
 	var missing := 0 if (active & 1) == 0 else 1
-	if at_gate and return_points.has(missing):
+	if (at_gate or near_escape(operator)) and return_points.has(missing):
 		operator.cancel_charge()
 		var arrival := return_points[missing] + Vector3.UP * (operator.standing_capsule.height * 0.5 + 0.08)
 		operator.reset_predicted_position(arrival, Vector3.ZERO, operator.facing)

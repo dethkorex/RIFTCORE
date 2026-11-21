@@ -40,8 +40,6 @@ func _ready() -> void:
 	entrance.piece = KIT.Piece.ROCKET_BOARD
 	add_child(entrance)
 	entrance.global_position = dock + Vector3.UP * .18
-	label(self,"ROCKET SPILLWAY",to_local(dock + Vector3(0,2.75,0)),Color("83edff"))
-	label(self,"HOLD UP TO BOARD",to_local(dock + Vector3(0,2.2,0)),Color.WHITE)
 	var ui := CanvasLayer.new()
 	ui.layer = 12
 	add_child(ui)
@@ -130,7 +128,6 @@ func build_track() -> void:
 		var pad := kit_piece(KIT.Piece.JUMP_PAD, Vector3(x, ground_height(x), 0))
 		pad.rotation.z = track_pitch(x)
 	warnings.sort_custom(func(a: Dictionary, b: Dictionary): return a.x < b.x)
-	label(self, "RELAY A  ·  SPILLWAY EXIT", Vector3(LENGTH - 12, ground_height(LENGTH) + 3, 0), Color("8affbb"))
 
 func add_hazard(prop: Node3D, height: float, size: Vector3) -> void:
 	var blocker := StaticBody3D.new()
@@ -156,27 +153,18 @@ func kit_piece(type: int, at: Vector3, span := 0.0) -> Node3D:
 	add_child(prop)
 	return prop
 
-func label(parent: Node3D, caption: String, at: Vector3, color: Color) -> void:
-	var sign := Label3D.new()
-	sign.text = caption
-	sign.font = preload("res://assets/ui/fonts/BarlowCondensed-ExtraBoldItalic.ttf")
-	sign.font_size = 54
-	sign.pixel_size = .006
-	sign.modulate = color
-	sign.outline_size = 9
-	sign.position = at
-	sign.visibility_range_end = 45
-	parent.add_child(sign)
-
 func _physics_process(_delta: float) -> void:
 	for actor in stage.get_node("Actors").get_children():
 		if not actor is RiftPlayer or not actor.is_physics_processing() or actor.health <= 0.0:
 			continue
 		if is_instance_valid(actor.rocket_course):
 			continue
-		var offset: Vector3 = actor.global_position-dock
-		if absf(offset.x)<1.7 and absf(offset.y-.85)<1.0 and not actor.controls_suspended and actor.movement_axis("climb_down","climb_up")>.4:
+		if can_board(actor) and actor.movement_axis("climb_down","climb_up") > .4:
 			mount(actor)
+
+func can_board(actor: RiftPlayer) -> bool:
+	var offset := actor.global_position - dock
+	return absf(offset.x) < 1.7 and absf(offset.y - .85) < 1.0 and not actor.controls_suspended
 
 func mount(actor: RiftPlayer) -> void:
 	actor.reset_predicted_position(to_global(Vector3(0,.85+HOVER_HEIGHT,0)),Vector3(12,0,0),1)
@@ -288,8 +276,16 @@ func finish(actor: RiftPlayer) -> void:
 func _process(_delta: float) -> void:
 	var camera := stage.get_node("CameraRig") as SideCameraRig
 	var local_actor := camera.target
-	readout.visible = is_instance_valid(local_actor) and local_actor.rocket_course == self and local_actor.health > 0
-	if readout.visible:
+	var eligible := is_instance_valid(local_actor) and local_actor.health > 0
+	var riding := eligible and local_actor.rocket_course == self
+	var boarding := eligible and not is_instance_valid(local_actor.rocket_course) and can_board(local_actor)
+	readout.visible = riding or boarding
+	if boarding:
+		var key := RiftSettings.binding_label("climb_up", "key")
+		var pad := RiftSettings.binding_label("climb_up", "pad")
+		readout.modulate = Color.WHITE
+		readout.text = "ROCKET SPILLWAY  ·  HOLD %s / %s TO BOARD" % [key, pad]
+	if riding:
 		var progress := clampf(to_local(local_actor.global_position).x/LENGTH,0,1)*100
 		var instruction := "JUMP: HOP / GLIDE    ·    CROUCH: SLIDE    ·    LEFT: BRAKE    ·    BUSTER: FIRE"
 		var here := to_local(local_actor.global_position).x

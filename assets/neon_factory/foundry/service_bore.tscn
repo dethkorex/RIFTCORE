@@ -1,0 +1,31 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://assets/neon_factory/foundry/basalt_service_bore.glb" id="Bore"]
+[ext_resource type="Texture2D" path="res://assets/neon_factory/foundry/bedrock_Volcanic basalt • albedo.png" id="Basalt"]
+[ext_resource type="Shader" path="res://assets/neon_factory/foundry/basalt_cut.gdshader" id="StoneShader"]
+
+[sub_resource type="ShaderMaterial" id="Cut"]
+shader = ExtResource("StoneShader")
+shader_parameter/basalt = ExtResource("Basalt")
+
+[sub_resource type="StandardMaterial3D" id="Iron"]
+albedo_color = Color(0.19, 0.13, 0.1, 1)
+metallic = 0.6
+roughness = 0.8
+
+[node name="ServiceBore" instance=ExtResource("Bore")]
+
+[node name="Basalt cut and crown" parent="." index="0"]
+material_override = SubResource("Cut")
+
+[node name="Retaining channel" parent="." index="1"]
+material_override = SubResource("Iron")
+
+[node name="Retaining channel_001" parent="." index="2"]
+material_override = SubResource("Iron")
+
+[node name="Roof bolt" parent="." index="3"]
+material_override = SubResource("Iron")
+
+[node name="Roof bolt_001" parent="." index="4"]
+material_override = SubResource("Iron")

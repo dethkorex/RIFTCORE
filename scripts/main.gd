@@ -85,6 +85,7 @@ var chat: WhisperOverlay
 var account: PlayerAccount
 var achievement_toast: AchievementToast
 var progress_reset_error := OK
+var choosing_after_coop_loss := false
 var coop_mission: Node3D
 var coop_join_loading: CanvasLayer
 var active_controller := -1
@@ -854,6 +855,7 @@ func configure_input() -> void:
 	add_key_action("swap_weapon", KEY_Q)
 	add_key_action("previous_suit", KEY_E)
 	add_key_action("melee", KEY_K)
+	add_key_action("guard", KEY_I)
 	add_key_action("restart", KEY_R)
 	add_key_action("pause", KEY_ESCAPE)
 	add_key_action("field_interact", KEY_F)
@@ -870,6 +872,8 @@ func configure_input() -> void:
 	add_joy_button("swap_weapon", JOY_BUTTON_RIGHT_SHOULDER)
 	add_joy_button("previous_suit", JOY_BUTTON_LEFT_SHOULDER)
 	add_joy_button("melee", JOY_BUTTON_Y)
+	add_joy_action("guard", JOY_AXIS_TRIGGER_LEFT, 1.0)
+	InputMap.action_set_deadzone("guard", 0.55)
 	add_joy_action("crouch_stick", JOY_AXIS_LEFT_Y, 1.0)
 	InputMap.action_set_deadzone("crouch_stick", 0.65)
 	add_joy_button("pause", JOY_BUTTON_START)
@@ -979,6 +983,7 @@ func start_coop_mission(is_host: bool, number: int) -> void:
 	coop_mission.sector = number
 	coop_mission.local_profile = profile
 	if save_session:
+		coop_mission.active_operator_slot = save_session.slot
 		coop_mission.persist_challenges = save_session.persist_challenge_progress
 		coop_mission.persist_reserves = save_session.persist_reserve_lives
 	coop_mission.relay_owner = RiftRelay
@@ -1061,8 +1066,11 @@ func bank_coop_rewards(xp: int, bolts: int, blueprints: Array, number: int) -> v
 func close_coop_mission(message: String) -> void:
 	if not is_instance_valid(coop_mission):
 		return
+	var selected_slot: int = coop_mission.next_operator_slot
+	var local: RiftPlayer = coop_mission.operators[coop_mission.local_index] if coop_mission.operators.size() > coop_mission.local_index else null
+	choosing_after_coop_loss = is_instance_valid(local) and local.lives <= 0 and local.health <= 0
 	profile.finish_field_supplies({}, false)
-	if coop_mission.outcome.is_empty() and coop_mission.operators[coop_mission.local_index].lives <= 0:
+	if coop_mission.outcome.is_empty() and choosing_after_coop_loss:
 		coop_mission.keep_recovered_blueprints(coop_mission.recovered_blueprint_ids(coop_mission.local_index))
 		reset_defeated_run()
 	remove_child(coop_mission)
@@ -1072,7 +1080,11 @@ func close_coop_mission(message: String) -> void:
 		shot.queue_free()
 	open_home_hub()
 	RiftAudio.play_music(false)
-	if RiftRelay.connected_room.is_empty():
+	if choosing_after_coop_loss:
+		home_hub.station_requested.emit("Operators")
+		if selected_slot > 0:
+			select_save_slot(selected_slot, ManualSave.read_slot(selected_slot) == null)
+	elif RiftRelay.connected_room.is_empty():
 		home_hub.station_requested.emit("Social")
 		menu.show_page("Party")
 		menu.relay_status.text = message
@@ -1266,8 +1278,10 @@ func select_save_slot(number: int, fresh: bool, operator_name := "") -> void:
 			account.operator_frames.erase(number)
 		account.last_operator = number
 		account.save()
-	var play_prologue := fresh and DisplayServer.get_name() != "headless"
+	var play_prologue := fresh and not choosing_after_coop_loss and RiftRelay.connected_room.is_empty() and DisplayServer.get_name() != "headless"
+	choosing_after_coop_loss = false
 	var show_arrival := false
+	var replay_tour := false
 	if play_prologue:
 		menu.hide()
 		menu.process_mode = Node.PROCESS_MODE_DISABLED
@@ -1278,7 +1292,8 @@ func select_save_slot(number: int, fresh: bool, operator_name := "") -> void:
 		var was_paused := music.stream_paused
 		music.stream_paused = true
 		await prologue.play()
-		show_arrival = not prologue.skipped
+		replay_tour = prologue.tutorial_requested
+		show_arrival = not prologue.skipped and not replay_tour
 		music.stream_paused = was_paused
 		remove_child(prologue)
 		prologue.queue_free()
@@ -1287,7 +1302,7 @@ func select_save_slot(number: int, fresh: bool, operator_name := "") -> void:
 		var arrival_hub := home_hub
 		await arrival_hub.materialize_operator("arrival" if show_arrival else "")
 		if play_prologue and is_instance_valid(arrival_hub) and home_hub == arrival_hub:
-			await arrival_hub.play_station_tour(menu)
+			await arrival_hub.play_station_tour(menu, replay_tour)
 
 func reset_player_profile() -> void:
 	if not account or account.display_name.is_empty() or is_instance_valid(coop_mission):
@@ -1664,7 +1679,12 @@ func load_game(show_deployment := true) -> void:
 		var legacy_bridge := path == "TERRAIN/DropBridgeRelay" and bool(save.get_value("checkpoint", "factory_bridge_lowered", false))
 		if path in restored_relays or legacy_bridge:
 			relay.restore_bridge()
-	player.set_meta("factory_caches", save.get_value("checkpoint", "factory_caches", []))
+	var opened_caches: Array = save.get_value("checkpoint", "factory_caches", [])
+	if sector == 1 and act == 2 and "SlagFerryCache" in opened_caches:
+		opened_caches.erase("SlagFerryCache")
+		if "CastingLoftCache" not in opened_caches:
+			opened_caches.append("CastingLoftCache")
+	player.set_meta("factory_caches", opened_caches)
 	for chest_name in player.get_meta("factory_caches"):
 		var chest := game_root.get_node_or_null(NodePath("TERRAIN/" + String(chest_name)))
 		if chest and chest.is_in_group(&"factory_salvage_chest"):
@@ -1680,6 +1700,8 @@ func load_game(show_deployment := true) -> void:
 		player.health_changed.emit(player.health, player.max_health)
 		player.energy = clampf(float(save.get_value("checkpoint", "energy", player.max_energy)), 0.0, player.max_energy)
 		player.energy_changed.emit(player.energy, player.max_energy)
+	if bool(save.get_value("checkpoint", "saber_equipped", false)) != player.saber_equipped:
+		player.switch_combat_mode()
 	if save.has_section_key("checkpoint", "equipped"):
 		player.equip_sector_weapon(String(save.get_value("checkpoint", "equipped", "")))
 	life_taken = bool(save.get_value("checkpoint", "life_taken", false))
@@ -1720,6 +1742,7 @@ func build_pause_menu() -> void:
 	stack = UI.column(layout, 8)
 	stack.custom_minimum_size.x = 176
 	var readout := PauseOperator.new()
+	readout.name = "OperatorInventory"
 	readout.operator = func(): return player
 	readout.life_total = func(actor: RiftPlayer): return actor.lives + profile.reserve_lives
 	readout.profile = profile
@@ -1969,6 +1992,10 @@ func build_hud() -> void:
 	hud.add_child(factory_hud)
 	factory_hud.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	factory_hud.show_quick_slots(profile)
+	factory_hud.add_field_lessons(sector, act, can_open_chat)
+	var lessons := preload("res://scripts/pickup_lessons.gd").new()
+	hud.add_child(lessons)
+	lessons.install(self, player)
 	factory_hud.remaining = remaining_enemies
 	factory_hud.lives = player.lives + profile.reserve_lives
 	factory_hud.core_shards = profile.core_shards
@@ -2034,6 +2061,7 @@ func save_checkpoint(manual_combat_snapshot := false) -> void:
 	save.set_value("checkpoint", "act", act)
 	save.set_value("checkpoint", "weapons", run_weapons.keys())
 	save.set_value("checkpoint", "module", run_module)
+	save.set_value("checkpoint", "saber_equipped", player.saber_equipped)
 	save.set_value("checkpoint", "at_start", not checkpoint_reached)
 	save.set_value("checkpoint", "spawn", checkpoint_spawn)
 	save.set_value("checkpoint", "station", checkpoint_station)
@@ -2363,6 +2391,7 @@ func _process(delta: float) -> void:
 		continuation.set_value("checkpoint", "weapons", run_weapons.keys())
 		continuation.set_value("checkpoint", "module", run_module)
 		continuation.set_value("checkpoint", "equipped", player.equipped_suit())
+		continuation.set_value("checkpoint", "saber_equipped", player.saber_equipped)
 		continuation.set_value("checkpoint", "at_start", true)
 		continuation.set_value("checkpoint", "experience", int(player.experience))
 		continuation.set_value("checkpoint", "lives", player.lives if replay else 3)
@@ -2451,6 +2480,7 @@ func advance_to_act_two() -> void:
 	save.set_value("checkpoint", "at_start", true)
 	save.set_value("checkpoint", "weapons", run_weapons.keys())
 	save.set_value("checkpoint", "module", run_module)
+	save.set_value("checkpoint", "saber_equipped", player.saber_equipped)
 	save.set_value("checkpoint", "experience", player.experience)
 	save.set_value("checkpoint", "credits", player.credits)
 	save.set_value("checkpoint", "salvage", player.salvage)

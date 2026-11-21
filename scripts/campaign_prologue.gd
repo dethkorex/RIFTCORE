@@ -30,6 +30,7 @@ var scene_index := 0
 var line_index := 0
 var ended := false
 var skipped := false
+var tutorial_requested := false
 var canvas: Control
 var page: Control
 var shade: ColorRect
@@ -62,6 +63,8 @@ func build_overlay() -> void:
 	anchor(controls, Rect2(.05, .914, .90, .05))
 	next = UI.button(controls, "Next", advance, true, 35)
 	UI.button(controls, "Skip intro", skip, false, 35)
+	if RiftSettings.show_hub_tips:
+		UI.button(controls, "Start Nova tutorial", start_tutorial, false, 35)
 	next.grab_focus()
 	shade = ColorRect.new()
 	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -93,6 +96,10 @@ func advance() -> void:
 		close()
 	else:
 		show_line()
+
+func start_tutorial() -> void:
+	tutorial_requested = true
+	close()
 
 func skip() -> void:
 	skipped = true
@@ -220,24 +227,34 @@ func show_floodgate() -> void:
 		RiftAudio.play_effect(&"deploy_zap")
 
 func show_convoy() -> void:
-	var river := art(WATER, Rect2(.665, .148, .258, .32), Color("71e7f5"))
-	var strip := Control.new()
-	river.add_child(strip)
-	anchor(strip, Rect2(0.05, 0.63, 0.90, 0.20))
+	var street := art(CITY, Rect2(.665, .148, .258, .32), Color("71e7f5"))
+	var road := ColorRect.new()
+	road.color = Color("1b2936")
+	street.add_child(road)
+	anchor(road, Rect2(0, .75, 1, .055))
 	for index in 3:
-		var boat := Polygon2D.new()
-		boat.polygon = PackedVector2Array([Vector2(-20, 3), Vector2(10, 3),
-			Vector2(20, -4), Vector2(10, -4), Vector2(3, -10), Vector2(-9, -10), Vector2(-13, -4), Vector2(-22, -4)])
-		boat.color = Color("17293b")
-		strip.add_child(boat)
-		var lamp := Polygon2D.new()
-		lamp.polygon = PackedVector2Array([Vector2(1, -8), Vector2(6, -8), Vector2(8, -5), Vector2(1, -5)])
-		lamp.color = Color("ffde94")
-		boat.add_child(lamp)
+		var carrier := Polygon2D.new()
+		carrier.polygon = PackedVector2Array([Vector2(-21, -13), Vector2(4, -13),
+			Vector2(4, -10), Vector2(12, -10), Vector2(20, -4), Vector2(20, 0), Vector2(-21, 0)])
+		carrier.color = Color("354b5c")
+		road.add_child(carrier)
+		var tread := PackedVector2Array()
+		for point in 8:
+			tread.append(Vector2.from_angle(TAU * point / 8.0) * 3.2)
+		for axle in [-14, -5, 12]:
+			var wheel := Polygon2D.new()
+			wheel.polygon = tread
+			wheel.position = Vector2(axle, 0)
+			wheel.color = Color("0d1622")
+			carrier.add_child(wheel)
+		var cab := Polygon2D.new()
+		cab.polygon = PackedVector2Array([Vector2(6, -9), Vector2(11, -9), Vector2(16, -5), Vector2(6, -5)])
+		cab.color = Color("ffde94")
+		carrier.add_child(cab)
 		var travel := create_tween()
 		travel.tween_method(func(progress: float):
-			boat.position = Vector2(strip.size.x * progress, 8.0 + index * 8.0)
-		, 0.05 + index * 0.14, 0.61 + index * 0.13, 2.45)
+			carrier.position = Vector2(road.size.x * progress, -2)
+		, 0.05 + index * 0.16, 0.58 + index * 0.16, 2.45)
 		travel.bind_node(page)
 
 func radio_break() -> void:

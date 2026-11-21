@@ -1,12 +1,13 @@
 extends AnimatableBody3D
 
 const VFX := preload("res://scripts/factory_trap_vfx.gd")
-# Six standard hits or four charged hits. Mixed hits share the same fracture meter.
+# Three standard hits or two charged hits. Mixed hits share the same fracture meter.
 const TO_BREAK := 18
 const FLOOR_MARK := preload("res://scripts/foundry_flame.gd")
 const WARNING := 0.62
-const START_SPEED := 5.5
-const ACCELERATION := 8.4
+const START_SPEED := 4.7
+const ACCELERATION := 7.1
+const MAX_SPEED := 18.5
 @export var radius := 1.4
 @export var runway_length := 10.0
 @export var direction := -1.0
@@ -87,7 +88,7 @@ func _physics_process(delta: float) -> void:
 	present()
 
 func roll(delta: float) -> void:
-	roll_speed = minf(roll_speed + ACCELERATION * delta, 22.0)
+	roll_speed = minf(roll_speed + ACCELERATION * delta, MAX_SPEED)
 	vertical_speed -= 28.0 * delta
 	var travel := Vector3(direction * roll_speed, vertical_speed, 0.0) * delta
 	var ground := move_and_collide(Vector3.DOWN * 0.12, true)
@@ -131,7 +132,7 @@ func operators() -> Array[Node]:
 func hit_by_projectile(shot: RiftProjectile) -> bool:
 	if shot.owner_faction != "player" or not authority or status == 3:
 		return false
-	hit_count = mini(TO_BREAK, hit_count + (5 if shot.is_charged else 3))
+	hit_count = mini(TO_BREAK, hit_count + (9 if shot.is_charged else 6))
 	if hit_count >= TO_BREAK:
 		shatter()
 	else:

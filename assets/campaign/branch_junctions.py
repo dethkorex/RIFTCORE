@@ -113,15 +113,15 @@ JUNCTIONS = {
 
 # Each pair describes the first and second junction in travel order.
 # "echo" sends players between levels to reconnect. "switch" opens a return
-# descent. "ferry" crosses a shaft diagonally. "slalom" alternates shelves.
+# descent. "transfer" crosses a shaft diagonally. "slalom" alternates shelves.
 ROUTE_BEATS = {
     "machine_jungle": (("echo", "slalom"), ("slalom", "switch")),
-    "frozen_reactor": (("switch", "echo"), ("ferry", "slalom")),
-    "abyssal_plant": (("ferry", "echo"), ("slalom", "switch")),
+    "frozen_reactor": (("switch", "echo"), ("transfer", "slalom")),
+    "abyssal_plant": (("transfer", "echo"), ("slalom", "switch")),
     "buried_archives": (("echo", "switch"), ("slalom", "echo")),
-    "sky_dock": (("slalom", "ferry"), ("echo", "switch")),
-    "biolab": (("echo", "slalom"), ("ferry", "switch")),
-    "orbital_array": (("slalom", "echo"), ("ferry", "switch")),
-    "scrapyard_expanse": (("switch", "ferry"), ("echo", "slalom")),
+    "sky_dock": (("slalom", "transfer"), ("echo", "switch")),
+    "biolab": (("echo", "slalom"), ("transfer", "switch")),
+    "orbital_array": (("slalom", "echo"), ("transfer", "switch")),
+    "scrapyard_expanse": (("switch", "transfer"), ("echo", "slalom")),
     "riftcore_nexus": (("echo", "switch"), ("slalom", "echo")),
 }
