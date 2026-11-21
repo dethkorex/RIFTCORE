@@ -62,6 +62,9 @@ var exposed_light: OmniLight3D
 
 @onready var armor: FoundryRig = $Armor
 
+func damage_model() -> Node3D:
+	return armor
+
 func _ready() -> void:
 	super._ready()
 	ignore_arena_access_decks()

@@ -100,6 +100,9 @@ func configure_difficulty(mode: int) -> void:
 		briar_damage_scale = Difficulty.jungle_boss_damage_scale(mode)
 		briar_damage_taken = Difficulty.jungle_boss_damage_taken(mode, true)
 
+func damage_model() -> Node3D:
+	return armor
+
 func _ready() -> void:
 	super._ready()
 	ignore_arena_access_decks()

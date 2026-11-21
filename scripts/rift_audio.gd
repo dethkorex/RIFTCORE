@@ -186,10 +186,18 @@ func enemy_shot(at: Vector3, heavy: bool) -> void:
 	if now - int(last_enemy_volley.time) < 70 and at.distance_squared_to(last_enemy_volley.at) < 1.4:
 		return
 	last_enemy_volley = {"at": at, "time": now}
+	play_enemy_sound(ENEMY_SHOTS[int(heavy)], at, -10.0 if heavy else -12.5)
+
+func enemy_damage(at: Vector3) -> void:
+	var camera := get_viewport().get_camera_3d()
+	if camera and camera.global_position.distance_squared_to(at) < 33.0 * 33.0:
+		play_enemy_sound(preload("res://assets/audio/enemy_damage.wav"), at, -10.5)
+
+func play_enemy_sound(stream: AudioStream, at: Vector3, gain_db: float) -> void:
 	var voice := AudioStreamPlayer3D.new()
 	voice.bus = &"SFX"
-	voice.stream = ENEMY_SHOTS[int(heavy)]
-	voice.volume_db = -10.0 if heavy else -12.5
+	voice.stream = stream
+	voice.volume_db = gain_db
 	voice.unit_size = 11.0
 	voice.max_distance = 33.0
 	voice.pitch_scale = randf_range(0.94,1.06)

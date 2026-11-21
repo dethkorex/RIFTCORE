@@ -43,6 +43,11 @@ func run() -> void:
 	game.open_home_hub()
 	await frames(15)
 	var hub = game.home_hub
+	hub.update_partner(17, hub.avatar.position.x, 0.0, "idle", "Partner")
+	var partner_plate: Label3D = hub.partners[17].label
+	check(hub.local_online_label.position == partner_plate.position and hub.local_online_label.font_size == partner_plate.font_size and hub.local_online_label.pixel_size == partner_plate.pixel_size, "Local and partner hub nameplates share head clearance and type size")
+	hub.partners[17].actor.queue_free()
+	hub.partners.erase(17)
 	var menu = game.menu
 	check(hub.pads.size() == 8 and hub.station_notice.visible and hub.current_station == 3, "Hub opens at the Deploy bay")
 	for index in hub.pads.size():

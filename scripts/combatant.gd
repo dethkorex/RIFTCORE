@@ -5,8 +5,10 @@ extends CharacterBody3D
 const BOSS_SIDE_YAW := PI * 0.5
 
 signal health_changed(current: float, maximum: float)
+signal enemy_damaged(fatal: bool)
 signal died
 
+const EnemyDamageFlash := preload("res://scripts/enemy_damage_flash.gd")
 const DAMAGE_NUMBER := preload("res://scripts/damage_number.gd")
 const BOSS_DIFFICULTY := preload("res://scripts/mission_difficulty.gd")
 
@@ -23,6 +25,7 @@ var burn_clock := 0.0
 var burn_power := 0.0
 var burn_effect: Node3D
 var burn_source := 0
+var damage_flash: EnemyDamageFlash
 
 func _ready() -> void:
 	health = max_health
@@ -36,8 +39,28 @@ func apply_boss_scaling(sector: int, mode: int, act: int, party_scale := 1.0) ->
 func take_damage(amount: float, source_position := Vector3.ZERO) -> void:
 	if invulnerable_time > 0.0 or health <= 0.0:
 		return
+	lose_health(amount, false, incoming_critical)
+
+func damage_model() -> Node3D:
+	return null
+
+func present_enemy_hit(fatal: bool) -> void:
+	var model := damage_model()
+	if not is_instance_valid(model):
+		return
+	RiftAudio.enemy_damage(global_position)
+	if not damage_flash:
+		damage_flash = EnemyDamageFlash.new(model)
+	damage_flash.pulse(model, fatal)
+
+func lose_health(amount: float, burning: bool, critical: bool) -> void:
+	var previous := health
 	health = maxf(0.0, health - amount)
-	show_damage.call_deferred(amount, false, incoming_critical)
+	if health < previous and is_instance_valid(damage_model()):
+		var fatal := health <= 0.0
+		present_enemy_hit(fatal)
+		enemy_damaged.emit(fatal)
+	show_damage.call_deferred(amount, burning, critical)
 	health_changed.emit(health, max_health)
 	if health <= 0.0:
 		died.emit()
@@ -103,11 +126,7 @@ func _process(delta: float) -> void:
 
 
 func apply_burn_tick() -> void:
-	health = maxf(0.0, health - burn_power)
-	show_damage.call_deferred(burn_power, true)
-	health_changed.emit(health, max_health)
-	if health <= 0.0:
-		died.emit()
+	lose_health(burn_power, true, false)
 
 
 func ignore_arena_access_decks() -> void:

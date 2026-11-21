@@ -208,6 +208,8 @@ func _ready() -> void:
 	peer.expose_func(receive_personal_pickup_taken)
 	peer.expose_func(receive_restore_feedback)
 	peer.expose_func(receive_hurt_feedback)
+	peer.expose_func(receive_enemy_hit)
+	peer.expose_func(receive_supply_hit)
 	peer.expose_func(receive_boss_intro)
 	peer.expose_func(receive_suit_reveal)
 	peer.expose_func(receive_suit_impact)
@@ -488,6 +490,7 @@ func load_stage(packed: PackedScene = null) -> void:
 		enemy.scale_for_sector(sector, act, difficulty, mode)
 		if host:
 			enemy.died.connect(earn_security_rewards.bind(enemy))
+			enemy.enemy_damaged.connect(send_enemy_hit.bind(enemies.size()))
 		else:
 			disable_replica(enemy)
 		enemies.append(enemy)
@@ -549,6 +552,8 @@ func load_stage(packed: PackedScene = null) -> void:
 		if stage.is_ancestor_of(supply):
 			supply.authority = host
 			supply.phase_time = func(): return factory_trap_clock
+			if host:
+				supply.enemy_damaged.connect(send_supply_hit.bind(stage.get_path_to(supply)))
 			stage_props.append(stage.get_path_to(supply))
 	for barricade in get_tree().get_nodes_in_group(&"factory_breakable"):
 		if stage.is_ancestor_of(barricade):
@@ -582,6 +587,8 @@ func load_stage(packed: PackedScene = null) -> void:
 		update_personal_hud(operators[local_index])
 
 func scale_opponent(enemy: Combatant) -> void:
+	if host:
+		enemy.enemy_damaged.connect(send_enemy_hit.bind(-1))
 	enemy.apply_boss_scaling(sector, mode, act, 1.0 + DIFFICULTY_PER_GUEST * (roster.size() - 1))
 	enemy.health_changed.emit(enemy.health, enemy.max_health)
 
@@ -1288,6 +1295,30 @@ func update_teammate_status(index: int, display_name: String, status: String) ->
 	row.bar.set_value_no_signal(fraction * 100.0)
 	row.fill.bg_color = Color("ff6c76") if fraction <= 0.25 else Color("ffce75") if fraction <= 0.5 else Color("72e3a6")
 
+func send_enemy_hit(fatal: bool, index: int) -> void:
+	peer.call_func(receive_enemy_hit, act, index, fatal)
+
+func send_supply_hit(fatal: bool, path: NodePath) -> void:
+	peer.call_func(receive_supply_hit, act, path, fatal)
+
+func receive_supply_hit(source_act: int, path: NodePath, fatal: bool) -> void:
+	if host or peer.get_sender_id() != peer.get_host() or source_act != act or path not in stage_props:
+		return
+	var supply := stage.get_node_or_null(path) as Combatant
+	if supply and supply.is_in_group(&"factory_supply_carrier"):
+		supply.present_enemy_hit(fatal)
+
+func receive_enemy_hit(source_act: int, index: int, fatal: bool) -> void:
+	if host or peer.get_sender_id() != peer.get_host() or source_act != act:
+		return
+	var target: Combatant
+	if index == -1:
+		target = boss
+	elif index >= 0 and index < enemies.size():
+		target = enemies[index]
+	if is_instance_valid(target):
+		target.present_enemy_hit(fatal)
+
 func receive_hurt_feedback(source_act: int, index: int) -> void:
 	if not host and peer.get_sender_id() == peer.get_host() and source_act == act and index >= 0 and index < operators.size():
 		operators[index].play_hurt_feedback(index == local_index)
@@ -1566,6 +1597,7 @@ func broadcast_state(reliable_operators := false) -> void:
 		players.append([operator.global_position, operator.model_root.rotation, operator.health, operator.energy, operator.current_animation, operator.facing, operator.equipped_suit(), operator.lives, operator.max_health, operator.max_energy, operator.velocity, operator.fire_lock, operator.charge_held, operator.melee_lock, operator.quick_profile.quick_slots if operator.quick_profile else [], operator.supplies, operator.charge_elapsed if operator.charge_held else 0.0, operator.saber_hold, remote_players.get(roster[players.size()], {}).get("quick_revision", 0), operator.recovered_supplies, operator.experience, Vector4(operator.boss_debuff, operator.debuff_left, operator.debuff_tick, operator.shock_stun), Vector3(1.0 if is_instance_valid(operator.rocket_course) else 0.0, operator.rocket_speed, operator.rocket_seconds)])
 		players.back().append(operator.run_module)
 		var flags := int(operator.saber_equipped) | (int(operator.guarding) << 1)
+		flags |= (operator.guard_stage << 8) if operator.guarding else 0
 		players.back().append(flags)
 		var swing := RiftPlayer.SWING_CLIPS.find(operator.current_animation) + 1
 		saber_states.append(flags | (int(operator.saber_hold >= 0.0) << 2) | (swing << 3))
@@ -1820,7 +1852,10 @@ func apply_operator_state(operator: RiftPlayer, data: Array, is_local: bool) -> 
 	operator.lives = data[7]
 	var combat_flags := int(data[24]) if data.size() > 24 else (int(data[14]) if data.size() == 15 else 0)
 	operator.saber_equipped = bool(combat_flags & 1)
-	operator.guarding = bool(combat_flags & 2)
+	if combat_flags & 2 and operator.health > 0.0 and operator.saber_equipped:
+		operator.show_guard(mini(2, (combat_flags >> 8) & 3))
+	else:
+		operator.guarding = false
 	if data.size() > 23:
 		operator.run_module = String(data[23])
 	if not (is_local and suit_reveal_playing) and operator.equipped_suit() != data[6]:
@@ -1883,6 +1918,7 @@ func _process(delta: float) -> void:
 			else:
 				operator.global_position = projected
 			if fresh:
+				operator.clear_trail_on_turn(data[1].y)
 				operator.model_root.rotation = data[1]
 				apply_operator_state(operator, data, false)
 				operator.reflect_saber_pose(data[4], float(data[12]) if data.size() > 12 else -1.0)

@@ -47,6 +47,9 @@ var lamp: OmniLight3D
 func configure_difficulty(mode: int) -> void:
 	difficulty_mode = mode
 
+func damage_model() -> Node3D:
+	return armor
+
 func _ready() -> void:
 	max_health *= 1.24
 	super._ready()

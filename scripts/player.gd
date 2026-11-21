@@ -138,7 +138,18 @@ var queued_charged := false
 var queued_pose := false
 var combo_hot := false
 var saber_equipped := false
-var guarding := false
+const GUARD_SECONDS := 3.0
+const GUARD_RECOVERY := 10.0
+const GUARD_COLORS := [Color("#248fff"), Color("#ffdb38"), Color("#ff424b")]
+var guard_remaining := GUARD_SECONDS
+var guard_cooldown := 0.0
+var guard_stage := 0
+var guard_bubble: MeshInstance3D
+var guarding := false:
+	set(value):
+		guarding = value
+		if not value and is_instance_valid(guard_bubble):
+			guard_bubble.hide()
 var melee_lock := 0.0
 var run_module := ""
 var charged_damage_multiplier := 1.0
@@ -152,7 +163,7 @@ var combo_facing := 1.0
 var combo_duration := 0.0
 const SABER_CLIPS := preload("res://assets/animations/rx07_saber_combo.res")
 const SWING_CLIPS := [&"saber_cut", &"saber_return", &"slash_finisher"]
-const SWING_DURATIONS := [0.42, 0.41, 0.56]
+const SWING_DURATIONS := [0.26, 0.25, 0.37]
 const SWING_IMPACT := [0.52, 0.49, 0.56]
 const SWEEP_START := [0.35, 0.32, 0.43]
 const SWEEP_END := 0.78
@@ -493,7 +504,7 @@ func simulate_movement(delta: float) -> void:
 	if not local_prediction:
 		if action_pressed("melee"):
 			switch_combat_mode()
-		guarding = saber_equipped and action_held("guard") and melee_lock <= 0.0 and dash_left <= 0.0 and contact_recoil <= 0.0 and shock_stun <= 0.0 and not wall_sliding and not is_instance_valid(ladder) and not is_instance_valid(rocket_course)
+		update_guard(delta, saber_equipped and action_held("guard") and melee_lock <= 0.0 and dash_left <= 0.0 and contact_recoil <= 0.0 and shock_stun <= 0.0 and not wall_sliding and not is_instance_valid(ladder) and not is_instance_valid(rocket_course))
 	if is_instance_valid(rocket_course):
 		rocket_course.simulate(self,delta)
 		return
@@ -529,8 +540,7 @@ func simulate_movement(delta: float) -> void:
 		contact_recoil = maxf(0.0, contact_recoil - delta)
 		axis = 0.0
 	if not guarding and dash_left <= 0.0 and absf(axis) > 0.1:
-		var next_facing := signf(axis)
-		facing = next_facing
+		facing = signf(axis)
 	if dropping:
 		coyote = 0.0
 	elif grounded():
@@ -578,6 +588,8 @@ func simulate_movement(delta: float) -> void:
 		var accel := acceleration * terrain.x if grounded() else air_acceleration
 		if axis * velocity.x < 0.0:
 			accel = acceleration * 1.8 * terrain.x if grounded() else air_reverse_acceleration
+			if saber_equipped:
+				accel *= 1.4
 		elif grounded() and absf(axis) < 0.08:
 			accel *= 1.20
 		elif not grounded() and absf(axis) < 0.08:
@@ -1736,8 +1748,11 @@ func update_melee(delta: float) -> void:
 				perform_melee(3, true)
 			cancel_saber_charge()
 	if melee_lock > 0.0:
-		if released_tap and combo_step + combo_queued < 3:
-			combo_queued += 1
+		if released_tap:
+			combo_queued = 1
+		# Track the stick through contact, commit the short follow-through, then allow a recovery turn.
+		if not combo_hit or combo_time >= combo_duration * SWEEP_END:
+			combo_facing = facing
 		combo_time += delta
 		if not combo_trail and combo_time >= combo_duration * SWEEP_START[combo_step - 1]:
 			combo_trail = true
@@ -1750,9 +1765,9 @@ func update_melee(delta: float) -> void:
 				strike_melee()
 		melee_lock = maxf(0.0, combo_duration - combo_time)
 		if melee_lock <= 0.0:
-			if combo_queued > 0 and combo_step < 3:
-				combo_queued -= 1
-				perform_melee(combo_step + 1)
+			if combo_queued > 0:
+				combo_queued = 0
+				perform_melee(combo_step % SWING_CLIPS.size() + 1)
 			else:
 				combo_grace = 0.19 if combo_step < 3 else 0.0
 	elif released_tap:
@@ -1787,6 +1802,13 @@ func perform_melee(step := 1, charged := false) -> void:
 			sword_pivot.rotation_degrees.z = -72.0 * facing if step != 2 else 65.0 * facing
 			var slash := create_tween().set_trans(Tween.TRANS_SINE)
 			slash.tween_property(sword_pivot, "rotation_degrees:z", 62.0 * facing if step != 2 else -71.0 * facing, combo_duration)
+
+func clear_trail_on_turn(heading: float) -> void:
+	if not saber_equipped or not sword_pivot or cos(model_root.rotation.y - heading) >= 0.0:
+		return
+	for child in sword_pivot.get_children():
+		if child is EdgefluxWeaponTrail3D:
+			child.clear()
 
 func emit_saber_trail(duration: float, finisher: bool) -> void:
 	if sword_pivot:
@@ -1933,12 +1955,14 @@ func update_character_visuals(axis: float) -> void:
 	var bracing := wall_sliding and not grounded() and dash_left <= 0.0 and melee_lock <= 0.0
 	var in_water:=swim_volume()!=null
 	if model_root:
-		var visual_facing := signf(velocity.x) if absf(velocity.x) > 0.65 and fire_lock <= 0.0 and melee_lock <= 0.0 and not guarding else facing
+		var visual_facing := signf(velocity.x) if not saber_equipped and absf(velocity.x) > 0.65 and fire_lock <= 0.0 and melee_lock <= 0.0 and not guarding else facing
 		if bracing:
 			visual_facing = -wall_side
 		elif is_instance_valid(charge_orb):
 			visual_facing = facing
-		var heading := (PI * 0.5 - 0.22) * combo_facing if melee_lock > 0.0 else PI * 0.5 * visual_facing
+		var swing_side := facing if local_prediction else combo_facing
+		var heading := (PI * 0.5 - 0.22) * swing_side if melee_lock > 0.0 else PI * 0.5 * visual_facing
+		clear_trail_on_turn(heading)
 		model_root.rotation.y = lerp_angle(model_root.rotation.y,heading,1.0-exp(-get_process_delta_time()*12.0)) if in_water else heading
 		var pitch:=0.0
 		if in_water and Vector2(velocity.x,velocity.y).length()>.55:
@@ -2008,6 +2032,46 @@ func mitigate_damage(amount: float) -> float:
 func defense_rating() -> float:
 	var last_stand := low_health_resistance if health < max_health * 0.30 else 0.0
 	return 1.0 - (1.0 - defense_for_experience(experience)) * (1.0 - armor_resistance) * (1.0 - supply_bonus("defense")) * (1.0 - last_stand)
+
+func update_guard(delta: float, requested: bool) -> void:
+	if guard_cooldown > 0.0:
+		guard_cooldown = maxf(0.0, guard_cooldown - delta)
+		guarding = false
+		if guard_cooldown < 0.00001:
+			guard_cooldown = 0.0
+			guard_remaining = GUARD_SECONDS
+		return
+	if not requested:
+		guarding = false
+		guard_remaining = minf(GUARD_SECONDS, guard_remaining + delta * GUARD_SECONDS / GUARD_RECOVERY)
+		return
+	guard_remaining -= delta
+	if guard_remaining <= 0.00001:
+		guard_remaining = 0.0
+		guard_cooldown = GUARD_RECOVERY
+		guarding = false
+		return
+	var fraction := guard_remaining / GUARD_SECONDS
+	show_guard(0 if fraction > 2.0 / 3.0 else (1 if fraction > 1.0 / 3.0 else 2))
+
+func show_guard(stage: int) -> void:
+	if not is_instance_valid(guard_bubble):
+		guard_bubble = MeshInstance3D.new()
+		guard_bubble.name = "SaberShield"
+		var sphere := SphereMesh.new()
+		sphere.radius = 1.08
+		sphere.height = 2.30
+		guard_bubble.mesh = sphere
+		guard_bubble.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		var shell := ShaderMaterial.new()
+		shell.shader = preload("res://assets/vfx/saber_guard.gdshader")
+		guard_bubble.material_override = shell
+		add_child(guard_bubble)
+	if not guarding or guard_stage != stage:
+		guard_bubble.material_override.set_shader_parameter("shield_tint", GUARD_COLORS[stage])
+	guard_stage = stage
+	guarding = true
+	guard_bubble.show()
 
 func blocks_hit(source: Vector3) -> bool:
 	if not saber_equipped or not guarding or not source.is_finite() or health <= 0.0 or (source.x - global_position.x) * facing <= .01:

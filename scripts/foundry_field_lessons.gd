@@ -6,7 +6,7 @@ const SKIP_KEY := "foundry_field_tips_skipped"
 # Bounds follow the actual forks and hazards. Passing a room never queues stale advice.
 const LESSONS := [
 	["intake", -12, 19, "Jump with {jump}. Tap {dash} midair if the far lip is just out of reach."],
-	["combat", 19, 43, "{melee} draws your saber. Tap {shoot} to cut, or hold for sparks and release a wave. Hold {guard} to block from the front."],
+	["combat", 19, 43, "{melee} draws your saber. Tap {shoot} to cut, or hold for sparks and release a wave. Hold {guard} to block from the front. Red means your shield is about to break."],
 	["fork", 43, 70, "See the broken gantry? There's a blueprint up top and a Patch Kit below. We need two relays to reach the Warden."],
 	["cave", 70, 112, "Hold toward a cave wall as you fall, then press {jump} to kick off. A cable runs under the old locker. There must be a way down."],
 	["slag", 113, 150, "Hear that rumble? Switch back to your buster with {melee} if needed. Three quick shots break a rolling boulder."],

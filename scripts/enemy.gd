@@ -97,6 +97,9 @@ func scale_for_sector(sector: int, act: int, health_scale: float, mode: int) -> 
 	sector_experience_scale = 1.0 + 0.10 * steps
 	health_changed.emit(health, max_health)
 
+func damage_model() -> Node3D:
+	return robot
+
 func _ready() -> void:
 	if patrol_model >= 0:
 		variant = STANDARD_ROLES[patrol_model]

@@ -10,6 +10,10 @@ var supply_target: RiftPlayer
 var faction := "enemy"
 var origin: Vector3
 var clock := 0.0
+var drone: Node3D
+
+func damage_model() -> Node3D:
+	return drone
 
 func _ready() -> void:
 	# Shootable layer: projectiles can hit it; player movement cannot.
@@ -20,7 +24,7 @@ func _ready() -> void:
 	origin = position
 	add_to_group(&"shootable_cargo")
 	var scene: PackedScene = preload("res://assets/neon_factory/foundry/ember_drone.glb") if supplies_only else preload("res://assets/enemies/factory_flyer.tscn")
-	var drone := scene.instantiate() as Node3D
+	drone = scene.instantiate() as Node3D
 	drone.scale = Vector3.ONE * 0.65
 	add_child(drone)
 	var cargo := Crate.make_visual()

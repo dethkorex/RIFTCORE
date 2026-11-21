@@ -91,9 +91,7 @@ func _ready() -> void:
 	avatar.collision_mask = 0
 	avatar.model_root.rotation.y = 0.28
 	avatar.play_character_animation("idle", true)
-	local_online_label = label_in_space(avatar, "", Vector3(0, 0.96, 0), 27, Color("91edff"))
-	local_online_label.pixel_size *= UI.COOP_NAME_SCALE
-	local_online_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	local_online_label = operator_nameplate(avatar, Color("91edff"))
 	local_online_label.hide()
 	camera = Camera3D.new()
 	add_child(camera)
@@ -438,9 +436,7 @@ func update_partner(id: int, x: float, facing: float, animation: String, display
 		partner.set_process(false)
 		partner.collision_layer = 0
 		partner.collision_mask = 0
-		var partner_label := label_in_space(partner, "", Vector3(0, 1.54, 0), 29, Color("ca99ff"))
-		partner_label.pixel_size *= UI.COOP_NAME_SCALE
-		partner_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		var partner_label := operator_nameplate(partner, Color("ca99ff"))
 		var microphone := Sprite3D.new()
 		microphone.texture = RiftRelay.voice.MIC_ICON
 		microphone.position = Vector3(0, 1.84, 0)
@@ -454,8 +450,8 @@ func update_partner(id: int, x: float, facing: float, animation: String, display
 		var frame := String(RiftRelay.relay.player_get_data(id, "operator_frame", ""))
 		var finish := String(RiftRelay.relay.player_get_data(id, "armor_finish", ""))
 		entry.actor.set_operator_appearance(frame, finish)
+		entry.label.modulate = UI.operator_tint(id, RiftRelay.relay.get_host(), RiftRelay.relay.lobby_get_all_clients())
 	entry.label.text = display_name
-	entry.label.modulate = UI.operator_tint(id, RiftRelay.relay.get_host(), RiftRelay.relay.lobby_get_all_clients())
 	entry.x = x
 	entry.facing = facing
 	entry.actor.play_character_animation(animation)
@@ -766,6 +762,12 @@ func box(parent: Node3D, at: Vector3, dimensions: Vector3, finish: Material) -> 
 	var mesh := BoxMesh.new()
 	mesh.size = dimensions
 	return part(parent, mesh, at, finish)
+
+func operator_nameplate(operator: RiftPlayer, tint: Color) -> Label3D:
+	var label := label_in_space(operator, "", Vector3(0, 1.54, 0), 29, tint)
+	label.pixel_size *= UI.COOP_NAME_SCALE
+	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	return label
 
 func label_in_space(parent: Node3D, text: String, at: Vector3, pixels: int, tint: Color) -> Label3D:
 	var label := Label3D.new()
