@@ -1,7 +1,7 @@
-# RIFTCORE Alpha 6.3.42
+# RIFTCORE Alpha 6.3.43
 
 ## Co-op
-- Deploy together after a 5-to-0 countdown with audio cues. Everyone sees the RIFTCORE loading screen before entering the mission.
+- Deploy together after a 5-to-0 countdown with audio cues. Everyone sees the RIFTCORE loading screen before entering the mission, with a retry if the host is still loading when a guest sends their loadout.
 - Review each operator’s rewards at extraction and return to the Operations Hub as a party. A party wipe keeps everyone on their current operator slot.
 - Party members can activate switches. The Ember Foundry lava shaft opens once both relays are active and the whole party is at the door.
 - Fixed guest gunfire audio, mini-boss dialogue, and cosmetic finishes appearing on the wrong operator. Co-op now sends fewer redundant updates and handles movement corrections more smoothly.

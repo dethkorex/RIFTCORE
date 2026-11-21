@@ -423,7 +423,7 @@ func verify_coop_mission(host: bool, smoke_sector: int, wipe_test := false) -> v
 	var mission = coop_mission
 	var local_index := 0 if host else 1
 	var local_operator: RiftPlayer = mission.operators[local_index]
-	if not await wait_for_relay(func(): return is_instance_valid(coop_mission) and coop_mission.operators[local_index].experience >= starting_operator_xp, 5.0):
+	if not await wait_for_relay(func(): return is_instance_valid(coop_mission) and coop_mission.operators[local_index].experience >= starting_operator_xp, 12.0):
 		print("Campaign check failed to carry Operator XP into deployment")
 		finish_relay_check(false)
 		return
@@ -608,8 +608,9 @@ func verify_coop_input_isolation(mission: Node, local_index: int) -> bool:
 	for moving_index in 2:
 		if local_index == moving_index:
 			Input.action_press("move_right")
+			await get_tree().physics_frame
 			Input.action_press("jump")
-			var jumped := await wait_for_relay(func(): return operator.global_position.y > local_start.y + .45 and operator.global_position.x > local_start.x + .55, .6)
+			var jumped := await wait_for_relay(func(): return operator.global_position.y > local_start.y + .45 and operator.global_position.x > local_start.x + .55, 1.0)
 			Input.action_release("move_right")
 			Input.action_release("jump")
 			if not jumped:

@@ -190,6 +190,8 @@ var starting_suit := ""
 var local_appearance: Array[String] = ["", ""]
 var mission_appearances: Dictionary[int, Array] = {}
 var deployment_xp: Dictionary[int, int] = {}
+var loadout_confirmed := false
+var next_loadout_retry := 0
 var pressed: Dictionary = {}
 var released: Dictionary = {}
 var targets: Array = []
@@ -237,6 +239,7 @@ func _ready() -> void:
 	peer.expose_func(receive_return_ready)
 	peer.expose_func(receive_act)
 	peer.expose_func(receive_loadout)
+	peer.expose_func(confirm_loadout)
 	peer.expose_func(receive_operator_appearance)
 	peer.expose_func(receive_quick_config)
 	peer.expose_func(receive_reboot_request)
@@ -248,10 +251,20 @@ func _ready() -> void:
 	build_hud()
 	show_field_briefing.call_deferred()
 	if not host:
-		var loadout: Dictionary = local_profile.owned.duplicate()
-		loadout["mission_bonus_lives"] = local_profile.reserve_lives
-		peer.call_func_on(peer.get_host(), receive_loadout, local_profile.gear, loadout, local_profile.quick_slots,
-			starting_xp, starting_weapons, starting_suit, local_appearance)
+		send_initial_loadout()
+
+func send_initial_loadout() -> void:
+	var loadout: Dictionary = local_profile.owned.duplicate()
+	loadout["mission_bonus_lives"] = local_profile.reserve_lives
+	var args := [local_profile.gear, loadout, local_profile.quick_slots, starting_xp,
+		starting_weapons, starting_suit, local_appearance]
+	# A guest can finish loading before the host exposes the mission functions.
+	peer._request_processor.create_function_call_request(receive_loadout, args, peer.get_host(), true, -1, false)
+	next_loadout_retry = Time.get_ticks_msec() + 750
+
+func confirm_loadout() -> void:
+	if not host and peer.get_sender_id() == peer.get_host():
+		loadout_confirmed = true
 
 func rebind_roster(rejoined: Array) -> void:
 	var prior := roster
@@ -289,6 +302,7 @@ func receive_loadout(gear: Dictionary, upgrades: Dictionary, quick: Array, xp: i
 		return
 	var remote: Dictionary = remote_players[sender]
 	if remote.loaded:
+		peer._request_processor.create_function_call_request(confirm_loadout, [], sender, true, -1, false)
 		return
 	remote.loaded = true
 	var loadout = remote.profile
@@ -319,6 +333,7 @@ func receive_loadout(gear: Dictionary, upgrades: Dictionary, quick: Array, xp: i
 	for operator_index in mission_appearances:
 		if operator_index != index:
 			peer.call_func_on(sender, receive_operator_appearance, operator_index, mission_appearances[operator_index])
+	peer._request_processor.create_function_call_request(confirm_loadout, [], sender, true, -1, false)
 	broadcast_state(true)
 
 func valid_appearance(appearance: Array) -> bool:
@@ -2075,6 +2090,8 @@ func _process(delta: float) -> void:
 			else:
 				send_input()
 	if not host:
+		if not loadout_confirmed and RiftRelay.mission_active and not RiftRelay.recovery.active() and outcome.is_empty() and Time.get_ticks_msec() >= next_loadout_retry:
+			send_initial_loadout()
 		snapshot_age += delta
 		var blend := 1.0 - exp(-19.0 * delta)
 		var fresh := latest_operators > presented_snapshot
