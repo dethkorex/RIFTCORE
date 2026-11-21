@@ -3,6 +3,7 @@ extends CanvasLayer
 const UI := preload("res://scripts/rift_ui.gd")
 const Score := preload("res://scripts/gamer_score.gd")
 const TROPHY := preload("res://assets/ui/riftcore_kit/icon_leaderboard.png")
+const HEAD_CLEARANCE := 33.0
 
 var card: PanelContainer
 var transition: Tween
@@ -33,25 +34,25 @@ func show_unlocks(ids: Array, points: int, operator: Node3D = null, hud: Control
 	card.hide()
 	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var spacing := StyleBoxEmpty.new()
-	spacing.content_margin_left = 11.0
-	spacing.content_margin_right = 26.0
-	spacing.content_margin_top = 8.0
-	spacing.content_margin_bottom = 10.0
+	spacing.content_margin_left = 8.0
+	spacing.content_margin_right = 17.0
+	spacing.content_margin_top = 4.0
+	spacing.content_margin_bottom = 6.0
 	card.add_theme_stylebox_override("panel", spacing)
-	card.custom_minimum_size = Vector2(300, 59)
+	card.custom_minimum_size = Vector2(242, 45)
 	add_child(card)
 	card.draw.connect(draw_banner.bind(card))
 	card.resized.connect(card.queue_redraw)
 
 	var row := HBoxContainer.new()
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	row.add_theme_constant_override("separation", 11)
+	row.add_theme_constant_override("separation", 7)
 	card.add_child(row)
 	var trophy := TextureRect.new()
 	trophy.texture = TROPHY
 	trophy.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	trophy.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	trophy.custom_minimum_size = Vector2(48, 31)
+	trophy.custom_minimum_size = Vector2(29, 23)
 	trophy.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	trophy.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(trophy)
@@ -64,27 +65,27 @@ func show_unlocks(ids: Array, points: int, operator: Node3D = null, hud: Control
 	header.add_theme_constant_override("separation", 5)
 	copy.add_child(header)
 	var slashes := Control.new()
-	slashes.custom_minimum_size.x = 13.0
+	slashes.custom_minimum_size.x = 11.0
 	slashes.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	header.add_child(slashes)
 	slashes.draw.connect(func(): draw_marks(slashes, Vector2(0, slashes.size.y * 0.5 - 4), UI.VIOLET))
 	var title := "ACHIEVEMENT UNLOCKED" if ids.size() == 1 else "%d ACHIEVEMENTS UNLOCKED" % ids.size()
-	UI.profile_label(header, title, 14, Color("f1dfff"))
+	UI.profile_label(header, title, 13, Color("f1dfff"))
 	for index in mini(3, ids.size()):
-		UI.profile_label(copy, Score.achievement_catalog[ids[index]][0], 25 if index == 0 else 15, UI.WHITE if index == 0 else UI.MUTED)
+		UI.profile_label(copy, Score.achievement_catalog[ids[index]][0], 22 if index == 0 else 14, UI.WHITE if index == 0 else UI.MUTED)
 	if ids.size() > 3:
-		UI.profile_label(copy, "+%d more in Profile  /  Achievements" % (ids.size() - 3), 14, UI.MUTED)
+		UI.profile_label(copy, "+%d more in Achievements" % (ids.size() - 3), 13, UI.MUTED)
 	if points > 0:
 		var tally := HBoxContainer.new()
 		tally.add_theme_constant_override("separation", 4)
 		tally.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		row.add_child(tally)
-		UI.profile_label(tally, "+%d" % points, 23, UI.VIOLET)
+		UI.profile_label(tally, "+%d" % points, 19, UI.VIOLET)
 		var badge := UI.profile_label(tally, "G", 15, UI.VIOLET)
-		badge.custom_minimum_size = Vector2(19, 19)
+		badge.custom_minimum_size = Vector2(17, 17)
 		badge.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		badge.draw.connect(func(): badge.draw_arc(badge.size * 0.5, 9.0, 0.0, TAU, 28, UI.VIOLET, 1.6, true))
+		badge.draw.connect(func(): badge.draw_arc(badge.size * 0.5, 8.0, 0.0, TAU, 28, UI.VIOLET, 1.6, true))
 	card.modulate.a = 0.0
 	transition = card.create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
 	transition.tween_property(card, "modulate:a", 1.0, 0.18)
@@ -104,37 +105,32 @@ func show_unlocks(ids: Array, points: int, operator: Node3D = null, hud: Control
 func draw_banner(canvas: Control) -> void:
 	var width := canvas.size.x
 	var bottom := canvas.size.y - 2.0
-	var middle := bottom * 0.5
 	var body := PackedVector2Array([
-		Vector2(43, 4), Vector2(width - 16, 4), Vector2(width - 2, 14),
-		Vector2(width - 26, bottom), Vector2(33, bottom), Vector2(15, middle),
+		Vector2(17, 3), Vector2(width - 9, 3), Vector2(width - 1, 10),
+		Vector2(width - 16, bottom), Vector2(9, bottom), Vector2(2, bottom - 8),
 	])
 	var plate := PackedVector2Array([
-		Vector2(23, 2), Vector2(55, 2), Vector2(71, middle - 3),
-		Vector2(49, bottom), Vector2(16, bottom), Vector2(7, middle + 5),
+		Vector2(18, 4), Vector2(44, 4), Vector2(35, bottom - 1),
+		Vector2(9, bottom - 1), Vector2(3, bottom - 8),
 	])
-	canvas.draw_colored_polygon(body, Color("0a1725f5"))
+	canvas.draw_colored_polygon(body, Color("0a1725e9"))
 	canvas.draw_colored_polygon(PackedVector2Array([
-		Vector2(width - 45, 5), Vector2(width - 16, 5), Vector2(width - 5, 15),
-		Vector2(width - 28, bottom - 3), Vector2(width - 71, bottom - 3),
+		Vector2(width - 35, 4), Vector2(width - 9, 4), Vector2(width - 2, 10),
+		Vector2(width - 17, bottom - 1), Vector2(width - 55, bottom - 1),
 	]), Color("17344c65"))
-	canvas.draw_colored_polygon(PackedVector2Array([
-		Vector2(15, middle - 17), Vector2(4, middle + 5), Vector2(15, bottom),
-		Vector2(10, bottom), Vector2(1, middle + 5), Vector2(12, middle - 16),
-	]), Color("a55aef"))
-	outline(canvas, body, Color("36dfff"))
-	canvas.draw_colored_polygon(plate, Color("0c2336"))
-	outline(canvas, plate, Color("62efff"))
-	canvas.draw_line(Vector2(75, 5), Vector2(132, 5), Color("b3fbff"), 2.2, true)
-	canvas.draw_line(Vector2(91, bottom), Vector2(148, bottom), Color("54e8ff"), 2.2, true)
-	canvas.draw_line(Vector2(150, bottom), Vector2(191, bottom), UI.VIOLET, 2.2, true)
-	draw_marks(canvas, Vector2(width - 49, bottom - 14), Color("36dfff"))
+	canvas.draw_colored_polygon(plate, Color("15354b"))
+	outline(canvas, body, Color("56e6ff"))
+	canvas.draw_line(Vector2(44, 5), Vector2(35, bottom - 1), Color("2f627e"), 1.0, true)
+	canvas.draw_line(Vector2(3, bottom - 9), Vector2(13, bottom - 34), UI.VIOLET, 1.8, true)
+	canvas.draw_line(Vector2(51, 4), Vector2(102, 4), Color("a7f6ff"), 1.4, true)
+	canvas.draw_line(Vector2(75, bottom), Vector2(113, bottom), Color("4bd8f0"), 1.4, true)
+	canvas.draw_line(Vector2(115, bottom), Vector2(144, bottom), UI.VIOLET, 1.4, true)
+	draw_marks(canvas, Vector2(width - 36, bottom - 11), Color("36dfff"))
 
 func outline(canvas: Control, points: PackedVector2Array, tint: Color) -> void:
 	points.append(points[0])
-	canvas.draw_polyline(points, Color(tint, 0.12), 8.0, true)
-	canvas.draw_polyline(points, Color(tint, 0.28), 4.0, true)
-	canvas.draw_polyline(points, tint, 1.9, true)
+	canvas.draw_polyline(points, Color(tint, 0.13), 4.0, true)
+	canvas.draw_polyline(points, tint, 1.25, true)
 
 func draw_marks(canvas: Control, start: Vector2, tint: Color) -> void:
 	for index in 3:
@@ -144,7 +140,7 @@ func draw_marks(canvas: Control, start: Vector2, tint: Color) -> void:
 func _process(_delta: float) -> void:
 	card.size = card.get_combined_minimum_size()
 	var pickup_clearance: float = field_hud.pickup_stack_height() if is_instance_valid(field_hud) else 0.0
-	card.position = UI.operator_popup_position(card, target, pickup_clearance + lift)
+	card.position = UI.operator_popup_position(card, target, maxf(pickup_clearance, HEAD_CLEARANCE) + lift)
 	var can_show := not get_tree().has_group(&"interactive_dialogue")
 	if card.visible != can_show:
 		card.visible = can_show
