@@ -128,6 +128,7 @@ var coyote := 0.0
 var jump_buffer := 0.0
 var dash_left := 0.0
 var dash_elapsed := 0.0
+var dash_evade_used := false
 var dash_facing := 1.0
 var ground_dash := false
 var dash_lock := 0.0
@@ -534,6 +535,7 @@ func simulate_movement(delta: float) -> void:
 	if not drop_command and not dropping and shock_stun <= 0.0 and boss_debuff != 9 and resume_input_guard <= 0.0 and contact_recoil <= 0.0 and action_pressed("dash") and dash_lock <= 0.0 and (grounded() or air_dash_available):
 		dash_left = dash_duration
 		dash_elapsed = 0.0
+		dash_evade_used = false
 		dash_facing = facing
 		ground_dash = grounded()
 		dash_lock = dash_cooldown
@@ -1957,6 +1959,10 @@ func take_damage(amount: float, source_position := Vector3.ZERO) -> void:
 		ladder_lock = 0.24
 
 func take_projectile_damage(amount: float) -> void:
+	if run_module == "slipstream" and not dash_evade_used and health > 0.0 and dash_left > 0.0 and dash_elapsed < 0.09:
+		dash_evade_used = true
+		restore_energy(4.0, true)
+		return
 	receive_hit(amount, Vector3.ZERO)
 
 func take_boss_hit(amount: float, source: Vector3, sector: int, recoil := false) -> void:

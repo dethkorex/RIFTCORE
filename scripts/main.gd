@@ -2285,6 +2285,8 @@ func _process(delta: float) -> void:
 	mission_stats.seconds += delta
 	factory_hud.set_run_time(mission_stats.seconds)
 	gate_relays.update_prompt(player, arena_door.near(player))
+	if sector == 1 and act == 1:
+		FoundryModule.update_prompt(game_root, player)
 	if factory_hud.boss_visible:
 		factory_hud.update_boss_mechanic(boss)
 	factory_hud.set_status_effects(player.supplies, player.boss_debuff, player.debuff_left)
@@ -2395,19 +2397,31 @@ func _process(delta: float) -> void:
 		ending, return_to_command_deck
 	)
 
+func choose_foundry_module(early: bool) -> void:
+	if not early and DisplayServer.get_name() == "headless":
+		run_module = "prism"
+	else:
+		var chooser := FoundryModule.new()
+		if early:
+			chooser.process_mode = Node.PROCESS_MODE_WHEN_PAUSED
+			player.cancel_charge()
+			get_tree().paused = true
+		add_child(chooser)
+		chooser.choose(early)
+		run_module = await chooser.selected
+		chooser.queue_free()
+		if early:
+			get_tree().paused = false
+			player.resume_input_guard = 0.12
+	player.run_module = run_module
+	if early and not run_module.is_empty():
+		save_checkpoint()
+
 func advance_to_act_two() -> void:
 	player.cancel_charge()
 	player.set_physics_process(false)
 	if sector == 1 and run_module.is_empty():
-		if DisplayServer.get_name() == "headless":
-			run_module = "prism"
-		else:
-			var chooser := FoundryModule.new()
-			add_child(chooser)
-			chooser.choose()
-			run_module = await chooser.selected
-			chooser.queue_free()
-		player.run_module = run_module
+		await choose_foundry_module(false)
 	var loading := ActLoadingScreen.new()
 	add_child(loading)
 	loading.show_loading(Catalog.info(sector).title)
@@ -2499,7 +2513,7 @@ func seal_arena() -> void:
 	play_arena_intro()
 
 func play_arena_intro() -> void:
-	RiftAudio.play_boss_music()
+	RiftAudio.play_boss_music(sector, act)
 	var intro_boss := boss
 	var intro_player := player
 	player.cancel_charge()
@@ -2587,6 +2601,10 @@ func on_joy_connection_changed(device: int, connected: bool) -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("field_interact") and is_instance_valid(gate_relays) and can_open_chat() and not chat.is_open():
+		if sector == 1 and act == 1 and FoundryModule.at_terminal(game_root, player):
+			get_viewport().set_input_as_handled()
+			choose_foundry_module(true)
+			return
 		var before := gate_relays.active
 		if gate_relays.interact(player, arena_door.near(player)):
 			if before != gate_relays.active:

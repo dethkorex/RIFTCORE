@@ -341,7 +341,7 @@ func load_stage(packed: PackedScene = null) -> void:
 	checkpoint_index=-1
 	var previous := []
 	for operator in operators:
-		previous.append([operator.health, operator.energy, operator.lives, operator.equipped_suit(), operator.recovered_supplies, operator.salvage, operator.recovered_blueprints, operator.experience, operator.run_weapon_ids])
+		previous.append([operator.health, operator.energy, operator.lives, operator.equipped_suit(), operator.recovered_supplies, operator.salvage, operator.recovered_blueprints, operator.experience, operator.run_weapon_ids, operator.run_module])
 	if is_instance_valid(stage):
 		remove_child(stage)
 		stage.queue_free()
@@ -422,6 +422,7 @@ func load_stage(packed: PackedScene = null) -> void:
 			operator.recovered_supplies = previous[index][4]
 			operator.salvage = previous[index][5]
 			operator.recovered_blueprints = previous[index][6]
+			operator.run_module = previous[index][9]
 		operator.set_physics_process(operator.health > 0.0 and (host or index == local_index))
 		if not host:
 			operator.set_process(false)
@@ -1000,9 +1001,9 @@ func check_campaign_progress() -> void:
 			entrance_open = true
 		if entrance_open and arena_door.passable and remaining.all(func(operator): return arena_door.inside(operator, far_edge)):
 			boss_started = true
-			var track := RiftAudio.choose_boss_track()
-			peer.call_func(receive_boss_intro, act, track)
-			play_boss_intro(track)
+			# Preserve the second RPC argument for clients that use the old playlist.
+			peer.call_func(receive_boss_intro, act, -1)
+			play_boss_intro()
 	update_doors()
 	if not boss_defeated and not boss_started:
 		room_status.text = gate_status()
@@ -1033,16 +1034,16 @@ func check_campaign_progress() -> void:
 				finish_mission(true, operators[local_index].experience, ledger.bolts, recovered_blueprint_ids(local_index), wiped)
 			return
 
-func receive_boss_intro(remote_act: int, track: int) -> void:
+func receive_boss_intro(remote_act: int, _legacy_track: int) -> void:
 	if not host and remote_act == act and peer.get_sender_id() == peer.get_host() and not boss_intro_active:
 		boss_started = true
-		play_boss_intro(track)
+		play_boss_intro()
 
-func play_boss_intro(track: int) -> void:
+func play_boss_intro() -> void:
 	boss_intro_active = true
 	if is_instance_valid(field_briefing):
 		field_briefing.hide()
-	RiftAudio.play_boss_music(track)
+	RiftAudio.play_boss_music(sector, act)
 	pressed.clear()
 	released.clear()
 	for index in operators.size():
@@ -1106,27 +1107,30 @@ func change_act(next: int) -> void:
 	await get_tree().create_timer(0.5, false).timeout
 	await loading.fade_out()
 	changing_act = false
-	if sector == 1 and act == 2 and operators[local_index].health > 0:
+	if sector == 1 and act == 2 and operators[local_index].health > 0 and operators[local_index].run_module.is_empty():
 		await choose_module()
 	show_field_briefing()
 
-func choose_module() -> void:
-	if DisplayServer.get_name() == "headless":
-		set_module(local_index, "prism")
-		if not host:
-			peer.call_func_on(peer.get_host(), receive_module_choice, "prism")
+func choose_module(early := false) -> void:
+	if DisplayServer.get_name() == "headless" and not early:
+		submit_module_choice("prism")
 		return
 	module_chooser = FoundryModule.new()
 	add_child(module_chooser)
-	module_chooser.choose()
+	module_chooser.choose(early)
 	set_local_controls_suspended(true)
 	var id: String = await module_chooser.selected
 	module_chooser.queue_free()
 	module_chooser = null
-	set_module(local_index, id)
-	if not host:
-		peer.call_func_on(peer.get_host(), receive_module_choice, id)
+	if not id.is_empty():
+		submit_module_choice(id)
 	resume_controls_pending = true
+
+func submit_module_choice(id: String) -> void:
+	if host:
+		set_module(local_index, id)
+	else:
+		peer.call_func_on(peer.get_host(), receive_module_choice, id)
 
 func receive_module_choice(id: String) -> void:
 	var sender: int = peer.get_sender_id()
@@ -1134,8 +1138,13 @@ func receive_module_choice(id: String) -> void:
 		set_module(roster.find(sender), id)
 
 func set_module(index: int, id: String) -> void:
-	if sector == 1 and act == 2 and index >= 0 and index < operators.size() and operators[index].run_module.is_empty() and FoundryModule.MODULES.has(id):
-		operators[index].run_module = id
+	if sector != 1 or index < 0 or index >= operators.size():
+		return
+	var operator := operators[index]
+	var early := act == 1 and id in FoundryModule.EARLY_OPTIONS and FoundryModule.at_terminal(stage, operator)
+	var fallback := act == 2 and id in FoundryModule.WARDEN_OPTIONS
+	if operator.health > 0.0 and operator.run_module.is_empty() and (early or fallback):
+		operator.run_module = id
 
 func show_field_briefing() -> void:
 	if DisplayServer.get_name() == "headless":
@@ -1542,6 +1551,7 @@ func broadcast_state(reliable_operators := false) -> void:
 	props_consumed.clear()
 	for operator in operators:
 		players.append([operator.global_position, operator.model_root.rotation, operator.health, operator.energy, operator.current_animation, operator.facing, operator.equipped_suit(), operator.lives, operator.max_health, operator.max_energy, operator.velocity, operator.fire_lock, operator.charge_held, operator.melee_lock, operator.quick_profile.quick_slots if operator.quick_profile else [], operator.supplies, operator.charge_elapsed if operator.charge_held else 0.0, operator.saber_hold, remote_players.get(roster[players.size()], {}).get("quick_revision", 0), operator.recovered_supplies, operator.experience, Vector4(operator.boss_debuff, operator.debuff_left, operator.debuff_tick, operator.shock_stun), Vector3(1.0 if is_instance_valid(operator.rocket_course) else 0.0, operator.rocket_speed, operator.rocket_seconds)])
+		players.back().append(operator.run_module)
 	for index in enemies.size():
 		var enemy := enemies[index]
 		if is_instance_valid(enemy) and enemy.health > 0:
@@ -1643,6 +1653,8 @@ func receive_state(remote_act: int, security: PackedFloat32Array, arena: Array, 
 	if not boss_intro_active:
 		if (boss_started and not arena[3]) or (arena[4] and not boss_defeated):
 			RiftAudio.play_music(true, sector)
+		elif arena[3] and not arena[4] and not boss_started:
+			RiftAudio.play_boss_music(sector, act)
 		boss_started = arena[3]
 	if act == 2 and arena[4] and not cache_opened and not boss_defeated and not is_instance_valid(boss_cache):
 		create_boss_cache()
@@ -1784,6 +1796,8 @@ func apply_operator_state(operator: RiftPlayer, data: Array, is_local: bool) -> 
 	operator.max_health = data[8]
 	operator.max_energy = data[9]
 	operator.lives = data[7]
+	if data.size() > 23:
+		operator.run_module = String(data[23])
 	if not (is_local and suit_reveal_playing) and operator.equipped_suit() != data[6]:
 		if String(data[6]).is_empty():
 			operator.equip_sector_weapon("")
@@ -1870,6 +1884,8 @@ func _process(delta: float) -> void:
 		preload("res://scripts/coop_corpse.gd").present(actor)
 	update_revive_meter()
 	var local := operators[local_index]
+	if sector == 1 and act == 1:
+		FoundryModule.update_prompt(stage, local)
 	if not boss_intro_active and not changing_act and not suit_reveal_playing:
 		var previous_target := camera.target
 		if local.health > 0.0 or local.lives > 0:
@@ -2136,6 +2152,10 @@ func _unhandled_input(event: InputEvent) -> void:
 				start_reboot(local_index)
 			else:
 				peer.call_func_on(peer.get_host(), receive_reboot_request, act)
+		elif sector == 1 and act == 1 and not changing_act and not boss_intro_active and not suit_reveal_playing \
+				and not is_instance_valid(field_briefing) and outcome.is_empty() and FoundryModule.at_terminal(stage, local):
+			get_viewport().set_input_as_handled()
+			choose_module(true)
 		elif host:
 			if interact_gate_relay(local):
 				get_viewport().set_input_as_handled()

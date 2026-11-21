@@ -13,6 +13,8 @@ const WINDOW := preload("res://assets/hub/orbital_view.png")
 const STATION_PLATFORM := preload("res://assets/hub/station_platform.glb")
 const DEPLOYMENT_PLATFORM := preload("res://assets/hub/deployment_platform.glb")
 const NOVA_DRONE := preload("res://assets/hub/nova_drone.glb")
+const NOVA_TOUR_SPACING := 2.35
+const NOVA_TOUR_END_WALL := 19.3
 const STATIONS := [
 	{"x": -18.0, "name": "System", "page": "Save Game", "color": Color("9cbbff"), "prop": "service_kiosk", "icon": "icon_save", "caption": "SYSTEM / SAVE"},
 	{"x": -13.5, "name": "Profile", "page": "Player Profile", "color": Color("b6a3ff"), "prop": "service_kiosk", "icon": "icon_profile"},
@@ -46,6 +48,7 @@ var nova: Node3D
 var nova_iris: Node3D
 var nova_hover_time := 0.0
 var nova_hover_height := 0.0
+var nova_tour_angle := PI
 var nova_transitioning := false
 var tour_active := false
 var tour_skipped := false
@@ -269,16 +272,9 @@ func play_opening_arrival() -> void:
 			RiftAudio.play_effect(&"checkpoint")
 	)
 	await story.play(Story.ARRIVAL, "Continue")
-	var skipped: bool = story.was_skipped
 	story.queue_free()
 	board.queue_free()
 	await fade_nova(false)
-	if not skipped:
-		var title = load("res://scripts/campaign_prologue.gd").new()
-		title.name = "OpeningTitle"
-		add_child(title)
-		await title.play_title()
-		title.queue_free()
 
 func has_dialogue() -> bool:
 	return nova_transitioning or (is_instance_valid(story) and story.visible and not story.is_queued_for_deletion())
@@ -310,9 +306,11 @@ func play_station_story(lines: Array, finish_label := "Back to Station") -> void
 func fade_nova(appearing: bool) -> void:
 	nova_transitioning = true
 	if appearing:
-		var side := 1.0 if avatar.position.x < -17.0 else -1.0
+		var spacing := NOVA_TOUR_SPACING if tour_active else 1.46
+		var side := 1.0 if avatar.position.x - spacing < -NOVA_TOUR_END_WALL else -1.0
+		nova_tour_angle = 0.0 if side > 0.0 else PI
 		nova_hover_height = avatar.position.y + 0.81
-		nova.position = Vector3(avatar.position.x + side * 1.46, nova_hover_height, 0.1)
+		nova.position = Vector3(avatar.position.x + side * spacing, nova_hover_height, 0.1)
 		nova_hover_time = 0.0
 		nova.show()
 
@@ -379,11 +377,19 @@ func _physics_process(delta: float) -> void:
 func _process(delta: float) -> void:
 	if nova.visible:
 		nova_hover_time += delta
-		if tour_active and not is_nan(tour_destination):
-			var lead := signf(tour_destination - avatar.position.x) * 1.55
-			var follow := 1.0 - exp(-8.0 * delta)
-			nova.position.x = lerpf(nova.position.x, avatar.position.x + lead, follow)
-			nova_hover_height = lerpf(nova_hover_height, avatar.position.y + 0.81, follow)
+		if tour_active and not nova_transitioning:
+			var lead_right := nova_tour_angle < PI * 0.5
+			if not is_nan(tour_destination):
+				lead_right = tour_destination > avatar.position.x
+			if absf(avatar.position.x) > NOVA_TOUR_END_WALL - NOVA_TOUR_SPACING:
+				lead_right = avatar.position.x < 0.0
+			nova_tour_angle = move_toward(nova_tour_angle, 0.0 if lead_right else PI, delta * 5.5)
+			# Arc up and around the operator when the next stop reverses direction.
+			var turn := sin(nova_tour_angle)
+			nova.position.x = clampf(avatar.position.x + cos(nova_tour_angle) * NOVA_TOUR_SPACING,
+				-NOVA_TOUR_END_WALL, NOVA_TOUR_END_WALL)
+			nova.position.z = 0.1 + turn * 1.8
+			nova_hover_height = avatar.position.y + 0.81 + turn * 0.72
 		nova.position.y = nova_hover_height + sin(nova_hover_time * 2.6) * 0.085
 		nova.rotation.y = lerpf(nova.rotation.y, clampf((avatar.position.x - nova.position.x) * 0.19, -0.48, 0.48), minf(1.0, delta * 4.0))
 		nova.rotation.z = sin(nova_hover_time * 2.6 + 1.2) * 0.10

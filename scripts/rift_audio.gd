@@ -1,16 +1,21 @@
 extends Node
 
 const MENU_TRACK := preload("res://assets/audio/vintage_menu.mp3")
-const LEVEL_TRACK := preload("res://assets/audio/space_boss_battle.ogg")
-const JUNGLE_TRACK := preload("res://assets/audio/machine_jungle.ogg")
-const BOSS_TRACKS := [
-	preload("res://assets/audio/boss_metal_1.ogg"),
-	preload("res://assets/audio/boss_metal_2.ogg"),
-	preload("res://assets/audio/boss_metal_3.ogg"),
-	preload("res://assets/audio/boss_metal_4.ogg"),
-	preload("res://assets/audio/boss_metal_5.ogg"),
-	preload("res://assets/audio/boss_metal_6.ogg"),
+const SCORE_ROOT := "res://assets/audio/soundtrack"
+# Each row follows sector order: exploration, Act I mini-boss, Act II main boss.
+const SCORE := [
+	["ember_foundry", "metallic_syncopation", "word_of_war"],
+	["machine_jungle", "machine_pulse", "big_cut"],
+	["frozen_reactor", "fractured", "it_s_time"],
+	["abyssal_plant", "driven_down", "descent"],
+	["buried_archives", "bit_crushed", "bones"],
+	["sky_dock", "riff_led", "relentless_pulse"],
+	["bio_lab", "breakdown", "2_sides"],
+	["orbital_array", "metal_techno", "climax"],
+	["scrapyard_expanse", "gears", "crushed"],
+	["riftcore_nexus", "riftcore", "final_boss"],
 ]
+const SCORE_CATEGORIES := ["level", "miniboss", "boss"]
 const EFFECTS := {
 	&"menu_move": [preload("res://assets/audio/menu_move.ogg"), -20.0, 1],
 	&"menu_confirm": [preload("res://assets/audio/menu_confirm.ogg"), -13.0, 2],
@@ -52,13 +57,10 @@ func foundry_sound(cue: StringName, at: Vector3) -> void:
 	voice.finished.connect(voice.queue_free)
 	voice.play()
 
-var boss_tracks: Array[AudioStreamOggVorbis] = []
-var last_boss_track := -1
 var requested_track: AudioStream
 var music: AudioStreamPlayer
+var music_tail: AudioStreamPlayer
 var menu_track: AudioStreamMP3
-var level_track: AudioStreamOggVorbis
-var jungle_track: AudioStreamOggVorbis
 var voices: Dictionary[StringName, AudioStreamPlayer] = {}
 var music_fade: Tween
 var dash_fade: Tween
@@ -68,19 +70,10 @@ var last_menu_move := -100
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
-	music = AudioStreamPlayer.new()
-	music.bus = &"Music"
-	add_child(music)
+	music = make_music_player()
+	music_tail = make_music_player()
 	menu_track = MENU_TRACK.duplicate() as AudioStreamMP3
-	level_track = LEVEL_TRACK.duplicate() as AudioStreamOggVorbis
-	jungle_track = JUNGLE_TRACK.duplicate() as AudioStreamOggVorbis
 	menu_track.loop = true
-	level_track.loop = true
-	jungle_track.loop = true
-	for source in BOSS_TRACKS:
-		var track := source.duplicate() as AudioStreamOggVorbis
-		track.loop = true
-		boss_tracks.append(track)
 	for cue in EFFECTS:
 		var voice := AudioStreamPlayer.new()
 		voice.bus = &"SFX"
@@ -91,17 +84,29 @@ func _ready() -> void:
 		voices[cue] = voice
 
 func play_music(in_level: bool, sector := 1) -> void:
-	var track: AudioStream = (jungle_track if sector == 2 else level_track) if in_level else menu_track
-	switch_music(track, -16.0 if in_level else -14.0)
+	if in_level:
+		play_sector_score(sector, 0)
+	else:
+		switch_music(menu_track, -14.0)
 
-func choose_boss_track() -> int:
-	if last_boss_track < 0:
-		return randi_range(0, boss_tracks.size() - 1)
-	return (last_boss_track + randi_range(1, boss_tracks.size() - 1)) % boss_tracks.size()
+func play_boss_music(sector: int, act: int) -> void:
+	play_sector_score(sector, clampi(act, 1, 2))
 
-func play_boss_music(index := -1) -> void:
-	last_boss_track = index if index >= 0 and index < boss_tracks.size() else choose_boss_track()
-	switch_music(boss_tracks[last_boss_track], -16.0)
+func play_sector_score(sector: int, category: int) -> void:
+	var tracks: Array = SCORE[clampi(sector - 1, 0, SCORE.size() - 1)]
+	var path := "%s/%s/%s.ogg" % [SCORE_ROOT, SCORE_CATEGORIES[category], tracks[category]]
+	if is_instance_valid(requested_track) and requested_track.resource_path == path:
+		return
+	var track := load(path) as AudioStreamOggVorbis
+	if track:
+		track.loop = true
+		switch_music(track, -16.0)
+
+func make_music_player() -> AudioStreamPlayer:
+	var deck := AudioStreamPlayer.new()
+	deck.bus = &"Music"
+	add_child(deck)
+	return deck
 
 func switch_music(track: AudioStream, volume: float) -> void:
 	if requested_track == track:
@@ -109,15 +114,36 @@ func switch_music(track: AudioStream, volume: float) -> void:
 	requested_track = track
 	if music_fade and music_fade.is_valid():
 		music_fade.kill()
-	music_fade = create_tween()
-	if music.playing:
-		music_fade.tween_property(music, "volume_db", -45.0, 0.18)
-	music_fade.tween_callback(func():
+	if music_tail.playing and music_tail.stream == track:
+		swap_music_players()
+	else:
+		# On a rapid switch, keep the louder source as the outgoing track.
+		if music_tail.playing and music_tail.volume_db > music.volume_db:
+			swap_music_players()
+		swap_music_players()
+		music.stop()
 		music.stream = track
-		music.volume_db = -38.0
+		music.volume_db = -80.0
 		music.play()
+
+	var incoming_start := db_to_linear(music.volume_db)
+	var incoming_target := db_to_linear(volume)
+	var outgoing_start := db_to_linear(music_tail.volume_db) if music_tail.playing else 0.0
+	music_fade = create_tween()
+	music_fade.tween_method(func(progress: float):
+		var angle := progress * PI * 0.5
+		music.volume_db = linear_to_db(maxf(0.0001, lerpf(incoming_start, incoming_target, sin(angle))))
+		music_tail.volume_db = linear_to_db(maxf(0.0001, outgoing_start * cos(angle)))
+	, 0.0, 1.0, 0.85 if music_tail.playing else 0.40)
+	music_fade.tween_callback(func():
+		music_tail.stop()
+		music_tail.stream = null
 	)
-	music_fade.tween_property(music, "volume_db", volume, 0.4)
+
+func swap_music_players() -> void:
+	var previous := music
+	music = music_tail
+	music_tail = previous
 
 func play_effect(cue: StringName) -> void:
 	if cue == &"voice_start" or cue == &"voice_level_up":

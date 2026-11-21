@@ -73,26 +73,54 @@ func check_boulder(game, act: int) -> void:
 			crossed = true
 	print("Act ", act, " mark ", mark, " final ", rock.position, " state ", rock.status, " ticks ", ticks)
 	check(crossed, "Act %d boulder keeps rolling beyond the yellow line" % act)
-	check(rock.status in [3, 4], "Act %d roll finishes at terrain or below the sector" % act)
-	if rock.status == 4:
-		var wall = rock.move_and_collide(Vector3.RIGHT * rock.direction * 0.08, true)
-		if wall:
-			print("Impact collider ", wall.get_collider().get_path(), " normal ", wall.get_normal())
-		check(wall != null and wall.get_normal().x * rock.direction < -0.45, "Stopped boulder rests against a physical obstruction")
-		var settled: Vector3 = rock.position
-		await frames(10)
-		check(rock.position.is_equal_approx(settled), "Wall impact holds the boulder in place")
+	check(rock.status == 3 and not rock.body_mesh.visible, "Act %d roll ends by shattering or leaving the sector" % act)
 	var state: Array = rock.snapshot()
 	check(is_equal_approx(state[4], rock.position.y), "Co-op snapshot includes actual boulder height")
-	rock.reset_runway()
-	for i in 4:
-		var shot = load("res://scripts/projectile.gd").new()
-		shot.is_charged = true
-		rock.hit_by_projectile(shot)
-		shot.free()
-	check(rock.status == 3 and not rock.body_mesh.visible, "Four charged shots destroy the boulder")
-	rock.reset_runway()
-	check(rock.status == 3, "Destroyed boulder stays destroyed on respawn")
+
+func make_test_boulder(terrain: Node3D, at: Vector3) -> AnimatableBody3D:
+	var rock := AnimatableBody3D.new()
+	rock.set_script(load("res://scripts/foundry_boulder.gd"))
+	rock.position = at
+	terrain.add_child(rock)
+	return rock
+
+func check_fracture(game) -> void:
+	var terrain: Node3D = game.game_root.get_node("TERRAIN")
+	for charged in [false, true]:
+		var rock := make_test_boulder(terrain, Vector3(30, 18, 0))
+		rock.set_physics_process(false)
+		var required := 4 if charged else 6
+		for attempt in required:
+			var shot = load("res://scripts/projectile.gd").new()
+			shot.is_charged = charged
+			rock.hit_by_projectile(shot)
+			shot.free()
+			check(rock.status == (3 if attempt == required - 1 else 0),
+				"%s hit %d of %d" % ["Charged" if charged else "Standard", attempt + 1, required])
+		rock.reset_runway()
+		check(rock.status == 3 and not rock.body_mesh.visible, "Destroyed boulder stays destroyed on respawn")
+		rock.queue_free()
+	var wall := StaticBody3D.new()
+	wall.position = Vector3(30, 18, 0)
+	var collider := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = Vector3(1, 10, 3)
+	collider.shape = box
+	wall.add_child(collider)
+	terrain.add_child(wall)
+	var rolling := make_test_boulder(terrain, Vector3(34, 18, 0))
+	var replica := make_test_boulder(terrain, Vector3(34, 27, 0))
+	replica.authority = false
+	await frames(3)
+	rolling.status = 2
+	for tick in 60:
+		await physics_frame
+		if rolling.status != 2:
+			break
+	check(rolling.status == 3 and rolling.hit_count == rolling.TO_BREAK and not rolling.body_mesh.visible,
+		"Forward collision shatters the rolling boulder")
+	replica.apply_snapshot(rolling.snapshot())
+	check(replica.status == 3 and not replica.body_mesh.visible, "Guest snapshot shows the wall shatter")
 
 func run() -> void:
 	for act in [1, 2]:
@@ -106,6 +134,8 @@ func run() -> void:
 		if act == 1:
 			await check_guard(game)
 		await check_boulder(game, act)
+		if act == 1:
+			await check_fracture(game)
 		game.queue_free()
 		await frames(5)
 	for voice in root.get_node("RiftAudio").find_children("*", "AudioStreamPlayer", true, false):

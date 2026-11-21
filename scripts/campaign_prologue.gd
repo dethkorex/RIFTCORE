@@ -15,8 +15,6 @@ const VOSS := preload("res://assets/ui/story/voss.png")
 const SOREN := preload("res://assets/ui/story/soren.png")
 const NOVA := preload("res://assets/ui/nova_portrait.png")
 const WATER := preload("res://assets/campaign/abyssal_plant/panorama.png")
-const WORDMARK := preload("res://assets/ui/riftcore-wordmark.svg")
-const COVER := preload("res://assets/ui/riftcore_title_art.png")
 const MUSIC := preload("res://assets/audio/dfg_ambient.ogg")
 const FRACTURE := preload("res://assets/ui/story/rift_fracture.gdshader")
 const TITLES := [
@@ -30,7 +28,6 @@ const FULL := Rect2(.045, .092, .91, .749)
 
 var scene_index := 0
 var line_index := 0
-var finale := false
 var ended := false
 var skipped := false
 var canvas: Control
@@ -46,23 +43,6 @@ var subtitle: Label
 func play() -> void:
 	build_overlay()
 	show_line()
-	await finished
-
-func play_title() -> void:
-	finale = true
-	build_overlay()
-	rebuild_page()
-	art(COVER, Rect2(.05, .085, .90, .79), UI.CYAN).modulate = Color("8297bb")
-	var mark := TextureRect.new()
-	mark.texture = WORDMARK
-	mark.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	mark.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	page.add_child(mark)
-	anchor(mark, Rect2(.43, .26, .49, .20))
-	caption("MISSION 01 UNLOCKED", "EMBER FOUNDRY", UI.CYAN)
-	next.text = "Enter Operations Hub"
-	flash(Color("7be8ff"), .52, 0.65)
-	RiftAudio.play_effect(&"checkpoint")
 	await finished
 
 func build_overlay() -> void:
@@ -81,8 +61,7 @@ func build_overlay() -> void:
 	canvas.add_child(controls)
 	anchor(controls, Rect2(.05, .914, .90, .05))
 	next = UI.button(controls, "Next", advance, true, 35)
-	if not finale:
-		UI.button(controls, "Skip intro", skip, false, 35)
+	UI.button(controls, "Skip intro", skip, false, 35)
 	next.grab_focus()
 	shade = ColorRect.new()
 	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -97,14 +76,10 @@ func build_overlay() -> void:
 	music.bus = &"Music"
 	music.volume_db = -23.0
 	add_child(music)
-	if not finale:
-		music.play()
+	music.play()
 
 func advance() -> void:
 	if ended:
-		return
-	if finale:
-		close()
 		return
 	if lettering and lettering.is_running():
 		lettering.kill()
@@ -334,14 +309,13 @@ func caption(speaker: String, detail: String, tint: Color) -> void:
 	panel.add_theme_stylebox_override("panel", style)
 	var copy := UI.column(panel, 4)
 	UI.label(copy, speaker, 25, tint)
-	subtitle = UI.label(copy, detail, 29 if finale else 27, UI.WHITE)
+	subtitle = UI.label(copy, detail, 27, UI.WHITE)
 	subtitle.add_theme_font_override("font", BODY_FONT)
 	subtitle.add_theme_constant_override("line_spacing", 5)
-	if not finale:
-		subtitle.visible_characters = 0
-		lettering = create_tween()
-		lettering.tween_property(subtitle, "visible_characters", detail.length(), float(detail.length()) / 48.0)
-		lettering.tween_callback(func(): subtitle.visible_characters = -1)
+	subtitle.visible_characters = 0
+	lettering = create_tween()
+	lettering.tween_property(subtitle, "visible_characters", detail.length(), float(detail.length()) / 48.0)
+	lettering.tween_callback(func(): subtitle.visible_characters = -1)
 
 func anchor(control: Control, bounds: Rect2) -> void:
 	control.anchor_left = bounds.position.x

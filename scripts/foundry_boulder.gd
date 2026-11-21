@@ -1,8 +1,8 @@
 extends AnimatableBody3D
 
 const VFX := preload("res://scripts/factory_trap_vfx.gd")
-# Ten standard hits or four charged hits. Mixed hits share the same fracture meter.
-const TO_BREAK := 30
+# Six standard hits or four charged hits. Mixed hits share the same fracture meter.
+const TO_BREAK := 18
 const FLOOR_MARK := preload("res://scripts/foundry_flame.gd")
 const WARNING := 0.62
 const START_SPEED := 5.5
@@ -54,7 +54,7 @@ func _ready() -> void:
 	present()
 
 func _physics_process(delta: float) -> void:
-	if not authority or status in [3, 4]:
+	if not authority or status == 3:
 		return
 	match status:
 		0:
@@ -82,7 +82,7 @@ func _physics_process(delta: float) -> void:
 				if body.health > 0.0 and center.distance_to(closest) < radius + 0.32:
 					body.die_in_pit()
 			# An unsupported boulder keeps falling until it leaves the playable sector.
-			if global_position.y < float(get_parent().get_parent().get_meta("pit_floor_y", -3.4)) - 24.0:
+			if status == 2 and global_position.y < float(get_parent().get_parent().get_meta("pit_floor_y", -3.4)) - 24.0:
 				status = 3
 	present()
 
@@ -100,8 +100,8 @@ func roll(delta: float) -> void:
 		if not hit:
 			break
 		var normal := hit.get_normal()
-		if normal.y < 0.65 and normal.x * direction < -0.45:
-			status = 4
+		if normal.y < 0.65 and (normal.x * direction < -0.12 or normal.y < -0.45):
+			shatter()
 			return
 		travel = hit.get_remainder().slide(normal)
 		if travel.length_squared() < 0.000001:
@@ -131,14 +131,18 @@ func operators() -> Array[Node]:
 func hit_by_projectile(shot: RiftProjectile) -> bool:
 	if shot.owner_faction != "player" or not authority or status == 3:
 		return false
-	hit_count = mini(TO_BREAK, hit_count + (8 if shot.is_charged else 3))
+	hit_count = mini(TO_BREAK, hit_count + (5 if shot.is_charged else 3))
 	if hit_count >= TO_BREAK:
-		status = 3
-		break_rock()
+		shatter()
 	else:
 		VFX.impact(self, 0.56, &"concrete")
 	present()
 	return true
+
+func shatter() -> void:
+	status = 3
+	hit_count = TO_BREAK
+	break_rock()
 
 func break_rock() -> void:
 	RiftAudio.foundry_sound(&"barricade_crack", global_position)
@@ -168,7 +172,7 @@ func break_rock() -> void:
 func present() -> void:
 	body_mesh.visible = status != 3
 	body_shape.set_deferred("disabled", status == 3)
-	var body_layer := 3 if status in [0, 1, 4] else 2
+	var body_layer := 3 if status < 2 else 2
 	if collision_layer != body_layer:
 		set_deferred("collision_layer", body_layer)
 	body_mesh.rotation.z = -Vector2(position.x - start.x, position.y - start.y).length() * direction / radius
@@ -191,7 +195,7 @@ func snapshot() -> Array:
 
 func apply_snapshot(state: Array) -> void:
 	var starts_rolling := status < 2 and int(state[0]) == 2
-	var breaks := hit_count < TO_BREAK and int(state[1]) >= TO_BREAK
+	var breaks := status != 3 and int(state[0]) == 3 and int(state[1]) >= TO_BREAK
 	status = int(state[0])
 	hit_count = int(state[1])
 	if state.size() > 4:

@@ -223,8 +223,11 @@ static func deployment(sector: int, act: int, tell_story := true, teach := true)
 		lines.append(["RX-07", OPERATOR_BRIEF_RESPONSES[index][int(second_act)], BRIEFING_EXPRESSIONS[index][int(second_act)]])
 	if teach:
 		lines.append([GUIDE, ACT_TWO_ADVICE[index] if second_act else FIELD_ADVICE[index]])
-		if sector == 1 and second_act:
-			lines.append([GUIDE, "If you hear slag rolling, wait outside the chute. You can shoot the boulder from there."])
+		if sector == 1:
+			if second_act:
+				lines.append([GUIDE, "If you hear slag rolling, wait outside the chute. Six regular Buster shots will break the boulder."])
+			else:
+				lines.append([GUIDE, "There's a module terminal ahead. At the furnace fork, the upper gantry has a blueprint and the service deck below has a Patch Kit."])
 	return lines
 
 static func boss_exchange(sector: int, act: int) -> Array:
