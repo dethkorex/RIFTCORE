@@ -178,6 +178,15 @@ func install_model() -> void:
 		Vector3(1.32, 1.2, 1.06), Vector3(1.0, 1.2, 1.16),
 		Vector3(1.1, 0.78, 0.95),
 	][variant] * 1.16
+	if is_in_group(&"jungle_enemies"):
+		var bounds := AABB()
+		for part: MeshInstance3D in robot.find_children("*", "MeshInstance3D", true, false):
+			var part_bounds := (global_transform.affine_inverse() * part.global_transform) * part.get_aabb()
+			bounds = part_bounds if bounds.size == Vector3.ZERO else bounds.merge(part_bounds)
+		if bounds.has_volume():
+			var width := maxf(bounds.size.x, bounds.size.z) + 0.06
+			hitbox.size = Vector3(width, bounds.size.y + 0.06, width)
+			collider.position.y = bounds.get_center().y
 	collider.shape = hitbox
 
 func finish_armor() -> void:

@@ -2,6 +2,8 @@ extends Node
 
 signal changed
 signal deploy_requested(host: bool, sector: int)
+signal deployment_countdown(sector: int, number: int)
+var counting_down := false
 signal partner_moved(id: int, x: float, facing: float, animation: String, display_name: String)
 signal blueprint_drop_changed(key: String, id: String, owner: int, x: float)
 signal blueprint_received(id: String)
@@ -444,6 +446,7 @@ func _room_joined(lobby_name: String) -> void:
 		return
 	request_timeout.stop()
 	relay.expose_func(_receive_deploy, RelayEnums.EXPOSE_PERMISSION.HOST)
+	relay.expose_func(_receive_countdown, RelayEnums.EXPOSE_PERMISSION.HOST)
 	relay.expose_func(_receive_return, RelayEnums.EXPOSE_PERMISSION.HOST)
 	relay.expose_func(_receive_abandon)
 	recovery.expose()
@@ -638,7 +641,7 @@ func append_party_message(alias: String, body: String, outgoing: bool) -> void:
 	party_chat_changed.emit()
 
 func can_deploy() -> bool:
-	return not mission_active and room_size >= 2 and is_instance_valid(relay) and relay.is_host()
+	return not mission_active and not counting_down and room_size >= 2 and is_instance_valid(relay) and relay.is_host()
 
 func set_difficulty_unlocks(sectors: Array, expert: bool) -> void:
 	hard_sectors = sectors.duplicate()
@@ -690,14 +693,43 @@ func deploy(sector := 1, mode := 0) -> void:
 	mission_roster.push_front(relay.get_client_id())
 	if mission_roster.size() < 2 or mission_roster.size() > MAX_PLAYERS:
 		return
+	var starting_room := connected_room
+	var starting_roster := mission_roster.duplicate()
+	counting_down = true
+	for number in range(5, -1, -1):
+		var members: Array = relay.lobby_get_all_clients()
+		if starting_room != connected_room or not relay.is_host() or members.size() != starting_roster.size() or not starting_roster.all(func(id): return members.has(id)):
+			counting_down = false
+			deployment_countdown.emit(sector, -1)
+			if starting_room == connected_room and relay.is_host():
+				relay.call_func(_receive_countdown, sector, -1)
+			mission_roster.clear()
+			return
+		relay.call_func(_receive_countdown, sector, number)
+		deployment_countdown.emit(sector, number)
+		await get_tree().create_timer(1.0 if number > 0 else 0.33).timeout
+	counting_down = false
+	var final_members: Array = relay.lobby_get_all_clients()
+	if starting_room != connected_room or not relay.is_host() or final_members.size() != starting_roster.size() or not starting_roster.all(func(id): return final_members.has(id)):
+		mission_roster.clear()
+		deployment_countdown.emit(sector, -1)
+		if starting_room == connected_room and relay.is_host():
+			relay.call_func(_receive_countdown, sector, -1)
+		return
 	if not recovery.new_mission(mission_roster, sector, mode):
 		mission_roster.clear()
+		deployment_countdown.emit(sector, -1)
+		relay.call_func(_receive_countdown, sector, -1)
 		_update("Could not set up mission recovery. Try deploying again.")
 		return
 	_clear_blueprint_drops()
 	mission_active = true
 	mission_mode = mode
 	deploy_requested.emit(true, sector)
+
+func _receive_countdown(sector: int, number: int) -> void:
+	if not mission_active and not connected_room.is_empty() and relay.get_sender_id() == relay.get_host() and number >= -1 and number <= 5:
+		deployment_countdown.emit(sector, number)
 
 func _receive_deploy(sector: int, roster: Array, mode: int, credentials: Dictionary) -> void:
 	if connected_room.is_empty() or sector < 1 or sector > 10 or relay.get_sender_id() != relay.get_host():

@@ -11,6 +11,7 @@ const PAD_TINT := Color("98ff63")
 var cloud: Node3D
 var clock := 0.0
 var participants := {}
+var authority := true
 
 func _ready() -> void:
 	add_to_group(&"jungle_canopy_route")
@@ -122,13 +123,23 @@ func make_mist() -> void:
 		RiftProjectile.part(cloud, layer, density, Vector3(18.0, -1.06 - index * 0.26, -1.35 + index * 0.59), Vector3.ONE)
 
 func launch_rider(operator: CharacterBody3D) -> void:
-	if practice:
+	if practice or not authority:
 		return
 	if participants.is_empty():
 		clock = 0.0
 	participants[operator.get_instance_id()] = weakref(operator)
 
+func mist_snapshot() -> Vector2:
+	return Vector2(cloud.position.y, float(cloud.visible)) if is_instance_valid(cloud) else Vector2.ZERO
+
+func apply_mist_snapshot(state: Vector2) -> void:
+	if is_instance_valid(cloud):
+		cloud.position.y = state.x
+		cloud.visible = state.y > 0.0
+
 func _physics_process(delta: float) -> void:
+	if not authority:
+		return
 	if participants.is_empty():
 		cloud.hide()
 		return

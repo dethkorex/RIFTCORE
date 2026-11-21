@@ -183,7 +183,7 @@ size = Vector3(5.5143, 0.46, 4.8)
 size = Vector3(6.1452, 0.84, 4.8)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_0153"]
-size = Vector3(0.79, 8.95, 4)
+size = Vector3(0.79, 5.925, 4)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_0156"]
 size = Vector3(7.305, 0.84, 4.8)
@@ -1308,7 +1308,7 @@ scale = Vector3(0.96667, 0.54762, 1)
 position = Vector3(0, -0.23, 0)
 shape = SubResource("BoxShape3D_0077")
 
-[node name="CompactApproach" type="StaticBody3D" parent="TERRAIN/Room02_Switchback"]
+[node name="CompactApproach" type="StaticBody3D" parent="TERRAIN/Room02_Switchback" groups=["factory_drop_through"]]
 position = Vector3(89.932, 5.425, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
@@ -1320,7 +1320,7 @@ scale = Vector3(1.164, 0.54762, 1)
 position = Vector3(0, -0.23, 0)
 shape = SubResource("BoxShape3D_0080")
 
-[node name="CompactTransfer" type="StaticBody3D" parent="TERRAIN/Room02_Switchback"]
+[node name="CompactTransfer" type="StaticBody3D" parent="TERRAIN/Room02_Switchback" groups=["factory_drop_through"]]
 position = Vector3(96.654, 4.95, 0)
 rotation = Vector3(0, 0, -0.14601)
 collision_layer = 1
@@ -1332,7 +1332,7 @@ scale = Vector3(1.0883, 0.54762, 1)
 position = Vector3(0, -0.23, 0)
 shape = SubResource("BoxShape3D_0083")
 
-[node name="CompactMerge" type="StaticBody3D" parent="TERRAIN/Room02_Switchback"]
+[node name="CompactMerge" type="StaticBody3D" parent="TERRAIN/Room02_Switchback" groups=["factory_drop_through"]]
 position = Vector3(101.89, 4.95, 0)
 rotation = Vector3(0, 0, 0.2323)
 collision_layer = 1
@@ -1520,12 +1520,12 @@ position = Vector3(0, -0.42, 0)
 shape = SubResource("BoxShape3D_0129")
 
 [node name="DropBulkhead" type="StaticBody3D" parent="TERRAIN/Room02_Switchback"]
-position = Vector3(104.65, 8.8, 0)
+position = Vector3(104.65, 10.3125, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
 [node name="Art" parent="TERRAIN/Room02_Switchback/DropBulkhead" instance=ExtResource("RCWall")]
-scale = Vector3(1, 2.1059, 1)
+scale = Vector3(1, 1.3941, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room02_Switchback/DropBulkhead"]
 position = Vector3(0, 0, 0)

@@ -46,6 +46,9 @@ func snapshot() -> Dictionary:
 	if profile.load(Player.PATH) != OK:
 		return {}
 	var data := {"profile": profile.encode_to_text(), "operators": {}}
+	var shared := ConfigFile.new()
+	if shared.load(Operators.shared_path()) == OK:
+		data["shared"] = shared.encode_to_text()
 	for number in range(1, Operators.SLOT_COUNT + 1):
 		var stored := Operators.read_slot(number)
 		if stored != null:
@@ -226,6 +229,10 @@ func valid_snapshot(data: Dictionary) -> bool:
 	var name := String(profile.get_value("player", "name", ""))
 	if name.is_empty():
 		return false
+	if data.has("shared"):
+		var shared := ConfigFile.new()
+		if not data.shared is String or shared.parse(data.shared) != OK:
+			return false
 	for id in data.operators:
 		if id not in ["1", "2", "3"] or not data.operators[id] is String:
 			return false
@@ -265,7 +272,7 @@ func restore_cloud() -> Dictionary:
 
 func apply_snapshot(data: Dictionary) -> Error:
 	var ops := data.operators as Dictionary
-	var values := {Player.PATH: data.profile}
+	var values := {Player.PATH: data.profile, Operators.shared_path(): data.get("shared", "")}
 	for number in range(1, Operators.SLOT_COUNT + 1):
 		values[Operators.slot_path(number)] = ops.get(str(number), "")
 	var moved := {}

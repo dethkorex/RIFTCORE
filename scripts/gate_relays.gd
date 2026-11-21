@@ -92,7 +92,7 @@ func is_near(operator: RiftPlayer, terminal: Node3D) -> bool:
 	var feet := offset.y - operator.standing_capsule.height * 0.5
 	return absf(offset.x) <= 1.58 and absf(feet) <= 0.85 and absf(offset.z) < 0.85
 
-func update_prompt(operator: RiftPlayer, at_gate: bool) -> void:
+func update_prompt(operator: RiftPlayer, at_gate: bool, waiting_for_squad := false) -> void:
 	var interact := ""
 	for index in terminals.size():
 		var near := is_near(operator, terminals[index])
@@ -103,6 +103,11 @@ func update_prompt(operator: RiftPlayer, at_gate: bool) -> void:
 			interact = interact if not interact.is_empty() else interaction_binding()
 			prompt.text = "%s  ·  ACTIVATE" % interact
 	var at_escape := near_escape(operator)
+	if at_escape and complete() and waiting_for_squad:
+		door_prompt.global_position = escape_door.global_position + Vector3(-2.65, 2.85, 0.85)
+		door_prompt.text = "WAITING FOR THE PARTY"
+		door_prompt.show()
+		return
 	door_prompt.visible = (at_gate or at_escape) and not complete()
 	if door_prompt.visible:
 		var portal: Node3D = escape_door if at_escape else get_parent().get_node("Gate")

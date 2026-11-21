@@ -7,19 +7,20 @@ const GREEN := Color("94f551")
 const ROOT := Color("29402d")
 
 var faction := "scenery"
-var health := 1.0
+var health := 36.0
+var authority := true
 var sacs: Node3D
 var throat: StandardMaterial3D
 var cloud: CPUParticles3D
 
 func build(tint: Color) -> void:
-	collision_layer = 8
+	collision_layer = 2 | 8
 	collision_mask = 0
 	var target := CollisionShape3D.new()
-	var shape := SphereShape3D.new()
-	shape.radius = 0.51
+	var shape := BoxShape3D.new()
+	shape.size = Vector3(1.1, 0.96, 1.05)
 	target.shape = shape
-	target.position.y = 0.55
+	target.position.y = 0.48
 	add_child(target)
 	sacs = Node3D.new()
 	add_child(sacs)
@@ -76,11 +77,21 @@ func update_pressure(charge: float, active: bool) -> void:
 	sacs.scale = Vector3.ONE * (1.0 + charge * 0.10)
 	cloud.emitting = active
 
-func take_damage(_amount: float, _source := Vector3.ZERO) -> void:
-	pass
+func take_damage(amount: float, _source := Vector3.ZERO) -> void:
+	if not authority or health <= 0.0 or amount <= 0.0:
+		return
+	if amount >= health:
+		destroy()
+	else:
+		health -= amount
+		RiftAudio.enemy_damage(global_position)
 
 func take_fire_damage(amount: float, _source := Vector3.ZERO) -> void:
-	if health <= 0.0 or amount <= 0.0:
+	if authority and amount > 0.0:
+		destroy()
+
+func destroy() -> void:
+	if health <= 0.0:
 		return
 	health = 0.0
 	burned.emit()

@@ -40,6 +40,8 @@ var defaults: Dictionary = {}
 var bindings: Dictionary = {}
 
 func _ready() -> void:
+	# Only physics-driven mission operators opt in. Network ghosts and camera tweens already update per frame.
+	get_tree().root.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
 	for bus_name in ["Music", "SFX", "Voice"]:
 		if AudioServer.get_bus_index(bus_name) == -1:
 			AudioServer.add_bus()

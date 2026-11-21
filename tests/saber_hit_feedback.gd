@@ -129,6 +129,13 @@ func run() -> void:
 	mission.peer = HostLink.new()
 	mission.host = false
 	mission.boss = boss
+	mission.operators.append(actor)
+	var buster = audio.voices[&"buster"]
+	buster.stop()
+	mission.receive_weapon_sound(mission.act + 1, 0, "buster", actor.global_position)
+	check(not buster.playing, "A stale shot sound from another act is ignored")
+	mission.receive_weapon_sound(mission.act, 0, "buster", actor.global_position)
+	check(buster.playing, "Guest hears its own confirmed buster through the SFX bus")
 	var remaining: float = boss.health
 	mission.receive_enemy_hit(mission.act + 1, -1, false)
 	mission.receive_enemy_hit(mission.act, -1, false)
@@ -149,23 +156,23 @@ func run() -> void:
 	actor.remote_held[&"guard"] = true
 	actor.simulate_movement(.016)
 	check(actor.guarding and actor.guard_stage == 0 and actor.guard_bubble.visible, "Holding block raises a blue shield")
-	actor.update_guard(1, true)
-	check(actor.guard_stage == 1, "Shield turns yellow")
-	actor.update_guard(1, true)
-	check(actor.guard_stage == 2 and actor.blocks_hit(actor.global_position + Vector3.RIGHT * actor.facing), "Red shield still blocks incoming frontal attacks")
-	actor.update_guard(1, true)
-	check(not actor.guarding and not actor.guard_bubble.visible and actor.guard_cooldown == 10, "Shield breaks at the end of its hold")
+	actor.update_guard(12, true)
+	check(actor.guarding and actor.guard_stage == 0, "Holding the shield does not spend hits")
+	var front: Vector3 = actor.global_position + Vector3.RIGHT * actor.facing
+	var back: Vector3 = actor.global_position - Vector3.RIGHT * actor.facing
+	check(not actor.blocks_hit(back) and actor.guard_stage == 0, "Rear attacks do not spend shield hits")
+	check(actor.blocks_hit(front) and actor.guard_stage == 1, "First block turns the shield yellow")
+	actor.update_guard(2, false)
+	actor.update_guard(.016, true)
+	check(actor.guarding and actor.guard_stage == 1, "Lowering the shield preserves its damage")
+	check(actor.blocks_hit(front) and actor.guard_stage == 2, "Second block turns the shield red")
+	check(actor.blocks_hit(front) and not actor.guarding and not actor.guard_bubble.visible and actor.guard_cooldown == 10, "Third hit is blocked and breaks the shield")
 	actor.switch_combat_mode()
 	actor.switch_combat_mode()
 	actor.update_guard(9.99, true)
-	check(not actor.guarding and not actor.blocks_hit(actor.global_position + Vector3.RIGHT * actor.facing), "Mode swapping and holding Block cannot bypass recovery")
+	check(not actor.guarding and not actor.blocks_hit(front), "Mode swapping and holding Block cannot bypass recovery")
 	actor.update_guard(.01, true)
-	actor.update_guard(.016, true)
 	check(actor.guarding and actor.guard_stage == 0, "Shield returns blue after ten seconds")
-	actor.update_guard(1.1, true)
-	var charge: float = actor.guard_remaining
-	actor.update_guard(.1, false)
-	check(not actor.guard_bubble.visible and actor.guard_remaining > charge and actor.guard_remaining < actor.GUARD_SECONDS, "Early release hides the bubble and gradually restores charge")
 	for voice in audio.get_children():
 		if voice is AudioStreamPlayer or voice is AudioStreamPlayer3D:
 			voice.stop()

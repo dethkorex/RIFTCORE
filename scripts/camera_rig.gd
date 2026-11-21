@@ -25,13 +25,14 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	if is_instance_valid(target):
-		global_position = global_position.lerp(target_position(), 1.0 - exp(-damping * delta))
+		global_position = global_position.lerp(target_position(true), 1.0 - exp(-damping * delta))
 
 func snap_to_target() -> void:
 	if is_instance_valid(target):
 		global_position = target_position()
 
-func target_position() -> Vector3:
+func target_position(interpolated := false) -> Vector3:
+	var at := target.get_global_transform_interpolated().origin if interpolated else target.global_position
 	var lead := 6.6 if is_instance_valid(target.rocket_course) else look_ahead
-	return Vector3(clampf(target.global_position.x + target.facing * lead, min_x, max_x), maxf(minimum_follow_y, target.global_position.y + 0.35), 0.0)
+	return Vector3(clampf(at.x + target.facing * lead, min_x, max_x), maxf(minimum_follow_y, at.y + 0.35), 0.0)
 

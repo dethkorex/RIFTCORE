@@ -1,9 +1,18 @@
-# RIFTCORE Alpha 6.3.41
+# RIFTCORE Alpha 6.3.42
 
-## Saber shield and combat
-- Hold Block in Saber Mode to raise a blue energy bubble and guard against incoming frontal attacks. The bubble turns yellow, then red. After three seconds of continuous use it drops, and a full recharge takes ten seconds. Release early to conserve charge.
-- Saber cuts recover faster. Turn during the windup to redirect a strike, keep moving in the air, and buffer the next cut through the finisher.
-- Each damaging hit gives enemies a short red flash and a new metallic impact sound. Shielded enemies keep their distinct block sound. Co-op partners see the shield colors and confirmed enemy hits.
+## Co-op
+- Deploy together after a 5-to-0 countdown with audio cues. Everyone sees the RIFTCORE loading screen before entering the mission.
+- Review each operator’s rewards at extraction and return to the Operations Hub as a party. A party wipe keeps everyone on their current operator slot.
+- Party members can activate switches. The Ember Foundry lava shaft opens once both relays are active and the whole party is at the door.
+- Fixed guest gunfire audio, mini-boss dialogue, and cosmetic finishes appearing on the wrong operator. Co-op now sends fewer redundant updates and handles movement corrections more smoothly.
 
-## Operations Hub
-- Your name now appears at the same height and size above your operator as your co-op partners’ names.
+## Combat and sectors
+- The buster can fire straight up or down and at upward or downward angles.
+- Saber Block changes color only when it absorbs a hit. The third blocked hit breaks the shield, and it recovers after 10 seconds.
+- Fixed a blocked route in Machine Jungle and adjusted the hitboxes on its plant and flame enemies. Improved camera and operator movement between physics ticks.
+
+## Operators and tutorials
+- Operator slots share storage, blueprints, and talents. Resetting the profile clears shared progress.
+- Rebalanced cosmetic finish requirements and reset finish unlocks for the new requirements.
+- New operators watch the opening cinematic before meeting Nova in the Operations Hub and starting the station tour.
+- Reused the RIFTCORE loading screen for mission transitions.

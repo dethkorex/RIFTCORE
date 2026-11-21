@@ -88,6 +88,10 @@ var progress_reset_error := OK
 var choosing_after_coop_loss := false
 var coop_mission: Node3D
 var coop_join_loading: CanvasLayer
+var countdown_layer: CanvasLayer
+var countdown_number: Label
+var coop_deploy_loading := false
+var solo_deploy_loading := false
 var active_controller := -1
 var controller_disconnected := false
 
@@ -363,6 +367,11 @@ func verify_live_relay(arguments: PackedStringArray) -> void:
 		finish_relay_check(await wait_for_relay(func(): return peer.lobby_get_data("rift_check_ack", false), 15.0))
 
 func verify_coop_mission(host: bool, smoke_sector: int, wipe_test := false) -> void:
+	var countdown: Array[int] = []
+	RiftRelay.deployment_countdown.connect(func(number: int, remaining: int):
+		if number == smoke_sector and remaining >= 0:
+			countdown.append(remaining)
+	)
 	profile.unlocked_sector = smoke_sector
 	RiftRelay.unlocked_sector = smoke_sector
 	if host:
@@ -407,8 +416,8 @@ func verify_coop_mission(host: bool, smoke_sector: int, wipe_test := false) -> v
 			finish_relay_check(false)
 			return
 		RiftRelay.deploy(smoke_sector)
-	if not await wait_for_relay(func(): return is_instance_valid(coop_mission), 15.0):
-		print("Campaign check failed to deploy")
+	if not await wait_for_relay(func(): return is_instance_valid(coop_mission) and not coop_deploy_loading, 20.0) or countdown != [5, 4, 3, 2, 1, 0]:
+		print("Campaign check failed to deploy, countdown=", countdown)
 		finish_relay_check(false)
 		return
 	var mission = coop_mission
@@ -489,9 +498,17 @@ func verify_coop_mission(host: bool, smoke_sector: int, wipe_test := false) -> v
 		if not await clear_coop_test_boss(mission):
 			finish_relay_check(false)
 			return
-	# The guest begins waiting before the host plays the guardian entrance,
-	# suit reveal and extraction debrief. Each is part of the normal test path.
-	var returned := await wait_for_relay(func(): return is_instance_valid(home_hub) and not RiftRelay.mission_active, 50.0)
+	if not await wait_for_relay(func(): return is_instance_valid(mission) and is_instance_valid(mission.extraction_status), 45.0):
+		print("Campaign check did not see the squad extraction screen")
+		finish_relay_check(false)
+		return
+	var squad: Array = mission.squad_rewards
+	if squad.size() != 2 or squad[0].bolts == squad[1].bolts:
+		print("Campaign check did not see separate reward cards for both operators")
+		finish_relay_check(false)
+		return
+	mission.mark_local_return_ready()
+	var returned := await wait_for_relay(func(): return is_instance_valid(home_hub) and not RiftRelay.mission_active, 10.0)
 	var continuation := read_checkpoint()
 	var next_sector := mini(smoke_sector + 1, Catalog.SECTORS.size())
 	var progressed: bool = (continuation != null
@@ -580,6 +597,7 @@ func verify_coop_input_isolation(mission: Node, local_index: int) -> bool:
 	var operator: RiftPlayer = mission.operators[local_index]
 	var teammate: RiftPlayer = mission.operators[1 - local_index]
 	if not await wait_for_relay(func(): return operator.grounded(), 3.0):
+		print("Input isolation: operator did not land at deployment")
 		return false
 	var lobby := RiftRelay.relay
 	var local_start := operator.global_position
@@ -595,6 +613,7 @@ func verify_coop_input_isolation(mission: Node, local_index: int) -> bool:
 			Input.action_release("move_right")
 			Input.action_release("jump")
 			if not jumped:
+				print("Input isolation: operator ", moving_index, " did not jump and move from ", local_start, ". Current position ", operator.global_position, ", suspended ", operator.controls_suspended)
 				return false
 			lobby.lobby_set_data("coop_input_jump_%d" % moving_index, true)
 			if not await wait_for_relay(func(): return lobby.lobby_get_data("coop_input_observed_%d" % moving_index, false), 5.0):
@@ -604,6 +623,7 @@ func verify_coop_input_isolation(mission: Node, local_index: int) -> bool:
 			if not await wait_for_relay(func(): return lobby.lobby_get_data("coop_input_jump_%d" % moving_index, false) and teammate.global_position.x > remote_start + .4, 5.0):
 				return false
 			if operator.global_position.distance_to(idle_start) > .25:
+				print("Input isolation: idle operator ", local_index, " drifted from ", idle_start, " to ", operator.global_position)
 				return false
 			lobby.lobby_set_data("coop_input_observed_%d" % moving_index, true)
 		# Ice preserves momentum after input release. Start the next player's
@@ -917,6 +937,11 @@ func show_main_menu() -> void:
 		RiftRelay.deploy_requested.connect(start_coop_mission)
 		RiftRelay.guest_joined.connect(enter_leader_hub)
 		RiftRelay.mission_disconnected.connect(close_coop_mission)
+		RiftRelay.deployment_countdown.connect(show_mission_countdown)
+		RiftRelay.changed.connect(func():
+			if RiftRelay.connected_room.is_empty() and is_instance_valid(countdown_layer):
+				show_mission_countdown(0, -1)
+		)
 		RiftRelay.mission_returned.connect(close_coop_mission.bind("Back at Operations Station."))
 		RiftRelay.party_rejoin_offered.connect(show_party_rejoin)
 		RiftRelay.recovery.changed.connect(update_recovery_menu)
@@ -967,12 +992,51 @@ func enter_leader_hub() -> void:
 	if is_instance_valid(loading):
 		loading.fade_out()
 
-func start_coop_mission(is_host: bool, number: int) -> void:
-	if is_instance_valid(coop_mission) or is_instance_valid(game_root):
+func show_mission_countdown(number: int, remaining: int) -> void:
+	if remaining < 0:
+		if is_instance_valid(countdown_layer):
+			countdown_layer.queue_free()
+			countdown_layer = null
 		return
+	if not is_instance_valid(countdown_layer):
+		countdown_layer = CanvasLayer.new()
+		countdown_layer.layer = 100
+		add_child(countdown_layer)
+		var backdrop := ColorRect.new()
+		backdrop.color = Color(0.024, 0.05, 0.10, 0.84)
+		countdown_layer.add_child(backdrop)
+		backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		var center := CenterContainer.new()
+		backdrop.add_child(center)
+		center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		var panel := UI.equipment_card(UI.CYAN)
+		panel.custom_minimum_size.x = 360
+		center.add_child(panel)
+		var stack := UI.column(panel, 8)
+		UI.label(stack, Catalog.info(number).title.to_upper(), 24, UI.MUTED).horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		countdown_number = UI.label(stack, "", 88, UI.CYAN)
+		countdown_number.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	countdown_number.text = str(remaining)
+	countdown_number.modulate = Color.WHITE
+	countdown_number.create_tween().tween_property(countdown_number, "modulate", Color("91caef"), 0.48)
+	RiftAudio.play_effect(&"deploy_zap" if remaining == 0 else &"menu_confirm")
+
+func start_coop_mission(is_host: bool, number: int) -> void:
+	if is_instance_valid(coop_mission) or is_instance_valid(game_root) or coop_deploy_loading:
+		return
+	coop_deploy_loading = true
+	show_mission_countdown(number, -1)
 	if is_instance_valid(coop_join_loading):
 		coop_join_loading.queue_free()
 		coop_join_loading = null
+	var loading := ActLoadingScreen.new()
+	add_child(loading)
+	loading.show_loading(Catalog.info(number).title, "DEPLOYING SQUAD")
+	await get_tree().create_timer(0.25).timeout
+	if not RiftRelay.mission_active:
+		coop_deploy_loading = false
+		loading.fade_out()
+		return
 	if is_instance_valid(home_hub):
 		remove_home_hub()
 	menu.hide()
@@ -982,6 +1046,7 @@ func start_coop_mission(is_host: bool, number: int) -> void:
 	coop_mission.host = is_host
 	coop_mission.sector = number
 	coop_mission.local_profile = profile
+	coop_mission.local_appearance.assign([current_operator_frame(), current_armor_finish()])
 	if save_session:
 		coop_mission.active_operator_slot = save_session.slot
 		coop_mission.persist_challenges = save_session.persist_challenge_progress
@@ -1006,6 +1071,10 @@ func start_coop_mission(is_host: bool, number: int) -> void:
 	)
 	add_child(coop_mission)
 	RiftAudio.play_music(true, number)
+	loading.begin("SQUAD DEPLOYED")
+	await get_tree().create_timer(0.35).timeout
+	await loading.fade_out()
+	coop_deploy_loading = false
 
 func bank_coop_rewards(xp: int, bolts: int, blueprints: Array, number: int) -> void:
 	profile.grant_first_boss_life(number, save_session.persist_reserve_lives if save_session else Callable())
@@ -1067,6 +1136,7 @@ func close_coop_mission(message: String) -> void:
 	if not is_instance_valid(coop_mission):
 		return
 	var selected_slot: int = coop_mission.next_operator_slot
+	var keep_operator: bool = coop_mission.return_on_same_operator
 	var local: RiftPlayer = coop_mission.operators[coop_mission.local_index] if coop_mission.operators.size() > coop_mission.local_index else null
 	choosing_after_coop_loss = is_instance_valid(local) and local.lives <= 0 and local.health <= 0
 	profile.finish_field_supplies({}, false)
@@ -1080,6 +1150,9 @@ func close_coop_mission(message: String) -> void:
 		shot.queue_free()
 	open_home_hub()
 	RiftAudio.play_music(false)
+	if keep_operator:
+		choosing_after_coop_loss = false
+		return
 	if choosing_after_coop_loss:
 		home_hub.station_requested.emit("Operators")
 		if selected_slot > 0:
@@ -1211,7 +1284,6 @@ func sync_achievement_finishes() -> void:
 	if not account or not directory.online() or not directory.progress.checked_release or directory.progress.conflict:
 		return
 	directory.gamer_score.use_account(directory.username)
-	account.restore_achievement_finishes(directory.gamer_score.earned)
 	directory.register_gamer_finishes(account.unlocked_skins)
 
 func current_armor_finish() -> String:
@@ -1246,7 +1318,7 @@ func select_save_slot(number: int, fresh: bool, operator_name := "") -> void:
 	var selected := ManualSave.new(number)
 	if progress_reset_error != OK:
 		return
-	if not fresh and not selected.load_slot():
+	if not fresh and not ManualSave.read_slot(number):
 		menu.show_slot_error()
 		return
 	if is_instance_valid(home_hub):
@@ -1258,6 +1330,9 @@ func select_save_slot(number: int, fresh: bool, operator_name := "") -> void:
 			menu.slot_error = "Could not save your active operator before switching."
 			menu.show_page("Operators")
 			return
+	if (fresh and selected.load_shared() != OK) or (not fresh and not selected.load_slot()):
+		menu.show_slot_error()
+		return
 	if account:
 		selected.profile.player_xp = account.experience
 	if account and not account.display_name.is_empty():
@@ -1280,8 +1355,6 @@ func select_save_slot(number: int, fresh: bool, operator_name := "") -> void:
 		account.save()
 	var play_prologue := fresh and not choosing_after_coop_loss and RiftRelay.connected_room.is_empty() and DisplayServer.get_name() != "headless"
 	choosing_after_coop_loss = false
-	var show_arrival := false
-	var replay_tour := false
 	if play_prologue:
 		menu.hide()
 		menu.process_mode = Node.PROCESS_MODE_DISABLED
@@ -1292,17 +1365,15 @@ func select_save_slot(number: int, fresh: bool, operator_name := "") -> void:
 		var was_paused := music.stream_paused
 		music.stream_paused = true
 		await prologue.play()
-		replay_tour = prologue.tutorial_requested
-		show_arrival = not prologue.skipped and not replay_tour
 		music.stream_paused = was_paused
 		remove_child(prologue)
 		prologue.queue_free()
 	open_home_hub()
 	if fresh:
 		var arrival_hub := home_hub
-		await arrival_hub.materialize_operator("arrival" if show_arrival else "")
+		await arrival_hub.materialize_operator("arrival" if play_prologue else "")
 		if play_prologue and is_instance_valid(arrival_hub) and home_hub == arrival_hub:
-			await arrival_hub.play_station_tour(menu, replay_tour)
+			await arrival_hub.play_station_tour(menu, true)
 
 func reset_player_profile() -> void:
 	if not account or account.display_name.is_empty() or is_instance_valid(coop_mission):
@@ -1321,7 +1392,11 @@ func reset_player_profile() -> void:
 		return
 	RiftRelay.leave()
 	RiftRelay.directory.progress.reset()
-	RiftSettings.remember_operator_name("")
+	RiftSettings.seen_story_beats.clear()
+	RiftSettings.seen_hub_tips.clear()
+	RiftSettings.last_operator_name = ""
+	if RiftSettings.save() != OK:
+		push_warning("Could not clear the local tutorial history.")
 	get_tree().remove_meta(&"riftcore_save_session")
 	remove_home_hub()
 	save_session = null
@@ -1501,6 +1576,8 @@ func remove_home_hub() -> void:
 		home_hub = null
 
 func deploy_selected_sector(number: int, selected_difficulty := 0) -> void:
+	if solo_deploy_loading:
+		return
 	if number < 1 or number > profile.unlocked_sector:
 		return
 	var mode := Difficulty.index(selected_difficulty)
@@ -1512,7 +1589,7 @@ func deploy_selected_sector(number: int, selected_difficulty := 0) -> void:
 	var save := read_checkpoint()
 	if save == null:
 		mission_difficulty = mode
-		start_game(true, number)
+		show_solo_deployment(number, start_game.bind(true, number))
 		return
 	var current := int(save.get_value("checkpoint", "sector", 1))
 	var cleared := clampi(int(save.get_value("checkpoint", "run_cleared_through", current - 1)), 0, Catalog.SECTORS.size())
@@ -1534,7 +1611,19 @@ func deploy_selected_sector(number: int, selected_difficulty := 0) -> void:
 		if write_checkpoint(save) != OK:
 			menu.show_deploy_error()
 			return
-	load_game()
+	show_solo_deployment(number, load_game)
+
+func show_solo_deployment(number: int, enter: Callable) -> void:
+	solo_deploy_loading = true
+	var loading := ActLoadingScreen.new()
+	add_child(loading)
+	loading.show_loading(Catalog.info(number).title, "DEPLOYING OPERATOR")
+	await get_tree().create_timer(0.25).timeout
+	enter.call()
+	loading.begin("OPERATOR DEPLOYED")
+	await get_tree().create_timer(0.35).timeout
+	await loading.fade_out()
+	solo_deploy_loading = false
 
 func start_game(play_intro := true, first_sector := 1) -> void:
 	if is_instance_valid(game_root):
@@ -1563,6 +1652,7 @@ func play_deploy_intro() -> void:
 	var floor_at := find_safe_spawn()
 	deployed_spawn = floor_at
 	player.global_position = floor_at
+	player.reset_physics_interpolation()
 	var pad := game_root.get_node_or_null("MARKERS/PlayerSpawn/DeploymentPad")
 	if pad:
 		pad.global_position = floor_at - Vector3.UP * (player.standing_capsule.height * 0.5 + 0.055)
@@ -1732,6 +1822,7 @@ func load_checkpoint_location(save: ConfigFile) -> void:
 	if not game_root.has_meta("interior_layout") and saved_spawn is Vector3 and saved_spawn.distance_to(checkpoint_spawn) < 3.0:
 		checkpoint_spawn = saved_spawn
 	player.global_position = checkpoint_spawn
+	player.reset_physics_interpolation()
 	camera_rig.global_position.x = checkpoint_spawn.x
 
 func build_pause_menu() -> void:
@@ -1847,6 +1938,8 @@ func build_level() -> void:
 		remaining_enemies += 1
 	camera_rig = game_root.get_node("CameraRig") as SideCameraRig
 	camera_rig.target = player
+	player.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_ON
+	player.reset_physics_interpolation()
 	var bounds := game_root.get_node("MARKERS/CameraBounds")
 	camera_rig.min_x = bounds.get_meta("min_x")
 	camera_rig.max_x = bounds.get_meta("max_x")
@@ -2164,6 +2257,7 @@ func _on_pit_fall() -> void:
 		if game_root.is_ancestor_of(boulder):
 			boulder.reset_runway()
 	player.global_position = checkpoint_spawn if checkpoint_reached else deployed_spawn
+	player.reset_physics_interpolation()
 	player.velocity = Vector3.ZERO
 	player.dash_left = 0.0
 	player.dash_lock = 0.0

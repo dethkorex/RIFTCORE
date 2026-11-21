@@ -430,7 +430,7 @@ size = Vector3(4.6952, 0.46, 4.8)
 size = Vector3(6.1452, 0.84, 4.8)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_0510"]
-size = Vector3(0.79, 8.95, 4)
+size = Vector3(0.79, 6.2, 4)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_0513"]
 size = Vector3(5.1283, 0.84, 4.8)
@@ -1696,6 +1696,7 @@ crossing_window_scale = 1.0
 power = 18
 direction = 1.0
 burnable_spore_pod = false
+plume_collision_scale = Vector3(0.76, 1, 0.66)
 kind = 6
 
 [node name="HighLaunch" type="StaticBody3D" parent="TERRAIN/OverheadLoop" groups=["factory_drop_through"]]
@@ -2468,7 +2469,7 @@ scale = Vector3(0.83333, 0.54762, 1)
 position = Vector3(0, -0.23, 0)
 shape = SubResource("BoxShape3D_0417")
 
-[node name="CompactApproach" type="StaticBody3D" parent="TERRAIN/Room05_Switchback"]
+[node name="CompactApproach" type="StaticBody3D" parent="TERRAIN/Room05_Switchback" groups=["factory_drop_through"]]
 position = Vector3(369.91, 3.3, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
@@ -2480,7 +2481,7 @@ scale = Vector3(0.91567, 0.54762, 1)
 position = Vector3(0, -0.23, 0)
 shape = SubResource("BoxShape3D_0420")
 
-[node name="CompactTransfer" type="StaticBody3D" parent="TERRAIN/Room05_Switchback"]
+[node name="CompactTransfer" type="StaticBody3D" parent="TERRAIN/Room05_Switchback" groups=["factory_drop_through"]]
 position = Vector3(375.2, 2.99, 0)
 rotation = Vector3(0, 0, -0.1214)
 collision_layer = 1
@@ -2492,7 +2493,7 @@ scale = Vector3(0.85327, 0.54762, 1)
 position = Vector3(0, -0.23, 0)
 shape = SubResource("BoxShape3D_0423")
 
-[node name="CompactMerge" type="StaticBody3D" parent="TERRAIN/Room05_Switchback"]
+[node name="CompactMerge" type="StaticBody3D" parent="TERRAIN/Room05_Switchback" groups=["factory_drop_through"]]
 position = Vector3(379.32, 2.99, 0)
 rotation = Vector3(0, 0, 0.1938)
 collision_layer = 1
@@ -2687,12 +2688,12 @@ position = Vector3(0, -0.42, 0)
 shape = SubResource("BoxShape3D_0471")
 
 [node name="DropBulkhead" type="StaticBody3D" parent="TERRAIN/Room05_Switchback"]
-position = Vector3(381.65, 6.675, 0)
+position = Vector3(381.65, 8.05, 0)
 rotation = Vector3(0, 0, 0)
 collision_layer = 1
 
 [node name="Art" parent="TERRAIN/Room05_Switchback/DropBulkhead" instance=ExtResource("RCWall")]
-scale = Vector3(1, 2.1059, 1)
+scale = Vector3(1, 1.4588, 1)
 
 [node name="Collision" type="CollisionShape3D" parent="TERRAIN/Room05_Switchback/DropBulkhead"]
 position = Vector3(0, 0, 0)

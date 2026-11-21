@@ -18,6 +18,7 @@ enum Kind { ICE, WATER, WIND, LOW_GRAVITY, VENT, ELECTRIC, UPDRAFT, MUTATION, SO
 @export var power := 20.0
 @export var terrain_strength := 1.0
 @export var burnable_spore_pod := false
+@export var plume_collision_scale := Vector3.ONE
 var clock := 0.0
 var effect: Node3D
 var surface: ShaderMaterial
@@ -41,6 +42,11 @@ func _ready() -> void:
 	shape.size = Vector3(dimensions.x * 0.89, 0.49, 1.5) if kind == Kind.PRESS else dimensions
 	damage_volume = CollisionShape3D.new()
 	damage_volume.shape = shape
+	if burnable_spore_pod:
+		shape.size = Vector3(minf(dimensions.x, 1.75), minf(dimensions.y, 1.65), minf(dimensions.z, 1.65))
+		damage_volume.position.y = (shape.size.y - dimensions.y) * 0.5
+	else:
+		shape.size *= plume_collision_scale
 	add_child(damage_volume)
 	effect = Node3D.new()
 	effect.name = "HazardEffect"

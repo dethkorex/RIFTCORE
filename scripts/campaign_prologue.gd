@@ -29,8 +29,6 @@ const FULL := Rect2(.045, .092, .91, .749)
 var scene_index := 0
 var line_index := 0
 var ended := false
-var skipped := false
-var tutorial_requested := false
 var canvas: Control
 var page: Control
 var shade: ColorRect
@@ -62,9 +60,6 @@ func build_overlay() -> void:
 	canvas.add_child(controls)
 	anchor(controls, Rect2(.05, .914, .90, .05))
 	next = UI.button(controls, "Next", advance, true, 35)
-	UI.button(controls, "Skip intro", skip, false, 35)
-	if RiftSettings.show_hub_tips:
-		UI.button(controls, "Start Nova tutorial", start_tutorial, false, 35)
 	next.grab_focus()
 	shade = ColorRect.new()
 	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -96,14 +91,6 @@ func advance() -> void:
 		close()
 	else:
 		show_line()
-
-func start_tutorial() -> void:
-	tutorial_requested = true
-	close()
-
-func skip() -> void:
-	skipped = true
-	close()
 
 func show_line() -> void:
 	rebuild_page()
@@ -365,10 +352,7 @@ func close() -> void:
 func _input(event: InputEvent) -> void:
 	if ended or not is_instance_valid(next):
 		return
-	if event.is_action_pressed(&"ui_cancel") or (event is InputEventJoypadButton and event.pressed and event.button_index == JOY_BUTTON_START):
-		get_viewport().set_input_as_handled()
-		skip()
-	elif event.is_action_pressed(&"ui_accept") and not event.is_echo():
+	if event.is_action_pressed(&"ui_accept") and not event.is_echo():
 		var focused := get_viewport().gui_get_focus_owner() as Button
 		get_viewport().set_input_as_handled()
 		if focused and is_ancestor_of(focused):

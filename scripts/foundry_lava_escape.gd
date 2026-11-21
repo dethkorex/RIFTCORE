@@ -22,6 +22,8 @@ const LAVA_HALF_DEPTH := 2.29
 enum Phase { READY, SEALED, RISING, DRAINING }
 
 var authority := true
+var require_full_party := false
+var entrance_ready := false
 var phase := Phase.READY
 var surface := REST_LEVEL
 var elapsed := 0.0
@@ -91,13 +93,16 @@ func make_warning() -> void:
 func _physics_process(delta: float) -> void:
 	if not authority:
 		return
-	var party := actors.get_children().filter(func(actor): return actor is RiftPlayer and actor.health > 0.0)
+	var squad := actors.get_children().filter(func(actor): return actor is RiftPlayer)
+	var party := squad.filter(func(actor): return actor.health > 0.0)
 	if not is_instance_valid(relays):
 		relays = get_parent().get_parent().get_node_or_null("GateRelays")
 	var unlocked: bool = is_instance_valid(relays) and relays.complete()
 	var inside := party.filter(is_inside)
 	match phase:
 		Phase.READY:
+			if require_full_party and (not door.passable or (inside.is_empty() and not party.any(door.near))):
+				entrance_ready = unlocked and not squad.is_empty() and squad.all(door.near)
 			if unlocked and door.passable and not inside.is_empty() and party.all(past_entrance):
 				elapsed = 0.0
 				set_phase(Phase.SEALED)
@@ -124,7 +129,10 @@ func _physics_process(delta: float) -> void:
 	for operator: RiftPlayer in party:
 		if touches_lava(operator):
 			operator.die_in_pit()
-	door.step(delta, unlocked and phase in [Phase.READY, Phase.DRAINING], party)
+	var ready_to_enter := phase == Phase.READY and (not require_full_party or entrance_ready)
+	var solo_draining := phase == Phase.DRAINING and not require_full_party
+	var open := unlocked and (ready_to_enter or solo_draining)
+	door.step(delta, open, party)
 	present()
 
 func touches_lava(operator: RiftPlayer) -> bool:
@@ -146,6 +154,8 @@ func set_phase(next: Phase) -> void:
 	if phase == next:
 		return
 	phase = next
+	if phase != Phase.READY:
+		entrance_ready = false
 	if phase == Phase.SEALED:
 		RiftAudio.play_effect(&"enemy_break")
 	elif phase == Phase.RISING:

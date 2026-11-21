@@ -188,6 +188,15 @@ func enemy_shot(at: Vector3, heavy: bool) -> void:
 	last_enemy_volley = {"at": at, "time": now}
 	play_enemy_sound(ENEMY_SHOTS[int(heavy)], at, -10.0 if heavy else -12.5)
 
+const OPERATOR_SHOT_CUES := [&"buster", &"buster_charged", &"saber_swing", &"saber_charge_release"]
+
+func play_operator_sound(cue: StringName, at: Vector3) -> void:
+	if cue not in OPERATOR_SHOT_CUES or not at.is_finite():
+		return
+	var camera := get_viewport().get_camera_3d()
+	if camera and camera.global_position.distance_squared_to(at) < 33.0 * 33.0:
+		play_enemy_sound(EFFECTS[cue][0], at, EFFECTS[cue][1])
+
 func enemy_damage(at: Vector3) -> void:
 	var camera := get_viewport().get_camera_3d()
 	if camera and camera.global_position.distance_squared_to(at) < 33.0 * 33.0:

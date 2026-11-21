@@ -20,6 +20,8 @@ var longest_operator := ""
 var unlocked_skins: Array = []
 var operator_skins: Dictionary = {}
 var operator_frames: Dictionary = {}
+var finish_progress: Dictionary = {}
+var finish_sectors: Array = []
 
 func restore() -> void:
 	var data := ConfigFile.new()
@@ -32,9 +34,12 @@ func restore() -> void:
 		total_kills = int(data.get_value("records", "kills", 0))
 		longest_run = float(data.get_value("records", "longest_run", 0.0))
 		longest_operator = str(data.get_value("records", "longest_operator", ""))
-		unlocked_skins = data.get_value("wardrobe", "unlocked", [])
-		operator_skins = data.get_value("wardrobe", "selections", {})
-		operator_frames = data.get_value("wardrobe", "frames", {})
+		if int(data.get_value("wardrobe", "epoch", 0)) == SkinKit.COSMETIC_EPOCH:
+			unlocked_skins = data.get_value("wardrobe", "unlocked", [])
+			operator_skins = data.get_value("wardrobe", "selections", {})
+			operator_frames = data.get_value("wardrobe", "frames", {})
+			finish_progress = data.get_value("wardrobe", "finish_progress", {})
+			finish_sectors = data.get_value("wardrobe", "finish_sectors", [])
 		return
 	var previous_name := RiftSettings.last_operator_name
 	for index in range(1, ManualSave.SLOT_COUNT + 1):
@@ -67,6 +72,8 @@ func clear_progress() -> void:
 	operator_skins.clear()
 	operator_frames.clear()
 	unlocked_skins.clear()
+	finish_progress.clear()
+	finish_sectors.clear()
 
 func save() -> Error:
 	var data := ConfigFile.new()
@@ -78,6 +85,9 @@ func save() -> Error:
 	data.set_value("records", "kills", total_kills)
 	data.set_value("records", "longest_run", longest_run)
 	data.set_value("records", "longest_operator", longest_operator)
+	data.set_value("wardrobe", "epoch", SkinKit.COSMETIC_EPOCH)
+	data.set_value("wardrobe", "finish_progress", finish_progress)
+	data.set_value("wardrobe", "finish_sectors", finish_sectors)
 	data.set_value("wardrobe", "unlocked", unlocked_skins)
 	data.set_value("wardrobe", "selections", operator_skins)
 	data.set_value("wardrobe", "frames", operator_frames)
@@ -87,7 +97,7 @@ func save() -> Error:
 	return DirAccess.rename_absolute(temporary, target) if error == OK else error
 
 func remove_local_progress(other_files: Array[String]) -> Error:
-	var files: Array[String] = [path]
+	var files: Array[String] = [path, ManualSave.shared_path()]
 	files.append_array(other_files)
 	for slot in range(1, ManualSave.SLOT_COUNT + 1):
 		files.append(ManualSave.slot_path(slot))
@@ -129,25 +139,29 @@ func award_clear(sector: int, difficulty: int, result := {}) -> Dictionary:
 			records[key] = seconds
 		track_survival(float(result.get("survival", seconds)), str(result.get("operator", "RX-07")))
 	var before_skins := unlocked_skins.duplicate()
-	var completed_sectors := {}
-	for key in records:
-		completed_sectors[String(key).get_slice(":", 0)] = true
-	completed_sectors[str(sector)] = true
-	for id in SkinKit.clear_finish_awards(result, total_clears, completed_sectors.size()):
-		if not unlocked_skins.has(id):
-			unlocked_skins.append(id)
+	var before_progress := finish_progress.duplicate()
+	var before_sectors := finish_sectors.duplicate()
+	if sector not in finish_sectors:
+		finish_sectors.append(sector)
+	var eligible := SkinKit.record_field_finishes(result, finish_progress, finish_sectors.size())
 	var new_finish := ""
 	if sector >= 1 and sector <= SkinKit.Catalog.SECTORS.size() and difficulty >= Difficulty.HARD:
 		var reward: String = SkinKit.Catalog.SECTORS[sector - 1].reward
-		if not unlocked_skins.has(reward):
-			unlocked_skins.append(reward)
+		if counted_finish(reward, SkinKit.BOSS_REQUIREMENT):
+			eligible.push_front(reward)
 		if difficulty == Difficulty.NIGHTMARE:
 			var variant := SkinKit.expert_finish(sector)
-			if not unlocked_skins.has(variant):
-				unlocked_skins.append(variant)
-				new_finish = variant
+			if counted_finish(variant, SkinKit.EXPERT_REQUIREMENT):
+				eligible.push_front(variant)
+	for id in eligible:
+		if not unlocked_skins.has(id):
+			unlocked_skins.append(id)
+			new_finish = id
+			break
 	if save() != OK:
 		unlocked_skins = before_skins
+		finish_progress = before_progress
+		finish_sectors = before_sectors
 		new_finish = ""
 		experience = previous
 		records = previous_records
@@ -166,14 +180,9 @@ func track_survival(seconds: float, operator: String) -> bool:
 	longest_operator = operator
 	return true
 
-func restore_achievement_finishes(earned: Array) -> void:
-	var before := unlocked_skins.duplicate()
-	for id in earned:
-		if id is String and not unlocked_skins.has(id) and not SkinKit.finish_achievement(id).is_empty():
-			unlocked_skins.append(id)
-	if before != unlocked_skins and save() != OK:
-		unlocked_skins = before
-		push_warning("Could not restore achievement finishes.")
+func counted_finish(id: String, required: int) -> bool:
+	finish_progress[id] = mini(int(finish_progress.get(id, 0)) + 1, required)
+	return int(finish_progress[id]) >= required
 
 func display_skin(slot: int) -> String:
 	var choice := String(operator_skins.get(slot, ""))

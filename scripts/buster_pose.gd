@@ -8,6 +8,7 @@ var low: Dictionary[int, Quaternion] = {}
 var crouched := false
 var ladder_direction := 0.0
 var water_direction := Vector3.ZERO
+var direction_override := Vector3.ZERO
 var recoil_time := 0.0
 var recoil_duration := 0.0
 var recoil_strength := 0.0
@@ -52,8 +53,10 @@ func _process_modification_with_delta(delta: float) -> void:
 	if muzzle_bone < 0:
 		return
 	var target := Vector3.BACK
-	if not is_zero_approx(ladder_direction) or not water_direction.is_zero_approx():
-		var world_target:=water_direction if not water_direction.is_zero_approx() else Vector3.RIGHT*ladder_direction
+	if not direction_override.is_zero_approx() or not is_zero_approx(ladder_direction) or not water_direction.is_zero_approx():
+		var world_target := direction_override if not direction_override.is_zero_approx() else water_direction
+		if world_target.is_zero_approx():
+			world_target = Vector3.RIGHT * ladder_direction
 		target = (skeleton.global_basis.inverse() * world_target).normalized()
 		var arm := skeleton.get_bone_parent(muzzle_bone)
 		var toward_elbow := skeleton.get_bone_global_pose(muzzle_bone).origin - skeleton.get_bone_global_pose(arm).origin

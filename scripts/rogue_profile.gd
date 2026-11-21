@@ -346,7 +346,7 @@ func decode_from(data: ConfigFile) -> void:
 	var skin := String(data.get_value("profile", "cosmetic", "Standard"))
 	cosmetic = skin if operator_level >= cosmetic_level(skin) else "Standard"
 	credits = maxi(0, int(data.get_value("profile", "credits", 0)))
-	owned_frames = data.get_value("wardrobe", "owned_frames", [])
+	owned_frames = data.get_value("wardrobe", "owned_frames", []) if OperatorFrames.current_wardrobe(data) else []
 	unlocked_sector = clampi(int(data.get_value("profile", "unlocked_sector", 1)), 1, Catalog.SECTORS.size())
 	reserve_lives = maxi(0, int(data.get_value("profile", "reserve_lives", 0)))
 	first_main_bosses = data.get_value("profile", "first_main_bosses", [])
@@ -416,6 +416,7 @@ func encode_into(data: ConfigFile) -> void:
 	for ending in endings:
 		data.set_value("archive", ending, true)
 	data.set_value("profile", "credits", credits)
+	data.set_value("wardrobe", "epoch", OperatorFrames.COSMETIC_EPOCH)
 	data.set_value("wardrobe", "owned_frames", owned_frames)
 	data.set_value("profile", "player_xp", player_xp)
 	data.set_value("profile", "operator_name", operator_name)

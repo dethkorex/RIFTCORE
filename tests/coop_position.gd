@@ -94,6 +94,33 @@ func run() -> void:
 	mission.last_sent_axis=Vector2.ZERO
 	mission.receive_operators(1,mission.targets,4,[0,0,0.0,502,1])
 	check(actor.grounded() and mission.correction.x>0,"A resting guest corrects toward the server despite an older prediction sample on the opposite side")
+	var jump: int = 1 << mission.INPUTS.find(&"jump")
+	var shoot: int = 1 << mission.INPUTS.find(&"shoot")
+	var remote := {}
+	mission.apply_input_edges(actor, remote, jump, 0, 104)
+	mission.apply_input_edges(actor, remote, shoot, 0, 102)
+	check(actor.remote_pressed.has(&"jump") and actor.remote_pressed.has(&"shoot"), "An older shot edge survives a newer jump packet")
+	actor.remote_pressed.clear()
+	mission.apply_input_edges(actor, remote, shoot, 0, 102)
+	check(actor.remote_pressed.is_empty(), "The duplicate shot edge from the reliable copy cannot fire twice")
+	mission.input_times[503] = Time.get_ticks_usec() - 170000
+	mission.update_snapshot_lead(503)
+	check(mission.snapshot_lead > mission.TICK * 0.5 and mission.snapshot_lead <= mission.MAX_SNAPSHOT_LEAD, "Interpolation lead adapts to a delayed acknowledgment")
+	var patrol := PackedFloat32Array([561.023, -10.479, -0.01, 1.57, 0.2, 81.5])
+	var packed = mission.pack_security(patrol)
+	check(packed is PackedByteArray and packed.size() == patrol.size() * 2, "The compressed patrol payload uses half as many bytes")
+	check(absf(float(packed.decode_s16(0)) / 32.0 - patrol[0]) < 0.016, "Patrol positions retain centimeter-scale precision")
+	patrol[0] = 1300.0
+	check(mission.pack_security(patrol) is PackedFloat32Array, "Large world coordinates fall back to full precision")
+	var partner = (load("res://scenes/actors/riftcore_player.tscn") as PackedScene).instantiate()
+	root.add_child(partner)
+	partner.set_physics_process(false)
+	mission.operators.append(partner)
+	mission.roster = [11, 12]
+	actor.set_operator_appearance("", "field:1")
+	mission.receive_operator_appearance(1, ["", "field:2"])
+	mission.receive_operator_appearance(0, ["", "field:2"])
+	check(actor.armor_finish == "field:1" and partner.armor_finish == "field:2", "Replicated appearance applies to the addressed partner and preserves the local finish")
 	mission.free()
 	peer.free()
 	quit(failures)

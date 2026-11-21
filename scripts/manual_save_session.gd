@@ -11,6 +11,7 @@ var profile := Profile.new()
 var run := ConfigFile.new()
 var owns_slot := false
 var play_seconds := 0
+var shared_gear_under_loadout: Array[String] = []
 var session_started_at := Time.get_ticks_msec()
 
 func _init(number: int) -> void:
@@ -28,9 +29,91 @@ static func read_slot(number: int) -> ConfigFile:
 static func slot_path(number: int) -> String:
 	return slot_directory.path_join("slot_%d.cfg" % number)
 
+static func shared_path() -> String:
+	return slot_directory.path_join("shared_progress.cfg")
+
+func load_shared() -> Error:
+	var saved := ConfigFile.new()
+	var error := saved.load(shared_path())
+	var shared := Profile.new()
+	if error == OK:
+		shared.decode_from(saved)
+		for id in saved.get_value("inventory", "blueprint_pouch", []):
+			if shared.blueprint_items.erase(id):
+				shared.blueprint_pouch.append(id)
+	elif error == ERR_FILE_NOT_FOUND:
+		for number in range(1, SLOT_COUNT + 1):
+			var old := read_slot(number)
+			if not old:
+				continue
+			var legacy := Profile.new()
+			legacy.decode_from(old)
+			for id in legacy.materials:
+				shared.materials[id] = int(shared.materials.get(id, 0)) + int(legacy.materials[id])
+			for id in legacy.stored_supplies:
+				shared.stored_supplies[id] = int(shared.stored_supplies.get(id, 0)) + int(legacy.stored_supplies[id])
+			for id in legacy.gear:
+				if legacy.gear[id] == "stored":
+					shared.gear[id] = "stored"
+			for id in legacy.owned:
+				shared.owned[id] = maxi(shared.rank(id), legacy.rank(id))
+			for id in legacy.blueprint_hunts:
+				shared.blueprint_hunts[id] = maxi(int(shared.blueprint_hunts.get(id, 0)), int(legacy.blueprint_hunts[id]))
+			shared.core_shards += legacy.core_shards
+			shared.blueprints.merge(legacy.blueprints)
+			shared.blueprint_items.merge(legacy.blueprint_items)
+	else:
+		return error
+	profile.materials = shared.materials
+	profile.stored_supplies = shared.stored_supplies
+	profile.blueprints = shared.blueprints
+	profile.blueprint_items = shared.blueprint_items
+	profile.blueprint_pouch = shared.blueprint_pouch
+	profile.blueprint_hunts = shared.blueprint_hunts
+	profile.owned = shared.owned
+	profile.core_shards = shared.core_shards
+	for id in profile.blueprints:
+		profile.blueprint_items.erase(id)
+	for id in profile.gear.keys():
+		if profile.gear[id] == "stored":
+			profile.gear.erase(id)
+	shared_gear_under_loadout.clear()
+	for id in shared.gear:
+		if profile.gear.get(id) == "equipped":
+			shared_gear_under_loadout.append(id)
+		else:
+			profile.gear[id] = "stored"
+	return OK
+
+func save_shared() -> Error:
+	var data := ConfigFile.new()
+	data.set_value("profile", "materials", profile.materials)
+	data.set_value("profile", "core_shards", profile.core_shards)
+	data.set_value("inventory", "stored_supplies", profile.stored_supplies)
+	data.set_value("inventory", "blueprints", profile.blueprint_items)
+	data.set_value("inventory", "blueprint_pouch", profile.blueprint_pouch)
+	data.set_value("archive", "blueprint_hunts", profile.blueprint_hunts)
+	for id in profile.blueprints:
+		data.set_value("blueprints", id, true)
+	for id in profile.owned:
+		data.set_value("upgrades", id, profile.rank(id))
+	for id in shared_gear_under_loadout:
+		data.set_value("equipment", id, "stored")
+	for id in profile.gear:
+		if profile.gear[id] == "stored":
+			data.set_value("equipment", id, "stored")
+	return write_config(data, shared_path())
+
 static func delete_slot(number: int) -> Error:
 	if not read_slot(number):
 		return ERR_FILE_NOT_FOUND
+	if not FileAccess.file_exists(shared_path()):
+		var existing = load("res://scripts/manual_save_session.gd").new(number)
+		var error: Error = existing.load_shared()
+		if error == OK:
+			error = existing.save_shared()
+		if error != OK:
+			return error
 	return DirAccess.remove_absolute(ProjectSettings.globalize_path(slot_path(number)))
 
 func persist_reconstruction_seen() -> Error:
@@ -52,7 +135,7 @@ func load_slot() -> bool:
 	profile.decode_from(data)
 	run = ConfigFile.new()
 	copy_checkpoint(data, run)
-	return true
+	return load_shared() == OK
 
 func save_slot() -> Error:
 	var data := ConfigFile.new()
@@ -61,7 +144,7 @@ func save_slot() -> Error:
 	data.set_value("slot", "play_seconds", play_seconds + floori((Time.get_ticks_msec() - session_started_at) / 1000.0))
 	profile.encode_into(data)
 	copy_checkpoint(run, data)
-	var error := write_slot(data)
+	var error := write_progress(data)
 	if error == OK:
 		owns_slot = true
 	return error
@@ -108,7 +191,7 @@ func invalidate_defeated_run() -> Error:
 		data.erase_section("equipment")
 	for id in profile.gear:
 		data.set_value("equipment", id, profile.gear[id])
-	return write_slot(data)
+	return write_progress(data)
 
 func persist_challenge_progress() -> Error:
 	var data := read_slot(slot)
@@ -135,14 +218,32 @@ func persist_blueprint_trade() -> Error:
 	data.set_value("inventory", "blueprint_pouch", profile.blueprint_pouch)
 	for id in profile.blueprints:
 		data.set_value("blueprints", id, true)
-	return write_slot(data)
+	return write_progress(data)
+
+func write_progress(data: ConfigFile) -> Error:
+	var previous := FileAccess.get_file_as_bytes(slot_path(slot)) if FileAccess.file_exists(slot_path(slot)) else PackedByteArray()
+	var error := write_slot(data)
+	if error != OK:
+		return error
+	error = save_shared()
+	if error != OK:
+		if previous.is_empty():
+			DirAccess.remove_absolute(slot_path(slot))
+		else:
+			var original := ConfigFile.new()
+			if original.parse(previous.get_string_from_utf8()) == OK:
+				write_slot(original)
+	return error
 
 func write_slot(data: ConfigFile) -> Error:
+	return write_config(data, slot_path(slot))
+
+static func write_config(data: ConfigFile, path: String) -> Error:
 	var directory := ProjectSettings.globalize_path(slot_directory)
 	var error := DirAccess.make_dir_recursive_absolute(directory)
 	if error != OK:
 		return error
-	var target := ProjectSettings.globalize_path(slot_path(slot))
+	var target := ProjectSettings.globalize_path(path)
 	var temporary := target + ".tmp"
 	error = data.save(temporary)
 	if error == OK:

@@ -8,6 +8,7 @@ const VINE_GLOW := Color("c3ff6f")
 @export var length := 4.4
 var stem: Node3D
 var leader: WeakRef
+var remote_angle := INF
 
 func _ready() -> void:
 	add_to_group(&"jungle_swing")
@@ -50,8 +51,14 @@ func hang_at(elapsed: float) -> Vector3:
 func capture(rider: Node3D) -> void:
 	leader = weakref(rider)
 
+func current_angle() -> float:
+	var rider: Node3D = leader.get_ref() if leader else null
+	if is_instance_valid(rider) and rider.jungle_vine == self and rider.visible:
+		return angle_at(rider.jungle_swing_time)
+	return angle_at(0.0)
+
 func _process(delta: float) -> void:
 	var rider: Node3D = leader.get_ref() if leader else null
-	var occupied: bool = is_instance_valid(rider) and rider.jungle_vine == self and rider.visible
-	var angle: float = angle_at(rider.jungle_swing_time) if occupied else angle_at(0.0)
-	stem.rotation.z = lerpf(stem.rotation.z, angle, minf(delta * (25.0 if occupied else 6.0), 1.0))
+	var predicting: bool = is_instance_valid(rider) and rider.local_prediction and rider.jungle_vine == self
+	var angle := remote_angle if is_finite(remote_angle) and not predicting else current_angle()
+	stem.rotation.z = lerpf(stem.rotation.z, angle, 1.0 - exp(-delta * 16.0))

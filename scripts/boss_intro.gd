@@ -186,24 +186,20 @@ func make_charge(parent: Node3D, tint: Color, height: float, width: float) -> Py
 func play_dialogue(camera: Camera3D, boss: Combatant, head: Vector3, height: float, title: String, tint: Color, sector: int, act: int, online: bool) -> void:
 	var hint := Story.foundry_boss_hint(act) if sector == 1 else Story.jungle_boss_hint(act) if sector == 2 else ""
 	var beat := "%d_%d" % [sector, act]
-	if RiftSettings.show_hub_tips and not hint.is_empty() and RiftSettings.claim_story_beat("arena_hint_" + beat):
+	if not online and RiftSettings.show_hub_tips and not hint.is_empty() and RiftSettings.claim_story_beat("arena_hint_" + beat):
 		var boss_shot := camera.transform
 		var show_target := sector == 1 and boss.has_method("mechanic_preview_target")
 		if show_target:
 			var prop_focus: Vector3 = boss.mechanic_preview_target()
 			aim(camera, prop_focus, Vector3(1.4, 0.9, 5.7))
 			boss.show_intro_target(true)
-		await play_nova_hint(hint, online)
+		await play_nova_hint(hint)
 		if show_target:
 			boss.show_intro_target(false)
 		camera.transform = boss_shot
-	elif online and not hint.is_empty():
-		await get_tree().create_timer(StoryDialogue.playback_seconds([[Story.GUIDE, hint]]), false).timeout
 	var exchange := Story.boss_exchange(sector, act)
-	if not RiftSettings.claim_story_beat("arena_story_v3_" + beat):
-		# Players may have different tutorial histories. Keep the online intro duration shared.
-		if online:
-			await get_tree().create_timer(StoryDialogue.playback_seconds(exchange), false).timeout
+	var first_view := RiftSettings.claim_story_beat("arena_story_v3_" + beat)
+	if not online and not first_view:
 		return
 	var portrait := await capture_portrait(camera, head, height)
 	var dialogue := StoryDialogue.new()
@@ -212,11 +208,11 @@ func play_dialogue(camera: Camera3D, boss: Combatant, head: Vector3, height: flo
 	await dialogue.play(exchange, "Continue", online, title, portrait, tint, online)
 	dialogue.queue_free()
 
-func play_nova_hint(hint: String, online: bool) -> void:
+func play_nova_hint(hint: String) -> void:
 	var guide := StoryDialogue.new()
 	guide.add_to_group(&"boss_dialogue")
 	add_child(guide)
-	await guide.play([[Story.GUIDE, hint]], "Continue", online, "", null, Color.WHITE, online)
+	await guide.play([[Story.GUIDE, hint]], "Continue")
 	guide.queue_free()
 
 func clear_drop_height(boss: CollisionObject3D, bounds: AABB, floor_y: float) -> float:
@@ -260,4 +256,5 @@ func capture_portrait(camera: Camera3D, head: Vector3, height: float) -> Texture
 	var factor := Vector2(frame.get_size()) / viewport.get_visible_rect().size
 	var span := maxi(2, roundi(absf(point.y - edge.y) * factor.y * 2.0))
 	var crop := Rect2i(Vector2i(point * factor) - Vector2i(span, span) / 2, Vector2i(span, span))
-	return ImageTexture.create_from_image(frame.get_region(crop.intersection(Rect2i(Vector2i.ZERO, frame.get_size()))))
+	crop = crop.intersection(Rect2i(Vector2i.ZERO, frame.get_size()))
+	return ImageTexture.create_from_image(frame.get_region(crop)) if crop.has_area() else null

@@ -38,6 +38,7 @@ const BOSS_DEBUFFS := ["", "BURN", "VENOM", "FROST", "SHOCK", "SIGNAL JAM", "TUR
 const Catalog := preload("res://scripts/sector_catalog.gd")
 signal fell_into_pit
 signal shot_fired(projectile: RiftProjectile)
+signal weapon_sound(cue: StringName, at: Vector3)
 signal melee_performed
 signal projectile_deflected(id: int)
 signal weapon_changed(title: String)
@@ -133,15 +134,18 @@ var dash_facing := 1.0
 var ground_dash := false
 var dash_lock := 0.0
 var fire_lock := 0.0
+enum BusterAim { SIDE, UP, DIAGONAL_UP, DIAGONAL_DOWN, DOWN }
+var buster_aim := BusterAim.SIDE
+var queued_buster_aim := BusterAim.SIDE
 var shot_buffer_left := 0.0
 var queued_charged := false
 var queued_pose := false
 var combo_hot := false
 var saber_equipped := false
-const GUARD_SECONDS := 3.0
+const GUARD_HITS := 3
 const GUARD_RECOVERY := 10.0
 const GUARD_COLORS := [Color("#248fff"), Color("#ffdb38"), Color("#ff424b")]
-var guard_remaining := GUARD_SECONDS
+var guard_hits := 0
 var guard_cooldown := 0.0
 var guard_stage := 0
 var guard_bubble: MeshInstance3D
@@ -530,6 +534,9 @@ func simulate_movement(delta: float) -> void:
 	var stick_crouch := action_held("crouch_stick") and absf(axis) < 0.35
 	var wants_crouch := action_held("crouch") or stick_crouch
 	var drop_command := wants_crouch and action_pressed("dash")
+	if not drop_command and not saber_equipped and absf(axis) > 0.35 and movement_axis("climb_down", "climb_up") < -0.22:
+		if charge_held or action_held("shoot") or action_released("shoot") or action_pressed("suit_fire"):
+			wants_crouch = false
 	var dropping := drop_command and shock_stun <= 0.0 and grounded() and not is_instance_valid(ladder) and start_platform_drop()
 	if not dropping and update_ladder(delta, axis):
 		cancel_saber_charge()
@@ -1069,6 +1076,7 @@ func update_ladder(delta: float, axis: float) -> bool:
 	if absf(axis) > 0.30:
 		facing = signf(axis)
 	if buster_pose:
+		present_buster_aim(BusterAim.SIDE, facing)
 		buster_pose.ladder_direction = facing
 		buster_pose.crouched = false
 		var aiming := absf(axis) > 0.30 or charge_held or fire_lock > 0.0
@@ -1117,6 +1125,7 @@ func reset_predicted_position(at: Vector3, motion: Vector3, direction: float) ->
 	dash_left = 0.0
 	contact_recoil = 0.0
 	global_position = at
+	reset_physics_interpolation()
 	velocity = motion
 	facing = direction
 
@@ -1291,7 +1300,7 @@ func update_charge(delta: float) -> void:
 		shot_buffer_left = maxf(0.0, shot_buffer_left - delta)
 		if fire_lock <= 0.0 and melee_lock <= 0.0:
 			shot_buffer_left = 0.0
-			shoot(queued_charged, queued_pose, queued_suit_shot)
+			shoot(queued_charged, queued_pose, queued_suit_shot, queued_buster_aim)
 	if not equipped_suit().is_empty():
 		cancel_charge()
 		if action_pressed("suit_fire"):
@@ -1311,18 +1320,54 @@ func update_charge(delta: float) -> void:
 		queue_buster_shot(full, pose_held)
 		return
 	charge_elapsed += delta
+	if buster_pose and fire_lock <= 0.0:
+		present_buster_aim(requested_buster_aim(), facing)
 	present_charge(charge_elapsed, boss_debuff != 5 and energy >= charged_shot_cost())
 
 func queue_buster_shot(charged: bool, pose_held: bool, suit_shot := false) -> void:
 	if saber_equipped or melee_lock > 0.0:
 		return
+	var shot_aim := requested_buster_aim()
 	if fire_lock <= 0.0:
-		shoot(charged, pose_held, suit_shot)
+		shoot(charged, pose_held, suit_shot, shot_aim)
 	else:
 		shot_buffer_left = 0.12
 		queued_charged = charged
 		queued_pose = pose_held
 		queued_suit_shot = suit_shot
+		queued_buster_aim = shot_aim
+
+func requested_buster_aim() -> BusterAim:
+	if low_profile or is_instance_valid(ladder) or is_instance_valid(rocket_course) or swim_volume():
+		return BusterAim.SIDE
+	var vertical := movement_axis("climb_down", "climb_up")
+	var diagonal := absf(movement_axis("move_left", "move_right")) > 0.35
+	if diagonal and vertical > 0.22:
+		return BusterAim.DIAGONAL_UP
+	if vertical > 0.45:
+		return BusterAim.UP
+	if diagonal and vertical < -0.22:
+		return BusterAim.DIAGONAL_DOWN
+	if vertical < -0.4 and not grounded():
+		return BusterAim.DOWN
+	return BusterAim.SIDE
+
+func buster_direction(aim: BusterAim, side: float) -> Vector3:
+	match aim:
+		BusterAim.UP:
+			return Vector3.UP
+		BusterAim.DIAGONAL_UP:
+			return Vector3(side, 1, 0).normalized()
+		BusterAim.DIAGONAL_DOWN:
+			return Vector3(side, -1, 0).normalized()
+		BusterAim.DOWN:
+			return Vector3.DOWN
+	return Vector3.RIGHT * side
+
+func present_buster_aim(aim: BusterAim, side: float) -> void:
+	buster_aim = aim
+	if buster_pose:
+		buster_pose.direction_override = buster_direction(aim, side) if aim != BusterAim.SIDE else Vector3.ZERO
 
 func show_charge_sparks(amount: float, tint: Color, blade: Node3D, muzzle: Vector3) -> void:
 	if not charge_sparks:
@@ -1382,7 +1427,7 @@ func charged_shot_cost() -> float:
 func suit_shot_cost() -> float:
 	return (8.0 if magma_active else 7.0) * charge_cost_multiplier * (0.75 if run_module == "conduit" else 1.0)
 
-func shoot(charged := false, pose_held := false, suit_shot := false) -> void:
+func shoot(charged := false, pose_held := false, suit_shot := false, shot_aim := BusterAim.SIDE) -> void:
 	var showcase := is_instance_valid(showcase_projectiles)
 	if saber_equipped and not showcase:
 		return
@@ -1397,6 +1442,8 @@ func shoot(charged := false, pose_held := false, suit_shot := false) -> void:
 	if uses_suit and not showcase:
 		restore_energy(-suit_shot_cost())
 	var aim := facing
+	var direction := buster_direction(shot_aim, aim)
+	present_buster_aim(shot_aim, aim)
 	if buster_pose:
 		var climbing := is_instance_valid(ladder)
 		buster_pose.ladder_direction = aim if climbing or is_instance_valid(rocket_course) else 0.0
@@ -1415,24 +1462,33 @@ func shoot(charged := false, pose_held := false, suit_shot := false) -> void:
 		# Match the shallow combat lane while the board turns the model across the track.
 		muzzle = Vector3(global_position.x + aim * .74, minf(muzzle.y, global_position.y + .09), global_position.z)
 	if not special.is_empty():
-		launch_reward_weapon(muzzle, aim, charged, special)
+		launch_reward_weapon(muzzle, direction, charged, special)
 	elif magma and charged:
 		for angle in [-.19, 0.0, .19]:
-			launch_buster(muzzle,Vector3(aim*cos(angle),sin(angle),0),true,true,34.0*level_damage_scale(),Color.TRANSPARENT,"magma_breaker")
+			launch_buster(muzzle,direction.rotated(Vector3.BACK, angle * aim),true,true,34.0*level_damage_scale(),Color.TRANSPARENT,"magma_breaker")
 	elif thorn:
 		var spread := [-.16, 0.0, .16] if charged else [-.09, .09]
 		for angle in spread:
-			launch_buster(muzzle, Vector3(aim * cos(angle), sin(angle), 0), charged, false, 16.0 * level_damage_scale(), Color("a8ff64"), "thorn_swarm")
+			launch_buster(muzzle, direction.rotated(Vector3.BACK, angle * aim), charged, false, 16.0 * level_damage_scale(), Color("a8ff64"), "thorn_swarm")
 	else:
 		var power := (34.0 * level_damage_scale()) if magma else (buster_power() * (4.0 if charged else 1.0))
-		launch_buster(muzzle, Vector3(aim, 0, 0), charged, magma, power, Color.TRANSPARENT, "magma_breaker" if magma else "")
+		launch_buster(muzzle, direction, charged, magma, power, Color.TRANSPARENT, "magma_breaker" if magma else "")
 	if not uses_suit and buster_pose:
 		buster_pose.recoil(charged)
 	if uses_suit:
 		RiftProjectile.suit_flash(showcase_projectiles if showcase else get_parent(), muzzle, Color(Catalog.weapon(suit).color), charged)
-	RiftAudio.play_effect(&"buster_charged" if charged else &"buster")
+	play_weapon_sound(&"buster_charged" if charged else &"buster", muzzle)
+
+func play_weapon_sound(cue: StringName, at: Vector3) -> void:
+	if remote_input:
+		RiftAudio.play_operator_sound(cue, at)
+	else:
+		RiftAudio.play_effect(cue)
+	weapon_sound.emit(cue, at)
 
 func buster_range(muzzle: Vector3, direction: Vector3) -> float:
+	if absf(direction.y) > 0.70:
+		return 20.0
 	# The authority has one camera. Use the normal camera footprint around a
 	# remote shooter instead of using the host's distance from that operator.
 	var camera := get_viewport().get_camera_3d()
@@ -1510,7 +1566,7 @@ func launch_buster(muzzle: Vector3, direction: Vector3, charged: bool, magma: bo
 		if is_inside_tree() and not is_queued_for_deletion() and health > 0.0:
 			launch_buster(cannon_muzzle(direction.x), direction, true, magma, power * echo_power, shot_color.lerp(Color("cf9bff"), 0.6), weapon_id, true)
 
-func launch_reward_weapon(muzzle: Vector3, aim: float, charged: bool, id: String) -> void:
+func launch_reward_weapon(muzzle: Vector3, direction: Vector3, charged: bool, id: String) -> void:
 	var info := Catalog.weapon(id)
 	var count := 1
 	var power := 35.0 if not charged else 111.0
@@ -1534,7 +1590,7 @@ func launch_reward_weapon(muzzle: Vector3, aim: float, charged: bool, id: String
 			power = 154.0 if charged else 23.0
 	for i in count:
 		var spread := (i - (count - 1) * 0.5) * (0.18 if charged else 0.13)
-		launch_buster(muzzle, Vector3(aim * cos(spread), sin(spread), 0), charged, false, power * level_damage_scale(), Color(info.color), id)
+		launch_buster(muzzle, direction.rotated(Vector3.BACK, spread * facing), charged, false, power * level_damage_scale(), Color(info.color), id)
 
 func equipped_suit() -> String:
 	return "magma_breaker" if magma_active else ("thorn_swarm" if thorn_active else special_weapon)
@@ -1814,7 +1870,7 @@ func emit_saber_trail(duration: float, finisher: bool) -> void:
 	if sword_pivot:
 		PACK_VFX.blade_trail(sword_pivot, duration, saber_tint(), finisher)
 	if not combo_wave:
-		RiftAudio.play_effect(&"saber_swing")
+		play_weapon_sound(&"saber_swing", global_position)
 
 func present_saber_charge(held_time: float, swinging: bool) -> void:
 	var charge_duration := SABER_CHARGE_TIME * charge_time_scale
@@ -1862,7 +1918,7 @@ func launch_saber_wave() -> void:
 	var tint := saber_tint()
 	var power := buster_power() * melee_multiplier * 1.8 * charged_damage_multiplier
 	spawn_saber_wave(aim, hot, tint, power, 1.0)
-	RiftAudio.play_effect(&"saber_charge_release")
+	play_weapon_sound(&"saber_charge_release", global_position)
 	melee_performed.emit()
 	if echo_power > 0.0:
 		await get_tree().create_timer(0.13, false).timeout
@@ -1947,6 +2003,7 @@ func play_ground_locomotion(axis: float, speed: float, top_speed: float) -> void
 func update_character_visuals(axis: float) -> void:
 	if is_instance_valid(rocket_course):
 		if buster_pose:
+			present_buster_aim(BusterAim.SIDE, facing)
 			buster_pose.ladder_direction = facing
 			buster_pose.crouched = low_profile
 			buster_pose.influence = 1.0 if fire_lock > 0.0 or charge_held else 0.0
@@ -1978,6 +2035,8 @@ func update_character_visuals(axis: float) -> void:
 	if buster_pose:
 		buster_pose.ladder_direction = 0.0
 		buster_pose.water_direction=Vector3.RIGHT*facing if in_water else Vector3.ZERO
+		if in_water or (not local_prediction and not charge_held and fire_lock <= 0.0):
+			present_buster_aim(BusterAim.SIDE, facing)
 		buster_pose.crouched = low_profile
 		var aiming: bool = not saber_equipped and not bracing and not swinging and displayed_saber_charge < 0.10 and not (ground_dash and dash_left > 0.0) and (charge_held or is_instance_valid(charge_orb) or fire_lock > 0.0 or buster_pose.has_recoil())
 		buster_pose.influence = 0.0 if bracing else move_toward(buster_pose.influence, 1.0 if aiming else 0.0, 0.30)
@@ -2036,23 +2095,13 @@ func defense_rating() -> float:
 func update_guard(delta: float, requested: bool) -> void:
 	if guard_cooldown > 0.0:
 		guard_cooldown = maxf(0.0, guard_cooldown - delta)
-		guarding = false
-		if guard_cooldown < 0.00001:
+		if guard_cooldown <= 0.00001:
 			guard_cooldown = 0.0
-			guard_remaining = GUARD_SECONDS
-		return
-	if not requested:
+			guard_hits = 0
+	if requested and guard_cooldown <= 0.0:
+		show_guard(guard_hits)
+	else:
 		guarding = false
-		guard_remaining = minf(GUARD_SECONDS, guard_remaining + delta * GUARD_SECONDS / GUARD_RECOVERY)
-		return
-	guard_remaining -= delta
-	if guard_remaining <= 0.00001:
-		guard_remaining = 0.0
-		guard_cooldown = GUARD_RECOVERY
-		guarding = false
-		return
-	var fraction := guard_remaining / GUARD_SECONDS
-	show_guard(0 if fraction > 2.0 / 3.0 else (1 if fraction > 1.0 / 3.0 else 2))
 
 func show_guard(stage: int) -> void:
 	if not is_instance_valid(guard_bubble):
@@ -2078,10 +2127,16 @@ func blocks_hit(source: Vector3) -> bool:
 		return false
 	if sword_pivot:
 		PACK_VFX.saber_hit(get_parent(), sword_pivot.to_global(Vector3(.75, 0, 0)), facing, saber_tint())
+	guard_hits += 1
+	if guard_hits >= GUARD_HITS:
+		guard_cooldown = GUARD_RECOVERY
+		guarding = false
+	else:
+		show_guard(guard_hits)
 	return true
 
 func take_damage(amount: float, source_position := Vector3.INF) -> void:
-	if blocks_hit(source_position):
+	if amount > 0.0 and blocks_hit(source_position):
 		return
 	if not source_position.is_finite():
 		source_position = Vector3.ZERO
@@ -2097,7 +2152,7 @@ func take_damage(amount: float, source_position := Vector3.INF) -> void:
 		ladder_lock = 0.24
 
 func take_projectile_damage(amount: float, source := Vector3.INF) -> void:
-	if blocks_hit(source):
+	if amount > 0.0 and blocks_hit(source):
 		return
 	if run_module == "slipstream" and not dash_evade_used and health > 0.0 and dash_left > 0.0 and dash_elapsed < 0.09:
 		dash_evade_used = true

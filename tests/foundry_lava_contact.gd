@@ -1,4 +1,7 @@
 extends SceneTree
+class GuestLink extends Node:
+	func get_sender_id() -> int: return 12
+
 var failures := 0
 func _initialize() -> void: run.call_deferred()
 func check(ok: bool, label: String) -> void:
@@ -23,6 +26,48 @@ func run() -> void:
 	var deaths=[0]
 	actor.fell_into_pit.connect(func(): deaths[0]+=1)
 	var half=actor.standing_capsule.height*.5
+	var guest = load("res://scenes/actors/riftcore_player.tscn").instantiate()
+	lava.actors.add_child(guest)
+	guest.set_physics_process(false)
+	var mission = load("res://tests/coop_revival_fixture.gd").new()
+	root.add_child(mission)
+	mission.host = true
+	mission.act = 2
+	mission.roster = [11, 12]
+	mission.operators.assign([actor, guest])
+	mission.peer = GuestLink.new()
+	mission.add_child(mission.peer)
+	mission.gate_relays = game.gate_relays
+	mission.arena_door = game.arena_door
+	var bounds: AABB = lava.door.bounds
+	var approach := Vector3(bounds.position.x - 1, bounds.position.y + half + .08, bounds.get_center().z)
+	actor.global_position = approach
+	for terminal in mission.gate_relays.terminals:
+		guest.global_position = terminal.global_position + Vector3.UP * half
+		mission.receive_gate_relay_request(2)
+	check(mission.gate_relays.complete() and mission.broadcasts == 2, "Guest can activate both switches and broadcast their state")
+	lava.require_full_party = true
+	guest.global_position = approach - Vector3.RIGHT * 15
+	lava._physics_process(.5)
+	check(lava.door.lift() == 0, "Unlocked lava entrance waits for the distant guest")
+	guest.global_position = approach
+	guest.health = 0
+	lava._physics_process(.5)
+	check(lava.door.lift() == 0, "A downed party member cannot satisfy the entrance check")
+	guest.health = guest.max_health
+	lava._physics_process(.5)
+	check(lava.door.passable, "Lava entrance opens when both party members arrive")
+	actor.global_position = lava.to_global(Vector3(2, 1, 0))
+	lava._physics_process(.016)
+	check(lava.door.passable and lava.phase == lava.Phase.READY, "The entrance stays open for the second operator to cross")
+	guest.global_position = lava.to_global(Vector3(2.5, 1, 0))
+	lava._physics_process(.016)
+	check(lava.phase == lava.Phase.SEALED, "The lava sequence starts after both operators cross")
+	mission.free()
+	guest.free()
+	lava.door.reset()
+	lava.phase = lava.Phase.READY
+	lava.require_full_party = false
 	lava.surface=7.0
 	actor.global_position=lava.to_global(Vector3(12,7+half+.2,0))
 	check(not lava.touches_lava(actor),"boots above lava remain safe")

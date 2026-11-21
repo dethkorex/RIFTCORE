@@ -227,7 +227,7 @@ func show_page(next: String) -> void:
 		"Delete Profile":
 			var form := card(columns)
 			UI.label(form, "Reset operator progress?", 32, UI.CYAN)
-			UI.label(form, "This clears all three operators and saved progression for this profile. Your RIFTCORE account, username, and friends stay intact.", 20, UI.MUTED)
+			UI.label(form, "This clears all three operators, levels, shared storage, blueprints, and talents. It keeps your RIFTCORE account, username, and friends.", 20, UI.MUTED)
 			UI.button(form, "Keep Progress", show_page.bind("Player Profile"), true).grab_focus()
 			UI.button(form, "Reset Operator Progress", profile_reset_requested.emit)
 			save_status = UI.label(form, "", 17, UI.VIOLET)
@@ -879,7 +879,7 @@ func build_cosmetics(columns: HBoxContainer) -> void:
 	var expert := wardrobe_section(options, "EXPERT FINISHES")
 	for number in range(1, Catalog.SECTORS.size() + 1):
 		var id := SkinKit.expert_finish(number)
-		add_finish.call(id, "Clear both acts of %s on Expert." % Catalog.info(number).title)
+		add_finish.call(id, SkinKit.expert_requirement(number))
 	var suits: Array[String] = []
 	var legacy: Array[String] = []
 	for id: String in account.unlocked_skins:
@@ -890,7 +890,7 @@ func build_cosmetics(columns: HBoxContainer) -> void:
 	if not suits.is_empty():
 		wardrobe_section(options, "BOSS APPEARANCES")
 		for id in suits:
-			add_finish.call(id, "Earned on Hard or Expert.")
+			add_finish.call(id, "Extract from its sector twice on Hard or Expert.")
 	if not legacy.is_empty():
 		wardrobe_section(options, "PREVIOUSLY OWNED FINISHES")
 		for id in legacy:

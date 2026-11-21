@@ -103,7 +103,6 @@ func record_clear(sector: int, mode: int, run: Dictionary) -> int:
 	if mode >= Difficulty.HARD and clean and kills >= 14 and run.get("online", false):
 		add("field_partners")
 	if mode == Difficulty.NIGHTMARE:
-		add(SkinKit.expert_finish(sector))
 		add("expert_entry")
 		if sector not in expert_sectors:
 			expert_sectors.append(sector)

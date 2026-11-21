@@ -9,10 +9,14 @@ const NAMES := {
 	"aegis": "Aegis",
 }
 
-const PRICES := {"relay": 8000, "kestrel": 12000, "bastion": 18000, "vector": 25000, "aegis": 35000}
+const COSMETIC_EPOCH := preload("res://scripts/operator_skins.gd").COSMETIC_EPOCH
+const PRICES := {"relay": 10000, "kestrel": 15000, "bastion": 23000, "vector": 32000, "aegis": 44000}
+
+static func current_wardrobe(save: ConfigFile) -> bool:
+	return save != null and int(save.get_value("wardrobe", "epoch", 0)) == COSMETIC_EPOCH
 
 static func owned(id: String, save: ConfigFile) -> bool:
-	return id.is_empty() or (save != null and id in save.get_value("wardrobe", "owned_frames", []))
+	return id.is_empty() or (current_wardrobe(save) and id in save.get_value("wardrobe", "owned_frames", []))
 
 static func model_path(id: String) -> String:
 	return "res://assets/models/operator_frames/%s.glb" % id

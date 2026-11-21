@@ -348,7 +348,7 @@ func set_chat_open(open: bool) -> void:
 	velocity_x = 0.0
 	avatar.play_character_animation("idle")
 
-func _physics_process(delta: float) -> void:
+func update_station_walk(delta: float) -> void:
 	if panel_open or chat_open or reconstructing or has_dialogue():
 		return
 	var walking_tour := not is_nan(tour_destination)
@@ -373,6 +373,7 @@ func _physics_process(delta: float) -> void:
 		finish_tour_walk()
 
 func _process(delta: float) -> void:
+	update_station_walk(minf(delta, 1.0 / 30.0))
 	if nova.visible:
 		nova_hover_time += delta
 		if tour_active and not nova_transitioning:
