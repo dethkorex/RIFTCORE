@@ -57,6 +57,7 @@ static func build(stack: VBoxContainer, sector_name: String, stats: Dictionary, 
 	UI.make_readable_scroll(scroll)
 	results.add_child(scroll)
 	var rewards := HBoxContainer.new()
+	rewards.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	rewards.add_theme_constant_override("separation", 8)
 	scroll.add_child(rewards)
 	for name in blueprints:
@@ -67,7 +68,7 @@ static func build(stack: VBoxContainer, sector_name: String, stats: Dictionary, 
 		if Profile.stock.has(id) and int(supplies[id]) > 0:
 			reward(rewards, Profile.stock[id].name, "×%d sent to Storage" % supplies[id], UI.CYAN)
 	if rewards.get_child_count() == 0:
-		UI.label(rewards, "No salvage recovered.", 16, UI.MUTED)
+		UI.profile_label(rewards, "No salvage recovered.", 16, UI.MUTED)
 	if challenges_completed > 0:
 		UI.label(stack, "Challenge rewards ready. Claim them in Challenges at the station.", 17, UI.VIOLET)
 	if not ending.is_empty():
@@ -107,5 +108,5 @@ static func reward(parent: HBoxContainer, caption: String, text: String, tint: C
 	tile.custom_minimum_size.x = 125
 	parent.add_child(tile)
 	var content := UI.column(tile, 4)
-	UI.label(content, text, 16, tint)
-	UI.label(content, caption, 15)
+	UI.profile_label(content, text, 16, tint)
+	UI.profile_label(content, caption, 15)

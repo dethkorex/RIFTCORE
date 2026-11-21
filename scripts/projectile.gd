@@ -4,6 +4,8 @@ extends Area3D
 const HALO := preload("res://assets/pickups/pickup_halo.gdshader")
 const BUSTER_PLASMA := preload("res://assets/vfx/buster_plasma.gdshader")
 const BUSTER_PULSE := preload("res://assets/vfx/buster_pulse.gdshader")
+const BUSTER_WAKE := preload("res://assets/vfx/buster_wake.gdshader")
+const BUSTER_CHARGED_COLOR := Color("ffda40")
 const PACK_VFX := preload("res://scripts/pack_combat_vfx.gd")
 const ATTACK_FX := preload("res://scripts/attack_fx.gd")
 static var paint_cache: Dictionary = {}
@@ -17,6 +19,8 @@ var spent := false
 var palette := Color.CYAN
 var skin: Node3D
 var spinner: Node3D
+var buster_wake: MeshInstance3D
+var buster_travel := 0.0
 var is_charged := false
 var is_magma := false
 var burn_power := 0.0
@@ -126,10 +130,15 @@ func build_buster_projectile() -> void:
 	var core := part(skin, cached_mesh("Orb"), plasma_paint(palette), Vector3(0, 0, .045 * scale_factor),
 		Vector3(.16, .16, .32) * scale_factor)
 	core.name = "PlasmaCore"
-	var wake := add_glow(skin, palette, .86 * scale_factor)
-	wake.name = "PlasmaWake"
-	wake.position.z = -.28 * scale_factor
-	wake.scale = Vector3(1.75, .54, 1.0)
+	var wake_paint := ShaderMaterial.new()
+	wake_paint.shader = BUSTER_WAKE
+	wake_paint.set_shader_parameter("ion_color", palette)
+	var wake_mesh := QuadMesh.new()
+	wake_mesh.size = Vector2.ONE
+	buster_wake = part(skin, wake_mesh, wake_paint, Vector3.ZERO, Vector3.ONE)
+	buster_wake.name = "PlasmaWake"
+	buster_wake.rotation.y = -PI * .5
+	buster_wake.hide()
 	var collar_paint := ShaderMaterial.new()
 	collar_paint.shader = BUSTER_PULSE
 	collar_paint.set_shader_parameter("ion_color", palette.lerp(Color.WHITE, .24))
@@ -146,10 +155,10 @@ func build_buster_projectile() -> void:
 	var flare_paint := collar_paint.duplicate() as ShaderMaterial
 	var flare := part(flash, cached_mesh("Ring"), flare_paint, Vector3.ZERO, Vector3.ONE * .22 * scale_factor)
 	flare.rotation.x = PI * .5
-	var time := .15 if is_charged else .085
+	var time := .105 if is_charged else .075
 	var pulse := flash.create_tween().set_parallel().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-	pulse.tween_property(flare, "scale", Vector3.ONE * .39 * scale_factor, time)
-	pulse.tween_method(func(value: float): flare_paint.set_shader_parameter("intensity", value), .72, 0.0, time)
+	pulse.tween_property(flare, "scale", Vector3.ONE * .29 * scale_factor, time)
+	pulse.tween_method(func(value: float): flare_paint.set_shader_parameter("intensity", value), .46, 0.0, time)
 	pulse.tween_property(glow, "scale", Vector3.ONE * .16, time)
 	pulse.chain().tween_callback(flash.queue_free)
 
@@ -173,6 +182,12 @@ func _physics_process(delta: float) -> void:
 		RiftAudio.enemy_shot(global_position, heavy_report)
 	var step := minf(speed * delta, range_remaining)
 	position += direction * step + Vector3.UP * vertical_drift * clock * delta
+	if is_instance_valid(buster_wake) and step > 0.0:
+		buster_travel += step
+		var wake_length := minf(buster_travel, 2.8 if is_charged else 1.35)
+		buster_wake.position.z = -wake_length * .5
+		buster_wake.scale = Vector3(wake_length, .74 if is_charged else .35, 1.0)
+		buster_wake.show()
 	range_remaining -= step
 	speed = maxf(4.0, speed + acceleration * delta)
 	lifetime -= delta

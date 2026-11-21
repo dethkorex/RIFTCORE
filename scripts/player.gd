@@ -1278,6 +1278,7 @@ func present_charge(held_time: float, has_energy: bool) -> void:
 		if primed and charge_shell == null:
 			charge_shell = ShaderMaterial.new()
 			charge_shell.shader = CHARGE_SHELL
+			charge_shell.set_shader_parameter("charge_color", RiftProjectile.BUSTER_CHARGED_COLOR)
 		refresh_suit_overlay()
 	if held_time < .18:
 		if is_instance_valid(charge_orb):
@@ -1289,7 +1290,7 @@ func present_charge(held_time: float, has_energy: bool) -> void:
 		add_child(charge_orb)
 		if not remote_input and not local_prediction:
 			RiftAudio.play_effect(&"buster_charge")
-	var tint := Color("4cdeff")
+	var tint := RiftProjectile.BUSTER_CHARGED_COLOR if primed else Color("4cdeff")
 	if magma_active:
 		tint = Color("ff8026")
 	elif not special_weapon.is_empty():
@@ -1426,7 +1427,9 @@ func launch_buster(muzzle: Vector3, direction: Vector3, charged: bool, magma: bo
 		"core_override":
 			projectile.pierces = 3 if charged else 1
 	projectile.lifetime = projectile.range_remaining / projectile.speed + 0.15
-	var shot_color := (Color("ffae35") if charged else Color("ff681c")) if magma else (Color("73f4ff") if charged else Color.CYAN)
+	var shot_color := RiftProjectile.BUSTER_CHARGED_COLOR if charged else Color.CYAN
+	if magma:
+		shot_color = Color("ffae35") if charged else Color("ff681c")
 	if tint.a > 0.0:
 		shot_color = tint
 	projectile.setup(direction, faction, shot_color, false, charged, magma)
