@@ -68,35 +68,65 @@ func run() -> void:
 		print("PASS " if fired_up else "FAIL ", "Hold Up fires vertically with a raised muzzle, charged=", charged)
 		failures += int(not fired_up)
 		await frames(20)
-	for pair in [["move_right", "climb_up", Vector3(1, 1, 0)], ["move_left", "climb_down", Vector3(-1, -1, 0)]]:
+	for sample in [
+		["move_right", 1.0, 1.0, Vector3(1.0, 1.0, 0.0)],
+		["move_right", 1.0, 0.4, Vector3(1.0, 0.4, 0.0)],
+		["move_left", 0.35, 1.0, Vector3(-0.35, 1.0, 0.0)],
+	]:
 		actor.reset_predicted_position(spawn.global_position, Vector3.ZERO, 1.0)
 		await frames(5)
-		Input.action_press(pair[0])
-		Input.action_press(pair[1])
-		if pair[1] == "climb_down":
-			Input.action_press("crouch")
-		Input.action_press("shoot")
-		await frames(3)
-		Input.action_release("shoot")
-		await frames(5)
-		var diagonal: bool = directions.back().is_equal_approx(pair[2].normalized())
-		print("PASS " if diagonal else "FAIL ", "Buster fires diagonally ", pair[0], " ", pair[1])
-		failures += int(not diagonal)
-		Input.action_release(pair[0])
-		Input.action_release(pair[1])
-		Input.action_release("crouch")
+		Input.action_press(sample[0], sample[1])
+		Input.action_press("climb_up", sample[2])
+		var before := directions.size()
+		await fire()
+		var correct: bool = directions.size() > before and directions.back().is_equal_approx(sample[3].normalized())
+		print("PASS " if correct else "FAIL ", "Upper aiming follows the exact stick ratio ", sample[3])
+		failures += int(not correct)
+		Input.action_release(sample[0])
+		Input.action_release("climb_up")
 		await frames(20)
-	actor.reset_predicted_position(spawn.global_position + Vector3.UP * 4.0, Vector3.ZERO, 1.0)
-	await frames(4)
+
+	actor.reset_predicted_position(spawn.global_position, Vector3.ZERO, 1.0)
+	await frames(10)
+	await fire()
+	var standing_height: float = muzzles.back().y
+	await frames(20)
 	Input.action_press("climb_down")
 	Input.action_press("crouch")
+	Input.action_press("move_right")
+	await frames(5)
+	var before_crouch := directions.size()
+	await fire()
+	var crouch_shot: bool = (directions.size() > before_crouch and actor.crouching
+		and directions.back().is_equal_approx(Vector3.RIGHT) and muzzles.back().y < standing_height - 0.15)
+	print("PASS " if crouch_shot else "FAIL ", "Down plus Forward fires from the crouched muzzle")
+	failures += int(not crouch_shot)
+	Input.action_release("move_right")
+	Input.action_release("climb_down")
+	Input.action_release("crouch")
+	await frames(20)
+
+	for sideways in [false, true]:
+		actor.reset_predicted_position(spawn.global_position + Vector3.UP * 4.0, Vector3.ZERO, 1.0)
+		await frames(4)
+		Input.action_press("climb_down")
+		Input.action_press("crouch")
+		if sideways:
+			Input.action_press("move_left")
+		var before := directions.size()
+		await fire()
+		var expected := Vector3.LEFT if sideways else Vector3.RIGHT
+		var level: bool = not actor.grounded() and directions.size() > before and directions.back().is_equal_approx(expected)
+		print("PASS " if level else "FAIL ", "Airborne down input fires horizontally, sideways=", sideways)
+		failures += int(not level)
+		Input.action_release("move_left")
+		Input.action_release("climb_down")
+		Input.action_release("crouch")
+		await frames(20)
+	quit(failures)
+
+func fire() -> void:
 	Input.action_press("shoot")
 	await frames(3)
 	Input.action_release("shoot")
 	await frames(5)
-	var downward: bool = not actor.grounded() and directions.back().is_equal_approx(Vector3.DOWN)
-	print("PASS " if downward else "FAIL ", "Airborne Buster fires straight down")
-	failures += int(not downward)
-	Input.action_release("climb_down")
-	Input.action_release("crouch")
-	quit(failures)

@@ -5,8 +5,9 @@ signal deploy_requested(host: bool, sector: int)
 signal deployment_countdown(sector: int, number: int)
 var counting_down := false
 signal partner_moved(id: int, x: float, facing: float, animation: String, display_name: String)
-signal blueprint_drop_changed(key: String, id: String, owner: int, x: float)
-signal blueprint_received(id: String)
+signal hub_item_changed(key: String, offer: Dictionary)
+signal hub_item_delivery(key: String, item: String, quantity: int)
+signal hub_item_refund(item: String, quantity: int)
 signal guest_joined
 signal mission_returned
 signal mission_disconnected(message: String)
@@ -23,7 +24,7 @@ const PartyRecovery := preload("res://scripts/party_recovery.gd")
 const RelayEnums := preload("res://addons/GD-Sync/Scripts/Enums/Enums.gd")
 const Codes := "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 const CodeLength := 10
-const ROOM_PREFIX := "riftcore-coop-v17-"
+const ROOM_PREFIX := "riftcore-coop-v18-"
 const Difficulty := preload("res://scripts/mission_difficulty.gd")
 const MAX_PLAYERS := 4
 const PARTY_ACCESS := {"public": "Public", "friends": "Friends Only", "invite": "Invite Only"}
@@ -70,12 +71,12 @@ var local_armor_finish := ""
 var local_operator_frame := ""
 var unlocked_sector := 1
 
-var blueprint_drops: Dictionary = {}
+var hub_drops: Dictionary[String, Dictionary] = {}
+var pending_hub_drops: Dictionary[String, Array] = {}
 var station_positions: Dictionary = {}
 var last_station_pose := Vector2(INF, INF)
 var last_station_animation := ""
 var last_station_update_at := 0
-var drop_serial := 0
 var relay: Node
 var request_timeout: Timer
 var voice: PartyVoice
@@ -455,10 +456,13 @@ func _room_joined(lobby_name: String) -> void:
 	relay.expose_func(_receive_party_whisper)
 	relay.expose_func(_receive_party_message)
 	relay.expose_func(voice.receive_voice)
-	relay.expose_func(_request_blueprint_drop)
-	relay.expose_func(_request_blueprint_pickup)
-	relay.expose_func(_receive_blueprint_drop, RelayEnums.EXPOSE_PERMISSION.HOST)
-	relay.expose_func(_deliver_blueprint, RelayEnums.EXPOSE_PERMISSION.HOST)
+	relay.expose_func(_request_hub_drop)
+	relay.expose_func(_request_hub_pickup)
+	relay.expose_func(_receive_hub_drop, RelayEnums.EXPOSE_PERMISSION.HOST)
+	relay.expose_func(_reject_hub_drop, RelayEnums.EXPOSE_PERMISSION.HOST)
+	relay.expose_func(_deliver_hub_item, RelayEnums.EXPOSE_PERMISSION.HOST)
+	relay.expose_func(_return_hub_item, RelayEnums.EXPOSE_PERMISSION.HOST)
+	relay.expose_func(_finish_hub_pickup)
 	var joined_as_guest := pending in ["join", "rejoin_party"]
 	var rejoining := is_rejoining_mission()
 	connected_room = room_code
@@ -565,9 +569,8 @@ func _players_changed(_client_id: int) -> void:
 	if room_size >= 2 and not mission_active:
 		share_sector_records.call_deferred()
 		if _client_id != 0 and relay.is_host():
-			for key in blueprint_drops:
-				var drop: Dictionary = blueprint_drops[key]
-				relay.call_func_on(_client_id, _receive_blueprint_drop, key, drop.id, drop.owner, drop.x)
+			for key in hub_drops:
+				relay.call_func_on(_client_id, _receive_hub_drop, key, hub_drops[key])
 
 func share_sector_records() -> void:
 	if room_size >= 2 and is_instance_valid(relay):
@@ -716,13 +719,14 @@ func deploy(sector := 1, mode := 0) -> void:
 		if starting_room == connected_room and relay.is_host():
 			relay.call_func(_receive_countdown, sector, -1)
 		return
+	_return_unclaimed_hub_items()
 	if not recovery.new_mission(mission_roster, sector, mode):
 		mission_roster.clear()
 		deployment_countdown.emit(sector, -1)
 		relay.call_func(_receive_countdown, sector, -1)
 		_update("Could not set up mission recovery. Try deploying again.")
 		return
-	_clear_blueprint_drops()
+	_clear_hub_drops()
 	mission_active = true
 	mission_mode = mode
 	deploy_requested.emit(true, sector)
@@ -751,7 +755,7 @@ func _receive_deploy(sector: int, roster: Array, mode: int, credentials: Diction
 	relay._data_controller.schedule_friend_status()
 	mission_roster = roster.duplicate()
 	mission_mode = mode
-	_clear_blueprint_drops()
+	_clear_hub_drops()
 	mission_active = true
 	recovery.acknowledge_deploy()
 	deploy_requested.emit(false, sector)
@@ -810,9 +814,11 @@ func _peer_left(client_id: int) -> void:
 	last_party_whisper.erase(client_id)
 	party_chat_allowance.erase(client_id)
 	if relay.is_host() and not mission_active:
-		for key in blueprint_drops.keys():
-			if blueprint_drops[key].owner == client_id:
-				_publish_blueprint_drop(key, "", client_id, 0.0)
+		for key in hub_drops.keys():
+			var offer := hub_drops[key]
+			if int(offer.get("claim", 0)) == client_id:
+				offer.erase("claim")
+				_publish_hub_drop(key, offer)
 	if mission_active and mission_roster.has(client_id):
 		recovery.begin()
 	_players_changed(client_id)
@@ -841,7 +847,7 @@ func _receive_abandon() -> void:
 func leave(message := "Create a room or enter a friend’s room code.", deliberate := true) -> void:
 	directory.clear_friends_party_request()
 	voice.reset()
-	_clear_blueprint_drops()
+	_clear_hub_drops()
 	var was_in_mission := mission_active
 	if deliberate:
 		previous_room = ""
@@ -892,78 +898,135 @@ func _update(message: String) -> void:
 	status = message
 	changed.emit()
 
-func can_share_blueprints() -> bool:
-	return not connected_room.is_empty() and room_size >= 2 and not mission_active and is_instance_valid(relay)
+func can_share_hub_items() -> bool:
+	return not connected_room.is_empty() and room_size >= 2 and not mission_active and not counting_down and is_instance_valid(relay)
 
-func drop_blueprint(id: String, x: float) -> bool:
-	if not can_share_blueprints() or not Profile.GEAR.has(id):
+func drop_hub_item(item: String, quantity: int, x: float) -> bool:
+	if not can_share_hub_items() or not Profile.valid_hub_item(item, quantity):
 		return false
+	var nonce := str(Time.get_ticks_usec())
 	if relay.is_host():
-		_create_blueprint_drop(relay.get_client_id(), id, x)
-	else:
-		relay.call_func_on(relay.get_host(), _request_blueprint_drop, id, x)
+		return _create_hub_drop(relay.get_client_id(), nonce, item, quantity, x)
+	pending_hub_drops[nonce] = [item, quantity]
+	relay.call_func_on(relay.get_host(), _request_hub_drop, nonce, item, quantity, x)
 	return true
 
-func _request_blueprint_drop(id: String, x: float) -> void:
-	_create_blueprint_drop(relay.get_sender_id(), id, x)
+func _request_hub_drop(nonce: String, item: String, quantity: int, x: float) -> void:
+	var owner: int = relay.get_sender_id()
+	if not _create_hub_drop(owner, nonce, item, quantity, x):
+		relay.call_func_on(owner, _reject_hub_drop, nonce)
 
-func _create_blueprint_drop(owner: int, id: String, x: float) -> void:
-	if not can_share_blueprints() or not relay.is_host() or (owner != relay.get_client_id() and not relay.lobby_get_all_clients().has(owner)):
-		return
-	if not Profile.GEAR.has(id) or not is_finite(x):
-		return
-	var deck_x := clampf(x, -19.15, 19.15)
-	if absf(deck_x - float(station_positions.get(owner, deck_x))) > 2.5:
-		deck_x = float(station_positions[owner])
-	drop_serial += 1
-	_publish_blueprint_drop(str(drop_serial), id, owner, deck_x)
+func _create_hub_drop(owner: int, nonce: String, item: String, quantity: int, x: float) -> bool:
+	if not can_share_hub_items() or not relay.is_host() or not _hub_member(owner):
+		return false
+	if not nonce.is_valid_int() or nonce.length() > 18 or not Profile.valid_hub_item(item, quantity) or not is_finite(x):
+		return false
+	var key := "%d:%s" % [owner, nonce]
+	if hub_drops.has(key):
+		return true
+	if hub_drops.size() >= 24:
+		return false
+	var position_x := clampf(x, -19.15, 19.15)
+	var synced_x := float(station_positions.get(owner, position_x))
+	if absf(position_x - synced_x) > 2.5:
+		position_x = synced_x
+	_publish_hub_drop(key, {"item": item, "quantity": quantity, "owner": owner, "x": position_x})
+	return true
 
-func _publish_blueprint_drop(key: String, id: String, owner: int, x: float) -> void:
-	_apply_blueprint_drop(key, id, owner, x)
-	relay.call_func(_receive_blueprint_drop, key, id, owner, x)
+func _hub_member(id: int) -> bool:
+	return id == relay.get_client_id() or relay.lobby_get_all_clients().has(id)
 
-func _receive_blueprint_drop(key: String, id: String, owner: int, x: float) -> void:
+func _publish_hub_drop(key: String, offer: Dictionary) -> void:
+	_apply_hub_drop(key, offer)
+	relay.call_func(_receive_hub_drop, key, offer)
+
+func _receive_hub_drop(key: String, offer: Dictionary) -> void:
 	if relay.get_sender_id() == relay.get_host() and not mission_active and not connected_room.is_empty():
-		_apply_blueprint_drop(key, id, owner, x)
+		_apply_hub_drop(key, offer)
 
-func _apply_blueprint_drop(key: String, id: String, owner: int, x: float) -> void:
-	if id.is_empty():
-		blueprint_drops.erase(key)
-	elif Profile.GEAR.has(id):
-		blueprint_drops[key] = {"id": id, "owner": owner, "x": x}
-	blueprint_drop_changed.emit(key, id, owner, x)
+func _apply_hub_drop(key: String, offer: Dictionary) -> void:
+	if offer.is_empty():
+		hub_drops.erase(key)
+	elif Profile.valid_hub_item(String(offer.get("item", "")), int(offer.get("quantity", 0))):
+		hub_drops[key] = offer
+		if int(offer.owner) == relay.get_client_id():
+			pending_hub_drops.erase(key.get_slice(":", 1))
+	else:
+		return
+	hub_item_changed.emit(key, offer)
 
-func pick_up_blueprint(key: String) -> void:
-	if not can_share_blueprints():
+func _reject_hub_drop(nonce: String) -> void:
+	if relay.get_sender_id() != relay.get_host() or not pending_hub_drops.has(nonce):
+		return
+	var pending_item := pending_hub_drops[nonce]
+	pending_hub_drops.erase(nonce)
+	hub_item_refund.emit(pending_item[0], pending_item[1])
+
+func pick_up_hub_item(key: String, reclaim := false) -> void:
+	if not can_share_hub_items():
 		return
 	if relay.is_host():
-		_grant_blueprint_drop(key, relay.get_client_id())
+		_grant_hub_item(key, relay.get_client_id(), reclaim)
 	else:
-		relay.call_func_on(relay.get_host(), _request_blueprint_pickup, key)
+		relay.call_func_on(relay.get_host(), _request_hub_pickup, key, reclaim)
 
-func _request_blueprint_pickup(key: String) -> void:
-	_grant_blueprint_drop(key, relay.get_sender_id())
+func _request_hub_pickup(key: String, reclaim: bool) -> void:
+	_grant_hub_item(key, relay.get_sender_id(), reclaim)
 
-func _grant_blueprint_drop(key: String, receiver: int) -> void:
-	if not can_share_blueprints() or not relay.is_host() or (receiver != relay.get_client_id() and not relay.lobby_get_all_clients().has(receiver)):
+func _grant_hub_item(key: String, receiver: int, reclaim: bool) -> void:
+	if not can_share_hub_items() or not relay.is_host() or not _hub_member(receiver):
 		return
-	var drop: Dictionary = blueprint_drops.get(key, {})
-	if drop.is_empty() or receiver == drop.owner or not station_positions.has(receiver):
+	var offer: Dictionary = hub_drops.get(key, {})
+	if offer.is_empty() or offer.has("claim") or (receiver == offer.owner) != reclaim or not station_positions.has(receiver):
 		return
-	if absf(float(station_positions[receiver]) - float(drop.x)) > 1.6:
+	if absf(float(station_positions[receiver]) - float(offer.x)) > 1.6:
 		return
-	_publish_blueprint_drop(key, "", drop.owner, 0.0)
+	offer["claim"] = receiver
 	if receiver == relay.get_client_id():
-		blueprint_received.emit(drop.id)
+		hub_item_delivery.emit(key, offer.item, offer.quantity)
 	else:
-		relay.call_func_on(receiver, _deliver_blueprint, drop.id)
+		relay.call_func_on(receiver, _deliver_hub_item, key, offer.item, offer.quantity)
 
-func _deliver_blueprint(id: String) -> void:
-	if relay.get_sender_id() == relay.get_host() and can_share_blueprints():
-		blueprint_received.emit(id)
+func _deliver_hub_item(key: String, item: String, quantity: int) -> void:
+	if relay.get_sender_id() == relay.get_host() and not mission_active and Profile.valid_hub_item(item, quantity):
+		hub_item_delivery.emit(key, item, quantity)
 
-func _clear_blueprint_drops() -> void:
-	for key in blueprint_drops:
-		blueprint_drop_changed.emit(key, "", 0, 0.0)
-	blueprint_drops.clear()
+func confirm_hub_pickup(key: String, accepted: bool) -> void:
+	if relay.is_host():
+		_resolve_hub_pickup(key, relay.get_client_id(), accepted)
+	else:
+		relay.call_func_on(relay.get_host(), _finish_hub_pickup, key, accepted)
+
+func _finish_hub_pickup(key: String, accepted: bool) -> void:
+	_resolve_hub_pickup(key, relay.get_sender_id(), accepted)
+
+func _resolve_hub_pickup(key: String, receiver: int, accepted: bool) -> void:
+	var offer: Dictionary = hub_drops.get(key, {})
+	if not relay.is_host() or offer.get("claim") != receiver:
+		return
+	if accepted:
+		_publish_hub_drop(key, {})
+	else:
+		offer.erase("claim")
+
+func _return_unclaimed_hub_items() -> void:
+	for key in hub_drops.keys():
+		var offer := hub_drops[key]
+		if offer.has("claim") or not _hub_member(offer.owner):
+			continue
+		if offer.owner == relay.get_client_id():
+			hub_item_refund.emit(offer.item, offer.quantity)
+		else:
+			relay.call_func_on(offer.owner, _return_hub_item, offer.item, offer.quantity)
+		_publish_hub_drop(key, {})
+
+func _return_hub_item(item: String, quantity: int) -> void:
+	if relay.get_sender_id() == relay.get_host() and Profile.valid_hub_item(item, quantity):
+		hub_item_refund.emit(item, quantity)
+
+func _clear_hub_drops() -> void:
+	for key in hub_drops:
+		hub_item_changed.emit(key, {})
+	hub_drops.clear()
+	pending_hub_drops.clear()
 	station_positions.clear()

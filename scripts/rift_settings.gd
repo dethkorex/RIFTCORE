@@ -1,6 +1,7 @@
 extends Node
 
-const MODES := [Vector2i(1280, 720), Vector2i(1600, 900), Vector2i(1920, 1080), Vector2i(2560, 1440), Vector2i(3840, 2160)]
+const MODES := [Vector2i(1280, 720), Vector2i(1600, 900), Vector2i(1920, 1080), Vector2i(2560, 1440),
+	Vector2i(3840, 2160), Vector2i(2560, 1080), Vector2i(3440, 1440), Vector2i(3840, 1600), Vector2i(5120, 1440)]
 const ACTIONS := {
 	"move_left": "Move left", "move_right": "Move right", "jump": "Jump",
 	"crouch": "Crouch", "climb_up": "Climb up", "climb_down": "Climb down",
@@ -12,7 +13,8 @@ const AXES := ["move_left", "move_right", "climb_up", "climb_down", "crouch"]
 var path := "user://riftcore_settings.cfg"
 signal hud_scale_changed
 signal voice_settings_changed
-const DISPLAY_MODES := ["Windowed", "Borderless Fullscreen", "Exclusive Fullscreen"]
+const DISPLAY_MODES := ["Windowed", "Borderless Fullscreen", "Exclusive Fullscreen", "Extended Fullscreen (Ultrawide)"]
+const EXTENDED_FULLSCREEN := 3
 const VSYNC_CHOICES := ["Off", "On", "Adaptive", "Mailbox"]
 const FRAME_LIMITS := [0, 30, 60, 90, 120, 144, 165, 240]
 const CONTROLLER_STYLES := ["Xbox", "PlayStation"]
@@ -196,16 +198,19 @@ func set_display(index: int, mode: int) -> void:
 
 func apply_video() -> void:
 	Engine.max_fps = FRAME_LIMITS[frame_limit]
+	var window := get_window()
+	var extended := display_mode == EXTENDED_FULLSCREEN
+	window.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_EXPAND if extended else Window.CONTENT_SCALE_ASPECT_KEEP
 	if DisplayServer.get_name() == "headless":
 		return
-	var window := get_window()
 	var target: Vector2i = MODES[resolution_index]
 	var screen := window.current_screen
 	var available := DisplayServer.screen_get_usable_rect(screen)
 	if display_mode != 0:
 		window.mode = Window.MODE_EXCLUSIVE_FULLSCREEN if display_mode == 2 else Window.MODE_FULLSCREEN
 		var pixels := DisplayServer.screen_get_size(screen)
-		window.scaling_3d_scale = clampf(float(target.x) / maxf(1.0, pixels.x), 0.25, 2.0)
+		var scale := float(target.y) / maxf(1.0, pixels.y) if extended else float(target.x) / maxf(1.0, pixels.x)
+		window.scaling_3d_scale = clampf(scale, 0.25, 2.0)
 	else:
 		window.mode = Window.MODE_WINDOWED
 		var visible_fit := Vector2i(available.size.x, maxi(540, available.size.y - 48))

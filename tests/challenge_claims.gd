@@ -19,7 +19,7 @@ func run() -> void:
 	profile.unlocked_sector = 3
 	profile.credits = 200
 	profile.reserve_lives = 6
-	var starting_shards: int = profile.core_shards
+	var starting_shards: float = profile.core_shards
 	check(session.save_slot() == OK, "Scratch operator saved")
 	check(profile.record_challenges(1, {"act": 1, "act_kills": 5}, session.persist_challenge_progress) == 0,
 		"Reaching Act II without the required security defeats does not clear the challenge")
@@ -32,6 +32,7 @@ func run() -> void:
 	check(restored.load_slot() and restored.profile.challenge_cycle(1).done == [0],
 		"Ready-to-claim progress survives a reload before extraction")
 	var before: Dictionary = profile.challenge_rewards(1, profile.challenge_cycle(1))
+	check(before.shards == 1.5, "A base challenge earns exactly fifty percent more Core Shards")
 	check(profile.claim_challenge_rewards(1, func(): return ERR_CANT_CREATE) == ERR_CANT_CREATE and
 		profile.credits == 200 and profile.challenge_rewards(1, profile.challenge_cycle(1)) == before,
 		"A failed write rolls back both the claim and currency")
@@ -67,7 +68,7 @@ func run() -> void:
 		claim.pressed.emit()
 	check(profile.credits == 200 + before.credits and profile.core_shards == starting_shards + before.shards
 		and profile.reserve_lives == 6, "Ordinary claims add Bolts and Core Shards but no bonus life")
-	check(restored.load_slot() and restored.profile.reserve_lives == 6 and restored.profile.credits == profile.credits
+	check(restored.load_slot() and restored.profile.reserve_lives == 6 and restored.profile.credits == profile.credits and restored.profile.core_shards == profile.core_shards
 		and restored.profile.claim_challenge_rewards(1) == ERR_DOES_NOT_EXIST, "Claim and its wallet are persisted together")
 
 	var run := {"act": 1, "act_kills": 6, "clear": 1, "clean": 1, "kills": 18, "materials": 10, "mode": Difficulty.NORMAL}
@@ -76,9 +77,9 @@ func run() -> void:
 	run.mode = Difficulty.HARD
 	var payout: int = profile.record_challenges(3, run)
 	var set_reward: Dictionary = profile.challenge_rewards(3, profile.challenge_cycle(3))
-	check(payout == 2 and set_reward.lives == 1 and set_reward.shards == 7 + profile.challenge_set_shards(3),
-		"Completing the set adds its reduced shard bonus once")
-	check(Difficulty.extraction_shards(1, Difficulty.NORMAL) == 2 and Difficulty.extraction_shards(10, Difficulty.NIGHTMARE) == 6,
+	check(payout == 2 and set_reward.lives == 1 and set_reward.shards == 15.0,
+		"Five boosted rewards and the fifty-percent set bonus pay out once")
+	check(Difficulty.extraction_shards(1, Difficulty.NORMAL) == 2.5 and Difficulty.extraction_shards(10, Difficulty.NIGHTMARE) == 7.5,
 		"Base shard rewards scale by sector and difficulty")
 
 	var catalog := Stock.catalog()
@@ -103,7 +104,7 @@ func run() -> void:
 		"Last-life death spends a banked life and reflects it on the HUD")
 	check(restored.load_slot() and restored.profile.reserve_lives == 6, "The spent bonus life is saved immediately")
 	await create_timer(1.4, true).timeout
-	var shards_before_extraction: int = profile.core_shards
+	var shards_before_extraction: float = profile.core_shards
 	var bolts_before_extraction: int = profile.credits
 	profile.challenge_cycles.erase(1)
 	game.mission_stats.kills = 12
@@ -112,8 +113,8 @@ func run() -> void:
 	game.boss_defeated = true
 	game.player.global_position = game.game_root.get_node("MARKERS/RoomExit").global_position
 	game._process(0.0)
-	check(game.sector_complete and profile.core_shards == shards_before_extraction + 2 and
-		profile.credits == bolts_before_extraction + 160, "Extraction awards the reduced mission payout only")
+	check(game.sector_complete and profile.core_shards == shards_before_extraction + 2.5 and
+		profile.credits == bolts_before_extraction + 160, "Extraction banks the twenty-five percent reward increase separately from challenges")
 	var pending: Dictionary = profile.challenge_rewards(1, profile.challenge_cycle(1))
 	check(pending.credits > 0 and pending.lives == 0 and profile.reserve_lives == 7,
 		"Extraction banks the first boss life and leaves ordinary challenge rewards ready to claim")

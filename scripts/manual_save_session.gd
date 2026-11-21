@@ -208,18 +208,6 @@ func persist_reserve_lives() -> Error:
 	data.set_value("profile", "first_main_bosses", profile.first_main_bosses)
 	return write_slot(data)
 
-func persist_blueprint_trade() -> Error:
-	if not owns_slot:
-		return OK
-	var data := read_slot(slot)
-	if not data:
-		return ERR_FILE_NOT_FOUND
-	data.set_value("inventory", "blueprints", profile.blueprint_items)
-	data.set_value("inventory", "blueprint_pouch", profile.blueprint_pouch)
-	for id in profile.blueprints:
-		data.set_value("blueprints", id, true)
-	return write_progress(data)
-
 func write_progress(data: ConfigFile) -> Error:
 	var previous := FileAccess.get_file_as_bytes(slot_path(slot)) if FileAccess.file_exists(slot_path(slot)) else PackedByteArray()
 	var error := write_slot(data)

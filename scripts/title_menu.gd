@@ -2,7 +2,7 @@ class_name RiftTitleMenu
 extends Control
 
 signal operator_deleted(slot: int)
-signal blueprint_drop_requested(id: String)
+signal hub_drop_requested(key: String, amount: int)
 signal start_requested
 signal load_requested
 signal hub_requested
@@ -86,7 +86,7 @@ var station_panel := false
 var station_tour_preview := false
 const STATION_TAB_ICONS := {
 	"Shop": "currency", "Fabrication": "craft", "Upgrades": "lightning", "Save Game": "save", "Settings": "gear",
-	"Gear": "shield", "Storage": "storage", "Player Profile": "person", "Cosmetics": "gear", "Achievements": "leaderboard",
+	"Gear": "shield", "Storage": "storage", "Inventory": "storage", "Player Profile": "person", "Cosmetics": "gear", "Achievements": "leaderboard",
 	"Collection": "archive", "Tutorials": "play", "Social": "person", "Party": "home", "Notifications": "warning",
 }
 var deploy_error := ""
@@ -286,6 +286,8 @@ func show_page(next: String) -> void:
 			build_gear(columns)
 		"Storage":
 			build_storage_transfer(columns)
+		"Inventory":
+			build_hub_inventory(columns)
 		"Blueprint Details", "Learn Blueprint":
 			build_blueprint_details(columns)
 		"Shop":
@@ -393,8 +395,8 @@ func station_tabs() -> Dictionary:
 		return {"Shop": "Marketplace", "Fabrication": "Crafting", "Upgrades": "Core Ascension"}
 	if page in ["Save Game", "Settings"]:
 		return {"Save Game": "Save Game", "Settings": "Settings"}
-	if page in ["Gear", "Storage"]:
-		return {"Gear": "Gear", "Storage": "Storage"}
+	if page in ["Gear", "Inventory", "Storage"]:
+		return {"Gear": "Gear", "Inventory": "Inventory", "Storage": "Storage"}
 	if page in ["Player Profile", "Cosmetics", "Achievements"]:
 		return {"Player Profile": "Profile", "Cosmetics": "Cosmetics", "Achievements": "Achievements"}
 	if page in ["Collection", "Tutorials"]:
@@ -414,7 +416,7 @@ func build_station_header(header: HBoxContainer) -> void:
 	var station_name := page.to_upper()
 	if page in ["Shop", "Fabrication", "Upgrades", "Craft Item"]:
 		station_name = "WORKSHOP"
-	elif page in ["Gear", "Storage", "Blueprint Details", "Learn Blueprint"]:
+	elif page in ["Gear", "Inventory", "Storage", "Blueprint Details", "Learn Blueprint"]:
 		station_name = "OPERATOR"
 	elif page in ["Save Game", "Settings"]:
 		station_name = "SYSTEM"
@@ -440,7 +442,7 @@ func build_station_header(header: HBoxContainer) -> void:
 	wallet.add_child(funds)
 	wallet_bolts = UI.currency_row(funds, "%04d BOLTS" % profile.credits)
 	funds.add_child(VSeparator.new())
-	UI.currency_row(funds, "%04d CORE SHARDS" % profile.core_shards, true)
+	UI.currency_row(funds, "%s CORE SHARDS" % UI.shard_amount(profile.core_shards, 4), true)
 
 func open_station(next: String, tour_preview := false) -> void:
 	station_panel = true
@@ -1851,7 +1853,7 @@ func select_challenge_sector(number: int, details: VBoxContainer, group: ButtonG
 		segment.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		segment.add_theme_stylebox_override("panel", UI.frame(UI.CYAN.darkened(.30) if index < cycle.done.size() else Color("101e32"), Color("5396ba"), 1))
 		segments.add_child(segment)
-	UI.label(progress, "SET BONUS  ·  %d CORE SHARDS" % Profile.challenge_set_shards(number), 17, UI.VIOLET).autowrap_mode = TextServer.AUTOWRAP_OFF
+	UI.label(progress, "SET BONUS  ·  %s CORE SHARDS" % UI.shard_amount(Profile.challenge_set_shards(number)), 17, UI.VIOLET).autowrap_mode = TextServer.AUTOWRAP_OFF
 	var tasks := scroll_entries(details)
 	tasks.add_theme_constant_override("separation", 6)
 	UI.make_readable_scroll(tasks.get_parent() as ScrollContainer)
@@ -1868,7 +1870,7 @@ func select_challenge_sector(number: int, details: VBoxContainer, group: ButtonG
 	status.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	if rewards.credits == 0 and rewards.shards == 0 and rewards.lives == 0:
 		return
-	status.text = "Ready to claim  ·  %d Bolts  ·  %d Core Shards" % [rewards.credits, rewards.shards]
+	status.text = "Ready to claim  ·  %d Bolts  ·  %s Core Shards" % [rewards.credits, UI.shard_amount(rewards.shards)]
 	if rewards.lives > 0:
 		status.text += "  ·  +%d %s" % [rewards.lives, "Life" if rewards.lives == 1 else "Lives"]
 	var claim := UI.button(footer, "Claim Rewards", func():
@@ -1932,8 +1934,7 @@ func add_challenge_row(parent: VBoxContainer, sector: int, index: int, cycle: Di
 	row.add_child(payout)
 	payout.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	UI.currency_row(payout, "%d Bolts" % Profile.rotated_challenge_credits(sector, index))
-	UI.currency_row(payout, "%d Core %s" % [Profile.challenge_shards(sector, index),
-		"Shard" if Profile.challenge_shards(sector, index) == 1 else "Shards"], true)
+	UI.currency_row(payout, "%s Core Shards" % UI.shard_amount(Profile.challenge_shards(sector, index)), true)
 	if Profile.challenge_life(index) > 0:
 		UI.label(payout, "+1 Life", 16, Color("8ff6ac")).autowrap_mode = TextServer.AUTOWRAP_OFF
 	var state := UI.label(row, "CLAIMED" if claimed else ("REWARD READY" if cleared else "OPEN"), 16,
@@ -2383,6 +2384,20 @@ func build_gear(columns: HBoxContainer) -> void:
 	else:
 		body.buttons[equipment_slot].grab_focus()
 
+func build_hub_inventory(columns: HBoxContainer) -> void:
+	var carried := card(columns)
+	UI.label(carried, "Inventory", 28, UI.CYAN)
+	var hint := "Drop a carried item for your party. They can walk over its icon to pick it up. Use Field Interact near your own drop to take it back."
+	UI.label(carried, hint if RiftRelay.can_share_hub_items() else "Join a party to share carried items.", 17, UI.MUTED)
+	var first := build_storage_items(carried, storage_items(true), "", true)
+	if first:
+		first.grab_focus()
+	if not inventory_status.is_empty():
+		UI.label(carried, inventory_status, 16, UI.VIOLET)
+	var quick := card(columns, 0.7)
+	UI.label(quick, "QUICK SLOTS", 24, UI.CYAN)
+	build_quick_assignments(quick)
+
 func build_storage_transfer(columns: HBoxContainer) -> void:
 	var inventory_panel := card(columns)
 	var storage_panel := card(columns)
@@ -2416,11 +2431,21 @@ func open_storage_item(parent: VBoxContainer, origin: Button, id: String, item: 
 	var reopen := func(action: Callable):
 		origin.grab_focus()
 		inventory_status = action.call()
-		show_page("Storage")
+		show_page(page)
+	if carried and page == "Inventory" and RiftRelay.can_share_hub_items():
+		var amount: int = profile.hub_item_count(id)
+		first = UI.button(row, "Drop for Party" if amount == 1 else "Drop 1", func(): hub_drop_requested.emit(id, 1), true, 33)
+		if amount > 1:
+			UI.button(row, "Drop Stack (%d)" % amount, func(): hub_drop_requested.emit(id, amount), false, 33)
 	if carried:
-		first = UI.button(row, "Stow Stack", reopen.bind(profile.stow_purchase.bind(id)), true, 33)
-	if item.kind == "Blueprints":
-		first = UI.button(row, "Learn Blueprint", func():
+		var stow: Callable = profile.stow_pouch_blueprint.bind(id.trim_prefix("blueprint/")) if item.kind == "Blueprints" else profile.stow_purchase.bind(id)
+		var button := UI.button(row, "Stow Stack", reopen.bind(stow), first == null, 33)
+		if not first:
+			first = button
+	elif item.kind != "Equipment":
+		first = UI.button(row, "Move to Inventory", reopen.bind(profile.withdraw_inventory.bind(id)), true, 33)
+	if item.kind == "Blueprints" and not carried:
+		UI.button(row, "Learn Blueprint", func():
 			origin.grab_focus()
 			pending_blueprint = id.trim_prefix("blueprint/")
 			show_page("Learn Blueprint")
@@ -2450,12 +2475,12 @@ func open_storage_item(parent: VBoxContainer, origin: Button, id: String, item: 
 
 func storage_items(carried := false) -> Dictionary:
 	var items := {}
-	for id in ([] if carried else Profile.GEAR.keys()):
+	for id in Profile.GEAR:
 		var gear: Dictionary = Profile.GEAR[id]
-		if profile.gear.has(id):
+		if not carried and profile.gear.has(id):
 			items[id] = {"kind": "Equipment", "name": gear.name, "slot": gear.slot, "icon": EquipmentIcons.icon(id, gear.slot),
 				"rarity": gear.rarity, "detail": gear.perk, "badge": item_status(id, false)}
-		if profile.blueprint_items.has(id):
+		if profile.blueprint_pouch.has(id) if carried else profile.blueprint_items.has(id):
 			items["blueprint/" + id] = {"kind": "Blueprints", "name": gear.name + " Blueprint", "slot": "", "icon": EquipmentIcons.icon(id, gear.slot),
 				"rarity": gear.rarity, "detail": "Learn this blueprint to unlock its recipe in Crafting.", "badge": "Recipe", "id": id}
 	for id in Profile.stock:
@@ -2592,7 +2617,7 @@ func build_quick_assignments(parent: VBoxContainer) -> void:
 	clear.select(0)
 	clear.item_selected.connect(func(index: int):
 		inventory_status = profile.clear_quick(index - 1)
-		show_page("Storage")
+		show_page(page)
 	)
 
 func add_stat_group(parent: VBoxContainer, category: String, values: String) -> void:

@@ -89,7 +89,7 @@ func run() -> void:
 	check(restored.profile.quick_slots[0].is_empty() and restored.profile.stored_supplies.get("patch_kit") == 4, "Only equipped supplies are lost")
 	check(restored.profile.player_level() == 50 and restored.profile.memories.has(2), "Permanent rank and memory fragments survive")
 	check(restored.profile.hard_unlocked(1) and restored.profile.nightmare_unlocked(), "Difficulty unlocks survive a defeated run and save reload")
-	check(restored.profile.unlocked_sector == catalog.SECTORS.size() and restored.profile.rank("armor") == 1 and restored.profile.core_shards == 10, "Unlocked sectors and paid enhancements persist through reconstruction")
+	check(restored.profile.unlocked_sector == catalog.SECTORS.size() and restored.profile.rank("armor") == 1 and restored.profile.core_shards == 12.25, "The exact 15 percent talent discount and fractional balance persist through reconstruction")
 	var player_script = load("res://scripts/player.gd")
 	var milestones := {}
 	for stock_id in restored.profile.stock:
@@ -206,6 +206,7 @@ func run() -> void:
 	check(first.load_slot() and first.profile.owned_frames.is_empty() and first.profile.credits == 900, "Legacy slot clears frame purchases and keeps its Bolt balance")
 	var clean_run := {"kills": 30, "materials": 10, "bolts": 400, "health": 100, "energy": 100, "seconds": 320, "clean": true}
 	account.award_clear(1, difficulty.NORMAL, clean_run)
+	check(account.experience == 130 + 257, "Profile XP keeps pace with increased extraction purchasing power")
 	check(account.unlocked_skins.is_empty(), "One high-scoring run cannot unlock a finish")
 	for run_index in 3:
 		account.award_clear(1, difficulty.NORMAL, clean_run)

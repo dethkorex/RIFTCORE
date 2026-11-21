@@ -121,7 +121,9 @@ func remove_local_progress(other_files: Array[String]) -> Error:
 	return OK
 
 static func clear_reward(sector: int, difficulty: int) -> int:
-	return roundi((145 + sector * 30) * (1.0 + difficulty * 0.5))
+	var previous_rate := (145 + sector * 30) * (1.0 + Difficulty.index(difficulty) * 0.5)
+	# Keep level gates in step with the increase in extraction purchasing power.
+	return roundi(previous_rate * Difficulty.EXTRACTION_SHARD_PERCENT / Profile.TALENT_PRICE_PERCENT)
 
 func award_clear(sector: int, difficulty: int, result := {}) -> Dictionary:
 	var previous := experience

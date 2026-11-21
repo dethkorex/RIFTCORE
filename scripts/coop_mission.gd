@@ -5,6 +5,8 @@ signal rewards_earned(xp: int, bolts: int, blueprints: Array, sector: int)
 signal operator_wiped
 
 const PLAYER := preload("res://scenes/actors/riftcore_player.tscn")
+const ReviveIndicators := preload("res://scripts/coop_revive_indicators.gd")
+const MissionMap := preload("res://scripts/mission_map.gd")
 const FactoryHUD := preload("res://scripts/factory_hud.gd")
 const UI := preload("res://scripts/rift_ui.gd")
 const Catalog := preload("res://scripts/sector_catalog.gd")
@@ -22,8 +24,10 @@ const StoryDialogue := preload("res://scripts/story_dialogue.gd")
 const CampaignDoor := preload("res://scripts/campaign_door.gd")
 const GateRelays := preload("res://scripts/gate_relays.gd")
 const INPUTS := [&"jump", &"dash", &"crouch", &"crouch_stick", &"shoot", &"melee", &"climb_down", &"swap_weapon", &"previous_suit", &"quick_0", &"quick_1", &"quick_2", &"quick_3", &"suit_fire", &"field_interact", &"guard"]
-const BUSTER_AIM_SHIFT := 11
-const BUSTER_AIM_MASK := 7 << BUSTER_AIM_SHIFT
+const LEGACY_BUSTER_AIM_SHIFT := 11
+const BUSTER_PITCH_SHIFT := 14
+const BUSTER_PITCH_MASK := 127 << BUSTER_PITCH_SHIFT
+const LEGACY_BUSTER_AIM_MASK := 7 << LEGACY_BUSTER_AIM_SHIFT
 const INPUT_ACT_SHIFT := 28
 const INPUT_ACT_MASK := 3 << INPUT_ACT_SHIFT
 const INPUT_SUSPENDED := 1 << 30
@@ -48,12 +52,6 @@ const DIFFICULTY_PER_GUEST := 0.25
 const XP_BONUS := 1.5
 const Profile := preload("res://scripts/rogue_profile.gd")
 
-const ManualSave := preload("res://scripts/manual_save_session.gd")
-var active_operator_slot := 0
-var next_operator_slot := 0
-var replacement_picker: PanelContainer
-var return_on_same_operator := false
-
 var host := false
 var roster: Array = []
 var local_index := 0
@@ -69,6 +67,7 @@ var challenges_completed := 0
 var reported_reserves_used: Dictionary = {}
 var persisted_reserves_used := 0
 var guest_reserves := 0
+var squad_reserves := PackedInt32Array()
 var relay_owner: Node
 var stage: Node3D
 var boss: Combatant
@@ -123,6 +122,7 @@ var partner_status: Label
 var camera: SideCameraRig
 var nameplates: Array[Label3D] = []
 var reboot_markers: Array[Label3D] = []
+var revive_indicators: ReviveIndicators
 var reboot_used := false
 var reboot_from := -1
 var reboot_target := -1
@@ -209,6 +209,7 @@ func _ready() -> void:
 		roster.push_front(peer.get_host())
 	local_index = roster.find(peer.get_client_id())
 	deployment_xp[local_index] = starting_xp
+	guest_reserves = local_profile.reserve_lives
 	for index in roster.size():
 		personal_rewards.append({"bolts": 0, "blueprints": [], "materials": {}, "supplies": {}})
 	difficulty = (1.0 + DIFFICULTY_PER_GUEST * (roster.size() - 1)) * Difficulty.combat_scale(sector, mode)
@@ -1266,6 +1267,12 @@ func show_field_briefing() -> void:
 func update_hud_title() -> void:
 	stage_title.text = "%s  /  ACT %s" % [Catalog.info(sector).title.to_upper(), "I" if act == 1 else "II"]
 
+func configure_mission_map(map: MissionMap) -> void:
+	map.stage_source = func(): return stage
+	map.operator = func(): return operators[local_index] if local_index < operators.size() else null
+	map.party_source = func(): return operators
+	map.names_source = func(): return nameplates.map(func(plate): return plate.text)
+
 func build_hud() -> void:
 	var layer := CanvasLayer.new()
 	add_child(layer)
@@ -1275,7 +1282,12 @@ func build_hud() -> void:
 	layer.add_child(personal_hud)
 	personal_hud.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	personal_hud.show_quick_slots(local_profile)
+	var minimap := MissionMap.new()
+	configure_mission_map(minimap)
+	minimap.place_in_hud(layer)
 	build_revive_meter(layer)
+	revive_indicators = ReviveIndicators.new()
+	layer.add_child(revive_indicators)
 	var panel := PanelContainer.new()
 	panel.theme = UI.theme()
 	panel.add_theme_stylebox_override("panel", UI.hud_frame(UI.CYAN, Vector2(13, 9), true))
@@ -1307,6 +1319,7 @@ func build_hud() -> void:
 	pause_menu = PauseMenu.new()
 	pause_menu.in_mission = true
 	pause_menu.profile = local_profile
+	pause_menu.configure_map = configure_mission_map
 	pause_menu.quick_edited = send_quick_config
 	pause_menu.operator = func(): return operators[local_index]
 	pause_menu.life_total = available_lives
@@ -1344,6 +1357,9 @@ func build_teammate_status() -> void:
 		var value := UI.label(heading, "", 18, UI.MUTED)
 		value.autowrap_mode = TextServer.AUTOWRAP_OFF
 		value.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		var lives := UI.label(heading, "", 15, UI.CYAN)
+		lives.autowrap_mode = TextServer.AUTOWRAP_OFF
+		lives.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		var bar := ProgressBar.new()
 		bar.custom_minimum_size.y = 7.0
 		bar.show_percentage = false
@@ -1353,7 +1369,7 @@ func build_teammate_status() -> void:
 		var fill := UI.profile_frame(Color("72e3a6"), Color.TRANSPARENT, Vector2.ZERO)
 		bar.add_theme_stylebox_override("fill", fill)
 		row.add_child(bar)
-		teammate_status.append({"name": name_label, "value": value, "bar": bar, "fill": fill, "microphone": microphone})
+		teammate_status.append({"name": name_label, "value": value, "lives": lives, "bar": bar, "fill": fill, "microphone": microphone})
 	partner_status = UI.label(content, "", 16, UI.CYAN)
 	partner_status.hide()
 
@@ -1375,7 +1391,10 @@ func update_teammate_status(index: int, display_name: String, status: String) ->
 	var fraction := clampf(teammate.health / maxf(teammate.max_health, 1.0), 0.0, 1.0)
 	row.name.text = display_name
 	row.name.tooltip_text = status
-	row.value.text = status if fraction <= 0.0 else "%d / %d HP" % [ceili(teammate.health), ceili(teammate.max_health)]
+	row.value.text = "DOWN" if fraction <= 0.0 else "%d / %d HP" % [ceili(teammate.health), ceili(teammate.max_health)]
+	var lives := available_lives(teammate)
+	row.lives.text = "%02d %s" % [lives, "LIFE" if lives == 1 else "LIVES"]
+	row.lives.add_theme_color_override("font_color", Color("ff6c76") if lives == 0 else UI.CYAN)
 	row.bar.set_value_no_signal(fraction * 100.0)
 	row.fill.bg_color = Color("ff6c76") if fraction <= 0.25 else Color("ffce75") if fraction <= 0.5 else Color("72e3a6")
 
@@ -1418,7 +1437,7 @@ func set_chat_open(open: bool) -> void:
 	set_local_controls_suspended(chat_open or is_pause_open() or suit_reveal_playing)
 
 func local_input_blocked() -> bool:
-	return chat_open or is_pause_open() or window_input_blocked or is_instance_valid(replacement_picker)
+	return chat_open or is_pause_open() or window_input_blocked
 
 func open_pause() -> void:
 	if local_input_blocked() or not outcome.is_empty() or changing_act or boss_intro_active or suit_reveal_playing:
@@ -1435,8 +1454,7 @@ func set_local_controls_suspended(suspended: bool) -> void:
 		send_input(true)
 
 func available_lives(operator: RiftPlayer) -> int:
-	var banked: int = local_profile.reserve_lives if host else guest_reserves
-	return operator.lives + banked
+	return operator.lives + remote_reserves_for(operators.find(operator))
 
 func record_guest_lives_spent(total: int) -> void:
 	var spent := total - persisted_reserves_used
@@ -1710,13 +1728,16 @@ func broadcast_state(reliable_operators := false) -> void:
 		var flags := int(operator.saber_equipped) | (int(operator.guarding) << 1)
 		flags |= (operator.guard_stage << 8) if operator.guarding else 0
 		if not operator.saber_equipped:
-			flags |= int(operator.buster_aim) << BUSTER_AIM_SHIFT
+			var pitch := roundi(rad_to_deg(operator.buster_pitch))
+			flags |= pitch << BUSTER_PITCH_SHIFT
+			# Older clients can still display an approximate upward pose.
+			flags |= (1 if pitch >= 68 else (2 if pitch > 0 else 0)) << LEGACY_BUSTER_AIM_SHIFT
 		players.back().append(flags)
 		if sector == 2:
 			var vine_index := canopy_vines.find(operator.jungle_vine) if is_instance_valid(operator.jungle_vine) else -1
 			players.back().append(Vector4(vine_index, operator.jungle_swing_time, operator.jungle_release_left, operator.jungle_grab_lock))
 		var swing := RiftPlayer.SWING_CLIPS.find(operator.current_animation) + 1
-		saber_states.append((flags & ~BUSTER_AIM_MASK) | (int(operator.saber_hold >= 0.0) << 2) | (swing << 3))
+		saber_states.append((flags & ~(BUSTER_PITCH_MASK | LEGACY_BUSTER_AIM_MASK)) | (int(operator.saber_hold >= 0.0) << 2) | (swing << 3))
 	# A short swing or guard transition can fit entirely between delivered UDP snapshots.
 	# Send transitions reliably, while movement and charge intensity continue at the normal rate.
 	if saber_states != last_saber_states:
@@ -1777,13 +1798,16 @@ func broadcast_state(reliable_operators := false) -> void:
 		else:
 			boss_state[13] = [boss.facing, boss.armor.rotation.y]
 	state_sequence += 1
+	var reserves := PackedInt32Array()
+	for index in roster.size():
+		reserves.append(remote_reserves_for(index))
 	for index in range(1, roster.size()):
 		var snapshot := players.duplicate()
 		for other in players.size():
 			if other != index:
 				snapshot[other] = players[other].slice(0, 11) + [players[other][16], players[other][17], players[other].slice(20, 23), players[other][24]]
 		var totals := [personal_rewards[index].bolts, operators[index].recovered_blueprints.size(), sector_seconds, remote_players[roster[index]].input, operators[index].get_meta(&"coop_position_revision", 0)]
-		totals.append_array([reported_reserves_used.get(index, 0), remote_players[roster[index]].profile.reserve_lives])
+		totals.append_array([reported_reserves_used.get(index, 0), reserves[index], reserves])
 		if reliable_operators:
 			peer.call_func_on(roster[index], receive_operators, act, snapshot, state_sequence, totals)
 		else:
@@ -1954,6 +1978,8 @@ func receive_operators(remote_act: int, players: Array, sequence: int, rewards: 
 	if rewards.size() > 6:
 		record_guest_lives_spent(int(rewards[5]))
 		guest_reserves = int(rewards[6])
+	if rewards.size() > 7 and rewards[7] is PackedInt32Array and rewards[7].size() == roster.size():
+		squad_reserves = rewards[7]
 	if rewards.size() > 2 and is_finite(float(rewards[2])):
 		sector_seconds = maxf(sector_seconds, float(rewards[2]))
 	if rewards.size() > 3:
@@ -2034,11 +2060,14 @@ func apply_operator_state(operator: RiftPlayer, data: Array, is_local: bool) -> 
 	var combat_flags := int(data[24]) if data.size() > 24 else (int(data[14]) if data.size() == 15 else 0)
 	operator.saber_equipped = bool(combat_flags & 1)
 	if operator.buster_pose:
-		var previous_aim := operator.buster_aim
-		var aim := ((combat_flags & BUSTER_AIM_MASK) >> BUSTER_AIM_SHIFT) as RiftPlayer.BusterAim
-		operator.present_buster_aim(aim, data[5])
-		if not is_local and (previous_aim != RiftPlayer.BusterAim.SIDE or aim != RiftPlayer.BusterAim.SIDE):
-			operator.buster_pose.influence = float(aim != RiftPlayer.BusterAim.SIDE)
+		var was_aiming_up := not is_zero_approx(operator.buster_pitch)
+		var pitch := (combat_flags & BUSTER_PITCH_MASK) >> BUSTER_PITCH_SHIFT
+		if pitch == 0:
+			var legacy := (combat_flags & LEGACY_BUSTER_AIM_MASK) >> LEGACY_BUSTER_AIM_SHIFT
+			pitch = 90 if legacy == 1 else (45 if legacy == 2 else 0)
+		operator.present_buster_pitch(deg_to_rad(pitch), data[5])
+		if not is_local and (was_aiming_up or pitch > 0):
+			operator.buster_pose.influence = float(pitch > 0)
 	if combat_flags & 2 and operator.health > 0.0 and operator.saber_equipped:
 		operator.show_guard(mini(2, (combat_flags >> 8) & 3))
 	else:
@@ -2134,7 +2163,6 @@ func _process(delta: float) -> void:
 		preload("res://scripts/coop_corpse.gd").present(actor)
 	update_revive_meter()
 	var local := operators[local_index]
-	update_replacement_picker(local)
 	if sector == 1 and act == 1:
 		FoundryModule.update_prompt(stage, local)
 	if not boss_intro_active and not changing_act and not suit_reveal_playing:
@@ -2146,12 +2174,13 @@ func _process(delta: float) -> void:
 			camera.target = survivor if survivor else local
 		if camera.target != previous_target:
 			camera.snap_to_target()
+	var view := camera.get_node("Camera3D") as Camera3D
+	update_revive_indicators(view, local)
 	hud_clock += delta
 	if hud_clock < HUD_INTERVAL:
 		return
 	hud_clock = fmod(hud_clock, HUD_INTERVAL)
 	var teammates := PackedStringArray()
-	var view := camera.get_node("Camera3D") as Camera3D
 	for index in operators.size():
 		var plate := nameplates[index]
 		var display_name := plate.text
@@ -2171,7 +2200,7 @@ func _process(delta: float) -> void:
 		var status := "Nearby"
 		if teammate.health <= 0.0:
 			status = "Down · revive available"
-		elif teammate.lives<=0:
+		elif available_lives(teammate) <= 0:
 			status = "No spare lives"
 		elif not get_viewport().get_visible_rect().has_point(view.unproject_position(teammate.global_position)):
 			status = "%s %.0f m" % ["←" if offset < 0.0 else "→", absf(offset)]
@@ -2200,10 +2229,27 @@ func _process(delta: float) -> void:
 	stats.text = "Security %d left  ·  %d blueprints" % [security_left, blueprints]
 	update_personal_hud(operators[local_index])
 
+func update_revive_indicators(view: Camera3D, local: RiftPlayer) -> void:
+	revive_indicators.begin_frame()
+	if not reboot_available() or local.health <= 0.0 or local_input_blocked():
+		return
+	for index in operators.size():
+		var teammate := operators[index]
+		if teammate.health > 0.0 or not teammate.has_meta("coop_down"):
+			continue
+		var plate := nameplates[index]
+		var at := teammate.get_global_transform_interpolated().origin
+		revive_indicators.point_to(view.unproject_position(at), plate.text,
+			local.global_position.distance_to(at), plate.modulate)
+
 func remote_reserves_for(index: int) -> int:
+	if index < 0:
+		return 0
 	if index == local_index:
-		return local_profile.reserve_lives
-	return remote_players[roster[index]].profile.reserve_lives
+		return local_profile.reserve_lives if host else guest_reserves
+	if host:
+		return remote_players[roster[index]].profile.reserve_lives
+	return squad_reserves[index] if index < squad_reserves.size() else 0
 
 func challenge_results(index := 0) -> Dictionary:
 	if not extracted_results.is_empty() or not host:
@@ -2324,9 +2370,6 @@ func keep_recovered_blueprints(blueprints: Array) -> int:
 func finish_mission(success: bool, xp: int, bolts: int, blueprints: Array, exhausted_lives := false, party_wiped := false) -> void:
 	if not outcome.is_empty():
 		return
-	return_on_same_operator = party_wiped
-	if party_wiped:
-		next_operator_slot = 0
 	var party_extracted := success or not squad_rewards.is_empty()
 	success = success and not exhausted_lives
 	var message := "Mission failed. The party ran out of lives."
@@ -2368,7 +2411,7 @@ func finish_mission(success: bool, xp: int, bolts: int, blueprints: Array, exhau
 				UI.label(rewards_status.get_parent(), "ACHIEVEMENT UNLOCKED  ·  +%d GAMER SCORE" % points, 17, UI.VIOLET)
 		rewards_status.text = "Recovered items sent to Storage. Save at the System pad to keep your rewards."
 		if extracted_results.get("banked_shards", 0) > 0:
-			rewards_status.text += "\nExtraction · +%d Core Shards." % extracted_results.banked_shards
+			rewards_status.text += "\nExtraction · +%s Core Shards." % UI.shard_amount(extracted_results.banked_shards)
 		if challenges_completed > 0:
 			rewards_status.text += "\nClaim your challenge rewards in Challenges at the station."
 		if extracted_results.get("talent_packs", 0) > 0:
@@ -2527,45 +2570,6 @@ func _unhandled_input(event: InputEvent) -> void:
 		else:
 			get_viewport().set_input_as_handled()
 			peer.call_func_on(peer.get_host(), receive_gate_relay_request, act)
-
-func update_replacement_picker(local: RiftPlayer) -> void:
-	if local.health > 0 or local.lives > 0 or not outcome.is_empty():
-		if local.health > 0 or local.lives > 0:
-			next_operator_slot = 0
-		if is_instance_valid(replacement_picker):
-			replacement_picker.queue_free()
-			replacement_picker = null
-		return
-	if next_operator_slot > 0 or is_instance_valid(replacement_picker) or active_operator_slot <= 0:
-		return
-	replacement_picker = PanelContainer.new()
-	replacement_picker.theme = UI.theme()
-	replacement_picker.add_theme_stylebox_override("panel", UI.hud_frame(UI.CYAN, Vector2(16, 9), true))
-	personal_hud.get_parent().add_child(replacement_picker)
-	replacement_picker.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
-	replacement_picker.offset_left = -205
-	replacement_picker.offset_right = 205
-	replacement_picker.offset_top = -110
-	var stack := UI.column(replacement_picker, 6)
-	UI.label(stack, "SELECT NEXT OPERATOR", 25, UI.CYAN)
-	UI.label(stack, "Choose a slot for the next deployment. Your squad can still revive you.", 17)
-	var first: Button
-	for number in range(1, ManualSave.SLOT_COUNT + 1):
-		if number == active_operator_slot:
-			continue
-		var saved := ManualSave.read_slot(number)
-		var caption := "Use Operator %02d" % number if saved else "Create Operator in Slot %02d" % number
-		var button := UI.button(stack, caption, select_replacement.bind(number), false, 34)
-		if not first:
-			first = button
-	if first:
-		first.grab_focus()
-
-func select_replacement(number: int) -> void:
-	next_operator_slot = number
-	if is_instance_valid(replacement_picker):
-		replacement_picker.queue_free()
-		replacement_picker = null
 
 func build_revive_meter(layer: CanvasLayer) -> void:
 	revive_panel = PanelContainer.new()

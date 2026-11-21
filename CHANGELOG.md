@@ -1,18 +1,16 @@
-# RIFTCORE Alpha 6.3.43
+# RIFTCORE Alpha 6.3.44
 
-## Co-op
-- Deploy together after a 5-to-0 countdown with audio cues. Everyone sees the RIFTCORE loading screen before entering the mission, with a retry if the host is still loading when a guest sends their loadout.
-- Review each operator’s rewards at extraction and return to the Operations Hub as a party. A party wipe keeps everyone on their current operator slot.
-- Party members can activate switches. The Ember Foundry lava shaft opens once both relays are active and the whole party is at the door.
-- Fixed guest gunfire audio, mini-boss dialogue, and cosmetic finishes appearing on the wrong operator. Co-op now sends fewer redundant updates and handles movement corrections more smoothly.
+## Co-op and the Operations Hub
+- When you lose your last life, spectate a surviving teammate and wait for a revive. A full wipe returns everyone to the hub on their current operator slot.
+- The squad HUD shows each teammate’s total lives, including banked reserves. Screen-edge arrows point toward downed allies and show their distance.
+- The holographic minimap tracks the squad. Open the Map tab from the pause or inventory panel for a larger view of the current act.
+- Press Tab or controller Select in the hub to open Inventory. Drop carried blueprints, materials, or quick-use items for teammates to pick up. Storage has a Move to Inventory action for stored items.
 
-## Combat and sectors
-- The buster can fire straight up or down and at upward or downward angles.
-- Saber Block changes color only when it absorbs a hit. The third blocked hit breaks the shield, and it recovers after 10 seconds.
-- Fixed a blocked route in Machine Jungle and adjusted the hitboxes on its plant and flame enemies. Improved camera and operator movement between physics ticks.
+## Progression
+- Successful extractions award 25% more base Core Shards. Individual challenges and full-set bonuses award 50% more.
+- Core Ascension ranks cost 15% less. Profile XP per clear is about 47% higher to match the new extraction purchasing power.
 
-## Operators and tutorials
-- Operator slots share storage, blueprints, and talents. Resetting the profile clears shared progress.
-- Rebalanced cosmetic finish requirements and reset finish unlocks for the new requirements.
-- New operators watch the opening cinematic before meeting Nova in the Operations Hub and starting the station tour.
-- Reused the RIFTCORE loading screen for mission transitions.
+## Controls and presentation
+- Aim the Buster anywhere from horizontal to straight overhead with the left stick. Crouch to fire a low, horizontal shot.
+- Hold crouch and press B to drop through compatible decks. Cleared overlapping decorative rock from Ember Foundry’s playable paths.
+- Video Settings now has Extended Fullscreen for ultrawide monitors. Pause, hub, and settings buttons use the same visual style.

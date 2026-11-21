@@ -31,7 +31,7 @@ var energy_capacity := 75.0
 var displayed_health_capacity := 80.0
 var displayed_energy_capacity := 75.0
 var credits := 0
-var core_shards := 0
+var core_shards := 0.0
 var experience := 0
 var animated_xp := 0.0
 var xp_tween: Tween
@@ -457,7 +457,7 @@ func draw_resources(at: Vector2) -> void:
 	caption(at + Vector2(40, 23), "BOLTS", 17, UI.MUTED)
 	caption(at + Vector2(40, 51), "CORE SHARDS", 17, UI.MUTED)
 	var bolt_count := "%04d" % credits
-	var shard_count := "%04d" % core_shards
+	var shard_count := UI.shard_amount(core_shards, 4)
 	caption(at + Vector2(204 - text_width(bolt_count, 19), 24), bolt_count, 19, Color("ffd481"))
 	caption(at + Vector2(204 - text_width(shard_count, 19), 52), shard_count, 19, Color("d7b0ff"))
 	draw_line(at + Vector2(12, 32), at + Vector2(207, 32), Color("284861"))

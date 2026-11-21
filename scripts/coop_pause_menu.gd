@@ -10,6 +10,7 @@ const OperatorPanel := preload("res://scripts/pause_operator_panel.gd")
 var in_mission := false
 var operator: Callable
 var life_total: Callable
+var configure_map: Callable
 var quick_edited: Callable
 var profile
 var menu: Control
@@ -58,6 +59,7 @@ func _ready() -> void:
 		operator_panel.operator = operator
 		operator_panel.life_total = life_total
 		operator_panel.profile = profile
+		operator_panel.configure_map = configure_map
 		operator_panel.quick_edited = quick_edited
 		layout.add_child(operator_panel)
 		menu.sections = operator_panel.sections
@@ -68,7 +70,6 @@ func _ready() -> void:
 	UI.label(content, hint, 17, UI.MUTED)
 	actions = UI.column(content, 8)
 	resume_button = UI.button(actions, "Resume", close, true)
-	UI.profile_button(resume_button, true)
 	menu.first_focus = resume_button
 	settings_button = UI.button(actions, "Settings", show_settings)
 	UI.button(actions, "Leave Mission…" if in_mission else "Leave Party…", show_confirmation.bind(true))
@@ -101,6 +102,7 @@ func show_confirmation(enabled: bool) -> void:
 func show_settings() -> void:
 	pause_layout.hide()
 	settings_page = PanelContainer.new()
+	settings_page.add_theme_stylebox_override("panel", UI.hud_frame(UI.CYAN, Vector2(16, 12), true))
 	menu.add_child(settings_page)
 	settings_page.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	settings_page.offset_left = 60

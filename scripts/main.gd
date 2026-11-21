@@ -1,6 +1,7 @@
 extends Node
 
 const PauseOperator := preload("res://scripts/pause_operator_panel.gd")
+const MissionMap := preload("res://scripts/mission_map.gd")
 const Story := preload("res://scripts/rift_story.gd")
 const StoryDialogue := preload("res://scripts/story_dialogue.gd")
 const UI := preload("res://scripts/rift_ui.gd")
@@ -85,7 +86,6 @@ var chat: WhisperOverlay
 var account: PlayerAccount
 var achievement_toast: AchievementToast
 var progress_reset_error := OK
-var choosing_after_coop_loss := false
 var coop_mission: Node3D
 var coop_join_loading: CanvasLayer
 var countdown_layer: CanvasLayer
@@ -131,6 +131,7 @@ func _ready() -> void:
 		or get_tree().has_group(&"interactive_dialogue"))
 	add_child(pointer)
 	RiftRelay.invite_received.connect(show_friend_invite)
+	RiftRelay.hub_item_refund.connect(refund_hub_item)
 	RiftRelay.directory.gamer_score_changed.connect(sync_achievement_finishes)
 	RiftRelay.directory.friend_request_received.connect(show_friend_request)
 	var arguments := OS.get_cmdline_user_args()
@@ -367,6 +368,9 @@ func verify_live_relay(arguments: PackedStringArray) -> void:
 		finish_relay_check(await wait_for_relay(func(): return peer.lobby_get_data("rift_check_ack", false), 15.0))
 
 func verify_coop_mission(host: bool, smoke_sector: int, wipe_test := false) -> void:
+	if wipe_test:
+		save_session = ManualSave.new(2 if host else 3)
+		save_session.profile = profile
 	var countdown: Array[int] = []
 	RiftRelay.deployment_countdown.connect(func(number: int, remaining: int):
 		if number == smoke_sector and remaining >= 0:
@@ -396,11 +400,11 @@ func verify_coop_mission(host: bool, smoke_sector: int, wipe_test := false) -> v
 		await get_tree().create_timer(0.8).timeout
 		Input.action_release("move_right")
 		RiftRelay.relay.lobby_set_data("coop_guest_in_hub", not RiftRelay.can_deploy())
-		if not await wait_for_relay(func(): return profile.blueprint_items.has("bp_01_02"), 10.0):
-			print("Campaign check failed blueprint pickup")
+		if not await wait_for_relay(func(): return profile.blueprint_pouch.has("bp_01_02") and profile.inventory.get("patch_kit", 0) == 2 and profile.carried_materials.get("scrap", 0) == 3, 12.0):
+			print("Campaign check failed to pick up all three shared item types")
 			finish_relay_check(false)
 			return
-		RiftRelay.relay.lobby_set_data("coop_blueprint_received", true)
+		RiftRelay.relay.lobby_set_data("coop_hub_items_received", true)
 	else:
 		var together := await wait_for_relay(func(): return home_hub.partners.values().any(func(entry): return entry.actor.position.x > 2.0) and RiftRelay.relay.lobby_get_data("coop_guest_in_hub", false), 8.0)
 		if not together:
@@ -410,9 +414,13 @@ func verify_coop_mission(host: bool, smoke_sector: int, wipe_test := false) -> v
 		home_hub.avatar.position.x = home_hub.partners.values()[0].x
 		profile.collect_blueprint("bp_01_02")
 		profile.move_blueprint_to_pouch("bp_01_02")
-		drop_hub_blueprint("bp_01_02")
-		if profile.blueprint_pouch.has("bp_01_02") or not await wait_for_relay(func(): return RiftRelay.relay.lobby_get_data("coop_blueprint_received", false), 10.0):
-			print("Campaign check failed blueprint handoff")
+		profile.inventory["patch_kit"] = 2
+		profile.carried_materials["scrap"] = 3
+		drop_hub_item("blueprint/bp_01_02", 1)
+		drop_hub_item("patch_kit", 2)
+		drop_hub_item("material_scrap", 3)
+		if not profile.blueprint_pouch.is_empty() or not await wait_for_relay(func(): return RiftRelay.relay.lobby_get_data("coop_hub_items_received", false), 10.0):
+			print("Campaign check failed to share inventory items")
 			finish_relay_check(false)
 			return
 		RiftRelay.deploy(smoke_sector)
@@ -557,6 +565,7 @@ func verify_frozen_coop_board(operator: RiftPlayer, mission: Node) -> bool:
 	return ok
 
 func verify_coop_wipe(host: bool, mission: Node) -> void:
+	var active_session := save_session
 	var room := RiftRelay.connected_room
 	var previous_xp: int = profile.player_xp
 	profile.gear["pulse_lens"] = "equipped"
@@ -574,12 +583,25 @@ func verify_coop_wipe(host: bool, mission: Node) -> void:
 		for operator in mission.operators:
 			operator.gain_experience(650, false)
 			operator.lives = 1
-			mission.respawn_operator(operator)
+		mission.respawn_operator(mission.operators[1])
+		if not await wait_for_relay(func(): return RiftRelay.relay.lobby_get_data("coop_guest_spectating", false), 10.0):
+			print("Party wipe check could not confirm guest spectating")
+			finish_relay_check(false)
+			return
+		mission.respawn_operator(mission.operators[0])
 	else:
 		RiftRelay.relay.lobby_set_data("coop_wipe_ready", true)
+		var guest: RiftPlayer = mission.operators[1]
+		var ally: RiftPlayer = mission.operators[0]
+		if not await wait_for_relay(func(): return guest.health <= 0.0 and guest.lives == 0 and mission.camera.target == ally, 10.0) \
+				or mission.local_input_blocked() or not mission.outcome.is_empty():
+			print("Party wipe check could not spectate a teammate on the last life")
+			finish_relay_check(false)
+			return
+		RiftRelay.relay.lobby_set_data("coop_guest_spectating", true)
 	var returned := await wait_for_relay(func(): return is_instance_valid(home_hub) and not RiftRelay.mission_active, 15.0)
 	var reset := returned and RiftRelay.connected_room == room and RiftRelay.room_size == 2
-	reset = reset and profile.operator_level == 1 and read_checkpoint() == null
+	reset = reset and save_session == active_session and profile.operator_level == 1 and read_checkpoint() == null
 	reset = reset and not profile.gear.has("pulse_lens") and profile.gear.get("impact_liner", "") == "stored"
 	reset = reset and profile.core_shards == 17 and profile.credits == 113 and profile.player_xp == previous_xp
 	if not host and reset:
@@ -590,7 +612,7 @@ func verify_coop_wipe(host: bool, mission: Node) -> void:
 		if reset:
 			RiftRelay.relay.lobby_set_data("coop_wipe_confirmed", true)
 			await get_tree().create_timer(1.3).timeout
-	print("LIVE PARTY WIPE ", reset, " / same room, Lv. 1 and permanent progress")
+	print("LIVE PARTY WIPE ", reset, " / same room and operator slot, Lv. 1 and permanent progress")
 	finish_relay_check(reset)
 
 func verify_coop_input_isolation(mission: Node, local_index: int) -> bool:
@@ -954,7 +976,7 @@ func show_main_menu() -> void:
 	menu.start_requested.connect(start_game)
 	menu.load_requested.connect(load_game)
 	menu.hub_requested.connect(open_home_hub)
-	menu.blueprint_drop_requested.connect(drop_hub_blueprint)
+	menu.hub_drop_requested.connect(drop_hub_item)
 	menu.station_closed.connect(close_station_panel)
 	menu.sector_requested.connect(deploy_selected_sector)
 	menu.slot_requested.connect(select_save_slot)
@@ -1049,7 +1071,6 @@ func start_coop_mission(is_host: bool, number: int) -> void:
 	coop_mission.local_profile = profile
 	coop_mission.local_appearance.assign([current_operator_frame(), current_armor_finish()])
 	if save_session:
-		coop_mission.active_operator_slot = save_session.slot
 		coop_mission.persist_challenges = save_session.persist_challenge_progress
 		coop_mission.persist_reserves = save_session.persist_reserve_lives
 	coop_mission.relay_owner = RiftRelay
@@ -1136,12 +1157,10 @@ func bank_coop_rewards(xp: int, bolts: int, blueprints: Array, number: int) -> v
 func close_coop_mission(message: String) -> void:
 	if not is_instance_valid(coop_mission):
 		return
-	var selected_slot: int = coop_mission.next_operator_slot
-	var keep_operator: bool = coop_mission.return_on_same_operator
 	var local: RiftPlayer = coop_mission.operators[coop_mission.local_index] if coop_mission.operators.size() > coop_mission.local_index else null
-	choosing_after_coop_loss = is_instance_valid(local) and local.lives <= 0 and local.health <= 0
+	var exhausted := is_instance_valid(local) and local.lives <= 0 and local.health <= 0
 	profile.finish_field_supplies({}, false)
-	if coop_mission.outcome.is_empty() and choosing_after_coop_loss:
+	if coop_mission.outcome.is_empty() and exhausted:
 		coop_mission.keep_recovered_blueprints(coop_mission.recovered_blueprint_ids(coop_mission.local_index))
 		reset_defeated_run()
 	remove_child(coop_mission)
@@ -1151,14 +1170,7 @@ func close_coop_mission(message: String) -> void:
 		shot.queue_free()
 	open_home_hub()
 	RiftAudio.play_music(false)
-	if keep_operator:
-		choosing_after_coop_loss = false
-		return
-	if choosing_after_coop_loss:
-		home_hub.station_requested.emit("Operators")
-		if selected_slot > 0:
-			select_save_slot(selected_slot, ManualSave.read_slot(selected_slot) == null)
-	elif RiftRelay.connected_room.is_empty():
+	if RiftRelay.connected_room.is_empty():
 		home_hub.station_requested.emit("Social")
 		menu.show_page("Party")
 		menu.relay_status.text = message
@@ -1354,8 +1366,7 @@ func select_save_slot(number: int, fresh: bool, operator_name := "") -> void:
 			account.operator_frames.erase(number)
 		account.last_operator = number
 		account.save()
-	var play_prologue := fresh and not choosing_after_coop_loss and RiftRelay.connected_room.is_empty() and DisplayServer.get_name() != "headless"
-	choosing_after_coop_loss = false
+	var play_prologue := fresh and RiftRelay.connected_room.is_empty() and DisplayServer.get_name() != "headless"
 	if play_prologue:
 		menu.hide()
 		menu.process_mode = Node.PROCESS_MODE_DISABLED
@@ -1511,7 +1522,7 @@ func open_home_hub() -> void:
 	home_hub.profile = profile
 	home_hub.initial_finish = current_armor_finish()
 	home_hub.initial_frame = current_operator_frame()
-	home_hub.persist_blueprint_trade = persist_blueprint_trade
+	home_hub.persist_hub_inventory = persist_hub_inventory
 	add_child(home_hub)
 	home_hub.set_bank(profile.credits, profile.core_shards, profile.player_level())
 	home_hub.station_requested.connect(func(page: String):
@@ -1534,23 +1545,31 @@ func open_home_hub() -> void:
 		menu.show_page("Title")
 	)
 
-func drop_hub_blueprint(id: String) -> void:
-	if not is_instance_valid(home_hub) or not profile.blueprint_pouch.has(id) or not RiftRelay.can_share_blueprints():
+func drop_hub_item(item: String, quantity: int) -> void:
+	if not is_instance_valid(home_hub) or not RiftRelay.can_share_hub_items():
 		return
-	var slot := profile.blueprint_pouch.find(id)
-	profile.blueprint_pouch.remove_at(slot)
-	RiftRelay.send_station_position(home_hub.avatar.position.x, home_hub.avatar.model_root.rotation.y, "idle")
-	if persist_blueprint_trade() != OK or not RiftRelay.drop_blueprint(id, home_hub.avatar.position.x):
-		profile.blueprint_pouch.insert(slot, id)
-		persist_blueprint_trade()
-		menu.inventory_status = "Could not drop the blueprint."
-		menu.show_page("Storage")
+	if not profile.change_hub_inventory(item, -quantity, persist_hub_inventory):
+		menu.inventory_status = "Could not drop the item."
+		menu.show_page("Inventory")
+		return
+	var avatar: RiftPlayer = home_hub.avatar
+	RiftRelay.send_station_position(avatar.position.x, avatar.model_root.rotation.y, "idle")
+	if not RiftRelay.drop_hub_item(item, quantity, avatar.position.x):
+		refund_hub_item(item, quantity)
+		menu.inventory_status = "Could not drop the item."
+		menu.show_page("Inventory")
 		return
 	menu.hide()
 	close_station_panel()
 
-func persist_blueprint_trade() -> Error:
-	return save_session.persist_blueprint_trade() if save_session else profile.save()
+func refund_hub_item(item: String, quantity: int) -> void:
+	if not profile.refund_hub_item(item, quantity, persist_hub_inventory):
+		push_warning("Could not save the returned party item.")
+
+func persist_hub_inventory() -> Error:
+	if save_session and save_session.owns_slot:
+		return persist_operator_save()
+	return profile.save()
 
 func close_station_panel() -> void:
 	if is_instance_valid(home_hub):
@@ -1560,7 +1579,7 @@ func close_station_panel() -> void:
 		RiftRelay.publish_operator_appearance(frame, finish)
 	menu.process_mode = Node.PROCESS_MODE_DISABLED
 	if is_instance_valid(home_hub):
-		if save_session and save_session.owns_slot and menu.page in ["Shop", "Gear", "Storage", "Fabrication", "Upgrades", "Craft Item", "Learn Blueprint", "Blueprint Details"]:
+		if save_session and save_session.owns_slot and menu.page in ["Shop", "Gear", "Inventory", "Storage", "Fabrication", "Upgrades", "Craft Item", "Learn Blueprint", "Blueprint Details"]:
 			if persist_operator_save() != OK:
 				push_warning("Could not save the station inventory change.")
 		home_hub.set_bank(profile.credits, profile.core_shards, profile.player_level())
@@ -1838,6 +1857,7 @@ func build_pause_menu() -> void:
 	readout.operator = func(): return player
 	readout.life_total = func(actor: RiftPlayer): return actor.lives + profile.reserve_lives
 	readout.profile = profile
+	readout.configure_map = configure_mission_map
 	layout.add_child(readout)
 	pause_menu.sections = readout.sections
 	UI.label(stack, "PAUSED", 36, UI.CYAN)
@@ -2071,6 +2091,10 @@ func reveal_suit(info: Dictionary) -> void:
 	player.set_controls_suspended(suspended)
 	suit_reveal_active = false
 
+func configure_mission_map(map: MissionMap) -> void:
+	map.stage_source = func(): return game_root
+	map.operator = func(): return player
+
 func build_hud() -> void:
 	hud = CanvasLayer.new()
 	add_child(hud)
@@ -2086,6 +2110,9 @@ func build_hud() -> void:
 	hud.add_child(factory_hud)
 	factory_hud.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	factory_hud.show_quick_slots(profile)
+	var minimap := MissionMap.new()
+	configure_mission_map(minimap)
+	minimap.place_in_hud(hud)
 	factory_hud.add_field_lessons(sector, act, can_open_chat)
 	var lessons := preload("res://scripts/pickup_lessons.gd").new()
 	hud.add_child(lessons)

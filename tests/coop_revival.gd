@@ -156,21 +156,35 @@ func run() -> void:
 	mission.record_guest_lives_spent(1)
 	mission.record_guest_lives_spent(1)
 	check(mission.local_profile.reserve_lives == 1, "Repeated reserve confirmations charge the guest only once")
-	mission.active_operator_slot = 1
-	var overlay := CanvasLayer.new()
-	mission.add_child(overlay)
 	mission.personal_hud = load("res://scripts/factory_hud.gd").new()
-	mission.personal_hud.local_operator = fallen
-	overlay.add_child(mission.personal_hud)
-	fallen.health = 0
-	fallen.lives = 0
-	mission.update_replacement_picker(fallen)
-	check(is_instance_valid(mission.replacement_picker), "Last local life opens the operator slots")
-	mission.select_replacement(2)
-	check(mission.next_operator_slot == 2 and fallen.health == 0, "Selecting a replacement preserves the current squad mission")
-	fallen.health = 10
-	mission.update_replacement_picker(fallen)
-	check(mission.next_operator_slot == 0, "A successful teammate reboot keeps the active operator")
+	mission.personal_hud.coop = true
+	layer.add_child(mission.personal_hud)
+	mission.build_teammate_status()
+	guest_profile.reserve_lives = 4
+	mission.remote_players[12] = {"profile": guest_profile}
+	mission.update_teammate_status(1, "Guest RX", "Nearby")
+	check(mission.teammate_status[1].lives.text == "05 LIVES", "The host sees a teammate's field and reserve lives")
+	mission.host = false
+	mission.squad_reserves = PackedInt32Array([0, 4])
+	mission.update_teammate_status(1, "Guest RX", "Nearby")
+	check(mission.teammate_status[1].lives.text == "05 LIVES", "Other clients show the same teammate life count")
+	var guide = load("res://scripts/coop_revive_indicators.gd").new()
+	layer.add_child(guide)
+	guide.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	guide.size = Vector2(1280, 720)
+	guide.point_to(Vector2(1450, 400), "RX-02", 16, Color.CYAN)
+	guide.point_to(Vector2(1450, 400), "RX-03", 18, Color.VIOLET)
+	guide.point_to(Vector2(600, 380), "On Screen", 3, Color.WHITE)
+	check(guide.markers.size() == 2, "Only offscreen revive targets get directional cards")
+	var first: Rect2 = guide.markers[0].bounds
+	var second: Rect2 = guide.markers[1].bounds
+	check(not first.intersects(second) and cos(guide.markers[0].angle) > 0.98,
+		"Multiple downed allies in one direction get distinct, correctly oriented arrows")
+	guide.begin_frame()
+	guide.point_to(Vector2(620, -110), "RX-04", 26, Color.CYAN)
+	check(guide.markers.size() == 1 and sin(guide.markers[0].angle) < -0.98, "The arrow can point up to a different elevation")
+	guide.begin_frame()
+	check(guide.markers.is_empty(), "Resolved revive targets clear their directional cards")
 	mission.peer.free()
 	mission.queue_free()
 	await process_frame

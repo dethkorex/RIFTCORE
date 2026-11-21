@@ -5,6 +5,7 @@ const NORMAL := 0
 const HARD := 1
 const NIGHTMARE := 2
 const PLAYER_LEVEL_CAP := 50
+const EXTRACTION_SHARD_PERCENT := 125
 const COMBAT := [1.10, 1.68, 3.0]
 const ENEMY_SPEED := [1.08, 1.14, 1.21]
 const LOOT := [1.0, 1.65, 3.2]
@@ -47,6 +48,6 @@ static func windup_time(base: float, mode: int, minimum: float = 0.42) -> float:
 static func boss_pursuit_scale(mode: int, miniboss := false) -> float:
 	return [1.14, 1.24, 1.35][index(mode)] if miniboss else [1.0, 1.09, 1.17][index(mode)]
 
-static func extraction_shards(sector: int, mode: int) -> int:
-	# Early sectors earn two on Normal. Later sectors and higher difficulties pay more.
-	return 2 + (sector - 1) / 4 + index(mode)
+static func extraction_shards(sector: int, mode: int) -> float:
+	var base := 2 + (sector - 1) / 4 + index(mode)
+	return base * EXTRACTION_SHARD_PERCENT / 100.0

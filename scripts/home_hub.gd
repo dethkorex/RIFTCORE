@@ -26,11 +26,12 @@ const STATIONS := [
 	{"x": 18.0, "name": "NOVA Archive", "page": "Collection", "color": Color("81ffe8"), "prop": "service_kiosk", "icon": "icon_archive"},
 ]
 
-const BlueprintOrb := preload("res://scripts/pickup_orb_visual.gd")
+const Profile := preload("res://scripts/rogue_profile.gd")
 var profile: RefCounted
-var persist_blueprint_trade: Callable
-var blueprint_visuals: Dictionary = {}
-var blueprint_requests: Dictionary = {}
+var persist_hub_inventory: Callable
+var pickup_receipts: Dictionary[String, bool] = {}
+var hub_item_visuals: Dictionary = {}
+var hub_item_requests: Dictionary = {}
 var avatar: RiftPlayer
 var initial_finish := ""
 var initial_frame := ""
@@ -107,11 +108,10 @@ func _ready() -> void:
 		RiftRelay.leave()
 	)
 	add_child(pause_menu)
-	RiftRelay.blueprint_drop_changed.connect(update_blueprint_drop)
-	RiftRelay.blueprint_received.connect(receive_blueprint)
-	for key in RiftRelay.blueprint_drops:
-		var offer: Dictionary = RiftRelay.blueprint_drops[key]
-		update_blueprint_drop(key, offer.id, offer.owner, offer.x)
+	RiftRelay.hub_item_changed.connect(update_hub_item)
+	RiftRelay.hub_item_delivery.connect(receive_hub_item)
+	for key in RiftRelay.hub_drops:
+		update_hub_item(key, RiftRelay.hub_drops[key])
 	RiftRelay.partner_moved.connect(update_partner)
 	RiftRelay.changed.connect(refresh_partner_room)
 	refresh_partner_room()
@@ -410,7 +410,7 @@ func _process(delta: float) -> void:
 		station_sync = 0.0
 		var animation := avatar.current_animation if avatar.current_animation in ["idle", "walk", "run"] else "idle"
 		RiftRelay.send_station_position(avatar.position.x, avatar.model_root.rotation.y, animation)
-		check_blueprint_pickups()
+		check_hub_item_pickups()
 	for index in range(pads.size()):
 		var pad := pads[index]
 		var active := index == current_station
@@ -499,10 +499,10 @@ func set_panel_open(open: bool) -> void:
 	if not open:
 		announce_shop_restock.call_deferred()
 
-func set_bank(amount: int, shards: int, level: int) -> void:
+func set_bank(amount: int, shards: float, level: int) -> void:
 	bank_label.text = "RX-07   /   PLAYER %02d" % level
 	bolts_label.text = "%04d BOLTS" % amount
-	shards_label.text = "%04d CORE SHARDS" % shards
+	shards_label.text = "%s CORE SHARDS" % UI.shard_amount(shards, 4)
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventJoypadButton or (event is InputEventJoypadMotion and absf(event.axis_value) > 0.28):
@@ -519,6 +519,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if panel_open or chat_open or reconstructing or has_dialogue():
 		return
+	var inventory_key: bool = event is InputEventKey and event.pressed and not event.echo and event.physical_keycode == KEY_TAB
+	var inventory_pad: bool = event is InputEventJoypadButton and event.pressed and event.button_index == JOY_BUTTON_BACK
+	if inventory_key or inventory_pad:
+		get_viewport().set_input_as_handled()
+		station_requested.emit("Inventory")
+		return
 	if not RiftRelay.connected_room.is_empty() and (event.is_action_pressed("pause") or event.is_action_pressed("ui_cancel")):
 		get_viewport().set_input_as_handled()
 		pause_menu.open()
@@ -527,6 +533,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel"):
 		get_viewport().set_input_as_handled()
 		title_requested.emit()
+		return
+	if event.is_action_pressed("field_interact") and check_hub_item_pickups(true):
+		get_viewport().set_input_as_handled()
 		return
 	var use_key: bool = event is InputEventKey and event.physical_keycode == KEY_E and event.pressed and not event.echo
 	if current_station >= 0 and (use_key or event.is_action_pressed("ui_accept")):
@@ -782,36 +791,59 @@ func label_in_space(parent: Node3D, text: String, at: Vector3, pixels: int, tint
 	parent.add_child(label)
 	return label
 
-func update_blueprint_drop(key: String, id: String, _owner: int, x: float) -> void:
-	if blueprint_visuals.has(key):
-		blueprint_visuals[key].queue_free()
-		blueprint_visuals.erase(key)
-	blueprint_requests.erase(key)
-	if id.is_empty():
+func update_hub_item(key: String, offer: Dictionary) -> void:
+	if hub_item_visuals.has(key):
+		hub_item_visuals[key].queue_free()
+		hub_item_visuals.erase(key)
+	hub_item_requests.erase(key)
+	if offer.is_empty():
 		return
-	var orb := BlueprintOrb.new()
-	orb.tint = Color("2abbff")
-	orb.mark = BlueprintOrb.Mark.BLUEPRINT
-	orb.position = Vector3(x, 0.54, 0.50)
-	add_child(orb)
-	blueprint_visuals[key] = orb
-	var title := label_in_space(orb, "BLUEPRINT", Vector3(0, 0.57, 0), 22, Color("82eaff"))
-	title.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	const Icons := preload("res://scripts/equipment_icons.gd")
+	var item: String = offer.item
+	var texture: Texture2D
+	if item.begins_with("blueprint/"):
+		var recipe := item.trim_prefix("blueprint/")
+		texture = Icons.icon(recipe, Profile.GEAR[recipe].slot)
+	else:
+		var stock: Dictionary = Profile.stock[item]
+		texture = Icons.icon(stock.icon, stock.icon) if stock.has("material") else Icons.supply_icon(stock)
+	var marker := Sprite3D.new()
+	marker.texture = texture
+	marker.pixel_size = 0.013
+	marker.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	var stack := 0
+	for other in hub_item_visuals.values():
+		if absf(other.position.x - float(offer.x)) < 0.45:
+			stack += 1
+	marker.position = Vector3(offer.x, 1.03 + stack * 0.72, 0.65)
+	add_child(marker)
+	hub_item_visuals[key] = marker
+	var caption := Profile.hub_item_label(item)
+	if offer.quantity > 1:
+		caption += " ×%d" % offer.quantity
+	var label := label_in_space(marker, caption, Vector3(0, 0.48, 0), 21, UI.CYAN)
+	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 
-func check_blueprint_pickups() -> void:
-	if not profile or panel_open or tour_active or not RiftRelay.can_share_blueprints():
-		return
-	for key in RiftRelay.blueprint_drops.keys():
-		var drop: Dictionary = RiftRelay.blueprint_drops[key]
-		if absf(avatar.position.x - float(drop.x)) > 0.66 or drop.owner == RiftRelay.relay.get_client_id():
+func check_hub_item_pickups(reclaim := false) -> bool:
+	if not profile or panel_open or tour_active or not RiftRelay.can_share_hub_items():
+		return false
+	for key in RiftRelay.hub_drops.keys():
+		var offer: Dictionary = RiftRelay.hub_drops.get(key, {})
+		if offer.is_empty() or (offer.owner == RiftRelay.relay.get_client_id()) != reclaim:
+			continue
+		if absf(avatar.position.x - float(offer.x)) > 0.72:
 			continue
 		var now := Time.get_ticks_msec()
-		if profile.can_collect_blueprint(drop.id) and now >= int(blueprint_requests.get(key, 0)):
-			blueprint_requests[key] = now + 1000
-			RiftRelay.pick_up_blueprint(key)
+		if profile.can_receive_hub_item(offer.item, offer.quantity) and now >= int(hub_item_requests.get(key, 0)):
+			hub_item_requests[key] = now + 1000
+			RiftRelay.pick_up_hub_item(key, reclaim)
+			return true
+	return false
 
-func receive_blueprint(id: String) -> void:
-	if profile and profile.collect_blueprint(id):
-		if persist_blueprint_trade.is_valid():
-			persist_blueprint_trade.call()
+func receive_hub_item(key: String, item: String, quantity: int) -> void:
+	var accepted := pickup_receipts.has(key)
+	if not accepted and profile and profile.change_hub_inventory(item, quantity, persist_hub_inventory):
+		pickup_receipts[key] = true
+		accepted = true
 		RiftAudio.play_effect(&"pickup")
+	RiftRelay.confirm_hub_pickup(key, accepted)

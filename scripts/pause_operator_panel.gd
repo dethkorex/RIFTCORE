@@ -6,10 +6,12 @@ const Materials := preload("res://scripts/fabrication_catalog.gd")
 const EquipmentBody := preload("res://scripts/equipment_body.gd")
 const EquipmentIcons := preload("res://scripts/equipment_icons.gd")
 const Catalog := preload("res://scripts/sector_catalog.gd")
+const MissionMap := preload("res://scripts/mission_map.gd")
 
 signal quick_assigned(id: String)
 
 var operator: Callable
+var configure_map: Callable
 var life_total: Callable
 var profile
 var progress: Label
@@ -61,6 +63,7 @@ func _ready() -> void:
 	UI.label(sidebar, "LB / RB   Switch tab", 14, UI.MUTED)
 	sections = TabContainer.new()
 	sections.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	sections.use_hidden_tabs_for_min_size = false
 	sections.add_theme_stylebox_override("panel", UI.frame(Color("101e32"), Color("365d79"), 1))
 	sections.add_theme_stylebox_override("tab_focus", StyleBoxEmpty.new())
 	sections.add_theme_stylebox_override("tab_selected", UI.frame(Color("34244f"), UI.VIOLET))
@@ -100,7 +103,17 @@ func _ready() -> void:
 		count.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		quick_labels.append(count)
 	build_inventory()
-	sections.tab_changed.connect(func(_tab: int):
+	var map_tab := -1
+	if configure_map.is_valid():
+		var map := MissionMap.new()
+		map.name = "Map"
+		map.expanded = true
+		map.custom_minimum_size = Vector2(620, 330)
+		configure_map.call(map)
+		sections.add_child(map)
+		map_tab = sections.get_tab_count() - 1
+	sections.tab_changed.connect(func(tab: int):
+		equipment.visible = tab != map_tab
 		selected_supply = ""
 		var focused := get_viewport().gui_get_focus_owner()
 		if focused == null or not focused.is_visible_in_tree():

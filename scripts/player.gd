@@ -134,9 +134,8 @@ var dash_facing := 1.0
 var ground_dash := false
 var dash_lock := 0.0
 var fire_lock := 0.0
-enum BusterAim { SIDE, UP, DIAGONAL_UP, DIAGONAL_DOWN, DOWN }
-var buster_aim := BusterAim.SIDE
-var queued_buster_aim := BusterAim.SIDE
+var buster_pitch := 0.0
+var queued_buster_pitch := 0.0
 var shot_buffer_left := 0.0
 var queued_charged := false
 var queued_pose := false
@@ -533,11 +532,9 @@ func simulate_movement(delta: float) -> void:
 	update_wall_contact(delta, axis)
 	var stick_crouch := action_held("crouch_stick") and absf(axis) < 0.35
 	var wants_crouch := action_held("crouch") or stick_crouch
-	var drop_command := wants_crouch and action_pressed("dash")
-	if not drop_command and not saber_equipped and absf(axis) > 0.35 and movement_axis("climb_down", "climb_up") < -0.22:
-		if charge_held or action_held("shoot") or action_released("shoot") or action_pressed("suit_fire"):
-			wants_crouch = false
-	var dropping := drop_command and shock_stun <= 0.0 and grounded() and not is_instance_valid(ladder) and start_platform_drop()
+	var drop_command := grounded() and action_pressed("dash") and (wants_crouch
+		or movement_axis("climb_down", "climb_up") <= -0.45)
+	var dropping := drop_command and shock_stun <= 0.0 and not is_instance_valid(ladder) and start_platform_drop()
 	if not dropping and update_ladder(delta, axis):
 		cancel_saber_charge()
 		return
@@ -561,7 +558,7 @@ func simulate_movement(delta: float) -> void:
 		jump_buffer = jump_buffer_duration
 	else:
 		jump_buffer = maxf(0.0, jump_buffer - delta)
-	if not dropping and shock_stun <= 0.0 and boss_debuff != 9 and resume_input_guard <= 0.0 and contact_recoil <= 0.0 and action_pressed("dash") and dash_lock <= 0.0 and (grounded() or air_dash_available):
+	if not drop_command and shock_stun <= 0.0 and boss_debuff != 9 and resume_input_guard <= 0.0 and contact_recoil <= 0.0 and action_pressed("dash") and dash_lock <= 0.0 and (grounded() or air_dash_available):
 		if melee_lock > 0.0:
 			melee_lock = 0.0
 			combo_queued = 0
@@ -1076,7 +1073,7 @@ func update_ladder(delta: float, axis: float) -> bool:
 	if absf(axis) > 0.30:
 		facing = signf(axis)
 	if buster_pose:
-		present_buster_aim(BusterAim.SIDE, facing)
+		present_buster_pitch(0.0, facing)
 		buster_pose.ladder_direction = facing
 		buster_pose.crouched = false
 		var aiming := absf(axis) > 0.30 or charge_held or fire_lock > 0.0
@@ -1300,7 +1297,7 @@ func update_charge(delta: float) -> void:
 		shot_buffer_left = maxf(0.0, shot_buffer_left - delta)
 		if fire_lock <= 0.0 and melee_lock <= 0.0:
 			shot_buffer_left = 0.0
-			shoot(queued_charged, queued_pose, queued_suit_shot, queued_buster_aim)
+			shoot(queued_charged, queued_pose, queued_suit_shot, queued_buster_pitch)
 	if not equipped_suit().is_empty():
 		cancel_charge()
 		if action_pressed("suit_fire"):
@@ -1321,53 +1318,37 @@ func update_charge(delta: float) -> void:
 		return
 	charge_elapsed += delta
 	if buster_pose and fire_lock <= 0.0:
-		present_buster_aim(requested_buster_aim(), facing)
+		present_buster_pitch(requested_buster_pitch(), facing)
 	present_charge(charge_elapsed, boss_debuff != 5 and energy >= charged_shot_cost())
 
 func queue_buster_shot(charged: bool, pose_held: bool, suit_shot := false) -> void:
 	if saber_equipped or melee_lock > 0.0:
 		return
-	var shot_aim := requested_buster_aim()
+	var shot_pitch := requested_buster_pitch()
 	if fire_lock <= 0.0:
-		shoot(charged, pose_held, suit_shot, shot_aim)
+		shoot(charged, pose_held, suit_shot, shot_pitch)
 	else:
 		shot_buffer_left = 0.12
 		queued_charged = charged
 		queued_pose = pose_held
 		queued_suit_shot = suit_shot
-		queued_buster_aim = shot_aim
+		queued_buster_pitch = shot_pitch
 
-func requested_buster_aim() -> BusterAim:
+func requested_buster_pitch() -> float:
 	if low_profile or is_instance_valid(ladder) or is_instance_valid(rocket_course) or swim_volume():
-		return BusterAim.SIDE
-	var vertical := movement_axis("climb_down", "climb_up")
-	var diagonal := absf(movement_axis("move_left", "move_right")) > 0.35
-	if diagonal and vertical > 0.22:
-		return BusterAim.DIAGONAL_UP
-	if vertical > 0.45:
-		return BusterAim.UP
-	if diagonal and vertical < -0.22:
-		return BusterAim.DIAGONAL_DOWN
-	if vertical < -0.4 and not grounded():
-		return BusterAim.DOWN
-	return BusterAim.SIDE
+		return 0.0
+	var up := movement_axis("climb_down", "climb_up")
+	if up <= 0.0:
+		return 0.0
+	return atan2(up, absf(movement_axis("move_left", "move_right")))
 
-func buster_direction(aim: BusterAim, side: float) -> Vector3:
-	match aim:
-		BusterAim.UP:
-			return Vector3.UP
-		BusterAim.DIAGONAL_UP:
-			return Vector3(side, 1, 0).normalized()
-		BusterAim.DIAGONAL_DOWN:
-			return Vector3(side, -1, 0).normalized()
-		BusterAim.DOWN:
-			return Vector3.DOWN
-	return Vector3.RIGHT * side
+func buster_direction(pitch: float, side: float) -> Vector3:
+	return Vector3(cos(pitch) * side, sin(pitch), 0.0)
 
-func present_buster_aim(aim: BusterAim, side: float) -> void:
-	buster_aim = aim
+func present_buster_pitch(pitch: float, side: float) -> void:
+	buster_pitch = clampf(pitch, 0.0, PI * 0.5)
 	if buster_pose:
-		buster_pose.direction_override = buster_direction(aim, side) if aim != BusterAim.SIDE else Vector3.ZERO
+		buster_pose.direction_override = Vector3.ZERO if is_zero_approx(buster_pitch) else buster_direction(buster_pitch, side)
 
 func show_charge_sparks(amount: float, tint: Color, blade: Node3D, muzzle: Vector3) -> void:
 	if not charge_sparks:
@@ -1427,7 +1408,7 @@ func charged_shot_cost() -> float:
 func suit_shot_cost() -> float:
 	return (8.0 if magma_active else 7.0) * charge_cost_multiplier * (0.75 if run_module == "conduit" else 1.0)
 
-func shoot(charged := false, pose_held := false, suit_shot := false, shot_aim := BusterAim.SIDE) -> void:
+func shoot(charged := false, pose_held := false, suit_shot := false, shot_pitch := 0.0) -> void:
 	var showcase := is_instance_valid(showcase_projectiles)
 	if saber_equipped and not showcase:
 		return
@@ -1442,8 +1423,8 @@ func shoot(charged := false, pose_held := false, suit_shot := false, shot_aim :=
 	if uses_suit and not showcase:
 		restore_energy(-suit_shot_cost())
 	var aim := facing
-	var direction := buster_direction(shot_aim, aim)
-	present_buster_aim(shot_aim, aim)
+	present_buster_pitch(0.0 if low_profile else shot_pitch, aim)
+	var direction := buster_direction(buster_pitch, aim)
 	if buster_pose:
 		var climbing := is_instance_valid(ladder)
 		buster_pose.ladder_direction = aim if climbing or is_instance_valid(rocket_course) else 0.0
@@ -2003,7 +1984,7 @@ func play_ground_locomotion(axis: float, speed: float, top_speed: float) -> void
 func update_character_visuals(axis: float) -> void:
 	if is_instance_valid(rocket_course):
 		if buster_pose:
-			present_buster_aim(BusterAim.SIDE, facing)
+			present_buster_pitch(0.0, facing)
 			buster_pose.ladder_direction = facing
 			buster_pose.crouched = low_profile
 			buster_pose.influence = 1.0 if fire_lock > 0.0 or charge_held else 0.0
@@ -2036,7 +2017,7 @@ func update_character_visuals(axis: float) -> void:
 		buster_pose.ladder_direction = 0.0
 		buster_pose.water_direction=Vector3.RIGHT*facing if in_water else Vector3.ZERO
 		if in_water or (not local_prediction and not charge_held and fire_lock <= 0.0):
-			present_buster_aim(BusterAim.SIDE, facing)
+			present_buster_pitch(0.0, facing)
 		buster_pose.crouched = low_profile
 		var aiming: bool = not saber_equipped and not bracing and not swinging and displayed_saber_charge < 0.10 and not (ground_dash and dash_left > 0.0) and (charge_held or is_instance_valid(charge_orb) or fire_lock > 0.0 or buster_pose.has_recoil())
 		buster_pose.influence = 0.0 if bracing else move_toward(buster_pose.influence, 1.0 if aiming else 0.0, 0.30)

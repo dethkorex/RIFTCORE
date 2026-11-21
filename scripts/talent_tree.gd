@@ -175,7 +175,7 @@ func tooltip(item: Dictionary) -> String:
 		lines.append("Rank %s active  ·  %s" % [Profile.TALENT_RANKS[rank - 1], Profile.talent_effect(item, rank - 1)])
 	if rank < item.prices.size():
 		lines.append("Rank %s  ·  %s" % [Profile.TALENT_RANKS[rank], Profile.talent_effect(item, rank)])
-		lines.append("%d Core Shards  ·  Player Lv. %d" % [item.prices[rank], item.levels[rank]])
+		lines.append("%s Core Shards  ·  Player Lv. %d" % [UI.shard_amount(Profile.talent_price(item, rank)), item.levels[rank]])
 		var gate: String = profile.talent_gate(item.branch, item.tier)
 		if not gate.is_empty():
 			lines.append(gate)
@@ -266,12 +266,13 @@ func inspect(tile: Button) -> void:
 	next_effect.text = "Rank %s  ·  %s" % [Profile.TALENT_RANKS[installed], Profile.talent_effect(item, installed)] if not maxed else ""
 	var gate: String = profile.talent_gate(item.branch, item.tier)
 	var blocked: String = profile.talent_lock(item)
-	if not maxed and profile.core_shards < int(item.prices[installed]):
+	var cost := Profile.talent_price(item, installed) if not maxed else 0.0
+	if not maxed and profile.core_shards < cost:
 		gate += "  ·  " if not gate.is_empty() else ""
-		gate += "Need %d more Core Shards" % (int(item.prices[installed]) - profile.core_shards)
+		gate += "Need %s more Core Shards" % UI.shard_amount(cost - profile.core_shards)
 	requirements.text = gate
 	requirements.visible = not gate.is_empty() and not maxed
-	price.text = "%d SHARDS  ·  LV. %d" % [item.prices[installed], item.levels[installed]] if not maxed else "ALL RANKS INSTALLED"
+	price.text = "%s SHARDS  ·  LV. %d" % [UI.shard_amount(cost), item.levels[installed]] if not maxed else "ALL RANKS INSTALLED"
 	price_icon.visible = not maxed
 	purchase.text = "Rank III" if maxed else ("Install" if installed == 0 else "Upgrade")
 	if not maxed and not Input.get_connected_joypads().is_empty():

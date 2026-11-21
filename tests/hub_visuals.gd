@@ -101,11 +101,31 @@ func run() -> void:
 			carried.pressed.emit()
 			if await choose(menu, "Stow Stack"):
 				check(not game.profile.inventory.has("patch_kit") and game.profile.stored_supplies.get("patch_kit") == 2, "Stow Stack transfers both items")
+				for button in menu.find_children("*", "Button", true, false):
+					if button.get_meta(&"return_focus", "") == "stored/patch_kit":
+						button.pressed.emit()
+						break
+				if await choose(menu, "Move to Inventory"):
+					check(game.profile.inventory.get("patch_kit") == 2 and not game.profile.stored_supplies.has("patch_kit"), "Storage withdraws an entire stack to Inventory")
 	if DisplayServer.get_name() != "headless" and OS.get_cmdline_user_args().size() > 1:
 		await RenderingServer.frame_post_draw
 		root.get_texture().get_image().save_png(OS.get_cmdline_user_args()[1])
 	menu.leave_page()
 	check(not hub.panel_open and hub.current_station == 4, "Back returns to the Operator bay")
+	var inventory_key := InputEventKey.new()
+	inventory_key.physical_keycode = KEY_TAB
+	inventory_key.pressed = true
+	root.push_input(inventory_key)
+	await frames(2)
+	check(menu.page == "Inventory" and hub.panel_open, "Tab opens the carried Inventory directly from the hub")
+	menu.leave_page()
+	var inventory_pad := InputEventJoypadButton.new()
+	inventory_pad.button_index = JOY_BUTTON_BACK
+	inventory_pad.pressed = true
+	root.push_input(inventory_pad)
+	await frames(2)
+	check(menu.page == "Inventory" and hub.panel_open, "Controller Select opens the same Inventory")
+	menu.leave_page()
 	await open_station(hub, -4.5)
 	check(menu.page == "Shop" and is_instance_valid(control(menu, "Crafting")) and is_instance_valid(control(menu, "Core Ascension")), "Workshop groups its three actions")
 	var shoulder := InputEventJoypadButton.new()

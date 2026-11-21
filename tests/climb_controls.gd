@@ -53,15 +53,22 @@ func run() -> void:
 	down.axis = JOY_AXIS_LEFT_Y
 	down.axis_value = 1.0
 	Input.parse_input_event(down)
+	var side := InputEventJoypadMotion.new()
+	side.device = 0
+	side.axis = JOY_AXIS_LEFT_X
+	side.axis_value = 0.55
+	Input.parse_input_event(side)
 	var dash := InputEventJoypadButton.new()
 	dash.device = 0
 	dash.button_index = JOY_BUTTON_B
 	dash.pressed = true
 	Input.parse_input_event(dash)
 	await frames(12)
-	check(actor.global_position.y < before - 0.25 and actor.dash_left == 0.0 and not is_instance_valid(actor.ladder), "Left stick down and B drop through a one-way deck")
+	check(actor.global_position.y < before - 0.25 and actor.dash_left == 0.0 and not is_instance_valid(actor.ladder), "Left stick down and B drop through a one-way deck while tilted sideways")
 	down.axis_value = 0.0
 	dash.pressed = false
+	side.axis_value = 0.0
+	Input.parse_input_event(side)
 	Input.parse_input_event(down)
 	Input.parse_input_event(dash)
 	await frames(2)

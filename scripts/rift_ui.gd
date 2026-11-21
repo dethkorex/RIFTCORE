@@ -11,7 +11,9 @@ const COOP_NAME_SCALE := 1.3225
 const PARTY_COLORS := [CYAN, Color("ffd072"), Color("e0a0ff"), Color("7cfac0")]
 const ITEM_SIZE := 48
 const ITEM_GAP := 5
-static var button_texture: ImageTexture
+
+static func shard_amount(amount: float, whole_digits := 0) -> String:
+	return ("%.2f" % amount).trim_suffix("0").trim_suffix("0").trim_suffix(".").pad_zeros(whole_digits)
 
 static func operator_tint(id: int, host: int, members: Array) -> Color:
 	if id == host:
@@ -83,11 +85,11 @@ static func theme(station := false) -> Theme:
 	result.set_color("font_color", "Label", WHITE)
 	result.set_stylebox("panel", "PanelContainer", texture_frame("panel_base_small", 31, Vector2(21, 14)))
 	result.set_stylebox("panel", "Panel", texture_frame("panel_base_small", 31, Vector2(21, 14)))
-	result.set_stylebox("normal", "Button", texture_frame("button_secondary", 30, Vector2(16, 6)))
-	result.set_stylebox("hover", "Button", texture_frame("button_primary", 31, Vector2(16, 6)))
-	result.set_stylebox("pressed", "Button", texture_frame("button_primary", 31, Vector2(16, 6)))
-	result.set_stylebox("focus", "Button", StyleBoxEmpty.new())
-	result.set_stylebox("disabled", "Button", texture_frame("button_disabled", 27, Vector2(16, 6)))
+	result.set_stylebox("normal", "Button", profile_frame(Color("0c2031"), Color("436586"), Vector2(15, 5)))
+	result.set_stylebox("hover", "Button", profile_frame(Color("103347"), CYAN, Vector2(15, 5), true))
+	result.set_stylebox("pressed", "Button", profile_frame(Color("173649"), CYAN, Vector2(15, 5)))
+	result.set_stylebox("focus", "Button", profile_frame(Color.TRANSPARENT, CYAN, Vector2.ZERO, true))
+	result.set_stylebox("disabled", "Button", profile_frame(Color("0b1727"), Color("2a4056"), Vector2(15, 5)))
 	var text_idle := frame(Color("0c192b"), Color("3b6384"), 1)
 	var text_focus := text_idle.duplicate() as StyleBoxFlat
 	text_focus.draw_center = false
@@ -116,7 +118,6 @@ static func theme(station := false) -> Theme:
 			result.set_stylebox("grabber", kind, thumb)
 			result.set_stylebox("grabber_highlight", kind, profile_frame(Color("4eafd2"), CYAN, Vector2(4, 4)))
 			result.set_stylebox("grabber_pressed", kind, profile_frame(Color("4592b5"), CYAN, Vector2(4, 4)))
-		result.set_stylebox("station_skin", "Button", surface)
 	return result
 
 static func label(parent: Node, value: String, font_size := 16, color := WHITE) -> Label:
@@ -131,35 +132,7 @@ static func label(parent: Node, value: String, font_size := 16, color := WHITE) 
 	return item
 
 static func style_button(item: Button) -> void:
-	if item.has_theme_stylebox("station_skin", "Button"):
-		profile_button(item)
-		return
-	if item.custom_minimum_size.y < 40:
-		var compact := frame(Color("12253d"), Color("3b6384"))
-		var compact_active := frame(Color("34244f"), VIOLET)
-		var compact_pressed := frame(Color("251936"), VIOLET.darkened(0.2))
-		set_button_states(item, compact, compact_active, compact_pressed)
-		return
-	if not button_texture:
-		var source := load(KIT + "button_primary.png") as Texture2D
-		var pixels := source.get_image()
-		pixels.convert(Image.FORMAT_RGBA8)
-		for y in pixels.get_height():
-			for x in pixels.get_width():
-				var pixel := pixels.get_pixel(x, y)
-				var value := pixel.v
-				pixels.set_pixel(x, y, Color(value, value, value, pixel.a))
-		button_texture = ImageTexture.create_from_image(pixels)
-	var active := texture_frame("button_primary", 31, Vector2(26, 8))
-	active.texture = button_texture
-	active.set_texture_margin(SIDE_TOP, 19)
-	active.set_texture_margin(SIDE_BOTTOM, 19)
-	active.modulate_color = VIOLET
-	var idle := active.duplicate() as StyleBoxTexture
-	idle.modulate_color = Color("5a9ac7")
-	var down := active.duplicate() as StyleBoxTexture
-	down.modulate_color = VIOLET.darkened(0.22)
-	set_button_states(item, idle, active, down)
+	profile_button(item)
 
 static func set_button_states(item: Button, inactive: StyleBox, active: StyleBox, down: StyleBox) -> void:
 	item.add_theme_stylebox_override("normal", inactive)
@@ -189,10 +162,7 @@ static func button(parent: Node, value: String, action: Callable, primary := fal
 		item.focus_mode = Control.FOCUS_NONE
 	parent.add_child(item)
 	if apply_default_style:
-		if item.has_theme_stylebox("station_skin", "Button"):
-			profile_button(item, primary)
-		else:
-			style_button(item)
+		profile_button(item, primary)
 	return item
 
 static func item_tile(parent: Container, icon: Texture2D, rarity: Color, rarity_index: int, caption: String, action: Callable) -> Button:

@@ -115,6 +115,8 @@ const TALENT_TIER_COUNT := 5
 const FORMER_ROOTS := ["capacitor", "dash", "trigger_relay", "combat_telemetry"]
 const LEGACY_TALENT_LEVELS := [1, 5, 10, 15]
 const TALENT_RANKS := ["I", "II", "III"]
+const TALENT_PRICE_PERCENT := 85
+const CHALLENGE_SHARD_MULTIPLIER := 1.5
 const FIELD_REBOOT := "field_reboot"
 const HUNT_CLEARS := 3
 
@@ -189,7 +191,9 @@ const Story := preload("res://scripts/rift_story.gd")
 var memories: Array[int] = []
 var endings: Array[String] = []
 var materials: Dictionary = {}
-var core_shards := 0
+var core_shards := 0.0:
+	set(value):
+		core_shards = roundf(maxf(0.0, value) * 100.0) / 100.0
 const COSMETICS := {"Standard": Color("55e7ff"), "Magenta": Color("ff67ce"), "Gold": Color("ffd069")}
 var operator_name := "RX-07"
 var survival_seconds := 0.0
@@ -334,7 +338,7 @@ func decode_from(data: ConfigFile) -> void:
 		for id in saved_materials:
 			materials[id] = maxi(0, int(saved_materials[id]))
 	var legacy_bolts := maxi(0, int(data.get_value("profile", "credits", 0)))
-	core_shards = maxi(0, int(data.get_value("profile", "core_shards", legacy_bolts / 100)))
+	core_shards = float(data.get_value("profile", "core_shards", legacy_bolts / 100))
 	# Legacy slots retain their original bolt balance and get a one-time scrap grant.
 	if not data.has_section_key("profile", "materials"):
 		materials["scrap"] = legacy_bolts / 50
@@ -611,18 +615,19 @@ static func challenge_seconds_left(clock := Time.get_datetime_dict_from_system()
 static func challenge_life(index: int) -> int:
 	return int(index == 4)
 
-static func challenge_shards(_sector: int, tier: int) -> int:
-	return 1 if tier < 3 else 2
+static func challenge_shards(_sector: int, tier: int) -> float:
+	return (1 if tier < 3 else 2) * CHALLENGE_SHARD_MULTIPLIER
 
-static func challenge_set_shards(sector: int) -> int:
-	return 3 + (sector - 1) / 3
+static func challenge_set_shards(sector: int) -> float:
+	var base := 3 + (sector - 1) / 3
+	return base * CHALLENGE_SHARD_MULTIPLIER
 
 static func rotated_challenge_credits(sector: int, index: int) -> int:
 	return 120 + index * 35 + (sector - 1) * 18
 
 func challenge_rewards(sector: int, cycle: Dictionary) -> Dictionary:
 	var carryover: Dictionary = cycle.get("carryover", {})
-	var reward := {"credits": int(carryover.get("credits", 0)), "shards": int(carryover.get("shards", 0)),
+	var reward := {"credits": int(carryover.get("credits", 0)), "shards": float(carryover.get("shards", 0)),
 		"lives": int(carryover.get("lives", 0))}
 	for index in 5:
 		if cycle.done.has(index) and not cycle.claimed.has(index):
@@ -838,6 +843,109 @@ func learn_blueprint(id: String) -> String:
 		blueprint_items[id] = true
 		return "Could not save the blueprint."
 	return "Learned " + String(GEAR[id].name) + "."
+
+static func hub_item_label(key: String) -> String:
+	if key.begins_with("blueprint/"):
+		return String(GEAR.get(key.trim_prefix("blueprint/"), {}).get("name", "")) + " Blueprint"
+	return String(stock.get(key, {}).get("name", ""))
+
+static func valid_hub_item(key: String, amount: int) -> bool:
+	if key.begins_with("blueprint/"):
+		return amount == 1 and GEAR.has(key.trim_prefix("blueprint/"))
+	return stock.has(key) and amount > 0 and amount <= STACK_MAX
+
+func hub_item_count(key: String) -> int:
+	if key.begins_with("blueprint/"):
+		return int(blueprint_pouch.has(key.trim_prefix("blueprint/")))
+	return supply_owned(key) if stock.has(key) else 0
+
+func can_receive_hub_item(key: String, amount: int) -> bool:
+	if not valid_hub_item(key, amount):
+		return false
+	if key.begins_with("blueprint/"):
+		return blueprint_pouch.size() < BLUEPRINT_POUCH_SIZE and can_collect_blueprint(key.trim_prefix("blueprint/"))
+	return hub_item_count(key) + amount <= STACK_MAX
+
+func change_hub_inventory(key: String, amount: int, persist: Callable) -> bool:
+	if amount == 0 or not valid_hub_item(key, absi(amount)):
+		return false
+	var before := hub_item_count(key)
+	if before + amount < 0 or (amount > 0 and not can_receive_hub_item(key, amount)):
+		return false
+	set_hub_item_count(key, before + amount)
+	var error: Error = persist.call() if persist.is_valid() else save()
+	if error != OK:
+		set_hub_item_count(key, before)
+		return false
+	return true
+
+func set_hub_item_count(key: String, count: int) -> void:
+	if key.begins_with("blueprint/"):
+		var id := key.trim_prefix("blueprint/")
+		if count == 0:
+			blueprint_pouch.erase(id)
+		elif not blueprint_pouch.has(id):
+			blueprint_pouch.append(id)
+		return
+	var item: Dictionary = stock[key]
+	var target := carried_materials if item.has("material") else inventory
+	var id: String = item.get("material", key)
+	if count == 0:
+		target.erase(id)
+	else:
+		target[id] = count
+
+func refund_hub_item(key: String, amount: int, persist: Callable) -> bool:
+	if not valid_hub_item(key, amount):
+		return false
+	if can_receive_hub_item(key, amount):
+		return change_hub_inventory(key, amount, persist)
+	var is_blueprint := key.begins_with("blueprint/")
+	var target: Dictionary
+	var id := key
+	if is_blueprint:
+		id = key.trim_prefix("blueprint/")
+		if not can_collect_blueprint(id):
+			return true
+		target = blueprint_items
+	else:
+		var item: Dictionary = stock[key]
+		target = materials if item.has("material") else stored_supplies
+		id = item.get("material", key)
+	var before: Variant = target.get(id)
+	target[id] = true if is_blueprint else int(target.get(id, 0)) + amount
+	var error: Error = persist.call() if persist.is_valid() else save()
+	if error == OK:
+		return true
+	if before == null:
+		target.erase(id)
+	else:
+		target[id] = before
+	return false
+
+func withdraw_inventory(key: String) -> String:
+	if key.begins_with("blueprint/"):
+		return move_blueprint_to_pouch(key.trim_prefix("blueprint/"))
+	if not stock.has(key):
+		return "Item unavailable."
+	var item: Dictionary = stock[key]
+	var source := materials if item.has("material") else stored_supplies
+	var id: String = item.get("material", key)
+	var before := int(source.get(id, 0))
+	var carried := hub_item_count(key)
+	var moved := mini(before, STACK_MAX - carried)
+	if moved <= 0:
+		return "Inventory stack is full." if before > 0 else "No items in Storage."
+	if moved == before:
+		source.erase(id)
+	else:
+		source[id] = before - moved
+	set_hub_item_count(key, carried + moved)
+	if save() != OK:
+		source[id] = before
+		set_hub_item_count(key, carried)
+		return "Could not move the item."
+	return "%s ×%d moved to Inventory." % [item.name, moved]
 
 func supply_owned(id: String) -> int:
 	var item: Dictionary = stock[id]
@@ -1073,6 +1181,9 @@ func talent_gate(branch: String, tier: int) -> String:
 			return "Requires Tier %d talent" % (earlier + 1)
 	return ""
 
+static func talent_price(item: Dictionary, rank_index: int) -> float:
+	return int(item.prices[rank_index]) * TALENT_PRICE_PERCENT / 100.0
+
 func talent_lock(item: Dictionary) -> String:
 	var installed := rank(item.id)
 	if installed >= item.prices.size():
@@ -1083,7 +1194,7 @@ func talent_lock(item: Dictionary) -> String:
 	var gate := talent_gate(talent_branch(item), talent_tier(item))
 	if not gate.is_empty():
 		return gate
-	if core_shards < int(item.prices[installed]):
+	if core_shards < talent_price(item, installed):
 		return "Not enough Core Shards"
 	return ""
 
@@ -1095,7 +1206,7 @@ func buy(id: String) -> String:
 		var reason := talent_lock(item)
 		if not reason.is_empty():
 			return reason + "."
-		var price: int = item.prices[current]
+		var price := talent_price(item, current)
 		core_shards -= price
 		owned[id] = current + 1
 		if save() != OK:

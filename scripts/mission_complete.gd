@@ -37,7 +37,7 @@ static func build(stack: VBoxContainer, sector_name: String, stats: Dictionary, 
 		["Time", "%02d:%02d" % [time / 60, time % 60]], ["Enemies defeated", str(stats.kills)],
 		["Boss defeated", "Yes"], ["Lives lost", str(deaths)],
 		["Operator XP gained", "+%d" % stats.operator_xp], ["Profile XP gained", "+%d" % stats.player_xp],
-		["Materials recovered", str(material_count)], ["Core Shards earned", "+%d" % stats.shards],
+		["Materials recovered", str(material_count)], ["Core Shards earned", "+" + UI.shard_amount(stats.shards)],
 		["Blueprints recovered", str(blueprints.size())], ["Bolts banked", "+%d" % bolts],
 	]:
 		var caption := UI.label(rows, entry[0], 15, UI.MUTED)
