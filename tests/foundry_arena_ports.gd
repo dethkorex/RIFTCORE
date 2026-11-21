@@ -10,7 +10,8 @@ func verify(condition: bool, detail: String) -> void:
 	failures += int(not condition)
 
 func run() -> void:
-	var act := int(OS.get_cmdline_user_args()[0])
+	var args := OS.get_cmdline_user_args()
+	var act := int(args[0]) if not args.is_empty() else 1
 	var game = load("res://scenes/main.tscn").instantiate()
 	game.profile.path = "user://foundry-port-test.cfg"
 	game.checkpoint_path = "user://foundry-port-save.cfg"
@@ -54,7 +55,7 @@ func run() -> void:
 	for side in [-1.0, 1.0]:
 		boss.clear_attack()
 		var center := 2 if side < 0 else 7
-		player.position = ports[center].position + Vector3.UP * .86
+		player.global_position = ports[center].global_position + Vector3.UP * .86
 		boss.begin_attack("kiln_backdraft" if act == 1 else "casting_wave")
 		var replica: Array = boss.foundry_snapshot()
 		var count := 3 if act == 1 else 5
@@ -71,12 +72,12 @@ func run() -> void:
 		var first = boss.zones[0]
 		var next = boss.zones[1]
 		var hp: float = player.health
-		player.position.x = (first.position.x + next.position.x) * .5
+		player.global_position.x = (first.global_position.x + next.global_position.x) * .5
 		player.invulnerable_time = 0
 		boss.elapsed = maxf(first.warning_time, next.warning_time) + .05
 		boss.advance_flames(true)
 		verify(is_equal_approx(player.health, hp), "space between grates is safe during the blast")
-		player.position.x = first.position.x
+		player.global_position.x = first.global_position.x
 		boss.advance_flames(true)
 		verify(player.health < hp, "standing on the glowing grate deals damage")
 		player.health = player.max_health

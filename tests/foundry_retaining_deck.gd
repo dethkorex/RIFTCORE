@@ -28,8 +28,10 @@ func run() -> void:
 		var centre := Vector3(89.55, -9.21 - depth, 0)
 		var hit := trace(stage, centre + Vector3.FORWARD * -3.0, centre)
 		check(hit.get("collider") == pier, "solid retaining face at %.2f metres below the tread" % depth)
-	for x in [85.7, 93.3, 103.1]:
+	for x in [85.7, 93.3, 98.7]:
 		check(trace(stage, Vector3(x, -9, 0), Vector3(x, -14.5, 0)).is_empty(), "open fissure at %.1f" % x)
+	var roof := trace(stage, Vector3(103.1, -9, 0), Vector3(103.1, -14.5, 0))
+	check(roof.get("collider") == stage.get_node("TERRAIN/CoolingCaverns/WellWestRoof"), "the return lip covers the east side of the inspection well")
 	var lane := Vector3(90, -6.75, 0)
 	check(trace(stage, lane, lane + Vector3.RIGHT * 4).is_empty(), "upper gallery supports leave the lower route clear")
 	quit(failures)
