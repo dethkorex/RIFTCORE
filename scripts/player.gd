@@ -113,7 +113,7 @@ const WALK_SPEED_FRACTION := 0.42
 @export var charge_time := 0.7
 @export var base_buster_damage := 18.0
 @export var melee_multiplier := 2.5
-@export var damage_gain_per_level := 0.06
+@export var damage_gain_per_level := 0.11
 @export var melee_range := 2.2
 @export var melee_cooldown := 0.42
 
@@ -1409,7 +1409,9 @@ func cannon_muzzle(aim: float) -> Vector3:
 	return global_position + Vector3(aim * 0.85, 0.08 if low_profile else 0.42, 0.0)
 
 func level_damage_scale() -> float:
-	return 1.0 + (level_for_experience(experience) - 1) * damage_gain_per_level
+	var levels := level_for_experience(experience) - 1
+	# Earlier levels give a larger boost and later gains stay close to the campaign's previous curve.
+	return 1.0 + mini(levels, 9) * damage_gain_per_level + maxi(levels - 9, 0) * minf(damage_gain_per_level, 0.06)
 
 func buster_power() -> float:
 	return base_buster_damage * level_damage_scale() * buster_damage_multiplier * (1.0 + supply_bonus("attack"))
@@ -2080,7 +2082,9 @@ func play_character_animation(animation_name: String, force := false) -> void:
 	animation_player.play(animation_name, 0.035 if force or animation_name in ["dash", "slide", "wall_slide"] else 0.10, speed_scale)
 
 static func defense_for_experience(total: int) -> float:
-	return minf(0.25, (level_for_experience(total) - 1) * 0.02)
+	# Level-based resistance stacks with equipment and buffs, with smaller gains at high levels.
+	var levels := level_for_experience(total) - 1
+	return 0.45 * (1.0 - pow(0.88, levels))
 
 func mitigate_damage(amount: float) -> float:
 	return amount * damage_taken_scale * (1.0 - defense_rating())

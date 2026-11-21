@@ -1318,9 +1318,10 @@ func complete_online_setup() -> void:
 		return
 	RiftSettings.confirm_startup_choice("online")
 	get_tree().set_meta(&"startup_choice_confirmed", true)
+	var cloud = RiftRelay.directory.progress
+	cloud.roster_check_stage = 1
 	menu.checking_cloud_save = true
 	menu.open_slot_picker("Load Game")
-	var cloud = RiftRelay.directory.progress
 	await cloud.sync(false, true)
 	if not is_instance_valid(menu):
 		return

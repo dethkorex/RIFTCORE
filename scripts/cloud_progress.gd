@@ -1,6 +1,7 @@
 extends Node
 
 signal changed
+signal roster_check_changed
 
 const Codes := preload("res://addons/GD-Sync/Scripts/Enums/Enums.gd")
 const Operators := preload("res://scripts/manual_save_session.gd")
@@ -22,6 +23,10 @@ var elapsed := 6.0
 var was_online := false
 var prepared_for := ""
 var checked_release := false
+var roster_check_stage := 1:
+	set(value):
+		roster_check_stage = value
+		roster_check_changed.emit()
 
 func _ready() -> void:
 	process_mode = PROCESS_MODE_ALWAYS
@@ -67,6 +72,7 @@ func remember(revision: String, data: Dictionary) -> void:
 	var saved := ConfigFile.new()
 	saved.set_value("sync", "account", directory.username)
 	saved.set_value("sync", "revision", revision)
+	saved.set_value("sync", "checked_at", Time.get_datetime_string_from_system(true, true))
 	saved.save(MARKER)
 	last_checked_hash = fingerprint(data)
 
@@ -136,7 +142,7 @@ func rename_owner(old_name: String, new_name: String) -> void:
 	prepared_for = ""
 	last_checked_hash = ""
 
-func read_remote() -> int:
+func read_remote(report_roster_check := false) -> int:
 	checked_release = false
 	var error := await prepare_release()
 	if error != 0:
@@ -146,6 +152,8 @@ func read_remote() -> int:
 	if code == Codes.ACCOUNT_GET_DOCUMENT_RESPONSE_CODE.DOESNT_EXIST:
 		checked_release = true
 		remote = {}
+		if report_roster_check:
+			roster_check_stage = 2
 		return 0
 	if code != 0:
 		return code
@@ -157,6 +165,8 @@ func read_remote() -> int:
 		return ERR_FILE_CORRUPT
 	remote = document
 	checked_release = true
+	if report_roster_check:
+		roster_check_stage = 2
 	return 0
 
 func sync(prefer_local := false, check_only := false) -> void:
@@ -166,7 +176,7 @@ func sync(prefer_local := false, check_only := false) -> void:
 		return
 	var displayed_revision := String(remote.get("revision", ""))
 	busy = true
-	var error := await read_remote()
+	var error := await read_remote(check_only)
 	if not directory.online() or error != 0:
 		busy = false
 		update("Local save kept. Cloud sync will retry." if error != ERR_FILE_CORRUPT else "Cloud save could not be read. Local save kept.")

@@ -62,7 +62,7 @@ var wallet_bolts: Label
 var shop_status := ""
 var shop_category := "All Items"
 var enhancement_focus := ""
-const SHOP_FILTERS := {"All Items": "visor", "Supplies": "frame", "Buffs": "utility", "Materials": "core"}
+const SHOP_FILTERS := ["All Items", "Supplies", "Buffs", "Materials"]
 var claim_challenge_rewards: Callable
 var challenge_sector := 1
 var selected_sector := 1
@@ -104,6 +104,7 @@ const Frames := preload("res://scripts/operator_frames.gd")
 const Catalog := preload("res://scripts/sector_catalog.gd")
 const Difficulty := preload("res://scripts/mission_difficulty.gd")
 const Blueprints := preload("res://scripts/blueprint_catalog.gd")
+const MarketplaceIcons := preload("res://scripts/marketplace_icons.gd")
 const Materials := preload("res://scripts/fabrication_catalog.gd")
 const Profile := preload("res://scripts/rogue_profile.gd")
 const MissionResults := preload("res://scripts/mission_complete.gd")
@@ -1403,8 +1404,7 @@ func open_slot_picker(mode: String) -> void:
 
 func build_save_slots(columns: HBoxContainer) -> void:
 	if checking_cloud_save:
-		var loading := card(columns)
-		UI.label(loading, "Checking cloud saves…", 24, UI.CYAN)
+		preload("res://scripts/cloud_sync_view.gd").build(columns, RiftRelay.directory)
 		return
 	var cards: Array[Button] = []
 	var saves: Array[ConfigFile] = []
@@ -1561,28 +1561,20 @@ func shop_type(item: Dictionary) -> String:
 func build_shop(columns: HBoxContainer) -> void:
 	var operator_level: int = profile.operator_level
 	var catalog := card(columns, 1.08)
-	var heading := HBoxContainer.new()
-	heading.add_theme_constant_override("separation", 20)
-	catalog.add_child(heading)
-	UI.label(heading, "Marketplace", 31, UI.CYAN).autowrap_mode = TextServer.AUTOWRAP_OFF
-	var subtitle := UI.label(heading, "Operator Lv. %d" % operator_level, 16, Color("ffd079"))
-	subtitle.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	subtitle.autowrap_mode = TextServer.AUTOWRAP_OFF
+	var catalog_title := workshop_heading(catalog, "Marketplace", null, "Operator Lv. %d" % operator_level)
+	catalog_title.add_theme_font_size_override("font_size", 29)
 	var filters := HBoxContainer.new()
-	filters.add_theme_constant_override("separation", 6)
+	filters.add_theme_constant_override("separation", 8)
 	catalog.add_child(filters)
 	var active_filter: Button
 	for category in SHOP_FILTERS:
 		var tab := UI.button(filters, category, func():
 			shop_category = category
 			show_page("Shop")
-		, category == shop_category, 34)
+		, category == shop_category, 35)
 		if category == shop_category:
 			tab.add_theme_color_override("font_color", UI.CYAN)
 			active_filter = tab
-		tab.icon = EquipmentIcons.icon(SHOP_FILTERS[category], SHOP_FILTERS[category])
-		tab.expand_icon = true
-		tab.add_theme_constant_override("icon_max_width", 16)
 
 	var items: Array[String] = []
 	for id in Profile.stock:
@@ -1597,69 +1589,80 @@ func build_shop(columns: HBoxContainer) -> void:
 		var b: Dictionary = Profile.stock[right]
 		return a.name < b.name if a.shop_level == b.shop_level else a.shop_level < b.shop_level
 	)
-	var list_header := shop_columns(catalog, "ITEM (%d)" % items.size(), "TYPE", "PRICE", Color("a6c7df"))
+	var table := MarginContainer.new()
+	catalog.add_child(table)
+	table.add_theme_constant_override("margin_left", 10)
+	table.add_theme_constant_override("margin_right", 23)
+	var list_header := shop_columns(table, "ITEM (%d)" % items.size(), "TYPE", "PRICE", UI.MUTED)
 	var gutter := Control.new()
-	gutter.custom_minimum_size.x = 39
+	gutter.custom_minimum_size.x = 37
 	gutter.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	list_header.add_child(gutter)
 	list_header.move_child(gutter, 0)
 	var entries := scroll_entries(catalog)
 	entries.add_theme_constant_override("separation", 4)
 
-	var info := card(columns, 1.0)
+	var info := card(columns)
 	if items.is_empty():
 		focused_item = ""
+		workshop_heading(info, "Item Details")
 		UI.label(info, "No stock in this category at Operator Lv. %d." % operator_level, 20, UI.MUTED)
 		active_filter.grab_focus()
 		return
-	var title := UI.label(info, "", 40, UI.CYAN)
-	info.add_child(HSeparator.new())
-	var rarity := UI.label(info, "", 20)
+	var title := workshop_heading(info, "")
+	title.add_theme_font_size_override("font_size", 29)
+	var rarity_badge := UI.equipment_card(Color("3b7fa8"))
+	rarity_badge.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	info.add_child(rarity_badge)
+	var rarity := UI.profile_label(rarity_badge, "", 17)
 	var preview := HBoxContainer.new()
-	preview.add_theme_constant_override("separation", 14)
+	preview.add_theme_constant_override("separation", 18)
 	preview.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	info.add_child(preview)
 	var tile := UI.equipment_card(UI.CYAN)
-	tile.custom_minimum_size = Vector2(122, 132)
+	tile.custom_minimum_size = Vector2(144, 144)
 	tile.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	preview.add_child(tile)
-	var icon := TextureRect.new()
-	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	tile.add_child(icon)
-	var facts := UI.column(preview, 8)
+	var icon := workshop_texture(tile, null, 86)
+	var facts := UI.column(preview, 7)
 	facts.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	facts.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	var description := UI.label(facts, "", 20, UI.WHITE)
+	var description := UI.label(facts, "", 22, UI.CYAN)
 	var type_value := shop_fact(facts, "Type")
 	var price_value := shop_fact(facts, "Price")
-	var owned := shop_fact(facts, "In inventory")
-	var order := UI.equipment_card(Color("3b7fa8"))
+	var owned := shop_fact(facts, "In Inventory")
+
+	var order := UI.equipment_card(Color("4e89aa"))
 	info.add_child(order)
-	var controls := UI.column(order, 4)
-	shop_columns(controls, "Purchase Quantity", "", "Total Cost", UI.MUTED)
+	var order_row := HBoxContainer.new()
+	order_row.add_theme_constant_override("separation", 15)
+	order.add_child(order_row)
+	var controls := UI.column(order_row, 5)
+	controls.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	UI.profile_label(controls, "Purchase Quantity", 18)
 	var quantity_row := HBoxContainer.new()
+	quantity_row.add_theme_constant_override("separation", 6)
 	controls.add_child(quantity_row)
-	var quantity := UI.label(quantity_row, "1", 23)
-	quantity.autowrap_mode = TextServer.AUTOWRAP_OFF
-	quantity.custom_minimum_size.x = 32
+	var quantity := UI.profile_label(quantity_row, "1", 25)
+	quantity.custom_minimum_size.x = 42
 	quantity.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	quantity.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	var total := UI.label(quantity_row, "", 23, Color("ffd079"))
-	total.autowrap_mode = TextServer.AUTOWRAP_OFF
-	total.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	total.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	order_row.add_child(VSeparator.new())
+	var totals := UI.column(order_row, 5)
+	totals.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	UI.profile_label(totals, "Total Cost", 18, UI.MUTED).horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var total := UI.profile_label(totals, "", 25, Color("ffd079"))
+	total.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	var buy := UI.button(info, "Buy", func():
 		inventory_status = profile.buy_supply(focused_item, int(quantity.text))
 		show_page("Shop")
 	, true, 51)
-	buy.icon = EquipmentIcons.icon("core", "core")
-	buy.expand_icon = true
-	buy.add_theme_constant_override("icon_max_width", 24)
-	buy.add_theme_font_size_override("font_size", 21)
-	var message := UI.label(info, "Purchases go to Inventory. Stow them under Operator → Storage." if inventory_status.is_empty() else inventory_status, 15, UI.MUTED if inventory_status.is_empty() else UI.VIOLET)
-	message.custom_minimum_size.y = 18
+	buy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	buy.add_theme_font_size_override("font_size", 24)
+	var hint := "Purchases go to Inventory. Stow them under Operator → Storage."
+	var message := UI.label(info, hint, 15, UI.MUTED)
+	message.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var buttons: Dictionary[String, Button] = {}
+	var rows: Dictionary[String, Button] = {}
 
 	var adjust := func(step: int):
 		var limit: int = profile.supply_purchase_limit(focused_item)
@@ -1669,48 +1672,61 @@ func build_shop(columns: HBoxContainer) -> void:
 		total.text = "%d bolts" % cost
 		buy.text = "BUY  /  %d BOLTS" % cost
 		buy.disabled = limit == 0 or profile.credits < cost
-		buy.tooltip_text = "Inventory stack is full" if limit == 0 else ("Not enough bolts" if buy.disabled else "Goes to Inventory.")
-	var minus := UI.button(quantity_row, "‹", adjust.bind(-1), false, 34)
+		buy.tooltip_text = "Inventory stack is full." if limit == 0 else ("Not enough Bolts." if buy.disabled else "")
+		for key in buttons:
+			var allowed := count > 1 if key == "minus" else count < limit
+			buttons[key].modulate = Color.WHITE if allowed else Color("8295a6")
+		message.text = (buy.tooltip_text if buy.disabled else hint) if inventory_status.is_empty() else inventory_status
+	var minus := UI.button(quantity_row, "−", adjust.bind(-1), false, 35)
+	var plus := UI.button(quantity_row, "+", adjust.bind(1), false, 35)
 	quantity_row.move_child(minus, 0)
-	var plus := UI.button(quantity_row, "›", adjust.bind(1), false, 34)
-	quantity_row.move_child(plus, 2)
+	for button in [minus, plus]:
+		button.custom_minimum_size.x = 46
+		button.add_theme_font_size_override("font_size", 23)
+		button.focus_neighbor_bottom = button.get_path_to(buy)
+	buttons["minus"] = minus
+	buttons["plus"] = plus
+	buy.focus_neighbor_top = buy.get_path_to(plus)
+
 	var reveal := func(id: String):
+		if focused_item != id:
+			inventory_status = ""
 		focused_item = id
 		var item: Dictionary = Profile.stock[id]
+		for key in rows:
+			rows[key].set_pressed_no_signal(key == id)
 		title.text = item.name
 		rarity.text = Profile.RARITY_NAMES[item.rarity]
 		rarity.add_theme_color_override("font_color", Profile.RARITY_COLORS[item.rarity])
-		var symbol: String = {"Supply": "vital_weave", "Energy Cell": "charge_relay"}.get(shop_type(item), item.icon)
-		icon.texture = EquipmentIcons.icon(symbol, item.icon)
-		icon.modulate = Profile.RARITY_COLORS[item.rarity]
-		description.text = item.detail
+		icon.texture = shop_icon(item)
+		description.text = "%d materials per bundle" % item.quantity if item.has("material") else item.detail
 		type_value.text = shop_type(item)
 		price_value.text = "%d bolts" % profile.supply_price(id)
 		owned.text = str(profile.supply_owned(id))
 		quantity.text = "1"
+		for control in [minus, plus, buy]:
+			control.focus_neighbor_left = control.get_path_to(rows[id])
 		adjust.call(0)
+
 	var selected: String = focused_item if focused_item in items else items[0]
+	var previous: Control = active_filter
 	for id in items:
 		var item: Dictionary = Profile.stock[id]
 		var record := UI.button(entries, "", func():
 			reveal.call(id)
-			if not buy.disabled:
-				buy.grab_focus()
+			plus.grab_focus()
 		, false, 39)
+		record.toggle_mode = true
 		record.tooltip_text = item.name
+		var highlight := UI.profile_frame(Color("113d4d"), UI.CYAN, Vector2(10, 3), true)
+		record.add_theme_stylebox_override("pressed", highlight)
+		record.add_theme_stylebox_override("hover_pressed", highlight)
 		var cells := shop_columns(record, item.name, shop_type(item), "%d" % profile.supply_price(id), Color("ffd079"))
 		cells.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 		cells.offset_left = 10
 		cells.offset_right = -10
-		var entry_icon := TextureRect.new()
-		entry_icon.texture = EquipmentIcons.icon(item.icon, item.icon)
-		entry_icon.modulate = Profile.RARITY_COLORS[item.rarity]
-		entry_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		entry_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		entry_icon.custom_minimum_size.x = 29
-		entry_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		cells.add_child(entry_icon)
-		cells.move_child(entry_icon, 0)
+		workshop_texture(cells, shop_icon(item), 29)
+		cells.move_child(cells.get_child(-1), 0)
 		var name_label := cells.get_child(1) as Label
 		cells.remove_child(name_label)
 		var name_stack := VBoxContainer.new()
@@ -1720,14 +1736,18 @@ func build_shop(columns: HBoxContainer) -> void:
 		cells.add_child(name_stack)
 		cells.move_child(name_stack, 1)
 		name_stack.add_child(name_label)
-		var tag_label := UI.label(name_stack, Profile.RARITY_NAMES[item.rarity], 14, Profile.RARITY_COLORS[item.rarity])
-		tag_label.autowrap_mode = TextServer.AUTOWRAP_OFF
-		tag_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		UI.profile_label(name_stack, Profile.RARITY_NAMES[item.rarity], 14, Profile.RARITY_COLORS[item.rarity])
 		record.focus_entered.connect(reveal.bind(id))
+		record.focus_neighbor_top = record.get_path_to(previous)
+		previous.focus_neighbor_bottom = previous.get_path_to(record)
 		record.focus_neighbor_right = record.get_path_to(plus)
-		if id == selected:
-			record.grab_focus()
+		rows[id] = record
+		previous = record
+	rows[selected].grab_focus()
 	reveal.call(selected)
+
+func shop_icon(item: Dictionary) -> Texture2D:
+	return MarketplaceIcons.icon(item)
 
 func shop_columns(parent: Control, item: String, type: String, price: String, color: Color) -> HBoxContainer:
 	var row := HBoxContainer.new()
@@ -2141,118 +2161,192 @@ func sector_card(entries: GridContainer, number: int, state: String) -> Button:
 	return choice
 
 func build_fabrication(columns: HBoxContainer) -> void:
-	var list := card(columns, 1.25)
-	var materials := card(columns, 0.75)
-	UI.label(list, "Known Recipes", 30, UI.CYAN)
-	UI.label(list, "OPERATOR LV. %d" % profile.operator_level, 18, Color("ffd079"))
+	var recipes := card(columns, 1.0)
+	var overview := card(columns, 1.32)
+	var storage := card(columns, 0.96)
+	workshop_heading(recipes, "Known Recipes")
+	UI.profile_label(recipes, "OPERATOR LV. %d" % profile.operator_level, 18, Color("ffd079"))
 	var filter := OptionButton.new()
-	list.add_child(filter)
+	recipes.add_child(filter)
 	UI.style_button(filter)
 	var filters: Array = [""] + Profile.GEAR_SLOTS.keys()
 	for slot in filters:
-		filter.add_item(Profile.GEAR_SLOTS.get(slot, "All equipment"))
-	filter.custom_minimum_size.x = 155
+		filter.add_item(Profile.GEAR_SLOTS.get(slot, "All Equipment"))
+	filter.custom_minimum_size = Vector2(162, 33)
 	filter.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	filter.set_meta(&"return_focus", "recipe/filter")
 	filter.select(maxi(0, filters.find(inventory_slot)))
 	filter.item_selected.connect(func(index: int):
 		inventory_slot = filters[index]
 		show_page("Fabrication")
 	)
-	var items: Array[String] = []
-	for id in Profile.GEAR:
-		if profile.blueprints.has(id) and (inventory_slot.is_empty() or Profile.GEAR[id].slot == inventory_slot):
-			items.append(id)
-	build_item_grid(list, items, true, 8)
-	UI.label(materials, "Materials in Storage", 26, UI.CYAN)
-	var stock := scroll_entries(materials)
+
+	var recipe_list := scroll_entries(recipes)
+	recipe_list.add_theme_constant_override("separation", 7)
+	var preview := scroll_entries(overview)
+	preview.add_theme_constant_override("separation", 11)
+	var craft := UI.button(overview, "Craft Item", func(): inspect_shop_item(focused_item), true, 47)
+	craft.icon = preload("res://assets/ui/riftcore_kit/icon_craft.png")
+	craft.add_theme_constant_override("icon_max_width", 23)
+	craft.custom_minimum_size.x = 205
+	craft.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	var availability := UI.label(overview, "", 15, UI.MUTED)
+	availability.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	availability.hide()
+
+	workshop_heading(storage, "Materials in Storage", preload("res://assets/ui/riftcore_kit/icon_storage.png"))
+	var stock := scroll_entries(storage)
+	stock.add_theme_constant_override("separation", 7)
 	for id in profile.materials:
-		if int(profile.materials[id]) > 0:
-			add_stat_group(stock, Materials.label(id), str(profile.materials[id]))
+		var count := int(profile.materials[id])
+		if count > 0:
+			crafting_material_row(stock, id, count)
 	if stock.get_child_count() == 0:
-		UI.label(stock, "No materials yet. Extract with salvage or buy materials and stow them from Inventory.", 17, UI.MUTED)
+		UI.label(stock, "No materials in Storage. Recover salvage or buy materials in Marketplace.", 17, UI.MUTED)
 	if not inventory_status.is_empty():
-		UI.label(materials, inventory_status, 16, UI.VIOLET)
+		UI.label(storage, inventory_status, 16, UI.VIOLET)
 
-func build_item_grid(parent: VBoxContainer, items: Array[String], blueprints: bool, max_columns: int) -> void:
-	if items.is_empty():
-		UI.label(parent, "No recipes in this category. Learn recovered blueprints from Storage." if blueprints else "No gear available.", 16, UI.MUTED)
-		return
-
-	var entries := scroll_entries(parent)
-	var grid := GridContainer.new()
-	grid.columns = 1
-	grid.add_theme_constant_override("h_separation", UI.ITEM_GAP)
-	grid.add_theme_constant_override("v_separation", UI.ITEM_GAP)
-	entries.add_child(grid)
-
-	var detail_card := UI.equipment_card(UI.CYAN)
-	parent.add_child(detail_card)
-	var details := UI.column(detail_card, 3)
-	var title := UI.label(details, "", 18)
-	title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	title.autowrap_mode = TextServer.AUTOWRAP_OFF
-	var state := UI.label(details, "", 14)
-	var perk := UI.label(details, "", 15, UI.MUTED)
-	var action := UI.button(details, "Inspect Blueprint" if blueprints else "Equip", func():
-		if blueprints:
-			inspect_shop_item(focused_item)
-		else:
-			inventory_status = profile.move_gear(focused_item)
-			show_page(page)
-	, false, 35)
-
+	var rows: Dictionary[String, Button] = {}
 	var reveal := func(id: String):
 		focused_item = id
-		var item: Dictionary = Profile.GEAR[id]
-		var owned: String = profile.gear.get(id, "")
-		var status := item_status(id, blueprints)
-		title.text = item.name
-		title.tooltip_text = item.name
-		perk.text = item.perk
-		state.text = "%s  /  %s  /  %s" % [Profile.RARITY_NAMES[item.rarity], Profile.GEAR_SLOTS[item.slot], status]
-		state.add_theme_color_override("font_color", Profile.RARITY_COLORS[item.rarity])
-		if blueprints:
-			action.text = "Inspect Blueprint" if owned.is_empty() else "Owned"
-		else:
-			var equipped: String = profile.equipped_for(item.slot)
-			action.text = "Stow" if owned == "equipped" else ("Equip" if equipped.is_empty() else "Replace " + String(Profile.GEAR[equipped].name))
-		action.disabled = blueprints and not owned.is_empty()
+		for key in rows:
+			rows[key].set_pressed_no_signal(key == id)
+		craft.focus_neighbor_left = craft.get_path_to(rows[id])
+		craft.set_meta(&"return_focus", "recipe/" + id)
+		show_recipe_preview(preview, id)
+		var storage_limit: String = profile.craft_limit(id)
+		var equip_limit: String = profile.craft_limit(id, true)
+		craft.disabled = not storage_limit.is_empty() and not equip_limit.is_empty()
+		availability.text = storage_limit if craft.disabled else ""
+		availability.visible = craft.disabled
 
-	var initial := focused_item if focused_item in items else items[0]
-	var tiles: Array[Button] = []
-	for id in items:
-		var item: Dictionary = Profile.GEAR[id]
-		var tint: Color = Profile.RARITY_COLORS[item.rarity]
-		var texture := EquipmentIcons.icon(id, item.slot)
-		var tile := UI.item_tile(grid, texture, tint, item.rarity, item_tile_caption(id, blueprints), func():
+	var previous: Control = filter
+	for id in Profile.GEAR:
+		var recipe: Dictionary = Profile.GEAR[id]
+		if not profile.blueprints.has(id) or (not inventory_slot.is_empty() and recipe.slot != inventory_slot):
+			continue
+		var title := crafting_recipe_name(recipe)
+		var row := UI.button(recipe_list, title, func():
 			reveal.call(id)
-			if not action.disabled:
-				action.grab_focus()
-		)
-		tile.tooltip_text = "%s
-%s" % [item.name, item.perk]
-		tile.focus_entered.connect(reveal.bind(id))
-		tiles.append(tile)
-	var fit_columns := func():
-		var columns := UI.item_grid_columns(entries.get_parent(), max_columns)
-		grid.columns = columns
-		for index in tiles.size():
-			var tile := tiles[index]
-			tile.focus_neighbor_bottom = tile.get_path_to(action) if index + columns >= tiles.size() else NodePath()
-	entries.resized.connect(fit_columns)
-	fit_columns.call_deferred()
-	for tile in tiles:
-		tile.focus_entered.connect(func(): action.focus_neighbor_top = action.get_path_to(tile))
-	action.focus_neighbor_top = action.get_path_to(tiles[items.find(initial)])
-	reveal.call(initial)
-	if page == "Storage":
-		tiles[items.find(initial)].grab_focus()
+			if not craft.disabled:
+				craft.grab_focus()
+		, false, 44)
+		row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		row.clip_text = true
+		row.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		row.toggle_mode = true
+		row.icon = EquipmentIcons.icon(id, recipe.slot)
+		row.add_theme_constant_override("icon_max_width", 27)
+		row.add_theme_constant_override("h_separation", 10)
+		row.set_meta(&"return_focus", "recipe/" + id)
+		row.tooltip_text = title
+		var highlight := UI.profile_frame(Color("103949"), UI.CYAN, Vector2(13, 5), true)
+		row.add_theme_stylebox_override("pressed", highlight)
+		row.add_theme_stylebox_override("hover_pressed", highlight)
+		row.focus_entered.connect(reveal.bind(id))
+		row.focus_neighbor_top = row.get_path_to(previous)
+		previous.focus_neighbor_bottom = previous.get_path_to(row)
+		previous = row
+		row.focus_neighbor_right = row.get_path_to(craft)
+		rows[id] = row
+	if rows.is_empty():
+		workshop_heading(preview, "Recipe Details")
+		UI.label(preview, "Learn recovered blueprints at Operator → Storage." if inventory_slot.is_empty() else "No learned recipes in this equipment category.", 18, UI.MUTED)
+		craft.hide()
+	else:
+		reveal.call(focused_item if rows.has(focused_item) else rows.keys()[0])
 
-func item_tile_caption(id: String, blueprints: bool) -> String:
-	var status := item_status(id, blueprints)
-	if status == "Blueprint" and Profile.GEAR[id].has("sector"):
-		return "S%02d" % Profile.GEAR[id].sector
-	return status
+func crafting_recipe_name(recipe: Dictionary) -> String:
+	return "S%02d  –  %s" % [recipe.sector, recipe.name] if recipe.has("sector") else String(recipe.name)
+
+func workshop_heading(parent: VBoxContainer, title: String, icon: Texture2D = null, note := "") -> Label:
+	var banner := PanelContainer.new()
+	banner.add_theme_stylebox_override("panel", UI.profile_frame(Color("0e293a"), Color("2a637c"), Vector2(11, 5)))
+	parent.add_child(banner)
+	var row := HBoxContainer.new()
+	banner.add_child(row)
+	row.add_theme_constant_override("separation", 8)
+	if icon:
+		workshop_texture(row, icon, 24)
+	var heading := UI.label(row, title, 26, UI.CYAN)
+	heading.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	heading.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	if not note.is_empty():
+		row.add_child(VSeparator.new())
+		UI.profile_label(row, note, 17, Color("ffd079"))
+	var marks := Control.new()
+	marks.custom_minimum_size.x = 33
+	row.add_child(marks)
+	marks.draw.connect(func():
+		var y := marks.size.y * 0.5 - 6.0
+		for index in 3:
+			var a := Vector2(10.0 + index * 9.0, y)
+			marks.draw_colored_polygon(PackedVector2Array([a, a + Vector2(5, 0), a + Vector2(-4, 12), a + Vector2(-9, 12)]), Color(UI.CYAN, 0.38))
+	)
+	return heading
+
+func show_recipe_preview(preview: VBoxContainer, id: String) -> void:
+	for child in preview.get_children():
+		preview.remove_child(child)
+		child.queue_free()
+	var recipe: Dictionary = Profile.GEAR[id]
+	workshop_heading(preview, crafting_recipe_name(recipe))
+	var rarity: Color = Profile.RARITY_COLORS[recipe.rarity]
+	UI.profile_label(preview, "%s  /  %s  /  %s" % [Profile.RARITY_NAMES[recipe.rarity], Profile.GEAR_SLOTS[recipe.slot], item_status(id, true)], 16, rarity)
+	var hero := HBoxContainer.new()
+	hero.add_theme_constant_override("separation", 15)
+	preview.add_child(hero)
+	var schematic := UI.equipment_card(UI.CYAN)
+	schematic.custom_minimum_size = Vector2(102, 102)
+	hero.add_child(schematic)
+	var grid := Control.new()
+	grid.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	schematic.add_child(grid)
+	grid.draw.connect(func():
+		var ink := Color(UI.CYAN, 0.10)
+		for x in range(0, int(grid.size.x), 11):
+			grid.draw_line(Vector2(x, 0), Vector2(x, grid.size.y), ink)
+		for y in range(0, int(grid.size.y), 11):
+			grid.draw_line(Vector2(0, y), Vector2(grid.size.x, y), ink)
+	)
+	workshop_texture(schematic, EquipmentIcons.icon(id, recipe.slot), 76)
+	var detail := UI.column(hero, 6)
+	detail.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	detail.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	UI.label(detail, recipe.perk, 23, UI.CYAN)
+	UI.label(detail, "Requires Operator Lv. %d" % profile.crafting_level(id), 16, UI.MUTED)
+	workshop_heading(preview, "Crafting Requirements")
+	var bill: Dictionary = profile.recipe_materials(id)
+	for material in bill:
+		crafting_material_row(preview, material, int(profile.materials.get(material, 0)), int(bill[material]))
+
+func crafting_material_row(parent: VBoxContainer, id: String, available: int, needed := 0) -> void:
+	var plate := PanelContainer.new()
+	plate.add_theme_stylebox_override("panel", UI.profile_frame(Color("0c2030"), Color("31556e"), Vector2(9, 4)))
+	parent.add_child(plate)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	plate.add_child(row)
+	var icon_name := "gear" if id in ["scrap", "components"] else ("lightning" if id == "cells" else "storage")
+	workshop_texture(row, load(UI.KIT + "icon_" + icon_name + ".png"), 22)
+	var title := UI.label(row, Materials.label(id), 17)
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	var tint := UI.WHITE if needed == 0 else (UI.CYAN if available >= needed else Color("ff9e91"))
+	UI.profile_label(row, str(available) if needed == 0 else "%d / %d" % [available, needed], 18, tint)
+	if needed > 0:
+		UI.profile_label(row, "✓" if available >= needed else "!", 18, tint)
+
+func workshop_texture(parent: Control, texture: Texture2D, extent: int) -> TextureRect:
+	var icon := TextureRect.new()
+	icon.texture = texture
+	icon.custom_minimum_size = Vector2(extent, extent)
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(icon)
+	return icon
 
 func item_status(id: String, blueprints: bool) -> String:
 	var owned: String = profile.gear.get(id, "")
@@ -2363,7 +2457,7 @@ func build_gear(columns: HBoxContainer) -> void:
 	EquipmentStats.apply(actor, profile)
 	actor.gain_experience(saved_experience, false)
 	add_stat_group(fitted, "DMG", "%.1f buster  /  %.1f blade" % [actor.buster_power(), actor.buster_power() * actor.melee_multiplier])
-	add_stat_group(fitted, "DEF", "%.1f%% reduction" % (100.0 - actor.mitigate_damage(100.0)))
+	add_stat_group(fitted, "DEF", "%.1f%% reduction" % (100.0 * actor.defense_rating()))
 	add_stat_group(fitted, "ENG  /  HP", "%.0f energy  /  %.0f max health" % [actor.max_energy, actor.max_health])
 	add_stat_group(fitted, "SPD", "%.1f run  /  %.1f dash" % [actor.move_speed, actor.dash_speed])
 
