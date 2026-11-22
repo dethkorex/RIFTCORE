@@ -193,7 +193,7 @@ func hit_operator(operator: RiftPlayer, power: float) -> void:
 	if float(contact_timers.get(id, 0.0)) > 0.0:
 		return
 	contact_timers[id] = 0.67
-	operator.take_damage(power, global_position)
+	operator.take_damage(power * encounter_attack_scale, global_position)
 
 func elevated_operator() -> RiftPlayer:
 	for operator: RiftPlayer in operators():
@@ -357,7 +357,7 @@ func update_rush(prior: float, delta: float) -> void:
 			var id: int = body.get_instance_id()
 			if not hit_players.has(id) and where.x > lo and where.x < hi and where.y < floor_height + 2.30:
 				hit_players[id] = true
-				body.take_boss_hit(33.0 + 5.0 * phase_index(), global_position, 1, true)
+				body.take_boss_hit((33.0 + 5.0 * phase_index()) * encounter_attack_scale, global_position, 1, true)
 		if quench_index >= 0 and absf(next_x - global_position.x) < 0.12:
 			world_impact = true
 			open_armor()
@@ -439,7 +439,7 @@ func fire_at(prior: float, at: float, height: float, is_drill: bool) -> void:
 	get_parent().add_child(shot)
 	shot.global_position = muzzle
 	shot.speed = 23.0 if is_drill else 12.5 + phase_index() * 1.0
-	shot.damage = (24.0 if is_drill else 17.0) + phase_index() * 4.0
+	shot.damage = ((24.0 if is_drill else 17.0) + phase_index() * 4.0) * encounter_attack_scale
 	shot.lifetime = 2.45
 	shot.setup(Vector3(facing, 0.0, 0.0), faction, ORANGE, is_drill, false, not is_drill)
 	var source := armor.drill_tip if is_drill else (armor.left_burner if height < 1.0 else armor.right_burner)
@@ -481,7 +481,8 @@ func advance_flames(authority: bool) -> void:
 				var at: Vector3 = body.global_position - flame.global_position
 				if not struck.has(id) and absf(at.x) < flame.width * 0.49 + 0.32 and at.y > 0.0 and at.y < flame.height + 0.49:
 					struck[id] = true
-					body.take_boss_hit((21.0 if warden else 29.0) + phase_index() * 3.0, flame.global_position, 1, true)
+					var power := (21.0 if warden else 29.0) + phase_index() * 3.0
+					body.take_boss_hit(power * encounter_attack_scale, flame.global_position, 1, true)
 
 func show_rush_markers() -> void:
 	var lo := minf(rush_origin, rush_destination()) - (2.45 if facing < 0 else 0.75)

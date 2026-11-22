@@ -207,7 +207,7 @@ func damage_on_contact(player: RiftPlayer) -> void:
 		var power := (34.0 if charge_time > 0.0 else 22.0) * briar_damage_scale if jungle_rig else 11.0 + sector
 		if frozen_rig:
 			power = 32.0 if charge_time > 0.0 else 26.0
-		player.take_damage(power, global_position)
+		player.take_damage(power * encounter_attack_scale, global_position)
 
 func _physics_process(delta: float) -> void:
 	if not active or not is_instance_valid(target) or target.health <= 0.0:
@@ -422,6 +422,7 @@ func strike() -> void:
 	var power := 32.0 * briar_damage_scale if jungle_rig else 15.0 + sector * 1.65
 	if frozen_rig:
 		power = 38.0 * Difficulty.boss_damage_scale(difficulty_mode)
+	power *= encounter_attack_scale
 	match attack:
 		"charge":
 			charge_time = 0.53

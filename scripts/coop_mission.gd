@@ -50,14 +50,13 @@ const BLOCKED_CORRECTION_DISTANCE := 1.15
 # Terrain movement fields can see the guest prediction body. Combat and pickups use layer 1.
 const PREDICTION_LAYER := 1 << 6
 const SECURITY_SCALES := [32.0, 32.0, 32.0, 2048.0, 2048.0, 16.0]
-const DIFFICULTY_PER_GUEST := 0.25
 const XP_BONUS := 1.5
+const BASE_XP_PER_GUEST_BONUS := 4
 const Profile := preload("res://scripts/rogue_profile.gd")
 
 var host := false
 var roster: Array = []
 var local_index := 0
-var difficulty := 1.0
 var mode := 0
 var remote_players: Dictionary = {}
 var sector := 1
@@ -151,6 +150,7 @@ var last_saber_states: Array[int] = []
 var hud_clock := HUD_INTERVAL
 var outcome := ""
 var team_xp := 0
+var guest_xp_progress := 0
 var sector_seconds := 0.0
 var chat_open := false
 var window_input_blocked := false
@@ -215,7 +215,6 @@ func _ready() -> void:
 	guest_reserves = local_profile.reserve_lives
 	for index in roster.size():
 		personal_rewards.append({"bolts": 0, "blueprints": [], "materials": {}, "supplies": {}, "kills": 0, "deaths": 0})
-	difficulty = (1.0 + DIFFICULTY_PER_GUEST * (roster.size() - 1)) * Difficulty.combat_scale(sector, mode)
 	if host:
 		for id in roster.slice(1):
 			var loadout = Profile.new()
@@ -452,7 +451,7 @@ func load_stage(packed: PackedScene = null) -> void:
 		stage.set_meta(&"replicate_projectile", send_shot)
 	add_child(stage)
 	var actors := stage.get_node("Actors")
-	actors.set_meta("opponent_health_scale", difficulty)
+	actors.set_meta("party_size", roster.size())
 	actors.set_meta("mission_difficulty", mode)
 	actors.set_meta("loot_scale", Difficulty.LOOT[mode])
 	var first := actors.get_node("RiftcoreMecha") as RiftPlayer
@@ -473,7 +472,7 @@ func load_stage(packed: PackedScene = null) -> void:
 		operator.pit_floor_y = first.pit_floor_y
 		operator.remote_input = host and index != local_index
 		operator.set_controls_suspended(remote.get("suspended", false) if operator.remote_input else local_input_blocked() and index == local_index)
-		operator.damage_taken_scale = difficulty
+		operator.damage_taken_scale = Difficulty.incoming_damage_scale(sector, mode)
 		Equipment.apply(operator, loadout)
 		if previous.is_empty():
 			if index == local_index:
@@ -559,7 +558,7 @@ func load_stage(packed: PackedScene = null) -> void:
 			continue
 		var enemy := node as WalkerBot
 		enemy.mission_enemy = true
-		enemy.scale_for_sector(sector, act, difficulty, mode)
+		enemy.scale_for_sector(sector, act, mode, roster.size())
 		if host:
 			enemy.died.connect(earn_security_rewards.bind(enemy))
 			enemy.enemy_damaged.connect(send_enemy_hit.bind(enemies.size()))
@@ -674,7 +673,7 @@ func load_stage(packed: PackedScene = null) -> void:
 func scale_opponent(enemy: Combatant) -> void:
 	if host:
 		enemy.enemy_damaged.connect(send_enemy_hit.bind(-1))
-	enemy.apply_boss_scaling(sector, mode, act, 1.0 + DIFFICULTY_PER_GUEST * (roster.size() - 1))
+	enemy.apply_boss_scaling(sector, mode, act, roster.size())
 	enemy.health_changed.emit(enemy.health, enemy.max_health)
 
 func disable_replica(body: Combatant) -> void:
@@ -1311,7 +1310,11 @@ func build_hud() -> void:
 	update_hud_title()
 	stats = UI.label(content, "", 16)
 	build_teammate_status()
-	room_status = UI.label(content, "Enemy HP/DMG %.2f×  ·  Shared XP 1.5×" % difficulty, 16, UI.MUTED)
+	var squad := roster.size()
+	room_status = UI.label(content, "Squad enemy HP +%d%%  ·  Shared XP %.0f%%" % [
+		roundi((Difficulty.party_health_scale(squad) - 1.0) * 100.0),
+		100.0 * (XP_BONUS + float(maxi(0, squad - 1)) / BASE_XP_PER_GUEST_BONUS),
+	], 16, UI.MUTED)
 	rewards_status = UI.label(content, "", 15, UI.CYAN)
 	rewards_status.hide()
 	return_button = UI.button(content, "Pause", func():
@@ -1749,8 +1752,11 @@ func earn_security_rewards(enemy: WalkerBot) -> void:
 func award_team_experience(base_xp: int) -> void:
 	if not outcome.is_empty():
 		return
-	var xp := roundi(base_xp * XP_BONUS)
-	team_xp += xp
+	# Carry partial XP across rewards so small kills still contribute.
+	guest_xp_progress += base_xp * maxi(0, roster.size() - 1)
+	var guest_bonus := floori(float(guest_xp_progress) / BASE_XP_PER_GUEST_BONUS)
+	guest_xp_progress %= BASE_XP_PER_GUEST_BONUS
+	team_xp += roundi(base_xp * XP_BONUS) + guest_bonus
 	for index in operators.size():
 		var operator := operators[index]
 		var earned := maxi(0, deployment_xp.get(index, 0) + roundi(team_xp * operator.xp_gain_multiplier) - operator.experience)

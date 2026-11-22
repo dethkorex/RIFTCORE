@@ -141,9 +141,9 @@ func _physics_process(delta: float) -> void:
 			hazards.erase(h)
 		elif h["tick"] <= 0.0 and absf(target.global_position.x - effect.global_position.x) < float(h.get("radius", 1.65)) and target.global_position.y < body_floor + 2.05:
 			h["tick"] = 0.64
-			target.take_boss_hit(16.0 * verdant_damage_scale, effect.global_position, 2, true)
+			target.take_boss_hit(16.0 * verdant_damage_scale * encounter_attack_scale, effect.global_position, 2, true)
 	if absf(dx) < 1.44 and absf(target.global_position.y - global_position.y) < 1.42:
-		target.take_damage(33.0 * verdant_damage_scale, global_position)
+		target.take_damage(33.0 * verdant_damage_scale * encounter_attack_scale, global_position)
 	if phase_time > 0.0:
 		return
 	if attack >= 0:
@@ -221,7 +221,7 @@ func _release() -> void:
 			shot.collision_layer = 0
 			shot.collision_mask = 1
 			shot.speed = 12.0 + i * 2.5
-			shot.damage = 34.0 * verdant_damage_scale
+			shot.damage = 34.0 * verdant_damage_scale * encounter_attack_scale
 			shot.setup(Vector3(strike_dir, (i - (count - 1) * 0.5) * 0.24, 0), "enemy", TOXIN, false, i == count / 2, false, 2, 4)
 			scene.add_child(shot)
 			shot.global_position = global_position + Vector3(strike_dir * 1.43, 0.52, 0)
@@ -232,7 +232,7 @@ func _release() -> void:
 	var reach := 4.15 if attack == 0 else 1.30
 	create_tween().tween_callback(func():
 		if active and is_instance_valid(target) and absf(target.global_position.x - at.x) < reach and target.global_position.y < body_floor + 2.02:
-			target.take_damage(49.0 * verdant_damage_scale, at)
+			target.take_damage(49.0 * verdant_damage_scale * encounter_attack_scale, at)
 	).set_delay(.12)
 
 func draw_root_attack(move: int, at: Vector3, direction: float) -> void:
@@ -275,7 +275,7 @@ func update_root_flood(delta: float) -> void:
 			if drains[index].occupied_by(actor):
 				occupied = index if occupied < 0 else mini(occupied, index)
 		if flood_tick <= 0.0 and actor.global_position.x > arena_left - 1.0 and actor.global_position.x < arena_right + 2.0 and actor.global_position.y < body_floor + 2.05:
-			actor.take_boss_hit(16.0 * verdant_damage_scale, flood_mist.global_position, 2, true)
+			actor.take_boss_hit(16.0 * verdant_damage_scale * encounter_attack_scale, flood_mist.global_position, 2, true)
 	if flood_tick <= 0.0:
 		flood_tick = 0.64
 	if occupied != drain_index:
@@ -372,7 +372,7 @@ func _summon() -> void:
 	drone.target = target
 	drone.add_to_group(&"arena_minions")
 	get_parent().add_child(drone)
-	drone.scale_for_sector(2, 2, Difficulty.combat_scale(2, difficulty_mode), difficulty_mode)
+	drone.scale_for_sector(2, 2, difficulty_mode, get_parent().get_meta("party_size", 1))
 
 func _break_apart() -> void:
 	active = false

@@ -449,7 +449,7 @@ func verify_coop_mission(host: bool, smoke_sector: int, wipe_test := false) -> v
 		finish_relay_check(false)
 		return
 	var spawn_x := local_operator.position.x
-	if mission.camera.target != local_operator or not is_equal_approx(local_operator.damage_taken_scale, mission.difficulty) or not mission.personal_hud.coop or not mission.personal_hud.is_visible_in_tree():
+	if mission.camera.target != local_operator or not is_equal_approx(local_operator.damage_taken_scale, Difficulty.incoming_damage_scale(mission.sector, mission.mode)) or not mission.personal_hud.coop or not mission.personal_hud.is_visible_in_tree():
 		print("Campaign check failed local camera or HUD")
 		finish_relay_check(false)
 		return
@@ -1984,11 +1984,9 @@ func build_level() -> void:
 	player = game_root.get_node("Actors/RiftcoreMecha") as RiftPlayer
 	var actors_root := game_root.get_node("Actors")
 	actors_root.set_meta("loot_scale", Difficulty.LOOT[mission_difficulty])
-	var combat_scale := Difficulty.combat_scale(sector, mission_difficulty)
-	actors_root.set_meta("opponent_health_scale", combat_scale)
 	actors_root.set_meta("mission_difficulty", mission_difficulty)
 	player.set_operator_appearance(current_operator_frame(), current_armor_finish())
-	player.damage_taken_scale = combat_scale
+	player.damage_taken_scale = Difficulty.incoming_damage_scale(sector, mission_difficulty)
 	player.experience = 0
 	player.quick_profile = profile
 	player_collision_layer = player.collision_layer
@@ -2001,7 +1999,7 @@ func build_level() -> void:
 		if not game_root.is_ancestor_of(enemy):
 			continue
 		enemy.target = player
-		enemy.scale_for_sector(sector, act, combat_scale, mission_difficulty)
+		enemy.scale_for_sector(sector, act, mission_difficulty)
 		enemy.operator_at_deploy = player
 		enemy.died.connect(_enemy_defeated)
 		remaining_enemies += 1

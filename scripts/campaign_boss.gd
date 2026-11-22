@@ -99,7 +99,7 @@ func damage_on_contact(player: RiftPlayer) -> void:
 	if not active or contact_left > 0.0:
 		return
 	contact_left = 0.65
-	player.take_damage(22.0 + sector_number * 1.9, global_position)
+	player.take_damage((22.0 + sector_number * 1.9) * encounter_attack_scale, global_position)
 
 func phase() -> int:
 	return 2 if health < max_health * 0.30 else (1 if health < max_health * 0.66 else 0)
@@ -262,7 +262,7 @@ func fire(at: Vector3, aim: Vector3, power: float, speed: float, heavy := false)
 	shot.boss_status_sector = sector_number
 	shot.collision_layer = 0
 	shot.collision_mask = 1 | 128
-	shot.damage = power
+	shot.damage = power * encounter_attack_scale
 	shot.speed = speed
 	shot.lifetime = 3.2
 	shot.setup(aim, faction, ATTACK_FX.tint_for(sector_number), false, heavy, false, sector_number, 4)
@@ -305,7 +305,7 @@ func update_fields(delta: float) -> void:
 		if data.pull != 0.0:
 			target.velocity.x += signf(diff.x) * float(data.pull) * 25.0 * delta
 		if data.tick <= 0.0 and (not data.crouchable or not target.low_profile):
-			target.take_boss_hit(data.damage, fx.global_position, sector_number)
+			target.take_boss_hit(data.damage * encounter_attack_scale, fx.global_position, sector_number)
 			data.tick = 0.66
 
 func ice_wall(x: float) -> void:
@@ -345,7 +345,7 @@ func summon() -> void:
 	add.add_to_group("arena_minions")
 	var actors := get_parent()
 	actors.add_child(add)
-	add.scale_for_sector(sector_number, 2, actors.get_meta("opponent_health_scale", 1.0), actors.get_meta("mission_difficulty", 0))
+	add.scale_for_sector(sector_number, 2, difficulty_mode, actors.get_meta("party_size", 1))
 
 func check_supply() -> void:
 	if supply_index >= 2 or health / max_health > [0.66, 0.32][supply_index]:

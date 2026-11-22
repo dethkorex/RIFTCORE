@@ -2078,9 +2078,9 @@ func show_mission_intel(panel: VBoxContainer, connected: bool, can_deploy: bool)
 	var difficulty_hint := UI.label(panel, "", 16, UI.MUTED)
 	var refresh := func(index: int):
 		selected_difficulty = index
-		difficulty_hint.text = "Recommended Lv. %d  ·  %.2f× enemy HP and damage  ·  +%d%% enemy movement%s" % [
-			Difficulty.recommended_level(selected_sector, index), Difficulty.combat_scale(selected_sector, index),
-			roundi((Difficulty.enemy_speed_scale(selected_sector, index) - 1.0) * 100),
+		difficulty_hint.text = "Recommended Lv. %d  ·  Enemies %.2f× HP  ·  Bosses %.2f× HP  ·  Incoming damage %.2f×%s" % [
+			Difficulty.recommended_level(selected_sector, index), Difficulty.ENEMY_HEALTH[index],
+			Difficulty.BOSS_HEALTH[index], Difficulty.INCOMING_DAMAGE[index],
 			"  ·  Better rare loot" if index > Difficulty.NORMAL else "",
 		]
 	refresh.call(selected_difficulty)

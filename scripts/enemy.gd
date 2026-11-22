@@ -9,6 +9,7 @@ const Guard := preload("res://scripts/enemy_guard.gd")
 const Catalog := preload("res://scripts/sector_catalog.gd")
 const Difficulty := preload("res://scripts/mission_difficulty.gd")
 const PATROL_SPEEDS := [2.4, 3.6, 1.35, 0.0, 2.5]
+const BASE_HEALTH := [40.0, 55.0, 95.0, 60.0, 35.0]
 const ARMOR := preload("res://assets/enemies/security_finish.gdshader")
 const HEIGHT_ATLAS := preload("res://assets/enemies/security_height.png")
 const ALBEDO_ATLAS := preload("res://assets/enemies/security_trim.png")
@@ -80,20 +81,19 @@ var locked_aim := Vector3.ZERO
 var ledge_probe := PhysicsRayQueryParameters3D.new()
 var ledge_target := RID()
 
-func scale_for_sector(sector: int, act: int, health_scale: float, mode: int) -> void:
+func scale_for_sector(sector: int, act: int, mode: int, party_size := 1) -> void:
 	sector_number = sector
 	difficulty_mode = mode
 	enemy_level = Difficulty.recommended_level(sector, mode)
 	level_tag.text = "LV. %d" % enemy_level
 	second_act = act == 2
 	var steps := maxi(0, sector - 1)
-	max_health = [40.0, 55.0, 95.0, 60.0, 35.0][variant] * (1.0 + 0.30 * steps) * (1.32 if second_act else 1.0) * health_scale
+	max_health = BASE_HEALTH[variant] * Difficulty.enemy_health_scale(sector, mode, act, party_size)
 	if is_in_group(&"spillway_patrol"):
 		max_health *= .66
 	move_speed = PATROL_SPEEDS[variant] * Difficulty.enemy_speed_scale(sector, mode)
 	health = max_health
-	var extra_levels := enemy_level - Difficulty.recommended_level(sector, Difficulty.NORMAL)
-	sector_damage_scale = (1.0 + 0.20 * steps) * (1.20 if second_act else 1.0) * (1.0 + 0.02 * extra_levels)
+	sector_damage_scale = (1.0 + .06 * steps) * (1.15 if second_act else 1.0)
 	sector_experience_scale = 1.0 + 0.10 * steps
 	health_changed.emit(health, max_health)
 
@@ -104,7 +104,7 @@ func _ready() -> void:
 	if patrol_model >= 0:
 		variant = STANDARD_ROLES[patrol_model]
 	has_defense = variant == Variant.HEAVY or patrol_model == 3
-	max_health = [40.0, 55.0, 95.0, 60.0, 35.0][variant]
+	max_health = BASE_HEALTH[variant]
 	move_speed = PATROL_SPEEDS[variant]
 	super._ready()
 	ledge_probe.exclude = [get_rid()]

@@ -20,6 +20,7 @@ var incoming_critical := false
 var damage_operator_id := 0
 var defeated_by_operator_id := 0
 var health: float
+var encounter_attack_scale := 1.0
 var invulnerable_time := 0.0
 var burn_left := 0.0
 var corrosion_left := 0.0
@@ -32,10 +33,11 @@ var damage_flash: EnemyDamageFlash
 func _ready() -> void:
 	health = max_health
 
-func apply_boss_scaling(sector: int, mode: int, act: int, party_scale := 1.0) -> void:
+func apply_boss_scaling(sector: int, mode: int, act: int, party_size := 1) -> void:
 	if has_method("configure_difficulty"):
 		call("configure_difficulty", mode)
-	max_health *= party_scale * BOSS_DIFFICULTY.boss_health_scale(sector, mode, act)
+	max_health = BOSS_DIFFICULTY.boss_health(sector, mode, act, party_size)
+	encounter_attack_scale = BOSS_DIFFICULTY.MINIBOSS_ATTACK_SCALE if act == 1 else BOSS_DIFFICULTY.BOSS_ATTACK_SCALE
 	health = max_health
 
 func take_damage(amount: float, source_position := Vector3.ZERO) -> void:
