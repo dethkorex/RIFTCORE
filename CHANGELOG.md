@@ -1,12 +1,5 @@
-# RIFTCORE Alpha 6.3.60
+# RIFTCORE Alpha 6.3.61
 
-## Ember Foundry
+## Co-op
 
-- Act I opens in the Pressure House. Slide through a service shutter, wall-jump to the inspection gallery, or cross the lower slag trench. The locker and boiler relays open return passages deeper into the facility.
-- Act II opens in the Transfer Works. The crane bridge and settling drain rejoin at the transfer lock. The valve gallery leads back to the lava escape checkpoint.
-- Both lower routes have a new inspection plinth over exposed slag. Missing the landing costs a life. The boiler discharge has a wider takeoff for the first jump.
-- Hosting and joining now use the same session clock from the start, so a newly joined operator can receive the first mission updates.
-- Foundry enemy movement now travels separately from room updates. Switch activations use reliable delivery so both operators see the same open paths. Update both players before starting a party.
-- The lava escape still waits for the party at the entrance. If one operator reaches the upper gallery and a partner respawns below, the returning partner can reopen the door for another attempt.
-- Added patrols at the new crossings and adjusted their movement to keep them on solid ground.
-- Kiln Warden retreats to a wall-mounted gantry during the lava surge. Climb to the purge valve to drain the room and bring the Warden back down.
+- Fixed a Linux host disconnect during busy co-op encounters on networks with a smaller packet size limit. The relay sends smaller batches and flushes each outgoing batch separately.

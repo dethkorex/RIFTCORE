@@ -666,7 +666,12 @@ func _send_multiplayer_packet(bytes : PackedByteArray, transfer_mode : int, tran
 		return
 	client.transfer_mode = transfer_mode
 	client.transfer_channel = transfer_channel
-	client.put_packet(bytes)
+	var result : Error = client.put_packet(bytes)
+	if result != OK:
+		logger.write_error("Failed to queue relay packet: "+error_string(result))
+	elif client is ENetMultiplayerPeer and not is_local():
+		# Keep separately sized relay messages in separate outbound UDP datagrams.
+		client.host.flush()
 
 func _send_websocket_packet(bytes : PackedByteArray) -> void:
 	await _await_artificial_latency()

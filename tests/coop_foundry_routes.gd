@@ -8,9 +8,11 @@ var actor: Node3D
 var shaft: Node3D
 var checkpoint_dir := ""
 var sequence := 0
+var require_continuous := false
 
 func exercise(client) -> void:
 	test = client
+	require_continuous = OS.get_cmdline_user_args().has("--require-continuous")
 	test.lobby.recovery.changed.connect(rejoin_if_offered, CONNECT_DEFERRED)
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--foundry-sync="):
@@ -51,6 +53,9 @@ func exercise(client) -> void:
 	await sync("hub-return")
 
 func rejoin_if_offered() -> void:
+	if require_continuous and test.lobby.recovery.active():
+		test.check(false, "The party connection was interrupted")
+		return
 	var button = test.game.recovery_button
 	if is_instance_valid(button) and button.is_visible_in_tree() and not button.disabled:
 		print("FOUNDRY accepting Rejoin Party")

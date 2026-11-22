@@ -21,7 +21,10 @@ def main():
     parser.add_argument("--suite", choices=("network", "campaign", "abyssal", "lava", "foundry", "foundry-escape"), default="network")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--distro", default="RIFTCORE-QA")
+    parser.add_argument("--require-continuous", action="store_true", help="Fail a Foundry run if either operator enters connection recovery.")
     args = parser.parse_args()
+    if args.require_continuous and not args.suite.startswith("foundry"):
+        parser.error("--require-continuous is for Foundry route tests")
     repo = Path(__file__).resolve().parents[1]
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=True)
@@ -43,6 +46,8 @@ def main():
         cli = ["--headless", "--path", str(repo), "--max-fps", "60", "--script", "res://tests/coop_stress.gd",
                "--", "--coop-stress", "host" if index == 0 else "join",
                str(len(platforms)), str(index), args.suite, *([room] if room else [])]
+        if args.require_continuous:
+            cli.append("--require-continuous")
         if args.suite.startswith("foundry"):
             cli.append("--foundry-sync=" + (str(checkpoints) if platforms[index] == "windows" else linux_path(checkpoints)))
         env = os.environ.copy()

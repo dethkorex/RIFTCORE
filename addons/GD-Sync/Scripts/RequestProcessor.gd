@@ -84,7 +84,7 @@ func clear_for_server_switch() -> void:
 const _WIRE_COMPRESSION : int = FileAccess.COMPRESSION_ZSTD
 const _MAX_PLAIN_REQUEST_BATCH_BYTES : int = 20480
 const _MAX_DECOMPRESSED_PACKET_BYTES : int = 2097152
-const _UNRELIABLE_WIRE_LIMIT : int = 1200
+const _UDP_WIRE_LIMIT : int = 1200
 const _UNRELIABLE_COMPRESS_HEADROOM : int = 64
 const _UNRELIABLE_AUTH_NONCE_PLACEHOLDER : int = 9223372036854775807
 const _TARGET_CLIENT_ID_MASK : int = 0x3FFFFFFF
@@ -209,7 +209,11 @@ func package_requests(type : int) -> PackedByteArray:
 		batch = requests.duplicate()
 		var sized : Dictionary = {packet_type: batch}
 		var sized_plain : PackedByteArray = var_to_bytes(sized)
-		while sized_plain.size() > _MAX_PLAIN_REQUEST_BATCH_BYTES and batch.size() > 1:
+		# The encrypted envelope and ENet headers also have to fit narrow links.
+		var plain_limit := _MAX_PLAIN_REQUEST_BATCH_BYTES
+		if connection_controller.client is ENetMultiplayerPeer and not connection_controller.is_local():
+			plain_limit = _UDP_WIRE_LIMIT - 128
+		while sized_plain.size() > plain_limit and batch.size() > 1:
 			batch = batch.slice(0, ceili(batch.size() / 2.0))
 			sized = {packet_type: batch}
 			sized_plain = var_to_bytes(sized)
@@ -277,7 +281,7 @@ func _unreliable_prefix_fits(requests : Array, count : int, packet_type : int) -
 		else:
 			batch.append(request)
 	var plain : PackedByteArray = var_to_bytes({packet_type: batch})
-	return _estimate_unreliable_wire_bytes(plain) <= _UNRELIABLE_WIRE_LIMIT
+	return _estimate_unreliable_wire_bytes(plain) <= _UDP_WIRE_LIMIT
 
 func _estimate_unreliable_wire_bytes(plain : PackedByteArray) -> int:
 	var pad : int = 16 - (plain.size() % 16)
