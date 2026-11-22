@@ -94,9 +94,6 @@ func _ready() -> void:
 	get_tree().scene_changed.connect(_on_scene_change)
 	current_scene = get_tree().current_scene
 	current_scene.tree_exiting.connect(_on_old_scene_exiting)
-	
-	randomize()
-	synced_time = randf_range(0, 1000)
 
 func _process(delta):
 	_process_scene_change(delta)
@@ -112,14 +109,15 @@ func handle_events(delta : float) -> void:
 			GDSync.synced_event_triggered.emit(event["Name"], event["Parameters"])
 			events.erase(event)
 	
-	if !GDSync.is_active() || !GDSync.is_host(): return
+	if lobby_name.is_empty() or !GDSync.is_host(): return
 	
 	synced_time_cooldown -= delta
 	if synced_time_cooldown <= 0.0:
 		synced_time_cooldown = 30.0
-		GDSync.call_func(sync_timer, synced_time)
+		request_processor.create_function_call_request(sync_timer, [synced_time], -1, true, -1, false)
 
 func sync_timer(time : float) -> void:
+	if GDSync.is_host() or GDSync.get_sender_id() != GDSync.get_host(): return
 	remote_time = time
 	remote_time_counter = 0
 	remote_time_latency = 0.0
@@ -135,6 +133,7 @@ func get_timer_latency(client : int, timestamp : float) -> void:
 	GDSync.call_func_on(client, timer_latency_callback, timestamp)
 
 func timer_latency_callback(timestamp : float) -> void:
+	if GDSync.is_host() or GDSync.get_sender_id() != GDSync.get_host(): return
 	remote_time_counter += 1
 	remote_time_latency += (Time.get_unix_time_from_system()-timestamp)/2.0
 	
@@ -176,6 +175,10 @@ func broadcast_player_data() -> void:
 
 func set_lobby_data(name : String, password : String) -> void:
 	synced_time = 0.0
+	remote_time = 0.0
+	remote_time_latency = 0.0
+	remote_time_counter = 0
+	synced_time_cooldown = 0.0
 	multiplayer_clock_synced = false
 	lobby_name = name
 	lobby_password = password
