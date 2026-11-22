@@ -470,8 +470,8 @@ func verify_coop_mission(host: bool, smoke_sector: int, wipe_test := false) -> v
 		print("Campaign check failed to move operator ", local_index)
 		finish_relay_check(false)
 		return
-	if smoke_sector == 1 and not await verify_foundry_landing(local_operator):
-		print("Campaign check failed at the Foundry intake landing")
+	if smoke_sector == 1 and not await verify_foundry_landing(local_operator, mission):
+		print("Campaign check failed at the Pressure House inspection plinth")
 		finish_relay_check(false)
 		return
 	if smoke_sector == 2 and not await verify_canopy_coop_crossing(local_operator, mission):
@@ -689,21 +689,38 @@ func verify_coop_input_isolation(mission: Node, local_index: int) -> bool:
 	print("CO-OP INPUT ISOLATION PASS ", "host" if local_index == 0 else "guest")
 	return true
 
-func verify_foundry_landing(operator: RiftPlayer) -> bool:
-	var start_health := operator.health
+func verify_foundry_landing(operator: RiftPlayer, mission: Node) -> bool:
+	var trench := mission.stage.get_node("TERRAIN/PressureHouse/SumpFloor") as Node3D
+	var plinth := mission.stage.get_node("TERRAIN/PressureHouse/PumpInspectionPlinth") as Node3D
+	var start := trench.global_position + Vector3.UP * (operator.standing_capsule.height * .5 + .05)
+	if mission.host:
+		if not await wait_for_relay(func(): return RiftRelay.relay.lobby_get_data("coop_plinth_ready", false), 10.0):
+			return false
+		for player in mission.operators:
+			player.global_position = start
+			player.velocity = Vector3.ZERO
+			player.invulnerable_time = 8.0
+			mission.mark_position_reset(player)
+		mission.broadcast_state(true)
+	else:
+		RiftRelay.relay.lobby_set_data("coop_plinth_ready", true)
+	if not await wait_for_relay(func(): return operator.grounded() and operator.global_position.distance_to(start) < .6, 10.0):
+		return false
+	var lives := operator.lives
 	Input.action_press("move_right")
-	var takeoff := await wait_for_jump_lip(operator, 14.0)
 	var crossed := false
-	if takeoff:
+	if await wait_for_jump_lip(operator, trench.global_position.x + 1.65):
 		Input.action_press("jump")
-		for frame in 17:
+		for frame in 85:
 			await get_tree().physics_frame
-		Input.action_press("dash")
-		crossed = await wait_for_relay(func(): return is_instance_valid(operator) and operator.global_position.x >= 22.25 and operator.is_on_floor(), 3.0)
-	Input.action_release("move_right")
+			if operator.global_position.x >= plinth.global_position.x - .65:
+				Input.action_release("move_right")
+			if frame > 5 and operator.grounded():
+				crossed = absf(operator.global_position.x - plinth.global_position.x) < 1.5
+				break
 	Input.action_release("jump")
-	Input.action_release("dash")
-	return crossed and is_equal_approx(operator.health, start_health)
+	Input.action_release("move_right")
+	return crossed and operator.lives == lives
 
 func verify_canopy_coop_crossing(operator: RiftPlayer, mission: Node) -> bool:
 	var route := mission.stage.find_child("CanopyTraverse", true, false) as Node3D
