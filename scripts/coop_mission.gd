@@ -172,6 +172,7 @@ var last_sent_input := 0
 var snapshot_age := 0.0
 var input_sequence := 0
 var state_sequence := 0
+var last_reliable_relay_mask := 0
 var latest_state := -1
 var latest_operators := -1
 var presented_snapshot := -1
@@ -433,6 +434,7 @@ func load_stage(packed: PackedScene = null) -> void:
 	factory_trap_clock = 0.0
 	moving_platforms.clear()
 	props_consumed.clear()
+	last_reliable_relay_mask = 0
 	boss_started = false
 	boss_intro_active = false
 	resetting_arena = false
@@ -1869,19 +1871,23 @@ func broadcast_state(reliable_operators := false) -> void:
 			if other != index:
 				snapshot[other] = players[other].slice(0, 11) + [players[other][16], players[other][17], players[other].slice(20, 23), players[other][24]]
 		var totals := [personal_rewards[index].bolts, operators[index].recovered_blueprints.size(), sector_seconds, remote_players[roster[index]].input, operators[index].get_meta(&"coop_position_revision", 0)]
-		totals.append_array([reported_reserves_used.get(index, 0), reserves[index], reserves])
+		totals.append_array([reported_reserves_used.get(index, 0), reserves[index], reserves, bool(remote_players[roster[index]].loaded)])
 		if reliable_operators:
 			peer.call_func_on(roster[index], receive_operators, act, snapshot, state_sequence, totals)
 		else:
 			peer.call_func_on_unreliable(roster[index], receive_operators, act, snapshot, state_sequence, totals)
-	if sector == 2:
-		# Machine Jungle's patrol roster makes the combined world packet exceed the relay MTU.
+	if sector in [1, 2]:
+		# Foundry and Jungle patrols travel separately so the world update fits the relay packet.
 		peer.call_func_unreliable(receive_security, act, pack_security(security), state_sequence)
 		security = PackedFloat32Array()
-	peer.call_func_unreliable(receive_state, act, security, boss_state, props_consumed, team_xp, state_sequence)
+	if last_reliable_relay_mask != gate_relays.active:
+		last_reliable_relay_mask = gate_relays.active
+		peer.call_func(receive_state, act, security, boss_state, props_consumed, team_xp, state_sequence)
+	else:
+		peer.call_func_unreliable(receive_state, act, security, boss_state, props_consumed, team_xp, state_sequence)
 
 func receive_state(remote_act: int, security: PackedFloat32Array, arena: Array, consumed: Array, xp: int, sequence: int) -> void:
-	if host or changing_act or remote_act != act or not outcome.is_empty() or peer.get_sender_id() != peer.get_host() or sequence <= latest_state or (security.size() != enemies.size() * 6 and not (sector == 2 and security.is_empty())):
+	if host or changing_act or remote_act != act or not outcome.is_empty() or peer.get_sender_id() != peer.get_host() or sequence <= latest_state or (security.size() != enemies.size() * 6 and not (sector in [1, 2] and security.is_empty())):
 		return
 	latest_state = sequence
 	if arena.size() > 20:
@@ -2035,6 +2041,10 @@ func apply_security_snapshot(security: PackedFloat32Array, sequence: int) -> voi
 func receive_operators(remote_act: int, players: Array, sequence: int, rewards: Array) -> void:
 	if host or changing_act or remote_act != act or not outcome.is_empty() or peer.get_sender_id() != peer.get_host() or sequence <= latest_operators or players.size() != roster.size():
 		return
+	# A slow-loading peer can miss the initial acknowledgement. Repeat the receipt
+	# in its personal snapshot so it can stop resending a loadout the host accepted.
+	if rewards.size() > 8 and rewards[8] == true:
+		loadout_confirmed = true
 	personal_bolts = int(rewards[0])
 	blueprint_count = int(rewards[1])
 	if rewards.size() > 6:

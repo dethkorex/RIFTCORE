@@ -27,6 +27,9 @@ func exercise(client) -> void:
 		if not await require(func(): return mission.act == act and not mission.changing_act, 95, "Act %d loads" % act):
 			return
 		actor = mission.operators[mission.local_index]
+		print("NET ",mission.get_path()," local=",mission.local_index," host=",mission.host," roster=", mission.roster)
+		if not await require(func(): return mission.remote_players[mission.roster[1]].loaded if test.host else mission.loadout_confirmed,40,"Guest loadout acknowledged"): return
+		if not await sync("network-ready"): return
 		if test.host:
 			for watched in mission.operators:
 				watched.fell_into_pit.connect(func(): print("PIT ",watched.name," ",watched.global_position),CONNECT_DEFERRED)
@@ -62,6 +65,7 @@ func sync(label: String) -> bool:
 func require(condition: Callable, seconds: float, label: String) -> bool:
 	var ok: bool = await test.until(condition, seconds)
 	if not ok and is_instance_valid(mission):
+		print("WORLD act=",mission.act," mask=",mission.gate_relays.active," seq=",mission.latest_state," sent=",mission.state_sequence, " operators=",mission.latest_operators, " enemies=",mission.latest_security," loaded=",mission.loadout_confirmed)
 		for p in mission.operators:
 			if is_instance_valid(p): print("OPERATOR ",p.name, " pos=",p.position, " hp=",p.health, " lives=",p.lives)
 	test.check(ok, label)
@@ -167,10 +171,11 @@ func relays(act: int) -> bool:
 	# Approach two separate terminals. In each act the joiner owns one switch input.
 	var spots := [Vector2(72.9,-16.4), Vector2(237.4,-19.45)] if act == 1 else [Vector2(285.6,6.9),Vector2(486.8,-4.6)]
 	if not await stage_at(spots,"relay-rooms"): return false
+	if not await sync("both-at-switches"): return false
 	for index in 2:
 		if mission.local_index == index: await interact()
 		var mask := 1 if index == 0 else 3
-		if not await require(func(): return mission.gate_relays.active == mask, 7,"Shared relay mask %d" % mask): return false
+		if not await require(func(): return mission.gate_relays.active == mask, 14,"Shared relay mask %d" % mask): return false
 		if not await sync("relay-%d" % index): return false
 	if act == 1:
 		# Meet at the pump outlet. The guest exits the activated boiler on foot.

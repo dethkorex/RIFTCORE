@@ -67,9 +67,11 @@ func run() -> void:
 	check(actor.global_position.x > -2.72 and actor.global_position.x < -2.58, "Small corrections remain smooth")
 	actor.global_position = Vector3(12.0, 1.1, 0.0)
 	mission.receive_operators(1, mission.targets, 1, [0, 0, 0.0, 4, 0])
+	check(not mission.loadout_confirmed, "A snapshot without a loadout receipt keeps the retry active")
 	check(actor.global_position.is_equal_approx(host_position), "First snapshot after deploy or rejoin restores host position")
 	actor.global_position = Vector3(12.0, 1.1, 0.0)
-	mission.receive_operators(1, mission.targets, 2, [0, 0, 0.0, 500, 0])
+	mission.receive_operators(1, mission.targets, 2, [0, 0, 0.0, 500, 0, 0, 0, PackedInt32Array([0]), true])
+	check(mission.loadout_confirmed, "A personal snapshot acknowledges an accepted loadout")
 	check(actor.global_position.is_equal_approx(host_position), "A missing input-history sample cannot leave the operator far from the host")
 	actor.global_position.x = host_position.x + .5
 	mission.receive_operators(1, mission.targets, 3, [0, 0, 0.0, 501, 1])
