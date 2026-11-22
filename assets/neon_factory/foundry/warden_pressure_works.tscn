@@ -1,0 +1,91 @@
+[gd_scene format=3]
+
+[ext_resource type="Texture2D" path="res://assets/neon_factory/foundry/forged_tread.png" id="SteelTrim"]
+
+[sub_resource type="StandardMaterial3D" id="PipeSteel"]
+albedo_texture = ExtResource("SteelTrim")
+albedo_color = Color(0.48, 0.30, 0.19, 1)
+metallic = 0.68
+roughness = 0.39
+
+[sub_resource type="StandardMaterial3D" id="CouplingSteel"]
+albedo_color = Color(0.29, 0.15, 0.08, 1)
+metallic = 0.78
+roughness = 0.43
+
+[sub_resource type="StandardMaterial3D" id="StatusGlass"]
+albedo_color = Color(0.16, 0.65, 0.69, 1)
+emission_enabled = true
+emission = Color(0.14, 0.69, 0.74, 1)
+emission_energy_multiplier = 1.35
+
+[sub_resource type="CylinderMesh" id="Riser"]
+material = SubResource("PipeSteel")
+top_radius = 0.17
+bottom_radius = 0.19
+height = 8.77
+radial_segments = 20
+
+[sub_resource type="CylinderMesh" id="Header"]
+material = SubResource("PipeSteel")
+top_radius = 0.16
+bottom_radius = 0.16
+height = 2.7
+radial_segments = 20
+
+[sub_resource type="SphereMesh" id="Elbow"]
+material = SubResource("PipeSteel")
+radius = 0.20
+height = 0.42
+radial_segments = 20
+rings = 10
+
+[sub_resource type="CylinderMesh" id="Collar"]
+material = SubResource("CouplingSteel")
+top_radius = 0.26
+bottom_radius = 0.26
+height = 0.23
+radial_segments = 20
+
+[sub_resource type="BoxMesh" id="Outlet"]
+material = SubResource("CouplingSteel")
+size = Vector3(0.8, 0.58, 0.68)
+
+[sub_resource type="BoxMesh" id="Stripe"]
+material = SubResource("StatusGlass")
+size = Vector3(0.38, 0.06, 0.055)
+
+[node name="WardenPressureWorks" type="Node3D"]
+
+[node name="ValveHeader" type="MeshInstance3D" parent="."]
+position = Vector3(1.2, -0.40, 0)
+rotation = Vector3(0, 0, 1.5707963)
+mesh = SubResource("Header")
+
+[node name="HeaderBend" type="MeshInstance3D" parent="."]
+position = Vector3(2.55, -0.42, 0)
+mesh = SubResource("Elbow")
+
+[node name="DrainRiser" type="MeshInstance3D" parent="."]
+position = Vector3(2.55, -4.81, 0)
+mesh = SubResource("Riser")
+
+[node name="UpperJoint" type="MeshInstance3D" parent="."]
+position = Vector3(2.55, -1.12, 0)
+mesh = SubResource("Collar")
+
+[node name="MiddleJoint" type="MeshInstance3D" parent="."]
+position = Vector3(2.55, -4.07, 0)
+mesh = SubResource("Collar")
+
+[node name="LowerJoint" type="MeshInstance3D" parent="."]
+position = Vector3(2.55, -7.44, 0)
+mesh = SubResource("Collar")
+
+[node name="DrainIntake" type="MeshInstance3D" parent="."]
+position = Vector3(2.55, -9.23, 0)
+mesh = SubResource("Outlet")
+
+[node name="IntakeStatus" type="MeshInstance3D" parent="DrainIntake"]
+position = Vector3(0, 0.04, 0.35)
+mesh = SubResource("Stripe")

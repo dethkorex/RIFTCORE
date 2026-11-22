@@ -40,5 +40,5 @@ func run() -> void:
 		for x in [-shape.shape.size.x * .36, 0.0, shape.shape.size.x * .36]:
 			var start := roof.global_position + Vector3(x, .9, 1.02)
 			check(cast(stage, start, start + Vector3.DOWN * 1.8).get("collider") == roof, name + " ceiling across the room")
-	check(is_equal_approx(stage.get_node("MARKERS/RoomExit").position.x - stage.get_node("MARKERS/PlayerSpawn").position.x, 333.4), "Act I keeps the original deployment-to-extraction distance")
+	check(is_equal_approx(stage.get_node("MARKERS/RoomExit").position.x - stage.get_node("MARKERS/PlayerSpawn").position.x, 393.4), "Act I includes the pressure-house extension")
 	finish(failures)

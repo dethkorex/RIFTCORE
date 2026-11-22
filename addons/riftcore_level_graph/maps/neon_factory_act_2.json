@@ -92,16 +92,16 @@
 		},
 		"entry": {
 			"notes": "Cross the first fire gap and follow the cooling line.",
-			"path": "MARKERS/PlayerSpawn",
+			"path": "TERRAIN/SmelterIntake00",
 			"position": [
 				0.0,
 				420.0
 			],
-			"title": "Smelter intake",
-			"type": "Start"
+			"title": "Smelter Intake",
+			"type": "Route"
 		},
 		"escape": {
-			"notes": "After the squad enters, the door seals and the lava rises. Climb the marked wall-kick bands.",
+			"notes": "After the squad enters, the door seals and the lava rises. Jump around the solid ledges and chain kicks up the four lit wall bands.",
 			"path": "TERRAIN/LavaEscape/Entrance",
 			"position": [
 				6400.0,
@@ -301,7 +301,7 @@
 			"type": "Route"
 		},
 		"valve": {
-			"notes": "Activate the second gate relay and work left to the lower passage.",
+			"notes": "The valve opens the drain grille to the east. Drop under the header to reach the escape checkpoint.",
 			"path": "MARKERS/GateRelay2",
 			"position": [
 				5760.0,
@@ -329,6 +329,66 @@
 			],
 			"title": "Surge checkpoint",
 			"type": "Checkpoint"
+		},
+		"transfer_entry": {
+			"notes": "The broken bridge exposes the settling channel below.",
+			"path": "MARKERS/PlayerSpawn",
+			"position": [
+				-1450,
+				200
+			],
+			"title": "Transfer Works",
+			"type": "Start"
+		},
+		"transfer_bridge": {
+			"notes": "Jump the broken spans to keep the high line.",
+			"path": "TERRAIN/TransferWorks/HighBridge",
+			"position": [
+				-1170,
+				85
+			],
+			"title": "Broken Crossing",
+			"type": "Route"
+		},
+		"transfer_drain": {
+			"notes": "Descend beneath the crane, jump the slag cut to the drain inspection plinth, then climb the stepped spillway.",
+			"path": "TERRAIN/TransferWorks/DrainIntake",
+			"position": [
+				-1170,
+				320
+			],
+			"title": "Settling Channel",
+			"type": "Route"
+		},
+		"transfer_lock": {
+			"notes": "Slide below the seal. Wall-kick between the guides to exit.",
+			"path": "TERRAIN/TransferWorks/PressureDoor",
+			"position": [
+				-870,
+				210
+			],
+			"title": "Transfer Lock",
+			"type": "Route"
+		},
+		"survey_loft": {
+			"notes": "Stay high for salvage before dropping to the smelter intake.",
+			"path": "TERRAIN/SurveyCraneLocker",
+			"position": [
+				-580,
+				60
+			],
+			"title": "Survey Crane",
+			"type": "Reward"
+		},
+		"discharge": {
+			"notes": "Descend along the pipe shelf and cross the outlet.",
+			"path": "TERRAIN/TransferWorks/DischargeShelf",
+			"position": [
+				-580,
+				320
+			],
+			"title": "Discharge Passage",
+			"type": "Route"
 		}
 	},
 	"routes": [
@@ -507,6 +567,38 @@
 		[
 			"room_3296563",
 			"titan"
+		],
+		[
+			"transfer_entry",
+			"transfer_bridge"
+		],
+		[
+			"transfer_entry",
+			"transfer_drain"
+		],
+		[
+			"transfer_bridge",
+			"transfer_lock"
+		],
+		[
+			"transfer_drain",
+			"transfer_lock"
+		],
+		[
+			"transfer_lock",
+			"survey_loft"
+		],
+		[
+			"transfer_lock",
+			"discharge"
+		],
+		[
+			"survey_loft",
+			"entry"
+		],
+		[
+			"discharge",
+			"entry"
 		]
 	]
 }

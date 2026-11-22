@@ -28,7 +28,7 @@ func run() -> void:
 	for body in shaft.get_node("SideWalls").get_children():
 		if body is StaticBody3D and not body.is_in_group(&"no_wall_kick"):
 			bands.append(body.name)
-	check(bands == [&"West02", &"West10", &"East07", &"East15"], "only the four grip bands support wall kicks")
+	check(bands == [&"West01", &"West02", &"West09", &"West10", &"East06", &"East07", &"East14", &"East15"], "four two-column grip bands support wall kicks")
 	for flags in [0, 1, 2, 3]:
 		game.gate_relays.set_active(flags)
 		for tick in 30:
@@ -36,7 +36,7 @@ func run() -> void:
 		await physics_frame
 		check(shaft.door.passable == (flags == 3) and shaft.door.blocker.disabled == (flags == 3),
 			"escape entrance enforces relay mask %d" % flags)
-	for sample in [["West02",-1], ["West01",-1], ["West05",-1], ["East07",1], ["East04",1], ["East12",1]]:
+	for sample in [["West02",-1], ["West01",-1], ["West03",-1], ["West05",-1], ["East07",1], ["East06",1], ["East04",1], ["East12",1]]:
 		var surface: StaticBody3D = shaft.get_node("SideWalls/" + sample[0])
 		var side: float = sample[1]
 		player.global_position = surface.global_position - Vector3(side * 1.07, 0, -2.07)
@@ -52,4 +52,15 @@ func run() -> void:
 			await physics_frame
 		check(player.is_on_wall() and not player.grounded(), sample[0] + " gives real airborne wall contact")
 		check((player.wall_grace > 0) == (not surface.is_in_group(&"no_wall_kick")), sample[0] + " enforces its grip during player movement")
+	var ledges := shaft.get_node("Climb").get_children()
+	check(ledges.size() == 25 and ledges.all(func(ledge): return not player.allows_platform_drop(ledge)), "the shaft uses fewer solid ledges")
+	var first: Node3D = ledges.front()
+	player.global_position = first.global_position - Vector3.UP * 1.6
+	player.velocity = Vector3.ZERO
+	for tick in 14:
+		player.update_one_way_collisions()
+		player.velocity = Vector3.UP * player.jump_velocity
+		player.move_and_slide()
+		await physics_frame
+	check(player.is_on_ceiling() and player.global_position.y < first.global_position.y, "a real upward player movement hits the underside of a shaft ledge")
 	finish(failures)

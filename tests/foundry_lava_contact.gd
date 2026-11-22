@@ -63,6 +63,14 @@ func run() -> void:
 	guest.global_position = lava.to_global(Vector3(2.5, 1, 0))
 	lava._physics_process(.016)
 	check(lava.phase == lava.Phase.SEALED, "The lava sequence starts after both operators cross")
+	# A surviving climber on the upper gallery cannot walk back to the entrance.
+	actor.global_position=lava.to_global(Vector3(28,81+half,0))
+	guest.global_position=approach
+	for i in 4: lava._physics_process(.5)
+	check(lava.door.passable, "After a split escape the respawned partner can retry from the entrance")
+	guest.global_position=lava.to_global(Vector3(2.5,1,0))
+	lava._physics_process(.016)
+	check(lava.phase==lava.Phase.SEALED,"The returning partner starts a fresh surge while the survivor waits above")
 	mission.free()
 	guest.free()
 	lava.door.reset()

@@ -51,7 +51,7 @@
 			"type": "Route"
 		},
 		"exit": {
-			"notes": "Unlocked after defeating Kiln Warden. End of Act I at 333.4 m.",
+			"notes": "Unlocked after defeating Kiln Warden. End of Act I at 393.4 m.",
 			"path": "MARKERS/RoomExit",
 			"position": [
 				3440.0,
@@ -131,7 +131,7 @@
 			"type": "Route"
 		},
 		"relay_a": {
-			"notes": "Break the locker seal, descend the west ladder and restore the hidden relay. The east shutter opens a return to the fissures.",
+			"notes": "Restore the locker relay to open the basalt drain. Follow the cut under the split pier into the deep well.",
 			"path": "MARKERS/GateRelay1",
 			"position": [
 				1140.0,
@@ -141,7 +141,7 @@
 			"type": "Relay"
 		},
 		"relay_b": {
-			"notes": "Cross the sump flue and descend the east boiler hatch. Breach the cracked seal and restore the relay to open the west return.",
+			"notes": "Drop from the west sump, restore the relay and breach the east seal. Follow the discharge shelves to the repair approach.",
 			"path": "MARKERS/GateRelay2",
 			"position": [
 				2690.0,
@@ -191,11 +191,11 @@
 			"type": "Hazard"
 		},
 		"spawn": {
-			"notes": "Spawn on the intake deck.",
+			"notes": "Pressure-house receiving apron.",
 			"path": "MARKERS/PlayerSpawn",
 			"position": [
-				0.0,
-				210.0
+				-1280,
+				210
 			],
 			"title": "Deployment",
 			"type": "Start"
@@ -211,7 +211,7 @@
 			"type": "Reward"
 		},
 		"warden": {
-			"notes": "Enter the arena and use the purge controls to expose the Warden.",
+			"notes": "Wall-kick left from the lit column to reach the first deck. Jump right across the column and follow the upper switchbacks to the purge valve. Turn it to drain the floor and expose the Warden on landing.",
 			"path": "Gate",
 			"position": [
 				3190.0,
@@ -219,6 +219,56 @@
 			],
 			"title": "Kiln Warden",
 			"type": "Arena"
+		},
+		"lock": {
+			"notes": "Slide beneath the amber blade. Use the inner track to kick up the inspection pier.",
+			"path": "TERRAIN/PressureHouse/PressureDoor",
+			"position": [
+				-1010,
+				210
+			],
+			"title": "Pressure Lock",
+			"type": "Route"
+		},
+		"loft": {
+			"notes": "Reverse across the shutter to reach the survey locker.",
+			"path": "TERRAIN/PressureSurveyLocker",
+			"position": [
+				-770,
+				-65
+			],
+			"title": "Survey Locker",
+			"type": "Reward"
+		},
+		"upper": {
+			"notes": "Cross the raised inspection gallery and drop onto the intake apron.",
+			"path": "TERRAIN/PressureHouse/InspectionBridge",
+			"position": [
+				-535,
+				80
+			],
+			"title": "Inspection Bridge",
+			"type": "Route"
+		},
+		"lower": {
+			"notes": "Cross the open slag cut to the pump inspection plinth and collect supplies by the outlet.",
+			"path": "TERRAIN/PressureHouse/TrenchInlet",
+			"position": [
+				-535,
+				360
+			],
+			"title": "Service Trench",
+			"type": "Route"
+		},
+		"apron": {
+			"notes": "The upper bridge and trench rejoin below the outlet.",
+			"path": "TERRAIN/IntakeDeck00",
+			"position": [
+				-225,
+				210
+			],
+			"title": "Intake Apron",
+			"type": "Route"
 		}
 	},
 	"routes": [
@@ -291,10 +341,6 @@
 			"exit"
 		],
 		[
-			"spawn",
-			"furnace"
-		],
-		[
 			"cavern",
 			"module"
 		],
@@ -341,6 +387,42 @@
 		[
 			"chimney",
 			"checkpoint"
+		],
+		[
+			"relay_a",
+			"module"
+		],
+		[
+			"spawn",
+			"lock"
+		],
+		[
+			"lock",
+			"loft"
+		],
+		[
+			"loft",
+			"lock"
+		],
+		[
+			"lock",
+			"upper"
+		],
+		[
+			"lock",
+			"lower"
+		],
+		[
+			"upper",
+			"apron"
+		],
+		[
+			"lower",
+			"apron"
+		],
+		[
+			"apron",
+			"furnace"
 		]
 	]
 }

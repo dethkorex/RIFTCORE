@@ -70,7 +70,8 @@ func run() -> void:
 	game.open_home_hub()
 	game.home_hub.station_requested.emit("Social")
 	game.menu.show_page("Party")
-	if host: game.menu.relay_host.pressed.emit()
+	if host and suite.begins_with("foundry"): lobby.host_room("code")
+	elif host: game.menu.relay_host.pressed.emit()
 	else:
 		game.menu.relay_code.text=args[5]
 		game.menu.relay_join.pressed.emit()
@@ -80,11 +81,19 @@ func run() -> void:
 		return
 	peer=lobby.relay
 	if host: print("STRESS ROOM ",lobby.connected_room)
-	if not await until(func(): return lobby.room_size==count,70):
+	if not await until(func(): return lobby.room_size==count,150 if suite.begins_with("foundry") else 70):
 		check(false,"all participants joined")
 		finish(1)
 		return
 	check(true,"joined %d-player room"%count)
+	if suite.begins_with("foundry"):
+		var runner = load("res://tests/coop_foundry_routes.gd").new()
+		await runner.exercise(self)
+		print("STRESS RESULT ", OS.get_name(), " client=", client, " suite=foundry failures=", failures)
+		lobby.leave()
+		await create_timer(.3).timeout
+		finish(1 if failures else 0)
+		return
 	lobby.party_chat_changed.connect(capture_chat)
 	await barrier("chat-ready")
 	for i in 16:

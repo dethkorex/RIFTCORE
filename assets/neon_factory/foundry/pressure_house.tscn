@@ -1,0 +1,167 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://assets/neon_factory/foundry/graded_retaining_floor.tscn" id="Floor"]
+[ext_resource type="PackedScene" path="res://assets/neon_factory/foundry/wall_service_deck.tscn" id="Deck"]
+[ext_resource type="PackedScene" path="res://assets/neon_factory/foundry/plated_interior_shell.tscn" id="Shell"]
+[ext_resource type="PackedScene" path="res://assets/neon_factory/foundry/pressure_slide_shutter.tscn" id="Shutter"]
+[ext_resource type="PackedScene" path="res://assets/neon_factory/foundry/inspection_grip_pier.tscn" id="Pier"]
+
+[ext_resource type="PackedScene" path="res://assets/neon_factory/foundry/service_roof.tscn" id="Roof"]
+[ext_resource type="PackedScene" path="res://assets/neon_factory/foundry/slag_pool.tscn" id="Pool"]
+[ext_resource type="PackedScene" path="res://assets/neon_factory/foundry/sump_pipework.tscn" id="Pipe"]
+[ext_resource type="PackedScene" path="res://assets/neon_factory/foundry/sluice_pump_bank.tscn" id="Pump"]
+
+[sub_resource type="StandardMaterial3D" id="HydraulicSteel"]
+albedo_color = Color(0.38, 0.43, 0.46, 1)
+metallic = 0.76
+roughness = 0.33
+
+[sub_resource type="CylinderMesh" id="CylinderRod"]
+top_radius = 0.18
+bottom_radius = 0.18
+height = 3.4000000000000004
+material = SubResource("HydraulicSteel")
+
+[sub_resource type="BoxMesh" id="Crosshead"]
+size = Vector3(2.34, 0.28, 1.0)
+material = SubResource("HydraulicSteel")
+
+[node name="PressureHouse" type="Node3D"]
+
+[node name="ReceivingFloor1" parent="." instance=ExtResource("Floor")]
+position = Vector3(-3.25, 0, 0)
+scale = Vector3(0.91667, 1, 1)
+
+[node name="ReceivingFloor2" parent="." instance=ExtResource("Floor")]
+position = Vector3(2.25, 0, 0)
+scale = Vector3(0.91667, 1, 1)
+
+[node name="ReceivingFloor3" parent="." instance=ExtResource("Floor")]
+position = Vector3(7.75, 0, 0)
+scale = Vector3(0.91667, 1, 1)
+
+[node name="ReceivingFloor4" parent="." instance=ExtResource("Floor")]
+position = Vector3(13.25, 0, 0)
+scale = Vector3(0.91667, 1, 1)
+
+[node name="PressureDoor" parent="." instance=ExtResource("Shutter")]
+position = Vector3(7, 0, 0)
+
+[node name="InspectionPier" parent="." instance=ExtResource("Pier")]
+position = Vector3(12.1, 0, 0)
+
+[node name="PressureHallPanel1" parent="." instance=ExtResource("Shell")]
+position = Vector3(-3.4, 5.55, -2.52)
+scale = Vector3(0.86667, 1.3875, 1)
+
+[node name="PressureHallPanel2" parent="." instance=ExtResource("Shell")]
+position = Vector3(1.8, 5.55, -2.52)
+scale = Vector3(0.86667, 1.3875, 1)
+
+[node name="PressureHallPanel3" parent="." instance=ExtResource("Shell")]
+position = Vector3(7, 5.55, -2.52)
+scale = Vector3(0.86667, 1.3875, 1)
+
+[node name="PressureHallPanel4" parent="." instance=ExtResource("Shell")]
+position = Vector3(12.2, 5.55, -2.52)
+scale = Vector3(0.86667, 1.3875, 1)
+
+[node name="PressureHallPanel5" parent="." instance=ExtResource("Shell")]
+position = Vector3(17.4, 5.55, -2.52)
+scale = Vector3(0.86667, 1.3875, 1)
+
+[node name="PressureHallLintel1" parent="." instance=ExtResource("Roof")]
+position = Vector3(-2.75, 11.4, 0)
+scale = Vector3(1.08333, 1, 1)
+
+[node name="PressureHallLintel2" parent="." instance=ExtResource("Roof")]
+position = Vector3(3.75, 11.4, 0)
+scale = Vector3(1.08333, 1, 1)
+
+[node name="PressureHallLintel3" parent="." instance=ExtResource("Roof")]
+position = Vector3(10.25, 11.4, 0)
+scale = Vector3(1.08333, 1, 1)
+
+[node name="PressureHallLintel4" parent="." instance=ExtResource("Roof")]
+position = Vector3(16.75, 11.4, 0)
+scale = Vector3(1.08333, 1, 1)
+
+[node name="LockerBalcony" parent="." instance=ExtResource("Deck")]
+position = Vector3(1.25, 7.05, 0)
+scale = Vector3(1.08333, 1, 1)
+
+[node name="InspectionBridge" parent="." instance=ExtResource("Deck")]
+position = Vector3(18.85, 6.75, 0)
+scale = Vector3(1.08333, 1, 1)
+
+[node name="GaugeGallery" parent="." instance=ExtResource("Deck")]
+position = Vector3(29.25, 7.6, 0)
+scale = Vector3(1.41667, 1, 1)
+
+[node name="OutletBridge" parent="." instance=ExtResource("Deck")]
+position = Vector3(38.75, 5.8, 0)
+scale = Vector3(0.91667, 1, 1)
+
+[node name="TrenchInlet" parent="." instance=ExtResource("Floor")]
+position = Vector3(19.5, -2, 0)
+scale = Vector3(1.16667, 1, 1)
+
+[node name="SumpFloor" parent="." instance=ExtResource("Floor")]
+position = Vector3(26.85, -2.8, 0)
+scale = Vector3(0.55, 1, 1)
+
+[node name="PumpInspectionPlinth" parent="." instance=ExtResource("Floor")]
+position = Vector3(32.45, -2.8, 0)
+scale = Vector3(0.516667, 1, 1)
+
+[node name="OutletSill" parent="." instance=ExtResource("Floor")]
+position = Vector3(38.45, -1.55, 0)
+scale = Vector3(0.61667, 1, 1)
+
+[node name="OutletApron" parent="." instance=ExtResource("Floor")]
+position = Vector3(44.75, 0, 0)
+scale = Vector3(0.75, 1, 1)
+
+[node name="GalleryBacking1" parent="." instance=ExtResource("Shell")]
+position = Vector3(22.7, 2.45, -2.52)
+scale = Vector3(1.05, 1.34, 1)
+
+[node name="GalleryBacking2" parent="." instance=ExtResource("Shell")]
+position = Vector3(29, 2.45, -2.52)
+scale = Vector3(1.05, 1.34, 1)
+
+[node name="GalleryBacking3" parent="." instance=ExtResource("Shell")]
+position = Vector3(35.3, 2.45, -2.52)
+scale = Vector3(1.05, 1.34, 1)
+
+[node name="GalleryBacking4" parent="." instance=ExtResource("Shell")]
+position = Vector3(41.6, 2.45, -2.52)
+scale = Vector3(1.05, 1.34, 1)
+
+[node name="HydraulicPowerUnit" parent="." instance=ExtResource("Pump")]
+position = Vector3(14.35, 0, -2.25)
+scale = Vector3(0.85, 0.92, 0.85)
+
+[node name="InspectionGauges" parent="." instance=ExtResource("Pipe")]
+position = Vector3(30.3, -2.8, -2.05)
+scale = Vector3(1, 1, 0.8)
+
+[node name="SlagChannel1" parent="." instance=ExtResource("Pool")]
+position = Vector3(29, -6.5, 0)
+width = 16
+
+[node name="SlagChannel2" parent="." instance=ExtResource("Pool")]
+position = Vector3(41, -6.5, 0)
+width = 8
+
+[node name="ShutterPiston1" type="MeshInstance3D" parent="."]
+position = Vector3(6.28, 9.700, -1.85)
+mesh = SubResource("CylinderRod")
+
+[node name="ShutterPiston2" type="MeshInstance3D" parent="."]
+position = Vector3(7.72, 9.700, -1.85)
+mesh = SubResource("CylinderRod")
+
+[node name="ShutterCrosshead" type="MeshInstance3D" parent="."]
+position = Vector3(7, 8, -1.85)
+mesh = SubResource("Crosshead")

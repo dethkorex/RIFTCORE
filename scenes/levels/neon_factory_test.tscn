@@ -1,5 +1,10 @@
 [gd_scene format=3 uid="uid://blexop4revys5"]
 
+[ext_resource type="PackedScene" path="res://assets/neon_factory/foundry/pressure_house.tscn" id="EntryWing"]
+[ext_resource type="PackedScene" path="res://assets/neon_factory/foundry/wall_service_deck.tscn" id="RouteDeck"]
+[ext_resource type="PackedScene" path="res://assets/neon_factory/foundry/inspection_grip_pier.tscn" id="DischargePier"]
+
+[ext_resource type="PackedScene" path="res://assets/neon_factory/foundry/graded_retaining_floor.tscn" id="GroundFloor"]
 [ext_resource type="PackedScene" path="res://assets/neon_factory/foundry/service_bore.tscn" id="BasaltBore"]
 [ext_resource type="PackedScene" path="res://assets/campaign/doorways/foundry_short_arch.tscn" id="arch"]
 [ext_resource type="PackedScene" path="res://assets/neon_factory/foundry/climb_platform_center.tscn" id="arena_hatch"]
@@ -58,6 +63,15 @@
 
 [ext_resource type="PackedScene" path="res://assets/neon_factory/support_truss.tscn" id="Truss"]
 [ext_resource type="PackedScene" path="res://assets/neon_factory/foundry/slag_pool.tscn" id="Pool"]
+
+[ext_resource type="PackedScene" path="res://assets/neon_factory/foundry/warden_service_deck.tscn" id="PurgeStep"]
+
+[ext_resource type="PackedScene" path="res://assets/neon_factory/foundry/warden_gantry.tscn" id="WardenGantry"]
+[ext_resource type="PackedScene" path="res://assets/neon_factory/foundry/warden_pressure_works.tscn" id="WardenPressureWorks"]
+
+[ext_resource type="Script" path="res://scripts/foundry_warden_room.gd" id="WardenRoom"]
+
+[ext_resource type="PackedScene" path="res://assets/neon_factory/foundry/warden_kick_column.tscn" id="WardenKickColumn"]
 
 [sub_resource type="StandardMaterial3D" id="RelayCableJacket"]
 albedo_color = Color(0.55, 0.27, 0.07, 1)
@@ -120,6 +134,9 @@ size = Vector3(0.86, 1.3, 1.78)
 radius = 0.155
 height = 0.31
 
+[sub_resource type="BoxShape3D" id="ExtractionEndShape"]
+size = Vector3(0.79, 14, 4.25)
+
 [sub_resource type="BoxShape3D" id="GateShape"]
 size = Vector3(0.65, 6.6, 4.65)
 
@@ -135,6 +152,9 @@ emission_energy_multiplier = 1.4
 [sub_resource type="BoxMesh" id="FieldScreen"]
 material = SubResource("ModuleCyan")
 size = Vector3(0.49, 0.43, 0.025)
+
+[sub_resource type="BoxShape3D" id="WardenHeaderShape"]
+size = Vector3(0.79, 8.5, 4.25)
 
 [node name="NeonFactoryTest" type="Node3D" unique_id=2076805959]
 metadata/interior_layout = true
@@ -153,18 +173,18 @@ shadow_enabled = true
 [node name="TERRAIN" type="Node3D" parent="." unique_id=904393639]
 
 [node name="AirlockEnd" parent="TERRAIN" unique_id=784428870 instance=ExtResource("Wall")]
-transform = Transform3D(1, 0, 0, 0, 3.5, 0, 0, 0, 1, -13, 7, 0)
+transform = Transform3D(1, 0, 0, 0, 3.5, 0, 0, 0, 1, -66, 7, 0)
 
-[node name="IntakeDeck00" parent="TERRAIN" unique_id=978114694 instance=ExtResource("Floor")]
+[node name="IntakeDeck00" parent="TERRAIN" unique_id=978114694 instance=ExtResource("GroundFloor")]
 transform = Transform3D(1.125, 0, 0, 0, 1, 0, 0, 0, 1, -9.625, 0, 0)
 
-[node name="IntakeDeck01" parent="TERRAIN" unique_id=1766091216 instance=ExtResource("Floor")]
+[node name="IntakeDeck01" parent="TERRAIN" unique_id=1766091216 instance=ExtResource("GroundFloor")]
 transform = Transform3D(1.125, 0, 0, 0, 1, 0, 0, 0, 1, -2.875, 0, 0)
 
-[node name="IntakeDeck02" parent="TERRAIN" unique_id=456379006 instance=ExtResource("Floor")]
+[node name="IntakeDeck02" parent="TERRAIN" unique_id=456379006 instance=ExtResource("GroundFloor")]
 transform = Transform3D(1.125, 0, 0, 0, 1, 0, 0, 0, 1, 3.875, 0, 0)
 
-[node name="IntakeDeck03" parent="TERRAIN" unique_id=605742378 instance=ExtResource("Floor")]
+[node name="IntakeDeck03" parent="TERRAIN" unique_id=605742378 instance=ExtResource("GroundFloor")]
 transform = Transform3D(1.125, 0, 0, 0, 1, 0, 0, 0, 1, 10.625, 0, 0)
 
 [node name="IntakeFireGap" type="Area3D" parent="TERRAIN" unique_id=370487380]
@@ -195,16 +215,16 @@ outline_modulate = Color(0.025, 0.059, 0.08, 1)
 modulate = Color(0.50, 0.91, 1, 1)
 pixel_size = 0.0051
 
-[node name="IntakeLanding00" parent="TERRAIN" unique_id=541935341 instance=ExtResource("Floor")]
+[node name="IntakeLanding00" parent="TERRAIN" unique_id=541935341 instance=ExtResource("GroundFloor")]
 transform = Transform3D(0.88889, 0, 0, 0, 1, 0, 0, 0, 1, 22.66667, 0, 0)
 
-[node name="IntakeLanding01" parent="TERRAIN" unique_id=1770320832 instance=ExtResource("Floor")]
+[node name="IntakeLanding01" parent="TERRAIN" unique_id=1770320832 instance=ExtResource("GroundFloor")]
 transform = Transform3D(0.700000, -0.20, 0, 0.15, 0.98, 0, 0, 0, 1, 27.4, 0.45, 0)
 
-[node name="IntakeLanding02" parent="TERRAIN" unique_id=578550001 instance=ExtResource("Floor")]
+[node name="IntakeLanding02" parent="TERRAIN" unique_id=578550001 instance=ExtResource("GroundFloor")]
 transform = Transform3D(0.533333, 0, 0, 0, 1, 0, 0, 0, 1, 34.4, 0.95, 0)
 
-[node name="FurnaceLookout00" parent="TERRAIN" unique_id=1458585189 instance=ExtResource("Floor")]
+[node name="FurnaceLookout00" parent="TERRAIN" unique_id=1458585189 instance=ExtResource("GroundFloor")]
 transform = Transform3D(1.33333, 0, 0, 0, 1, 0, 0, 0, 1, 40, 0, 0)
 
 [node name="FurnaceFireGap" type="Area3D" parent="TERRAIN" unique_id=788733838]
@@ -217,10 +237,10 @@ shot_height = 5.8
 period = 4.2
 molten_visual = true
 
-[node name="FurnaceDeck00" parent="TERRAIN" unique_id=1873601540 instance=ExtResource("Floor")]
+[node name="FurnaceDeck00" parent="TERRAIN" unique_id=1873601540 instance=ExtResource("GroundFloor")]
 transform = Transform3D(1.11111, 0, 0, 0, 1, 0, 0, 0, 1, 52.33333, 0, 0)
 
-[node name="FurnaceDeck01" parent="TERRAIN" unique_id=1678879958 instance=ExtResource("Floor")]
+[node name="FurnaceDeck01" parent="TERRAIN" unique_id=1678879958 instance=ExtResource("GroundFloor")]
 transform = Transform3D(1.11111, 0, 0, 0, 1, 0, 0, 0, 1, 59, 0, 0)
 
 [node name="FurnaceDeck02" parent="TERRAIN" unique_id=1571863945 instance=ExtResource("Floor")]
@@ -312,26 +332,26 @@ script = ExtResource("Supply")
 reward = ExtResource("repair")
 supplies_only = true
 
-[node name="RunwayDeck00" parent="TERRAIN" unique_id=2064916247 instance=ExtResource("Floor")]
+[node name="RunwayDeck00" parent="TERRAIN" unique_id=2064916247 instance=ExtResource("GroundFloor")]
 transform = Transform3D(0.95238, 0, 0, 0, 1, 0, 0, 0, 1, 123.85714, 0, 0)
 
-[node name="RunwayDeck01" parent="TERRAIN" unique_id=451545552 instance=ExtResource("Floor")]
+[node name="RunwayDeck01" parent="TERRAIN" unique_id=451545552 instance=ExtResource("GroundFloor")]
 transform = Transform3D(1.04762, 0, 0, 0, 1, 0, 0, 0, 1, 129.85715, 0, 0)
 
-[node name="RunwayDeck02" parent="TERRAIN" unique_id=1163038815 instance=ExtResource("Floor")]
+[node name="RunwayDeck02" parent="TERRAIN" unique_id=1163038815 instance=ExtResource("GroundFloor")]
 transform = Transform3D(1.1666662, -0.29360607, 0, 0.3583333, 0.9559265, 0, 0, 0, 1, 136.5, 1.075, 0)
 
-[node name="RunwayDeck03" parent="TERRAIN" unique_id=1552151765 instance=ExtResource("Floor")]
+[node name="RunwayDeck03" parent="TERRAIN" unique_id=1552151765 instance=ExtResource("GroundFloor")]
 transform = Transform3D(0.208333, 0, 0, 0, 1, 0, 0, 0, 1, 140.625, 2.15, 0)
 
-[node name="RunwayDeck04" parent="TERRAIN" unique_id=475632388 instance=ExtResource("Floor")]
+[node name="RunwayDeck04" parent="TERRAIN" unique_id=475632388 instance=ExtResource("GroundFloor")]
 transform = Transform3D(0.9583333, 0.35023034, 0, -0.3583329, 0.9366636, 0, 0, 0, 1, 144.125, 1.075, 0)
 
-[node name="RunwayDeck05" parent="TERRAIN" instance=ExtResource("Floor")]
+[node name="RunwayDeck05" parent="TERRAIN" instance=ExtResource("GroundFloor")]
 position = Vector3(149.95, 0, 0)
 scale = Vector3(0.983333, 1, 1)
 
-[node name="RunwayDeck06" parent="TERRAIN" instance=ExtResource("Floor")]
+[node name="RunwayDeck06" parent="TERRAIN" instance=ExtResource("GroundFloor")]
 position = Vector3(158.45, 0, 0)
 scale = Vector3(0.850000, 1, 1)
 
@@ -353,13 +373,13 @@ accent = Color(1, 0.47, 0.17, 1)
 [node name="ForgeBulkheadHeader" parent="TERRAIN" unique_id=733474499 instance=ExtResource("Wall")]
 transform = Transform3D(1, 0, 0, 0, 2.245, 0, 0, 0, 1, 157.5, 8.91, 0)
 
-[node name="ForgeApproach00" parent="TERRAIN" unique_id=100983874 instance=ExtResource("Floor")]
+[node name="ForgeApproach00" parent="TERRAIN" unique_id=100983874 instance=ExtResource("GroundFloor")]
 transform = Transform3D(0.5, 0, 0, 0, 1, 0, 0, 0, 1, 162.5, 0, 0)
 
-[node name="ForgeApproach01" parent="TERRAIN" unique_id=609918085 instance=ExtResource("Floor")]
+[node name="ForgeApproach01" parent="TERRAIN" unique_id=609918085 instance=ExtResource("GroundFloor")]
 transform = Transform3D(0.833333, 0, 0, 0, 1, 0, 0, 0, 1, 170.5, 1.45, 0)
 
-[node name="ForgeApronClimb" parent="TERRAIN" unique_id=865062742 instance=ExtResource("Floor")]
+[node name="ForgeApronClimb" parent="TERRAIN" unique_id=865062742 instance=ExtResource("GroundFloor")]
 transform = Transform3D(0.66666645, -0.34079933, 0, 0.2416666, 0.9401361, 0, 0, 0, 1, 166, 0.725, 0)
 
 [node name="ForgeFireGap" type="Area3D" parent="TERRAIN" unique_id=1691787861]
@@ -372,10 +392,10 @@ shot_height = 8.15
 period = 4.1
 molten_visual = true
 
-[node name="ForgeLanding00" parent="TERRAIN" unique_id=106070331 instance=ExtResource("Floor")]
+[node name="ForgeLanding00" parent="TERRAIN" unique_id=106070331 instance=ExtResource("GroundFloor")]
 transform = Transform3D(1.166667, 0, 0, 0, 1, 0, 0, 0, 1, 182.5, 2.05, 0)
 
-[node name="ForgeLanding02" parent="TERRAIN" unique_id=1462280919 instance=ExtResource("Floor")]
+[node name="ForgeLanding02" parent="TERRAIN" unique_id=1462280919 instance=ExtResource("GroundFloor")]
 transform = Transform3D(1.333333, 0, 0, 0, 1, 0, 0, 0, 1, 195, 0, 0)
 
 [node name="ForgeVent" type="Area3D" parent="TERRAIN" unique_id=578574765]
@@ -386,10 +406,10 @@ period = 3.9
 flame_height = 3.15
 nozzle_width = 1.72
 
-[node name="ArmorFloor00" parent="TERRAIN" unique_id=1948644691 instance=ExtResource("Floor")]
+[node name="ArmorFloor00" parent="TERRAIN" unique_id=1948644691 instance=ExtResource("GroundFloor")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 268, 0, 0)
 
-[node name="ArmorFloor01" parent="TERRAIN" unique_id=244171136 instance=ExtResource("Floor")]
+[node name="ArmorFloor01" parent="TERRAIN" unique_id=244171136 instance=ExtResource("GroundFloor")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 274, 0, 0)
 
 [node name="ArmorFloor02" parent="TERRAIN" unique_id=1325164067 instance=ExtResource("BossFooting")]
@@ -428,11 +448,17 @@ transform = Transform3D(0.1667, 0, 0, 0, 1, 0, 0, 0, 1, 337.5, 0, 0)
 [node name="ForgeHallDoorLintel" parent="TERRAIN" unique_id=917279711 instance=ExtResource("Wall")]
 transform = Transform3D(1, 0, 0, 0, 2.125, 0, 0, 0, 1, 268, 10.74, 0)
 
-[node name="GateLintel" parent="TERRAIN" unique_id=996153180 instance=ExtResource("Wall")]
-transform = Transform3D(1, 0, 0, 0, 2.125, 0, 0, 0, 1, 281, 10.74, 0)
+[node name="GateLintel" type="StaticBody3D" parent="TERRAIN" unique_id=996153180]
+position = Vector3(281, 10.74, 0)
 
-[node name="ExtractionEnd" parent="TERRAIN" unique_id=2017858817 instance=ExtResource("Wall")]
-transform = Transform3D(1, 0, 0, 0, 3.5, 0, 0, 0, 1, 337, 7, 0)
+[node name="Collider" type="CollisionShape3D" parent="TERRAIN/GateLintel"]
+shape = SubResource("WardenHeaderShape")
+
+[node name="ExtractionEnd" type="StaticBody3D" parent="TERRAIN" unique_id=2017858817]
+position = Vector3(337, 7, 0)
+
+[node name="Collider" type="CollisionShape3D" parent="TERRAIN/ExtractionEnd"]
+shape = SubResource("ExtractionEndShape")
 
 [node name="ForgeHallCheckpoint" type="Area3D" parent="TERRAIN" unique_id=2057498286]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 274.6, 0, 0)
@@ -534,9 +560,9 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 246.5, -3.15, 0)
 climb_height = 6.7
 
 [node name="PumpExitLanding00" parent="TERRAIN" unique_id=965349290 instance=ExtResource("Floor")]
-transform = Transform3D(1.13333, 0, 0, 0, 1, 0, 0, 0, 1, 254.6, -2.75, 0)
+transform = Transform3D(0.25, 0, 0, 0, 1, 0, 0, 0, 1, 257.25, -2.75, 0)
 
-[node name="PumpExitRamp" parent="TERRAIN" unique_id=1226090423 instance=ExtResource("Floor")]
+[node name="PumpExitRamp" parent="TERRAIN" unique_id=1226090423 instance=ExtResource("GroundFloor")]
 transform = Transform3D(1.1666707, -0.365649, 0, 0.45833004, 0.9307528, 0, 0, 0, 1, 261.5, -1.375, 0)
 
 [node name="FurnaceWestCatwalkHatch" parent="TERRAIN" unique_id=205199491 instance=ExtResource("arena_hatch")]
@@ -638,13 +664,6 @@ shape = SubResource("ChestShape")
 
 [node name="Art" parent="TERRAIN/PumpMaintenanceCache" unique_id=618509947 instance=ExtResource("Chest")]
 
-[node name="WardenPressurePerch" parent="TERRAIN" unique_id=2049035122 instance=ExtResource("arena_hatch")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 300.25, 4.85, 0)
-deck_width = 5.85
-deck_depth = 3.15
-climb_height = 4.85
-solid_deck = true
-
 [node name="FurnaceUpperBulkhead" type="StaticBody3D" parent="TERRAIN" unique_id=940706471 groups=["no_wall_kick"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 35.4, 9.07, -0.98)
 
@@ -719,12 +738,6 @@ position = Vector3(81.75, -3.45, 0)
 deck_width = 4.45
 climb_height = 6.85
 
-[node name="LockerReturn" parent="TERRAIN" instance=ExtResource("arena_hatch")]
-position = Vector3(81.6, -10.3, 0)
-deck_width = 4
-climb_height = 6.10
-deck_depth = 2.7
-
 [node name="FissureWellHatch" parent="TERRAIN" instance=ExtResource("arena_hatch")]
 position = Vector3(98.4, -8.1, 0)
 deck_width = 4
@@ -743,18 +756,6 @@ deck_width = 4
 climb_height = 7.00
 deck_depth = 2.7
 
-[node name="BoilerReturn" parent="TERRAIN" instance=ExtResource("arena_hatch")]
-position = Vector3(235.1, -9.85, 0)
-deck_width = 3.8
-climb_height = 9.60
-deck_depth = 2.7
-
-[node name="BoilerDescent" parent="TERRAIN" instance=ExtResource("arena_hatch")]
-position = Vector3(245, -9.85, 0)
-deck_width = 4
-climb_height = 9.60
-deck_depth = 2.7
-
 [node name="RefugeGantry" parent="TERRAIN" instance=ExtResource("Floor")]
 position = Vector3(133.1, 5.4, 0)
 scale = Vector3(0.766667, 1, 1)
@@ -767,20 +768,16 @@ scale = Vector3(0.850000, 1, 1)
 position = Vector3(188.25, 7, 0)
 scale = Vector3(0.983333, 1, 1)
 
-[node name="BoilerBaseWest" parent="TERRAIN" instance=ExtResource("Floor")]
+[node name="BoilerBaseWest" parent="TERRAIN" instance=ExtResource("GroundFloor")]
 position = Vector3(236.65, -19.45, 0)
 scale = Vector3(1.316667, 1, 1)
 
-[node name="BoilerBaseEast" parent="TERRAIN" instance=ExtResource("Floor")]
-position = Vector3(244.2, -19.45, 0)
-scale = Vector3(1.200000, 1, 1)
+[node name="BoilerBaseEast" parent="TERRAIN" instance=ExtResource("GroundFloor")]
+position = Vector3(244.6, -19.45, 0)
+scale = Vector3(1.333333, 1, 1)
 
 [node name="BoilerWestEnd" parent="TERRAIN" instance=ExtResource("Wall")]
 position = Vector3(232.5, -14.75, 0)
-scale = Vector3(0.75, 2.4, 1)
-
-[node name="BoilerEastEnd" parent="TERRAIN" instance=ExtResource("Wall")]
-position = Vector3(248.1, -14.75, 0)
 scale = Vector3(0.75, 2.4, 1)
 
 [node name="BuriedPumpLining0" parent="TERRAIN" instance=ExtResource("Lining")]
@@ -793,11 +790,11 @@ position = Vector3(240.4, -16.4, -3.1)
 position = Vector3(246.1, -16.4, -3.1)
 
 [node name="RelayReturnShutter" parent="TERRAIN" instance=ExtResource("Shutter")]
-position = Vector3(77.95, -12.44, 0)
+position = Vector3(83.5, -14.65, 0)
 scale = Vector3(1, 0.65, 1)
 
 [node name="BoilerReturnShutter" parent="TERRAIN" instance=ExtResource("Shutter")]
-position = Vector3(236.65, -13.45, 0)
+position = Vector3(247.6, -16.1, 0)
 
 [node name="VentServiceSeal" type="StaticBody3D" parent="TERRAIN"]
 position = Vector3(186.8, 7, 0)
@@ -888,12 +885,10 @@ width = 3.10
 [node name="BasaltFissureCenter" parent="TERRAIN" instance=ExtResource("Pool")]
 position = Vector3(93.375, -12.35, 0)
 width = 3.35
-basin_depth = 3.8
 
 [node name="BasaltFissureEast" parent="TERRAIN" instance=ExtResource("Pool")]
 position = Vector3(103.2, -11.55, 0)
 width = 2.80
-basin_depth = 3.8
 
 [node name="ForgeCrucible" parent="TERRAIN" instance=ExtResource("Pool")]
 position = Vector3(176.0, -3.6, 0)
@@ -977,15 +972,44 @@ shape = SubResource("BleedTarget")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -1.07)
 mesh = SubResource("BleedLens")
 
-[node name="WardenGaugeStep" parent="TERRAIN" unique_id=1085314993 groups=["arena_player_deck", "factory_drop_through", "factory_one_way"] instance=ExtResource("Grate")]
-transform = Transform3D(0.65, 0, 0, 0, 0.48, 0, 0, 0, 0.84, 292, 2.55, 0)
+[node name="WardenPurgeRoute" type="Node3D" parent="TERRAIN"]
 
-[node name="WardenEastPerch" parent="TERRAIN" instance=ExtResource("arena_hatch")]
-position = Vector3(321.5, 4.85, 0)
-deck_width = 5.85
-deck_depth = 3.15
-climb_height = 4.85
-solid_deck = true
+[node name="Takeoff" parent="TERRAIN/WardenPurgeRoute" groups=["arena_player_deck", "factory_drop_through", "no_wall_kick"] instance=ExtResource("PurgeStep")]
+position = Vector3(290.6, 4.65, 0)
+scale = Vector3(0.61, 1, 1)
+
+[node name="Switchback" parent="TERRAIN/WardenPurgeRoute" groups=["arena_player_deck", "factory_drop_through", "no_wall_kick"] instance=ExtResource("PurgeStep")]
+position = Vector3(298.45, 6.77, 0)
+scale = Vector3(0.62, 1, 1)
+
+[node name="UpperTurn" parent="TERRAIN/WardenPurgeRoute" groups=["arena_player_deck", "factory_drop_through", "no_wall_kick"] instance=ExtResource("PurgeStep")]
+position = Vector3(306.4, 8.87, 0)
+scale = Vector3(0.62, 1, 1)
+
+[node name="ReliefTurn" parent="TERRAIN/WardenPurgeRoute" groups=["arena_player_deck", "factory_drop_through", "no_wall_kick"] instance=ExtResource("PurgeStep")]
+position = Vector3(298.35, 11.04, 0)
+scale = Vector3(0.54, 1, 1)
+
+[node name="Transfer" parent="TERRAIN/WardenPurgeRoute" groups=["arena_player_deck", "factory_drop_through", "no_wall_kick"] instance=ExtResource("PurgeStep")]
+position = Vector3(306.2, 13.14, 0)
+scale = Vector3(0.54, 1, 1)
+
+[node name="ValveDeck" parent="TERRAIN/WardenPurgeRoute" groups=["arena_player_deck", "factory_drop_through", "no_wall_kick"] instance=ExtResource("PurgeStep")]
+position = Vector3(313.95, 15.04, 0)
+scale = Vector3(0.69, 1, 1)
+
+[node name="WardenKickColumn" parent="TERRAIN" instance=ExtResource("WardenKickColumn")]
+position = Vector3(295.4, 3.05, -0.10)
+
+[node name="WardenLavaPerch" parent="TERRAIN" groups=["no_wall_kick"] instance=ExtResource("WardenGantry")]
+position = Vector3(328.5, 20.15, -2.35)
+scale = Vector3(1.20, 1, 1.04)
+
+[node name="GantryBeacon" type="OmniLight3D" parent="TERRAIN/WardenLavaPerch"]
+position = Vector3(0, 0.65, 1.2)
+light_color = Color(1, 0.45, 0.19, 1)
+light_energy = 1.35
+omni_range = 5.7
 
 [node name="DECOR" type="Node3D" parent="." unique_id=1814076464]
 
@@ -1192,26 +1216,11 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 263, 4.55, -2.75)
 [node name="HallBackwall01" parent="DECOR" unique_id=1184742001 instance=ExtResource("Lining")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 269, -1.45, -2.75)
 
-[node name="HallUpperBackwall01" parent="DECOR" unique_id=130257952 instance=ExtResource("Lining")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 269, 4.55, -2.75)
-
 [node name="HallBackwall02" parent="DECOR" unique_id=1307556060 instance=ExtResource("Lining")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 275, -1.45, -2.75)
 
-[node name="HallUpperBackwall02" parent="DECOR" unique_id=412802917 instance=ExtResource("Lining")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 275, 4.55, -2.75)
-
 [node name="HallBackwall03" parent="DECOR" unique_id=59612785 instance=ExtResource("Lining")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 281, -1.45, -2.75)
-
-[node name="HallUpperBackwall03" parent="DECOR" unique_id=332505049 instance=ExtResource("Lining")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 281, 4.55, -2.75)
-
-[node name="HallBackwall12" parent="DECOR" unique_id=1390326988 instance=ExtResource("Lining")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 335, -1.45, -2.75)
-
-[node name="HallUpperBackwall12" parent="DECOR" unique_id=1315163105 instance=ExtResource("Lining")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 335, 4.55, -2.75)
 
 [node name="FurnaceBuildingInlet" parent="DECOR" unique_id=870979645 instance=ExtResource("BuildingFrame")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 35.4, 0, 0)
@@ -1631,9 +1640,6 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 233.9, -9.85, 0)
 [node name="BoulderStopLineStripe" parent="DECOR" unique_id=852956131 instance=ExtResource("HazardStripe")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 148.85, 0, 0)
 
-[node name="KilnPressureManifold" parent="DECOR" unique_id=1616107820 instance=ExtResource("SumpPipes")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 308.4, -0.05, -2.5)
-
 [node name="RunwayEastEave" parent="DECOR" unique_id=1214430137 instance=ExtResource("RoofBay")]
 transform = Transform3D(0.5, 0, 0, 0, 1, 0, 0, 0, 1.19, 159, 8.6, -0.52)
 
@@ -1642,9 +1648,6 @@ transform = Transform3D(0.316667, 0, 0, 0, 1, 0, 0, 0, 1.19, 266, 12.4, -0.52)
 
 [node name="InspectionLoftBack" parent="DECOR" unique_id=927921294 instance=ExtResource("InteriorShell")]
 transform = Transform3D(0.78, 0, 0, 0, 0.81, 0, 0, 0, 0.42, 264.32, 6.45, -1.92)
-
-[node name="KilnManifoldWall" parent="DECOR" unique_id=1872336284 instance=ExtResource("PitKit")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 306.5, 0, 0)
 
 [node name="BleederFeed" parent="DECOR" unique_id=816891823 instance=ExtResource("PurgeFeed")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 56.5, 0, -1.68)
@@ -1733,7 +1736,7 @@ variant = 3
 detachment_sector = 1
 
 [node name="RiftcoreMecha" parent="Actors" unique_id=1461428444 instance=ExtResource("player")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.87, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -60, 0.87, 0)
 pit_floor_y = -26.0
 
 [node name="ForgeTitan" parent="Actors" unique_id=1413608539 instance=ExtResource("Boss")]
@@ -1754,11 +1757,12 @@ detachment_sector = 1
 patrol_left_limit = 227.8
 
 [node name="PumpExitDefender" type="CharacterBody3D" parent="Actors" unique_id=1318649731 groups=["damageable_enemies", "level_enemies"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 255, -1.84, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 262.1, -0.19, 0)
 script = ExtResource("enemy")
 variant = 3
 detachment_sector = 1
-patrol_right_limit = 256.7
+patrol_left_limit = 261.1
+patrol_right_limit = 263.8
 
 [node name="PumpCraneGuard" type="CharacterBody3D" parent="Actors" unique_id=1078253643 groups=["damageable_enemies", "level_enemies"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 249.5, 3.58, 0)
@@ -1768,10 +1772,18 @@ detachment_sector = 1
 patrol_left_limit = 248.4
 patrol_right_limit = 252.0
 
+[node name="WardenChamber" type="Node3D" parent="DECOR"]
+position = Vector3(314.5, 0, -3.22)
+script = ExtResource("WardenRoom")
+
+[node name="WardenPressureWorks" parent="DECOR" instance=ExtResource("WardenPressureWorks")]
+position = Vector3(313.55, 16.27, -1.77)
+scale = Vector3(1, 1.70, 1)
+
 [node name="MARKERS" type="Node3D" parent="." unique_id=801949274]
 
 [node name="PlayerSpawn" type="Marker3D" parent="MARKERS" unique_id=1764459144]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.87, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -60, 0.87, 0)
 
 [node name="SpawnPad" parent="MARKERS/PlayerSpawn" unique_id=2106438852 instance=ExtResource("Pad")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.87, 0)
@@ -1783,7 +1795,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 333.4, 0.87, 0)
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.87, 0)
 
 [node name="CameraBounds" type="Node3D" parent="MARKERS" unique_id=266604467]
-metadata/min_x = -7.0
+metadata/min_x = -67.0
 metadata/max_x = 334.0
 
 [node name="GateRelay1" type="Marker3D" parent="MARKERS" unique_id=2033480977]
@@ -1798,11 +1810,8 @@ metadata/landmark = "Under the east sluice"
 metadata/label_distance = 9.0
 metadata/return_shutter = NodePath("TERRAIN/BoilerReturnShutter")
 
-[node name="WardenPurgeWest" type="Marker3D" parent="MARKERS" unique_id=663859041]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 291.5, 1.16, 0)
-
-[node name="WardenPurgeEast" type="Marker3D" parent="MARKERS" unique_id=224567564]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 318.4, 1.16, 0)
+[node name="WardenPurge" type="Marker3D" parent="MARKERS"]
+position = Vector3(313.55, 16.20, 0)
 
 [node name="RelayApproach1" type="Marker3D" parent="MARKERS" unique_id=293254645]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 65.66667, 0, 0)
@@ -1851,8 +1860,7 @@ shape = SubResource("GateShape")
 [node name="ExitBarrier" type="StaticBody3D" parent="." unique_id=1717793944]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 332, 0, 0)
 
-[node name="Seal" parent="ExitBarrier" unique_id=863185503 instance=ExtResource("gate")]
-transform = Transform3D(-3.3665908e-06, 0, -1, 0, 1.7838, 0, 0.93, 0, -3.6199901e-06, 0, 0, 0)
+[node name="Seal" type="Node3D" parent="ExitBarrier" unique_id=863185503]
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="ExitBarrier" unique_id=1615808222]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.2, 0)
@@ -1866,3 +1874,98 @@ minimum_follow_y = -22.0
 [node name="CastingDrainBreak" parent="TERRAIN" instance=ExtResource("Pool")]
 position = Vector3(154.4, -3.8, 0)
 width = 3.0
+
+
+[node name="PressureHouse" parent="TERRAIN" instance=ExtResource("EntryWing")]
+position = Vector3(-60, 0, 0)
+
+[node name="SumpInspectionCover" parent="TERRAIN" instance=ExtResource("RouteDeck")]
+position = Vector3(245, -9.85, 0)
+scale = Vector3(0.666667, 1, 1)
+
+[node name="DrainToe" parent="TERRAIN" instance=ExtResource("RouteDeck")]
+position = Vector3(251.05, -18.05, 0)
+scale = Vector3(0.616667, 1, 1)
+
+[node name="Turntable" parent="TERRAIN" instance=ExtResource("RouteDeck")]
+position = Vector3(256.4, -16.25, 0)
+scale = Vector3(0.666667, 1, 1)
+
+[node name="FilterShelf" parent="TERRAIN" instance=ExtResource("RouteDeck")]
+position = Vector3(251, -14.15, 0)
+scale = Vector3(0.600000, 1, 1)
+
+[node name="InspectionShelf" parent="TERRAIN" instance=ExtResource("RouteDeck")]
+position = Vector3(256.3, -12.05, 0)
+scale = Vector3(0.65, 1, 1)
+
+
+
+
+[node name="OutletShaftLining1" parent="TERRAIN" instance=ExtResource("Lining")]
+position = Vector3(250.6, -14.0, -3.1)
+scale = Vector3(1, 1.75, 1)
+
+[node name="OutletShaftLining2" parent="TERRAIN" instance=ExtResource("Lining")]
+position = Vector3(256.55, -14.0, -3.1)
+scale = Vector3(1, 1.75, 1)
+[node name="PressureSurveyLocker" type="Area3D" parent="TERRAIN" groups=["factory_salvage_chest"]]
+position = Vector3(-59, 7.05, 0)
+collision_layer = 0
+script = ExtResource("ChestCode")
+materials = 2
+
+[node name="Trigger" type="CollisionShape3D" parent="TERRAIN/PressureSurveyLocker"]
+position = Vector3(0, 0.61, 0)
+shape = SubResource("ChestShape")
+
+[node name="Art" parent="TERRAIN/PressureSurveyLocker" instance=ExtResource("Chest")]
+position = Vector3(0, 0, -0.32)
+
+
+[node name="TrenchSupply" parent="TERRAIN" instance=ExtResource("repair")]
+position = Vector3(-28.2, -2.35, 0)
+
+[node name="GaugeSentry" type="CharacterBody3D" parent="Actors" groups=["damageable_enemies", "level_enemies"]]
+position = Vector3(-30.4, 8.52, 0)
+script = ExtResource("enemy")
+variant = 2
+detachment_sector = 1
+patrol_left_limit = -33.5
+patrol_right_limit = -27.8
+
+[node name="SettlingBedScout" type="CharacterBody3D" parent="Actors" groups=["damageable_enemies", "level_enemies"]]
+position = Vector3(-33.15, -1.88, 0)
+script = ExtResource("enemy")
+variant = 0
+detachment_sector = 1
+patrol_left_limit = -34.05
+patrol_right_limit = -32.25
+
+[node name="SluiceWatch" type="CharacterBody3D" parent="Actors" groups=["damageable_enemies", "level_enemies"]]
+position = Vector3(220.5, -8.94, 0)
+script = ExtResource("enemy")
+variant = 2
+detachment_sector = 1
+patrol_left_limit = 218.8
+patrol_right_limit = 222
+
+[node name="OutletPressureGuide" parent="TERRAIN" instance=ExtResource("DischargePier")]
+position = Vector3(253.25, -9.35, 0)
+scale = Vector3(1, 0.69, 1)
+
+[node name="OutletPressureRam" parent="TERRAIN" instance=ExtResource("DischargePier")]
+position = Vector3(257.15, -12.05, 0)
+scale = Vector3(1, 0.75, 1)
+
+[node name="BoilerDischargeSlag" parent="TERRAIN" instance=ExtResource("Pool")]
+position = Vector3(253.3, -21.7, 0)
+width = 11.4
+
+[node name="DischargePitLining" parent="DECOR" instance=ExtResource("Lining")]
+position = Vector3(253.4, -20, -3.15)
+scale = Vector3(1.88, 1.18, 1)
+
+[node name="OutletRamManifold" parent="DECOR" instance=ExtResource("SluicePump")]
+position = Vector3(255.15, -11.96, -2.05)
+scale = Vector3(0.8, 0.8, 0.75)

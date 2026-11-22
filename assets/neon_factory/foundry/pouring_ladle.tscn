@@ -2,6 +2,8 @@
 
 [ext_resource type="Texture2D" path="res://assets/neon_factory/foundry/bulkhead_Heat-treated steel • albedo.png" id="SteelTrim"]
 
+[ext_resource type="Shader" path="res://assets/neon_factory/foundry/rising_lava.gdshader" id="Lava"]
+
 [sub_resource type="StandardMaterial3D" id="Steel"]
 albedo_color = Color(0.40, 0.37, 0.35, 1)
 roughness = 0.44
@@ -24,21 +26,13 @@ albedo_color = Color(0.47, 0.27, 0.16, 1)
 roughness = 0.87
 metallic = 0.03
 
-[sub_resource type="StandardMaterial3D" id="Melt"]
-albedo_color = Color(1, 0.255, 0.022, 1)
-roughness = 0.58
-metallic = 0.05
-emission_enabled = true
-emission = Color(1, 0.255, 0.022, 1)
-emission_energy_multiplier = 2.7
+[sub_resource type="ShaderMaterial" id="Melt"]
+shader = ExtResource("Lava")
+shader_parameter/flat_surface = true
 
-[sub_resource type="StandardMaterial3D" id="Core"]
-albedo_color = Color(1, 0.60, 0.065, 1)
-roughness = 0.61
-metallic = 0.05
-emission_enabled = true
-emission = Color(1, 0.60, 0.065, 1)
-emission_energy_multiplier = 4.2
+[sub_resource type="ShaderMaterial" id="Pour"]
+shader = ExtResource("Lava")
+shader_parameter/pouring_stream = true
 
 [sub_resource type="BoxMesh" id="Mesh0"]
 material = SubResource("Frame")
@@ -78,14 +72,6 @@ height = 0.055
 radial_segments = 24
 rings = 1
 
-[sub_resource type="CylinderMesh" id="Mesh6"]
-material = SubResource("Core")
-top_radius = 0.52
-bottom_radius = 0.52
-height = 0.025
-radial_segments = 24
-rings = 1
-
 [sub_resource type="CylinderMesh" id="Mesh7"]
 material = SubResource("Frame")
 top_radius = 0.32
@@ -99,20 +85,12 @@ material = SubResource("Ceramic")
 size = Vector3(0.54, 0.16, 0.19)
 
 [sub_resource type="CylinderMesh" id="Mesh9"]
-material = SubResource("Melt")
+material = SubResource("Pour")
 top_radius = 0.17
 bottom_radius = 0.24
 height = 2.18
 radial_segments = 24
-rings = 1
-
-[sub_resource type="CylinderMesh" id="Mesh10"]
-material = SubResource("Core")
-top_radius = 0.096
-bottom_radius = 0.113
-height = 1.88
-radial_segments = 24
-rings = 1
+rings = 13
 
 [sub_resource type="BoxMesh" id="Mesh11"]
 material = SubResource("Ceramic")
@@ -122,25 +100,11 @@ size = Vector3(4.75, 0.4, 1.29)
 material = SubResource("Frame")
 size = Vector3(4.75, 0.43, 0.18)
 
-[sub_resource type="BoxMesh" id="Mesh13"]
+[sub_resource type="PlaneMesh" id="Mesh13"]
 material = SubResource("Melt")
-size = Vector3(4.48, 0.07, 0.74)
-
-[sub_resource type="BoxMesh" id="Mesh14"]
-material = SubResource("Core")
-size = Vector3(2.1, 0.02, 0.2)
-
-[sub_resource type="Animation" id="Motion"]
-resource_name = "flow"
-length = 3.5
-loop_mode = 1
-tracks/0/type = "value"
-tracks/0/path = NodePath("FlowGlint:position:x")
-tracks/0/interp = 2
-tracks/0/keys = {"times": PackedFloat32Array(0.0, 1.75, 3.5), "transitions": PackedFloat32Array(1, 1, 1), "update": 0, "values": [-0.04, 1.96, -0.04]}
-
-[sub_resource type="AnimationLibrary" id="Library"]
-_data = {&"flow": SubResource("Motion")}
+size = Vector2(4.48, 0.74)
+subdivide_width = 24
+subdivide_depth = 6
 
 [node name="FoundryPouringLadle" type="Node3D"]
 
@@ -176,10 +140,6 @@ mesh = SubResource("Mesh4")
 position = Vector3(0, 0.7, 0)
 mesh = SubResource("Mesh5")
 
-[node name="HotCenter" type="MeshInstance3D" parent="Vessel"]
-position = Vector3(0.12, 0.738, 0.05)
-mesh = SubResource("Mesh6")
-
 [node name="Pivot0" type="MeshInstance3D" parent="Vessel"]
 position = Vector3(-0.78, 0.03, 0.23)
 mesh = SubResource("Mesh7")
@@ -205,11 +165,6 @@ position = Vector3(0.92, 0.35, 0.64)
 mesh = SubResource("Mesh9")
 rotation = Vector3(0, 0, -0.17)
 
-[node name="HotStream" type="MeshInstance3D" parent="."]
-position = Vector3(0.95, 0.38, 0.65)
-mesh = SubResource("Mesh10")
-rotation = Vector3(0, 0, -0.17)
-
 [node name="Trough" type="MeshInstance3D" parent="."]
 position = Vector3(1.08, -0.8, 0.57)
 mesh = SubResource("Mesh11")
@@ -223,19 +178,12 @@ position = Vector3(1.08, -0.61, 1.12)
 mesh = SubResource("Mesh12")
 
 [node name="SlagChannel" type="MeshInstance3D" parent="."]
-position = Vector3(1.08, -0.57, 0.57)
+position = Vector3(1.08, -0.535, 0.57)
+cast_shadow = 0
 mesh = SubResource("Mesh13")
-
-[node name="FlowGlint" type="MeshInstance3D" parent="."]
-position = Vector3(1.06, -0.51, 0.67)
-mesh = SubResource("Mesh14")
 
 [node name="PourLight" type="OmniLight3D" parent="."]
 position = Vector3(0.91, 0.2, 1.01)
 light_color = Color(1, 0.38, 0.09, 1)
 light_energy = 2.48
 omni_range = 5.4
-
-[node name="AnimationPlayer" type="AnimationPlayer" parent="."]
-libraries = {&"": SubResource("Library")}
-autoplay = "flow"

@@ -1,0 +1,38 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://assets/neon_factory/foundry/warden_service_deck.tscn" id="Deck"]
+[ext_resource type="Texture2D" path="res://assets/neon_factory/foundry/forged_tread.png" id="Steel"]
+
+[sub_resource type="StandardMaterial3D" id="Oxide"]
+albedo_color = Color(0.48, 0.31, 0.21, 1)
+albedo_texture = ExtResource("Steel")
+metallic = 0.48
+roughness = 0.60
+
+[sub_resource type="BoxMesh" id="Web"]
+size = Vector3(0.16, 0.19, 3.21)
+material = SubResource("Oxide")
+
+[sub_resource type="BoxMesh" id="Anchor"]
+size = Vector3(0.33, 1.27, 0.16)
+material = SubResource("Oxide")
+
+[node name="WallServiceDeck" instance=ExtResource("Deck")]
+
+[node name="WestKnee" type="MeshInstance3D" parent="."]
+position = Vector3(-1.85, -0.72, -0.97)
+rotation = Vector3(-0.35, 0, 0)
+mesh = SubResource("Web")
+
+[node name="EastKnee" type="MeshInstance3D" parent="."]
+position = Vector3(1.85, -0.72, -0.97)
+rotation = Vector3(-0.35, 0, 0)
+mesh = SubResource("Web")
+
+[node name="WestAnchor" type="MeshInstance3D" parent="."]
+position = Vector3(-1.85, -0.70, -2.43)
+mesh = SubResource("Anchor")
+
+[node name="EastAnchor" type="MeshInstance3D" parent="."]
+position = Vector3(1.85, -0.70, -2.43)
+mesh = SubResource("Anchor")

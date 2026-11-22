@@ -1,18 +1,10 @@
-# RIFTCORE Alpha 6.3.57
+# RIFTCORE Alpha 6.3.58
 
-## Stability and cleanup
+## Ember Foundry
 
-- Quitting from the menu or the game window now stops music, sound effects, and party voice and lets the audio mixer release them before the game exits.
-- Signed-in play still runs cloud save and relay sign-out cleanup before the final exit.
-- Removed unused Workshop, Social, Steam contact, and arena helpers.
-- Updated sector regression checks to match the current boss HP, attack damage, and difficulty scaling. Release tests now check for audio resources left alive at shutdown.
-
-## Boss encounters
-
-- Minibosses and main bosses materialize on illuminated deployment pads with a faster entrance and a clear name reveal.
-- Forge Titan’s ground slam drops a lit amber core from the new arena roof. Bait the drill into the core to shatter it and expose Titan’s armor.
-- Both Ember Foundry arenas now have a rising-lava attack with a warning and accessible upper platforms. Kiln Warden’s purge valves still provide its opening.
-
-## Buster controls
-
-- Movement uses horizontal shots. Aim straight up with Up, or straight down with Down while falling. Crouch and ladder shots stay horizontal in solo and co-op.
+- Act I opens in the Pressure House. Slide through a service shutter, wall-jump to the inspection gallery, or cross the lower slag trench. The locker and boiler relays open return passages deeper into the facility.
+- Act II opens in the Transfer Works. The crane bridge and settling drain rejoin at the transfer lock. The valve gallery leads back to the lava escape checkpoint.
+- Both lower routes have a new inspection plinth over exposed slag. Missing the landing costs a life. The boiler discharge has a wider takeoff for the first jump.
+- The lava escape still waits for the party at the entrance. If one operator reaches the upper gallery and a partner respawns below, the returning partner can reopen the door for another attempt.
+- Added patrols at the new crossings and adjusted their movement to keep them on solid ground.
+- Kiln Warden retreats to a wall-mounted gantry during the lava surge. Climb to the purge valve to drain the room and bring the Warden back down.

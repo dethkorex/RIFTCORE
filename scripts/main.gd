@@ -250,6 +250,7 @@ func show_friend_invite(display_name: String, code: String, password: String) ->
 func add_build_version() -> void:
 	var layer := CanvasLayer.new()
 	layer.layer = 190
+	layer.add_to_group(&"build_version_overlay")
 	add_child(layer)
 	var version := String(ProjectSettings.get_setting("application/config/version"))
 	var metadata := "res://assets/update_channel.json"
@@ -2800,6 +2801,9 @@ func on_joy_connection_changed(device: int, connected: bool) -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("field_interact") and is_instance_valid(gate_relays) and can_open_chat() and not chat.is_open():
+		if is_instance_valid(boss) and boss.has_method("interact_purge_valve") and boss.interact_purge_valve(player):
+			get_viewport().set_input_as_handled()
+			return
 		if sector == 1 and act == 1 and FoundryModule.at_terminal(game_root, player):
 			get_viewport().set_input_as_handled()
 			choose_foundry_module(true)

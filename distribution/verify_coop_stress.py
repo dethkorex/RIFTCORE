@@ -18,7 +18,7 @@ def main():
     parser.add_argument("--windows", type=Path, required=True)
     parser.add_argument("--linux", type=Path, required=True)
     parser.add_argument("--platforms", default="windows,linux")
-    parser.add_argument("--suite", choices=("network", "campaign", "abyssal", "lava"), default="network")
+    parser.add_argument("--suite", choices=("network", "campaign", "abyssal", "lava", "foundry", "foundry-escape"), default="network")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--distro", default="RIFTCORE-QA")
     args = parser.parse_args()
@@ -33,10 +33,18 @@ def main():
         path = path.resolve().as_posix()
         return "/mnt/" + path[0].lower() + path[2:]
 
+    # Synchronize QA checkpoints separately from gameplay traffic. A unique directory
+    # prevents stale checkpoint files from satisfying a repeat run.
+    checkpoints = output / ("checkpoints-" + str(time.time_ns()))
+    if args.suite.startswith("foundry"):
+        checkpoints.mkdir()
+
     def launch(index, room=""):
         cli = ["--headless", "--path", str(repo), "--max-fps", "60", "--script", "res://tests/coop_stress.gd",
                "--", "--coop-stress", "host" if index == 0 else "join",
                str(len(platforms)), str(index), args.suite, *([room] if room else [])]
+        if args.suite.startswith("foundry"):
+            cli.append("--foundry-sync=" + (str(checkpoints) if platforms[index] == "windows" else linux_path(checkpoints)))
         env = os.environ.copy()
         private = output / ("userdata-" + str(index))
         private.mkdir(exist_ok=True)

@@ -10,6 +10,7 @@ const Fire := preload("res://addons/pyrolux_fx/nodes_3d/pyrolux_fire_3d.gd")
 const Pad := preload("res://assets/neon_factory/deployment_pad.tscn")
 const Beam := preload("res://scripts/deploy_lightning.gd")
 const UI := preload("res://scripts/rift_ui.gd")
+const WardenReveal := preload("res://scripts/foundry_warden_reveal.gd")
 const Materialize := preload("res://assets/vfx/boss_materialize.gdshader")
 const CHARGE_TIME := 1.30
 
@@ -49,107 +50,124 @@ func play(rig: SideCameraRig, boss: Combatant, floor_y: float, title: String, ti
 	var focus := head - Vector3.UP * height * 0.42
 	var wide := maxf(height * 1.55, 5.5)
 	var pad := mount_pad(boss, floor_y, tint)
-	var scan := ShaderMaterial.new()
-	scan.shader = Materialize
-	scan.set_shader_parameter("tint", tint)
-	scan.set_shader_parameter("scan_y", floor_y - .16)
-	var silhouette: Dictionary[MeshInstance3D, Material] = {}
-	for mesh: MeshInstance3D in articulation.find_children("*", "MeshInstance3D", true, false):
-		silhouette[mesh] = mesh.material_override
-		mesh.material_override = scan
-	rig.set_process(false)
-	boss.collision_layer = 0
-	readout.boss_visible = false
-	readout.queue_redraw()
-
-	var approach := Vector3(-wide * 0.20, 0.72, wide)
-	var floor_focus := focus.lerp(pad.global_position, .41)
-	aim(camera, floor_focus, approach)
-	pad.pulse()
-	await get_tree().create_timer(.17, false).timeout
-	var beam := Beam.new()
-	add_child(beam)
-	beam.global_position = pad.global_position + Vector3.UP * .12
-	beam.strike(tint, clampf(height + 1.4, 3.2, 6.0))
-	RiftAudio.play_effect(&"deploy_zap")
-	var arrival := create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-	arrival.tween_method(func(weight: float):
-		scan.set_shader_parameter("scan_y", floor_y - .16 + (height + .4) * weight)
-		if animate.is_valid():
-			animate.call(get_process_delta_time(), 0.0, 1.0 - weight, 0.0, 0.0)
-		aim(camera, floor_focus.lerp(focus, weight), approach)
-	, 0.0, 1.0, .58)
-	await arrival.finished
-	for mesh in silhouette:
-		if is_instance_valid(mesh):
-			mesh.material_override = silhouette[mesh]
-
-	var impact := Node3D.new()
-	add_child(impact)
-	impact.global_position = Vector3(landing.x, floor_y + 0.10, landing.z)
-	CombatVFX.explosion(impact, tint)
-	RiftAudio.play_effect(&"enemy_break")
-	if foundry:
-		RiftAudio.foundry_sound(&"boulder_roll", impact.global_position)
-	var recovery := create_tween()
-	recovery.tween_method(func(weight: float):
-		var brace := sin(PI * weight)
-		if animate.is_valid():
-			animate.call(get_process_delta_time(), 0.0, brace, 0.0, 0.0)
-		aim(camera, focus, approach + Vector3.DOWN * brace * 0.13)
-	, 0.0, 1.0, 0.25)
-	await recovery.finished
-
-	var hero_offset := Vector3(-wide * 0.32, 0.42, wide * 0.91)
-	var opening_rotation := articulation.rotation
-	var title_card := show_title(title, tint, act, camera.get_viewport())
-	var hero_focus := focus - Vector3.RIGHT * clampf(height * .47, .85, 2.1)
-	var pose := create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-	pose.tween_method(func(weight: float):
-		if armor:
-			armor.rotation.y = lerp_angle(opening_rotation.y, -0.36, weight)
-		if animate.is_valid():
-			animate.call(get_process_delta_time(), 0.0, 0.0, weight, 0.0)
-		aim(camera, focus.lerp(hero_focus, weight), approach.lerp(hero_offset, weight))
-	, 0.0, 1.0, 0.52)
-	await pose.finished
-
-	var charge_tint := Color("d45aff") if jungle and act == 2 else tint
-	var charge_fx := make_charge(impact, charge_tint, height, maxf(bounds.size.x, bounds.size.z))
-	if jungle:
-		charge_fx.light_energy *= 0.70
-		charge_fx.flame_height *= 0.78
-	var starting_amount := charge_fx.amount
-	var starting_light := charge_fx.light_energy
-	var peak_light := 3.15 if jungle else 5.4
-	charge_fx.ignite()
-	readout.boss_name = title.to_upper()
-	readout.boss_tint = tint
-	readout.boss_sector = sector
-	readout.boss_act = act
-	readout.boss_max_health = boss.max_health
-	readout.boss_health = 0.0
-	readout.boss_visible = true
-	readout.queue_redraw()
-	RiftAudio.play_effect(&"titan_windup")
-	var charge := create_tween()
-	charge.tween_method(func(weight: float):
-		if animate.is_valid():
-			animate.call(get_process_delta_time(), 0.0, 0.0, 1.0, weight)
-		charge_fx.amount = lerpf(starting_amount, 1.0, weight)
-		charge_fx.light_energy = lerpf(starting_light, peak_light, weight)
-		readout.boss_health = boss.health * smoothstep(0.08, 1.0, weight)
+	var chamber := boss.get_parent().get_parent().get_node_or_null("DECOR/WardenChamber") as Node3D
+	var warden_cinematic := sector == 1 and act == 1 and foundry != null and chamber != null
+	var mission_ui := readout.get_parent() as CanvasLayer
+	var version_ui := get_tree().get_first_node_in_group(&"build_version_overlay") as CanvasLayer
+	var ui_was_visible := mission_ui != null and mission_ui.visible
+	var version_was_visible := version_ui != null and version_ui.visible
+	if warden_cinematic:
+		rig.set_process(false)
+		if mission_ui:
+			mission_ui.hide()
+		if version_ui:
+			version_ui.hide()
+		boss.collision_layer = 0
+		readout.boss_visible = false
 		readout.queue_redraw()
-	, 0.0, 1.0, CHARGE_TIME)
-	await charge.finished
-	readout.boss_health = boss.health
-	readout.queue_redraw()
-	RiftAudio.stop_effect(&"titan_windup")
-	RiftAudio.play_effect(&"deploy_zap")
-	RiftProjectile.suit_flash(impact, boss.global_position, charge_tint, true)
-	charge_fx.extinguish()
-	title_card.queue_free()
-	await get_tree().create_timer(0.45, false).timeout
+		await WardenReveal.play(self, camera, boss, foundry, chamber, pad, title, tint, readout)
+	else:
+		var scan := ShaderMaterial.new()
+		scan.shader = Materialize
+		scan.set_shader_parameter("tint", tint)
+		scan.set_shader_parameter("scan_y", floor_y - .16)
+		var silhouette: Dictionary[MeshInstance3D, Material] = {}
+		for mesh: MeshInstance3D in articulation.find_children("*", "MeshInstance3D", true, false):
+			silhouette[mesh] = mesh.material_override
+			mesh.material_override = scan
+		rig.set_process(false)
+		boss.collision_layer = 0
+		readout.boss_visible = false
+		readout.queue_redraw()
+
+		var approach := Vector3(-wide * 0.20, 0.72, wide)
+		var floor_focus := focus.lerp(pad.global_position, .41)
+		aim(camera, floor_focus, approach)
+		pad.pulse()
+		await get_tree().create_timer(.17, false).timeout
+		var beam := Beam.new()
+		add_child(beam)
+		beam.global_position = pad.global_position + Vector3.UP * .12
+		beam.strike(tint, clampf(height + 1.4, 3.2, 6.0))
+		RiftAudio.play_effect(&"deploy_zap")
+		var arrival := create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+		arrival.tween_method(func(weight: float):
+			scan.set_shader_parameter("scan_y", floor_y - .16 + (height + .4) * weight)
+			if animate.is_valid():
+				animate.call(get_process_delta_time(), 0.0, 1.0 - weight, 0.0, 0.0)
+			aim(camera, floor_focus.lerp(focus, weight), approach)
+		, 0.0, 1.0, .58)
+		await arrival.finished
+		for mesh in silhouette:
+			if is_instance_valid(mesh):
+				mesh.material_override = silhouette[mesh]
+
+		var impact := Node3D.new()
+		add_child(impact)
+		impact.global_position = Vector3(landing.x, floor_y + 0.10, landing.z)
+		CombatVFX.explosion(impact, tint)
+		RiftAudio.play_effect(&"enemy_break")
+		if foundry:
+			RiftAudio.foundry_sound(&"boulder_roll", impact.global_position)
+		var recovery := create_tween()
+		recovery.tween_method(func(weight: float):
+			var brace := sin(PI * weight)
+			if animate.is_valid():
+				animate.call(get_process_delta_time(), 0.0, brace, 0.0, 0.0)
+			aim(camera, focus, approach + Vector3.DOWN * brace * 0.13)
+		, 0.0, 1.0, 0.25)
+		await recovery.finished
+
+		var hero_offset := Vector3(-wide * 0.32, 0.42, wide * 0.91)
+		var opening_rotation := articulation.rotation
+		var title_card := show_title(title, tint, act, camera.get_viewport())
+		var hero_focus := focus - Vector3.RIGHT * clampf(height * .47, .85, 2.1)
+		var pose := create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+		pose.tween_method(func(weight: float):
+			if armor:
+				armor.rotation.y = lerp_angle(opening_rotation.y, -0.36, weight)
+			if animate.is_valid():
+				animate.call(get_process_delta_time(), 0.0, 0.0, weight, 0.0)
+			aim(camera, focus.lerp(hero_focus, weight), approach.lerp(hero_offset, weight))
+		, 0.0, 1.0, 0.52)
+		await pose.finished
+
+		var charge_tint := Color("d45aff") if jungle and act == 2 else tint
+		var charge_fx := make_charge(impact, charge_tint, height, maxf(bounds.size.x, bounds.size.z))
+		if jungle:
+			charge_fx.light_energy *= 0.70
+			charge_fx.flame_height *= 0.78
+		var starting_amount := charge_fx.amount
+		var starting_light := charge_fx.light_energy
+		var peak_light := 3.15 if jungle else 5.4
+		charge_fx.ignite()
+		readout.boss_name = title.to_upper()
+		readout.boss_tint = tint
+		readout.boss_sector = sector
+		readout.boss_act = act
+		readout.boss_max_health = boss.max_health
+		readout.boss_health = 0.0
+		readout.boss_visible = true
+		readout.queue_redraw()
+		RiftAudio.play_effect(&"titan_windup")
+		var charge := create_tween()
+		charge.tween_method(func(weight: float):
+			if animate.is_valid():
+				animate.call(get_process_delta_time(), 0.0, 0.0, 1.0, weight)
+			charge_fx.amount = lerpf(starting_amount, 1.0, weight)
+			charge_fx.light_energy = lerpf(starting_light, peak_light, weight)
+			readout.boss_health = boss.health * smoothstep(0.08, 1.0, weight)
+			readout.queue_redraw()
+		, 0.0, 1.0, CHARGE_TIME)
+		await charge.finished
+		readout.boss_health = boss.health
+		readout.queue_redraw()
+		RiftAudio.stop_effect(&"titan_windup")
+		RiftAudio.play_effect(&"deploy_zap")
+		RiftProjectile.suit_flash(impact, boss.global_position, charge_tint, true)
+		charge_fx.extinguish()
+		title_card.queue_free()
+		await get_tree().create_timer(0.45, false).timeout
 
 	if DisplayServer.get_name() != "headless":
 		await play_dialogue(camera, boss, head, height, title, tint, sector, act, online)
@@ -184,6 +202,11 @@ func play(rig: SideCameraRig, boss: Combatant, floor_y: float, title: String, ti
 	rig.global_position = view_at
 	camera.transform = gameplay_camera
 	rig.set_process(true)
+	if warden_cinematic:
+		if is_instance_valid(mission_ui):
+			mission_ui.visible = ui_was_visible
+		if is_instance_valid(version_ui):
+			version_ui.visible = version_was_visible
 
 func show_title(title: String, tint: Color, act: int, viewport: Viewport) -> CanvasLayer:
 	var layer := CanvasLayer.new()

@@ -7,6 +7,7 @@ enum Style { BACKDRAFT, CASTING, HIGH_VENT, DRILL }
 
 var height := 2.4
 var width := 1.2
+var warning_start := 0.0
 var warning_time := 0.65
 var burst_time := 0.66
 var style := Style.BACKDRAFT
@@ -76,10 +77,10 @@ static func floor_mark(length: float, depth: float, mode: int, tint: Color) -> M
 
 
 func show_phase(at: float) -> void:
-	var warning := at >= 0.0 and at < warning_time
+	var warning := at >= warning_start and at < warning_time
 	var burning := at >= warning_time and at < warning_time + burst_time
 	if warning or burning:
-		mark_material.set_shader_parameter("progress", clampf(at / maxf(warning_time, 0.001), 0.0, 1.0))
+		mark_material.set_shader_parameter("progress", clampf(inverse_lerp(warning_start, maxf(warning_time, warning_start + .001), at), 0.0, 1.0))
 		var cooling := 1.0 - clampf((at - warning_time) / burst_time, 0.0, 1.0)
 		mark_material.set_shader_parameter("heat", cooling if burning else 0.0)
 	mark.visible = warning or burning

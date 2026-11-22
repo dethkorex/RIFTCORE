@@ -1091,10 +1091,17 @@ func interact_gate_relay(operator: RiftPlayer) -> bool:
 	broadcast_state(true)
 	return true
 
+func interact_mission_device(operator: RiftPlayer) -> bool:
+	if host and boss_started and not boss_intro_active and not changing_act and outcome.is_empty() and is_instance_valid(boss) and boss.has_method("interact_purge_valve"):
+		if boss.interact_purge_valve(operator):
+			broadcast_state(true)
+			return true
+	return interact_gate_relay(operator)
+
 func receive_gate_relay_request(remote_act: int) -> void:
 	var source := roster.find(peer.get_sender_id())
 	if host and source > 0 and source < operators.size() and remote_act == act:
-		interact_gate_relay(operators[source])
+		interact_mission_device(operators[source])
 
 func check_campaign_progress() -> void:
 	var remaining := operators.filter(func(operator): return operator.lives > 0 or operator.health>0)
@@ -2582,7 +2589,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 			choose_module(true)
 		elif host:
-			if interact_gate_relay(local):
+			if interact_mission_device(local):
 				get_viewport().set_input_as_handled()
 		else:
 			get_viewport().set_input_as_handled()

@@ -1,0 +1,127 @@
+[gd_scene format=3]
+
+[ext_resource type="Texture2D" path="res://assets/neon_factory/foundry/forged_tread.png" id="Tread"]
+
+[sub_resource type="StandardMaterial3D" id="TreadSteel"]
+albedo_texture = ExtResource("Tread")
+albedo_color = Color(0.52, 0.55, 0.57, 1)
+metallic = 0.67
+roughness = 0.53
+uv1_scale = Vector3(2.4, 1.5, 1)
+
+[sub_resource type="StandardMaterial3D" id="RailSteel"]
+albedo_color = Color(0.25, 0.28, 0.32, 1)
+metallic = 0.72
+roughness = 0.45
+
+[sub_resource type="StandardMaterial3D" id="Recess"]
+albedo_color = Color(0.058, 0.065, 0.074, 1)
+metallic = 0.45
+roughness = 0.62
+
+[sub_resource type="StandardMaterial3D" id="EdgeAmber"]
+albedo_color = Color(0.79, 0.43, 0.15, 1)
+emission_enabled = true
+emission = Color(1, 0.51, 0.12, 1)
+emission_energy_multiplier = 0.85
+
+[sub_resource type="BoxShape3D" id="Collider"]
+size = Vector3(6, 0.25, 3.2)
+
+[sub_resource type="BoxMesh" id="Deck"]
+material = SubResource("TreadSteel")
+size = Vector3(6, 0.25, 3.2)
+
+[sub_resource type="BoxMesh" id="Longeron"]
+material = SubResource("RailSteel")
+size = Vector3(5.82, 0.19, 0.21)
+
+[sub_resource type="BoxMesh" id="EndPlate"]
+material = SubResource("RailSteel")
+size = Vector3(0.22, 0.35, 3.17)
+
+[sub_resource type="BoxMesh" id="FaceSlot"]
+material = SubResource("Recess")
+size = Vector3(4.76, 0.12, 0.055)
+
+[sub_resource type="BoxMesh" id="EdgeLamp"]
+material = SubResource("EdgeAmber")
+size = Vector3(0.75, 0.045, 0.035)
+
+[sub_resource type="BoxMesh" id="CrossTie"]
+material = SubResource("RailSteel")
+size = Vector3(0.2, 0.32, 2.96)
+
+[sub_resource type="BoxMesh" id="DeckRail"]
+material = SubResource("RailSteel")
+size = Vector3(5.38, 0.1, 0.1)
+
+[sub_resource type="BoxMesh" id="RailingPost"]
+material = SubResource("RailSteel")
+size = Vector3(0.1, 0.55, 0.11)
+
+[node name="WardenServiceDeck" type="StaticBody3D"]
+
+[node name="Collider" type="CollisionShape3D" parent="."]
+position = Vector3(0, -0.125, 0)
+shape = SubResource("Collider")
+
+[node name="Deck1" type="MeshInstance3D" parent="."]
+position = Vector3(0, -0.125, 0)
+mesh = SubResource("Deck")
+
+[node name="Longeron1" type="MeshInstance3D" parent="."]
+position = Vector3(0, -0.28, 1.47)
+mesh = SubResource("Longeron")
+
+[node name="Longeron2" type="MeshInstance3D" parent="."]
+position = Vector3(0, -0.28, -1.47)
+mesh = SubResource("Longeron")
+
+[node name="EndPlate1" type="MeshInstance3D" parent="."]
+position = Vector3(-2.88, -0.192, 0)
+mesh = SubResource("EndPlate")
+
+[node name="EndPlate2" type="MeshInstance3D" parent="."]
+position = Vector3(2.88, -0.192, 0)
+mesh = SubResource("EndPlate")
+
+[node name="FaceSlot1" type="MeshInstance3D" parent="."]
+position = Vector3(0, -0.275, 1.594)
+mesh = SubResource("FaceSlot")
+
+[node name="EdgeLamp1" type="MeshInstance3D" parent="."]
+position = Vector3(-1.65, -0.268, 1.628)
+mesh = SubResource("EdgeLamp")
+
+[node name="EdgeLamp2" type="MeshInstance3D" parent="."]
+position = Vector3(1.65, -0.268, 1.628)
+mesh = SubResource("EdgeLamp")
+
+[node name="CrossTie1" type="MeshInstance3D" parent="."]
+position = Vector3(-1.85, -0.29, 0)
+mesh = SubResource("CrossTie")
+
+[node name="CrossTie2" type="MeshInstance3D" parent="."]
+position = Vector3(0, -0.29, 0)
+mesh = SubResource("CrossTie")
+
+[node name="CrossTie3" type="MeshInstance3D" parent="."]
+position = Vector3(1.85, -0.29, 0)
+mesh = SubResource("CrossTie")
+
+[node name="DeckRail1" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.55, -1.49)
+mesh = SubResource("DeckRail")
+
+[node name="RailingPost1" type="MeshInstance3D" parent="."]
+position = Vector3(-2.59, 0.27, -1.49)
+mesh = SubResource("RailingPost")
+
+[node name="RailingPost2" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.27, -1.49)
+mesh = SubResource("RailingPost")
+
+[node name="RailingPost3" type="MeshInstance3D" parent="."]
+position = Vector3(2.59, 0.27, -1.49)
+mesh = SubResource("RailingPost")

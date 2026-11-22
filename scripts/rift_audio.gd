@@ -39,6 +39,7 @@ const EFFECTS := {
 }
 
 const FOUNDRY_SOUNDS := {
+	&"warden_ignition": preload("res://assets/neon_factory/foundry/warden_ignition.wav"),
 	&"fire_jet": preload("res://assets/neon_factory/foundry/fire_jet.wav"),
 	&"boulder_roll": preload("res://assets/neon_factory/foundry/boulder_roll.wav"),
 	&"barricade_crack": preload("res://assets/audio/barricade_crack.wav"),

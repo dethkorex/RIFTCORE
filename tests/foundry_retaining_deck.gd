@@ -24,10 +24,12 @@ func run() -> void:
 	await physics_frame
 	var stage: Node3D = game.game_root
 	var pier := stage.get_node("TERRAIN/CoolingCaverns/PierFoundation1")
-	for depth in [1.25, 5.0, 12.0, 18.5]:
+	var footing := stage.get_node("TERRAIN/CoolingCaverns/PierDrainFooting")
+	for depth in [1.25, 4.5, 12.0, 18.5]:
 		var centre := Vector3(89.55, -9.21 - depth, 0)
 		var hit := trace(stage, centre + Vector3.FORWARD * -3.0, centre)
-		check(hit.get("collider") == pier, "solid retaining face at %.2f metres below the tread" % depth)
+		check(hit.get("collider") == (pier if depth < 5 else footing), "solid retaining face at %.2f metres below the tread" % depth)
+	check(trace(stage, Vector3(89.55, -17.85, 3), Vector3(89.55, -17.85, 0)).is_empty(), "drain passes through the pier above its footing")
 	for x in [85.7, 93.3, 98.7]:
 		check(trace(stage, Vector3(x, -9, 0), Vector3(x, -14.5, 0)).is_empty(), "open fissure at %.1f" % x)
 	var roof := trace(stage, Vector3(103.1, -9, 0), Vector3(103.1, -14.5, 0))

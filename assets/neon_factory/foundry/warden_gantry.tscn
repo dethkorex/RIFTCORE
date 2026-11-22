@@ -1,0 +1,63 @@
+[gd_scene format=3]
+
+[ext_resource type="Texture2D" path="res://assets/neon_factory/foundry/forged_tread.png" id="Tread"]
+
+[sub_resource type="StandardMaterial3D" id="HeavySteel"]
+albedo_color = Color(0.34, 0.29, 0.25, 1)
+metallic = 0.77
+roughness = 0.48
+
+[sub_resource type="StandardMaterial3D" id="HeatGlass"]
+albedo_color = Color(1, 0.34, 0.09, 1)
+emission_enabled = true
+emission = Color(1, 0.28, 0.055, 1)
+emission_energy_multiplier = 1.65
+
+[sub_resource type="StandardMaterial3D" id="DeckSteel"]
+albedo_texture = ExtResource("Tread")
+albedo_color = Color(0.57, 0.59, 0.6, 1)
+metallic = 0.55
+roughness = 0.52
+uv1_scale = Vector3(2, 2, 1)
+
+[sub_resource type="CylinderMesh" id="Anvil"]
+material = SubResource("HeavySteel")
+top_radius = 1
+bottom_radius = 0.83
+height = 0.55
+radial_segments = 8
+
+[sub_resource type="CylinderMesh" id="TreadPlate"]
+material = SubResource("DeckSteel")
+top_radius = 1
+bottom_radius = 1
+height = 0.18
+radial_segments = 8
+
+[sub_resource type="BoxMesh" id="Lens"]
+material = SubResource("HeatGlass")
+size = Vector3(0.40, 0.09, 0.06)
+
+[sub_resource type="ConvexPolygonShape3D" id="Berth"]
+points = PackedVector3Array(-3,0,-0.66,-1.24,0,-1.6,1.24,0,-1.6,3,0,-0.66,3,0,0.66,1.24,0,1.6,-1.24,0,1.6,-3,0,0.66,-2.49,-0.72,-0.55,-1.03,-0.72,-1.33,1.03,-0.72,-1.33,2.49,-0.72,-0.55,2.49,-0.72,0.55,1.03,-0.72,1.33,-1.03,-0.72,1.33,-2.49,-0.72,0.55)
+
+[node name="WardenGantry" type="StaticBody3D"]
+
+[node name="Collider" type="CollisionShape3D" parent="."]
+shape = SubResource("Berth")
+
+[node name="LandingBed" type="MeshInstance3D" parent="."]
+transform = Transform3D(3,0,-1.243,0,1,0,0.663,0,1.6,0,-0.45,0)
+mesh = SubResource("Anvil")
+
+[node name="TopPlate" type="MeshInstance3D" parent="."]
+transform = Transform3D(3,0,-1.243,0,1,0,0.663,0,1.6,0,-0.09,0)
+mesh = SubResource("TreadPlate")
+
+[node name="PortLight" type="MeshInstance3D" parent="."]
+position = Vector3(-0.78,-0.1,1.61)
+mesh = SubResource("Lens")
+
+[node name="StarboardLight" type="MeshInstance3D" parent="."]
+position = Vector3(0.78,-0.1,1.61)
+mesh = SubResource("Lens")

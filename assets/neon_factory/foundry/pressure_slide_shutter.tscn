@@ -1,0 +1,171 @@
+[gd_scene format=3]
+
+[ext_resource type="Texture2D" path="res://assets/neon_factory/foundry/forged_tread.png" id="Steel"]
+
+[sub_resource type="StandardMaterial3D" id="Plate"]
+albedo_color = Color(0.38, 0.38, 0.36, 1)
+albedo_texture = ExtResource("Steel")
+metallic = 0.54
+roughness = 0.6
+uv1_triplanar = true
+uv1_world_triplanar = true
+
+[sub_resource type="StandardMaterial3D" id="Rib"]
+albedo_color = Color(0.34, 0.17, 0.09, 1)
+albedo_texture = ExtResource("Steel")
+metallic = 0.54
+roughness = 0.6
+uv1_triplanar = true
+uv1_world_triplanar = true
+
+[sub_resource type="StandardMaterial3D" id="Guide"]
+albedo_color = Color(0.95, 0.50, 0.12, 1)
+emission_enabled = true
+emission = Color(0.95, 0.50, 0.12, 1)
+emission_energy_multiplier = 1.4
+
+[sub_resource type="BoxShape3D" id="DoorShape"]
+size = Vector3(2.2, 6.72, 4.3)
+
+[sub_resource type="BoxShape3D" id="GripShape"]
+size = Vector3(0.14, 6.72, 4.3)
+
+[sub_resource type="BoxMesh" id="DoorPlate"]
+material = SubResource("Plate")
+size = Vector3(2.2, 6.72, 4.25)
+
+[sub_resource type="BoxMesh" id="Hem"]
+material = SubResource("Rib")
+size = Vector3(2.34, 0.17, 4.32)
+
+[sub_resource type="BoxMesh" id="Runner"]
+material = SubResource("Rib")
+size = Vector3(0.17, 8, 0.24)
+
+[sub_resource type="BoxMesh" id="AmberStrip"]
+material = SubResource("Guide")
+size = Vector3(1.75, 0.07, 0.05)
+
+[sub_resource type="BoxMesh" id="Louver"]
+material = SubResource("Rib")
+size = Vector3(0.15, 0.11, 4.23)
+
+[sub_resource type="BoxMesh" id="Stiffener"]
+material = SubResource("Rib")
+size = Vector3(2.21, 0.095, 0.11)
+
+[sub_resource type="BoxMesh" id="Indicator"]
+material = SubResource("Guide")
+size = Vector3(0.12, 0.21, 0.04)
+
+[node name="PressureShutter" type="StaticBody3D" groups=["no_wall_kick"]]
+
+[node name="DoorCollider" type="CollisionShape3D" parent="."]
+position = Vector3(0, 4.64, 0)
+shape = SubResource("DoorShape")
+
+[node name="InnerGuide" type="StaticBody3D" parent="."]
+
+[node name="GripCollider" type="CollisionShape3D" parent="InnerGuide"]
+position = Vector3(1.13, 4.64, 0)
+shape = SubResource("GripShape")
+
+[node name="DoorPlate1" type="MeshInstance3D" parent="."]
+position = Vector3(0, 4.64, 0)
+mesh = SubResource("DoorPlate")
+
+[node name="Hem1" type="MeshInstance3D" parent="."]
+position = Vector3(0, 1.38, 0)
+mesh = SubResource("Hem")
+
+[node name="Hem2" type="MeshInstance3D" parent="."]
+position = Vector3(0, 7.91, 0)
+mesh = SubResource("Hem")
+
+[node name="Runner1" type="MeshInstance3D" parent="."]
+position = Vector3(-1.08, 4, -2.18)
+mesh = SubResource("Runner")
+
+[node name="Runner2" type="MeshInstance3D" parent="."]
+position = Vector3(1.08, 4, -2.18)
+mesh = SubResource("Runner")
+
+[node name="AmberStrip1" type="MeshInstance3D" parent="."]
+position = Vector3(0, 1.46, 2.15)
+mesh = SubResource("AmberStrip")
+
+[node name="Louver1" type="MeshInstance3D" parent="."]
+position = Vector3(1.13, 1.8, 0)
+mesh = SubResource("Louver")
+
+[node name="Louver2" type="MeshInstance3D" parent="."]
+position = Vector3(1.13, 2.53, 0)
+mesh = SubResource("Louver")
+
+[node name="Louver3" type="MeshInstance3D" parent="."]
+position = Vector3(1.13, 3.26, 0)
+mesh = SubResource("Louver")
+
+[node name="Louver4" type="MeshInstance3D" parent="."]
+position = Vector3(1.13, 3.99, 0)
+mesh = SubResource("Louver")
+
+[node name="Louver5" type="MeshInstance3D" parent="."]
+position = Vector3(1.13, 4.72, 0)
+mesh = SubResource("Louver")
+
+[node name="Louver6" type="MeshInstance3D" parent="."]
+position = Vector3(1.13, 5.45, 0)
+mesh = SubResource("Louver")
+
+[node name="Louver7" type="MeshInstance3D" parent="."]
+position = Vector3(1.13, 6.18, 0)
+mesh = SubResource("Louver")
+
+[node name="Louver8" type="MeshInstance3D" parent="."]
+position = Vector3(1.13, 6.91, 0)
+mesh = SubResource("Louver")
+
+[node name="Louver9" type="MeshInstance3D" parent="."]
+position = Vector3(1.13, 7.64, 0)
+mesh = SubResource("Louver")
+
+[node name="PanelSeam1" type="MeshInstance3D" parent="."]
+position = Vector3(0, 2.22, 2.14)
+mesh = SubResource("Stiffener")
+
+[node name="PanelSeam2" type="MeshInstance3D" parent="."]
+position = Vector3(0, 3.36, 2.14)
+mesh = SubResource("Stiffener")
+
+[node name="PanelSeam3" type="MeshInstance3D" parent="."]
+position = Vector3(0, 4.50, 2.14)
+mesh = SubResource("Stiffener")
+
+[node name="PanelSeam4" type="MeshInstance3D" parent="."]
+position = Vector3(0, 5.64, 2.14)
+mesh = SubResource("Stiffener")
+
+[node name="PanelSeam5" type="MeshInstance3D" parent="."]
+position = Vector3(0, 6.78, 2.14)
+mesh = SubResource("Stiffener")
+
+[node name="ClearanceStripe1" type="MeshInstance3D" parent="."]
+position = Vector3(-0.72, 1.74, 2.16)
+rotation = Vector3(0, 0, -0.52)
+mesh = SubResource("Indicator")
+
+[node name="ClearanceStripe2" type="MeshInstance3D" parent="."]
+position = Vector3(-0.29, 1.74, 2.16)
+rotation = Vector3(0, 0, -0.52)
+mesh = SubResource("Indicator")
+
+[node name="ClearanceStripe3" type="MeshInstance3D" parent="."]
+position = Vector3(0.14, 1.74, 2.16)
+rotation = Vector3(0, 0, -0.52)
+mesh = SubResource("Indicator")
+
+[node name="ClearanceStripe4" type="MeshInstance3D" parent="."]
+position = Vector3(0.57, 1.74, 2.16)
+rotation = Vector3(0, 0, -0.52)
+mesh = SubResource("Indicator")

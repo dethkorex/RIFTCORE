@@ -8,12 +8,13 @@ extends Node3D
 var target: RiftPlayer
 var min_x := -18.0
 var max_x := 38.0
+var warden_framing := 0.0
+@onready var camera_view := get_node_or_null("Camera3D") as Camera3D
 
 func _ready() -> void:
-	var scene_camera := get_node_or_null("Camera3D") as Camera3D
-	if scene_camera:
-		scene_camera.position.z = gameplay_distance
-		scene_camera.fov = 80.0
+	if camera_view:
+		camera_view.position.z = gameplay_distance
+		camera_view.fov = 80.0
 		return
 	var camera := Camera3D.new()
 	camera.name = "Camera3D"
@@ -22,10 +23,26 @@ func _ready() -> void:
 	camera.current = true
 	camera.fov = 80.0
 	add_child(camera)
+	camera_view = camera
 
 func _process(delta: float) -> void:
 	if is_instance_valid(target):
-		global_position = global_position.lerp(target_position(true), 1.0 - exp(-damping * delta))
+		var boss := get_tree().get_first_node_in_group(&"warden_lava_phase") as Node3D
+		var framing := 0.0
+		var lead := 0.0
+		var frame_height := 7.4
+		if boss and boss.get_parent() == target.get_parent() and not boss.exposed:
+			var separation: float = boss.warden_perch.global_position.x - target.global_position.x
+			framing = 1.0 - smoothstep(14.0, 26.0, absf(separation))
+			frame_height = boss.warden_perch.global_position.y * .52
+			lead = clampf(separation * .27, -4.9, 4.9) * framing
+		var blend := 1.0 - exp(-damping * delta)
+		warden_framing = lerpf(warden_framing, framing, blend)
+		camera_view.position.z = gameplay_distance + warden_framing * 5.10
+		var desired := target_position(true)
+		desired.x = clampf(desired.x + lead, min_x, max_x)
+		desired.y += maxf(0.0, frame_height - desired.y) * warden_framing
+		global_position = global_position.lerp(desired, blend)
 
 func snap_to_target() -> void:
 	if is_instance_valid(target):

@@ -45,7 +45,7 @@ func _ready() -> void:
 	actors = stage.get_node("Actors")
 	camera_rig = stage.get_node("CameraRig")
 	lava = make_lava(SHAFT_RIGHT)
-	lava_column = make_lava(SHAFT_RIGHT - SHAFT_LEFT)
+	lava_column = make_lava(SHAFT_RIGHT - SHAFT_LEFT + .42)
 	lava_light = OmniLight3D.new()
 	lava_light.light_color = Color("ff4e15")
 	lava_light.light_energy = 3.4
@@ -80,7 +80,9 @@ func make_lava(width: float) -> MeshInstance3D:
 	slab.subdivide_depth = 12
 	var molten := ShaderMaterial.new()
 	molten.shader = LAVA_SHADER
-	return RiftProjectile.part(self, slab, molten, Vector3.ZERO, Vector3.ONE)
+	var volume := RiftProjectile.part(self, slab, molten, Vector3.ZERO, Vector3.ONE)
+	volume.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	return volume
 
 func make_warning() -> void:
 	var overlay := CanvasLayer.new()
@@ -102,7 +104,8 @@ func _physics_process(delta: float) -> void:
 	match phase:
 		Phase.READY:
 			if require_full_party and (not door.passable or (inside.is_empty() and not party.any(door.near))):
-				entrance_ready = unlocked and not squad.is_empty() and squad.all(door.near)
+				# A partner who has reached the upper gallery cannot return through the sealed shaft.
+				entrance_ready = unlocked and squad.any(door.near) and squad.all(ready_for_shaft)
 			if unlocked and door.passable and not inside.is_empty() and party.all(past_entrance):
 				elapsed = 0.0
 				set_phase(Phase.SEALED)
@@ -142,6 +145,12 @@ func touches_lava(operator: RiftPlayer) -> bool:
 	return at.x + radius >= 0.0 and at.x - radius <= SHAFT_RIGHT \
 		and absf(at.z) - radius <= LAVA_HALF_DEPTH \
 		and at.y - operator.standing_capsule.height * 0.5 <= contact_surface + SURFACE_CONTACT
+
+func ready_for_shaft(operator: RiftPlayer) -> bool:
+	if door.near(operator):
+		return true
+	var at := to_local(operator.global_position)
+	return operator.health > 0.0 and at.x >= EXIT_CLEARANCE and at.y >= $ExitBridge.position.y - 2.0
 
 func past_entrance(operator: RiftPlayer) -> bool:
 	return to_local(operator.global_position).x >= ENTRY_CLEARANCE

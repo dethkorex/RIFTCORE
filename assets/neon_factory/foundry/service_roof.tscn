@@ -1,0 +1,14 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://assets/neon_factory/foundry/interior_roof_bay.tscn" id="Art"]
+
+[sub_resource type="BoxShape3D" id="Roof"]
+size = Vector3(6, 0.66, 5.95)
+
+[node name="ServiceRoof" type="StaticBody3D" groups=["no_wall_kick"]]
+
+[node name="Art" parent="." instance=ExtResource("Art")]
+
+[node name="Collider" type="CollisionShape3D" parent="."]
+position = Vector3(0, 0, -0.42)
+shape = SubResource("Roof")
