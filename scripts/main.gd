@@ -690,22 +690,55 @@ func verify_coop_input_isolation(mission: Node, local_index: int) -> bool:
 	return true
 
 func verify_foundry_landing(operator: RiftPlayer, mission: Node) -> bool:
-	var trench := mission.stage.get_node("TERRAIN/PressureHouse/SumpFloor") as Node3D
-	var plinth := mission.stage.get_node("TERRAIN/PressureHouse/PumpInspectionPlinth") as Node3D
-	var start := trench.global_position + Vector3.UP * (operator.standing_capsule.height * .5 + .05)
+	var room := mission.stage.get_node("TERRAIN/PressureHouse") as Node3D
+	var trench := room.get_node("SumpFloor") as Node3D
+	var plinth := room.get_node("PumpInspectionPlinth") as Node3D
+	var stance := Vector3.UP * (operator.standing_capsule.height * .5 + .05)
+	var start := trench.global_position + stance
+	var lobby := RiftRelay.relay
 	if mission.host:
-		if not await wait_for_relay(func(): return RiftRelay.relay.lobby_get_data("coop_plinth_ready", false), 10.0):
+		if not await wait_for_relay(func(): return lobby.lobby_get_data("coop_plinth_ready", false), 10.0):
+			print("Pressure House: guest did not reach the crossing check")
 			return false
-		for player in mission.operators:
-			player.global_position = start
-			player.velocity = Vector3.ZERO
-			player.invulnerable_time = 8.0
-			mission.mark_position_reset(player)
-		mission.broadcast_state(true)
+		# The patrol occupies the takeoff. Isolate the jump from enemy contact.
+		var scout := mission.stage.get_node_or_null("Actors/SettlingBedScout") as WalkerBot
+		if is_instance_valid(scout) and scout.health > 0:
+			scout.take_damage(scout.health)
 	else:
-		RiftRelay.relay.lobby_set_data("coop_plinth_ready", true)
-	if not await wait_for_relay(func(): return operator.grounded() and operator.global_position.distance_to(start) < .6, 10.0):
-		return false
+		lobby.lobby_set_data("coop_plinth_ready", true)
+
+	for index in mission.operators.size():
+		if mission.host:
+			# The ledges are narrow. Move the first operator clear before the
+			# second takes off, so neither starts or lands inside a teammate.
+			if index > 0:
+				var observer: RiftPlayer = mission.operators[index - 1]
+				observer.global_position = (room.get_node("OutletSill") as Node3D).global_position + stance
+				observer.velocity = Vector3.ZERO
+				mission.mark_position_reset(observer)
+			var mover: RiftPlayer = mission.operators[index]
+			mover.global_position = start
+			mover.velocity = Vector3.ZERO
+			mover.invulnerable_time = 8.0
+			mission.mark_position_reset(mover)
+			mission.broadcast_state(true)
+		if index != mission.local_index:
+			continue
+		if not await wait_for_relay(func(): return operator.grounded() and operator.global_position.distance_to(start) < .65, 12.0):
+			print("Pressure House: operator ", index, " did not settle at takeoff. At ", operator.global_position, " expected ", start)
+			return false
+		if not await cross_foundry_plinth(operator, trench, plinth):
+			print("Pressure House: operator ", index, " missed the plinth. At ", operator.global_position, " expected ", plinth.global_position)
+			return false
+		print("Pressure House: operator ", index, " landed on the inspection plinth")
+	if mission.host:
+		var guest: RiftPlayer = mission.operators[1]
+		if not await wait_for_relay(func(): return guest.grounded() and guest.global_position.distance_to(plinth.global_position + stance) < 1.55, 12.0):
+			print("Pressure House: host observed guest at ", guest.global_position, " expected ", plinth.global_position)
+			return false
+	return true
+
+func cross_foundry_plinth(operator: RiftPlayer, trench: Node3D, plinth: Node3D) -> bool:
 	var lives := operator.lives
 	Input.action_press("move_right")
 	var crossed := false
