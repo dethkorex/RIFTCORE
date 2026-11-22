@@ -256,6 +256,9 @@ func climb_shaft() -> bool:
 		var height := float(start_y + deck.position.y)
 		var width := 6 * absf(deck.scale.x)
 		var passed := await climb_ledge(previous, deck, target, height, width)
+		if not passed and actor.grounded() and absf(feet() - previous.global_position.y)<.18:
+			print("Retrying jump from ",previous.name)
+			passed = await climb_ledge(previous, deck, target, height, width)
 		if not passed:
 			test.check(false,"Climb " + str(deck.name) + " at " + str(actor.position))
 			return false
@@ -276,6 +279,10 @@ func climb_ledge(previous: Node3D, deck: Node3D, target: float, height: float, w
 	var wall := str(deck.name).ends_with("WallKick")
 	var side := (-1.0 if deck.position.x < 12.0 else 1.0) if wall else signf(target-actor.position.x)
 	var edge := from + side*(span-.45) if wall else clampf(target, from-span+.38, from+span-.38)
+	if not wall:
+		# Leave space for the capsule at the overlapping corners of solid landings.
+		var clear := target - side*(width*.5+.72)
+		edge = minf(clear,edge) if side > 0 else maxf(clear,edge)
 	if previous.name == "ShaftFloor1":
 		edge = shaft.position.x + 6.2
 	Input.action_release("jump")
@@ -286,11 +293,12 @@ func climb_ledge(previous: Node3D, deck: Node3D, target: float, height: float, w
 	if wall:
 		kick_width = width
 		return await kick_to(side, target, height, true)
-	var near := target-side*(width*.5+.40)
+	var near := target-side*(width*.5+.61)
 	axis(shaft_steer(near))
 	Input.action_press("jump")
 	await test.physics_frame
 	for frame in 72:
+		if frame > 14 and actor.grounded() and absf(feet() - previous.global_position.y)<.14: break
 		axis(shaft_steer(target-side*(width*.5-.68) if feet() > height-.025 else near))
 		await test.physics_frame
 		if actor.grounded() and absf(feet()-height)<.13:
