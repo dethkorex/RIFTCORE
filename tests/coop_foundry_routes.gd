@@ -11,6 +11,7 @@ var sequence := 0
 
 func exercise(client) -> void:
 	test = client
+	test.lobby.recovery.changed.connect(rejoin_if_offered, CONNECT_DEFERRED)
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--foundry-sync="):
 			checkpoint_dir = arg.trim_prefix("--foundry-sync=")
@@ -48,6 +49,18 @@ func exercise(client) -> void:
 	mission.mark_local_return_ready()
 	await require(func(): return is_instance_valid(test.game.home_hub) and not test.lobby.mission_active and test.lobby.room_size == 2, 20, "Both operators extracted into the same party")
 	await sync("hub-return")
+
+func rejoin_if_offered() -> void:
+	var button = test.game.recovery_button
+	if is_instance_valid(button) and button.is_visible_in_tree() and not button.disabled:
+		print("FOUNDRY accepting Rejoin Party")
+		button.pressed.emit()
+
+func next_motion_frame() -> void:
+	await test.physics_frame
+	while test.paused or (not test.host and mission.snapshot_age > .6):
+		stop()
+		await test.process_frame
 
 func sync(label: String) -> bool:
 	print("FOUNDRY waiting ", label)
@@ -105,13 +118,13 @@ func steer(x: float) -> float:
 func walk(x: float, limit := 170) -> void:
 	for i in limit:
 		axis(clampf(steer(x), -.55, .55) if absf(x - actor.position.x) < 2.5 else steer(x))
-		await test.physics_frame
+		await next_motion_frame()
 		if absf(actor.position.x - x) < .16 and actor.grounded(): break
 	axis(0)
 
 func jump() -> void:
 	Input.action_release("jump")
-	await test.physics_frame
+	await next_motion_frame()
 	Input.action_press("jump")
 
 func cross(edge: float, landing_edge: float, target: float, height: float, approach_ticks := 100) -> bool:
@@ -124,7 +137,7 @@ func cross(edge: float, landing_edge: float, target: float, height: float, appro
 	axis(direction)
 	await jump()
 	for i in 92:
-		await test.physics_frame
+		await next_motion_frame()
 		axis(steer(landing_edge - direction * .48 if feet() < height - .02 and actor.velocity.y > 0 else target))
 		if i > 6 and actor.grounded(): break
 	stop()
@@ -162,7 +175,7 @@ func interact() -> void:
 	event.action = &"field_interact"
 	event.pressed = true
 	Input.parse_input_event(event)
-	await test.physics_frame
+	await next_motion_frame()
 	event = InputEventAction.new()
 	event.action = &"field_interact"
 	Input.parse_input_event(event)
@@ -206,7 +219,7 @@ func kick_to(side: float, target: float, height: float, shaft_band: bool) -> boo
 	await jump()
 	var outbound := false
 	for i in 178:
-		await test.physics_frame
+		await next_motion_frame()
 		if feet() > height - .08 and actor.grounded() and absf(actor.position.x - target) < 2.2:
 			stop()
 			return true
@@ -217,7 +230,7 @@ func kick_to(side: float, target: float, height: float, shaft_band: bool) -> boo
 			var high := feet() > height-2.96
 			axis(side)
 			await jump()
-			for hold in 3: await test.physics_frame
+			for hold in 3: await next_motion_frame()
 			if high: outbound = true
 			elif not shaft_band: side *= -1
 		if outbound:
@@ -245,6 +258,10 @@ func escape() -> bool:
 		await walk(501.55)
 	if not await require(func(): return shaft.door.passable and mission.operators.all(func(p): return shaft.door.near(p)),30,"Both operators regroup and the shaft door opens"): return false
 	if not await sync("enter-together"): return false
+	# Let the joining operator enter first, so replication delay at the door
+	# does not take time away from their climb when the host triggers the surge.
+	if test.host and not await require(func(): return shaft.past_entrance(mission.operators[1]), 10, "Guest enters the open shaft"):
+		return false
 	return await climb_shaft()
 
 func climb_shaft() -> bool:
@@ -256,19 +273,30 @@ func climb_shaft() -> bool:
 	var route: Array = shaft.get_node("Climb").get_children()
 	route.append(shaft.get_node("ExitBridge"))
 	var rising := false
-	for deck in route:
+	var step := 0
+	var retries := 0
+	while step < route.size():
+		var deck: Node3D = route[step]
 		var target := float(start_x + deck.position.x)
 		var height := float(start_y + deck.position.y)
 		var width := 6 * absf(deck.scale.x)
 		var passed := await climb_ledge(previous, deck, target, height, width)
-		if not passed and actor.grounded() and absf(feet() - previous.global_position.y)<.18:
-			print("Retrying jump from ",previous.name)
-			passed = await climb_ledge(previous, deck, target, height, width)
+		if not passed and actor.grounded() and retries < 5:
+			# Rejoining acknowledges the host landing. Resume the climb from the
+			# platform supporting the operator, including after a missed jump.
+			var supports := [shaft.get_node("ShaftFloor1")] + route.slice(0, step + 1)
+			var support := supports.find_custom(func(p): return absf(feet() - p.global_position.y) < .18 and absf(actor.position.x - p.global_position.x) <= 3 * absf(p.scale.x) + .3)
+			if support >= 0:
+				previous = supports[support]
+				step = support
+				retries += 1
+				continue
 		if not passed:
 			test.check(false,"Climb " + str(deck.name) + " at " + str(actor.position))
 			return false
 		rising = rising or shaft.phase == shaft.Phase.RISING
 		previous = deck
+		step += 1
 		print("SHAFT ",deck.name," feet=",feet()," lava=",start_y+shaft.surface)
 	await walk(start_x+28.1)
 	if not await require(func(): return mission.operators.all(func(p): return p.position.x > start_x+shaft.EXIT_CLEARANCE and p.position.y > start_y+78 and p.health > 0),10,"Both living operators cross the shaft exit"): return false
@@ -294,18 +322,18 @@ func climb_ledge(previous: Node3D, deck: Node3D, target: float, height: float, w
 	for frame in (24 if wall else 43):
 		if not wall and absf(edge - actor.position.x)<.17: break
 		axis(shaft_steer(edge))
-		await test.physics_frame
+		await next_motion_frame()
 	if wall:
 		kick_width = width
 		return await kick_to(side, target, height, true)
 	var near := target-side*(width*.5+.61)
 	axis(shaft_steer(near))
 	Input.action_press("jump")
-	await test.physics_frame
+	await next_motion_frame()
 	for frame in 72:
 		if frame > 14 and actor.grounded() and absf(feet() - previous.global_position.y)<.14: break
 		axis(shaft_steer(target-side*(width*.5-.68) if feet() > height-.025 else near))
-		await test.physics_frame
+		await next_motion_frame()
 		if actor.grounded() and absf(feet()-height)<.13:
 			stop()
 			return true
