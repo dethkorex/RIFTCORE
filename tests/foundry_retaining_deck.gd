@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tests/game_test_tree.gd"
 
 var failures := 0
 
@@ -34,4 +34,4 @@ func run() -> void:
 	check(roof.get("collider") == stage.get_node("TERRAIN/CoolingCaverns/WellWestRoof"), "the return lip covers the east side of the inspection well")
 	var lane := Vector3(90, -6.75, 0)
 	check(trace(stage, lane, lane + Vector3.RIGHT * 4).is_empty(), "upper gallery supports leave the lower route clear")
-	quit(failures)
+	finish(failures)

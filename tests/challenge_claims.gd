@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tests/game_test_tree.gd"
 
 const Difficulty := preload("res://scripts/mission_difficulty.gd")
 const Stock := preload("res://scripts/stock_catalog.gd")
@@ -132,4 +132,4 @@ func run() -> void:
 	paused = false
 	game.queue_free()
 	await process_frame
-	quit(failures)
+	finish(failures)

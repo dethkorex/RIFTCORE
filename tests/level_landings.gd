@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tests/game_test_tree.gd"
 
 ## Real-controller checks for the hand-authored landings. Each trial starts grounded
 ## on the preceding ledge. No changes to velocity, gravity or collisions in flight.
@@ -173,4 +173,4 @@ func run() -> void:
 		await process_frame
 		await physics_frame
 	print("LANDING FAILURES ", failures)
-	quit(failures)
+	finish(failures)

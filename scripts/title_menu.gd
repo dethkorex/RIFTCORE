@@ -2387,12 +2387,6 @@ func item_card(parent: VBoxContainer, id: String) -> VBoxContainer:
 	UI.label(stack, item.perk, 16, UI.MUTED)
 	return stack
 
-func select_inventory_slot(slot: String) -> void:
-	shop_item = ""
-	focused_item = ""
-	inventory_slot = slot
-	show_page(page)
-
 func inspect_shop_item(id: String) -> void:
 	shop_item = id
 	var state: Dictionary = navigation_state.get(page, {})
@@ -2766,12 +2760,6 @@ func build_blueprint_details(columns: HBoxContainer) -> void:
 		UI.label(content, inventory_status, 16, UI.VIOLET)
 	if not learn.disabled:
 		learn.grab_focus()
-
-func build_info(columns: HBoxContainer, title: String, description: String) -> void:
-	var info := card(columns, 1.25)
-	UI.label(info, title, 30, UI.CYAN)
-	UI.label(info, description, 19)
-	portrait(card(columns))
 
 func deploy() -> void:
 	start_requested.emit()

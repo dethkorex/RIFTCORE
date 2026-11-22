@@ -2,13 +2,14 @@
 extends Node3D
 
 @export var extraction := false
+@export var tint_override := Color.TRANSPARENT
 var emitters: Node3D
 var lamps: StandardMaterial3D
 var glow: OmniLight3D
 var tint: Color
 
 func _ready() -> void:
-	tint = Color("c58aff") if extraction else Color("43dcff")
+	tint = tint_override if tint_override.a > 0.0 else (Color("c58aff") if extraction else Color("43dcff"))
 	var steel := paint(Color("263551"), 0.72)
 	var deck := paint(Color("617385"), 0.48)
 	var inset := paint(Color("101c29"), 0.65)

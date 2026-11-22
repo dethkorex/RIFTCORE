@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tests/game_test_tree.gd"
 class GuestLink extends Node:
 	func get_sender_id() -> int: return 12
 
@@ -121,4 +121,4 @@ func run() -> void:
 	actor=null
 	await process_frame
 	print("LAVA CONTACT RESULT failures=",failures)
-	quit(int(failures>0))
+	finish(int(failures>0))

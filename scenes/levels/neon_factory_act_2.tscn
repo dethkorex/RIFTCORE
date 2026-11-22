@@ -46,7 +46,7 @@
 
 [ext_resource type="PackedScene" path="res://assets/neon_factory/foundry/lava_escape_shaft.tscn" id="LavaEscape"]
 
-[ext_resource type="Script" path="res://scripts/foundry_quench_lock.gd" id="QuenchLock"]
+[ext_resource type="Script" path="res://scripts/foundry_titan_room.gd" id="TitanRoomRoof"]
 
 [ext_resource type="PackedScene" path="res://assets/neon_factory/foundry/retaining_deck.tscn" id="Foundation"]
 
@@ -2914,6 +2914,13 @@ solid_deck = true
 position = Vector3(596, 80.15, 0)
 scale = Vector3(1.15, 0.58, 1)
 
+[node name="TitanEastPerch" parent="TERRAIN" instance=ExtResource("arena_hatch")]
+position = Vector3(622, 78.46, 0)
+deck_width = 6.4
+deck_depth = 3.10
+climb_height = 4.86
+solid_deck = true
+
 [node name="PlayerSpawn" type="Marker3D" parent="MARKERS"]
 position = Vector3(0.0000, 0.8700, 0.0000)
 
@@ -2985,16 +2992,21 @@ position = Vector3(448.05, 0.6, 0)
 [node name="SlagReliefVentApproachStripe" parent="DECOR" instance=ExtResource("HazardStripe")]
 position = Vector3(455.0, 0.6, 0)
 
-[node name="TitanQuenchLocks" type="Node3D" parent="TERRAIN"]
-position = Vector3(38, 73.6, 0)
+[node name="TitanDropPoints" type="Node3D" parent="TERRAIN"]
+position = Vector3(0, 73.6, 0)
 
-[node name="WestLock" type="Node3D" parent="TERRAIN/TitanQuenchLocks"]
-position = Vector3(552.8, 0, 0)
-script = ExtResource("QuenchLock")
+[node name="WestCore" type="Marker3D" parent="TERRAIN/TitanDropPoints"]
+position = Vector3(592, 0, 0)
 
-[node name="EastLock" type="Node3D" parent="TERRAIN/TitanQuenchLocks"]
-position = Vector3(578, 0, 0)
-script = ExtResource("QuenchLock")
+[node name="CenterCore" type="Marker3D" parent="TERRAIN/TitanDropPoints"]
+position = Vector3(604, 0, 0)
+
+[node name="EastCore" type="Marker3D" parent="TERRAIN/TitanDropPoints"]
+position = Vector3(615, 0, 0)
+
+[node name="TitanArenaRoof" type="Node3D" parent="DECOR"]
+position = Vector3(603, 83.25, 0)
+script = ExtResource("TitanRoomRoof")
 
 [node name="TitanEastDrop" type="Marker3D" parent="TERRAIN"]
 position = Vector3(620.5, 73.6, 0)

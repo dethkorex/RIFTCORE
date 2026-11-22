@@ -7,22 +7,32 @@ const PACK_VFX := preload("res://scripts/pack_combat_vfx.gd")
 const FoundryRig := preload("res://scripts/foundry_boss_rig.gd")
 const Difficulty := preload("res://scripts/mission_difficulty.gd")
 const ReliefValve := preload("res://scripts/foundry_relief_valve.gd")
-const QuenchLock := preload("res://scripts/foundry_quench_lock.gd")
+const FallingCore := preload("res://scripts/foundry_falling_core.gd")
+const LavaShader := preload("res://assets/neon_factory/foundry/rising_lava.gdshader")
+const Burst := preload("res://scripts/pit_burst.gd")
 const WARDEN_WINDOWS := [5.0, 4.25, 3.6]
 const TITAN_WINDOWS := [6.0, 5.2, 4.5]
 const WARDEN_UNLOCK_TIME := [1.45, 1.28, 1.12]
-const RUSH_WINDUP := 0.92
-const RUSH_END_TIME := 1.78
+const SLAM_TIME := .82
+const CORE_LAND_TIME := 1.56
+const AIM_LOCK_TIME := 2.65
+const RUSH_WINDUP := 3.68
+const RUSH_END_TIME := 4.84
+const CORE_START_HEIGHT := 6.42
+const LAVA_WARNING := [3.75, 3.35, 3.0]
+const LAVA_RISE_TIME := 1.1
+const LAVA_HOLD_TIME := 2.0
+const LAVA_DRAIN_TIME := .90
 const DRILL_REACH := 2.45
 const FIRST_SEAL := 0.64
 const SECOND_SEAL := 0.30
 const ORANGE := Color("ff6e31")
 const HEAT_MARKER := Color("ff6932")
-const MINI_CYCLE := ["low_volley", "kiln_backdraft", "sweep", "kiln_backdraft", "firewall", "kiln_backdraft"]
-const TITAN_CYCLE := ["drill_volley", "rush", "casting_wave", "rush", "hammer", "rush"]
-const HARD_WARDEN_CYCLE := ["crossfire", "kiln_backdraft", "sweep", "kiln_backdraft", "low_volley", "kiln_backdraft"]
-const HARD_TITAN_CYCLE := ["crossfire", "rush", "casting_wave", "rush", "hammer", "rush", "pressure_dump", "rush"]
-const EXPERT_TITAN_CYCLE := ["rupture", "casting_wave", "rupture", "crossfire", "rupture", "hammer", "rupture", "pressure_dump"]
+const MINI_CYCLE := ["low_volley", "kiln_backdraft", "lava_surge", "kiln_backdraft", "firewall", "kiln_backdraft"]
+const TITAN_CYCLE := ["drill_volley", "rush", "lava_surge", "rush", "casting_wave", "rush"]
+const HARD_WARDEN_CYCLE := ["crossfire", "kiln_backdraft", "lava_surge", "kiln_backdraft", "low_volley", "kiln_backdraft"]
+const HARD_TITAN_CYCLE := ["crossfire", "rush", "lava_surge", "rush", "hammer", "rush", "pressure_dump", "rush"]
+const EXPERT_TITAN_CYCLE := ["rupture", "lava_surge", "rupture", "crossfire", "rupture", "hammer", "rupture", "pressure_dump"]
 
 @export var warden := false
 var chassis_height := 1.45
@@ -54,8 +64,15 @@ var purge_valves: Array[ReliefValve] = []
 var pressure_released := false
 var elevated_time: Dictionary = {}
 var window_end := 0.0
-var quench_locks: Array[QuenchLock] = []
-var quench_index := -1
+var drop_points: Array[Node3D] = []
+var core_index := -1
+var falling_core: FallingCore
+var intro_core: FallingCore
+var rush_hits_core := false
+var core_shattered := false
+var last_shatter_step := -1
+var lava_surface: MeshInstance3D
+var lava_damage_at := 0.0
 var last_attack_was_overhead := false
 var block_feedback_left := 0.0
 var exposed_light: OmniLight3D
@@ -87,11 +104,10 @@ func _ready() -> void:
 		floor_ports.clear()
 		for index in 10:
 			floor_ports.append(lerpf(arena_left, arena_right, (float(index) + 0.5) / 10.0))
-	var locks := stage.get_node_or_null("TERRAIN/TitanQuenchLocks")
-	if not warden and locks:
-		for child in locks.get_children():
-			if child is QuenchLock:
-				quench_locks.append(child)
+	var points := stage.get_node_or_null("TERRAIN/TitanDropPoints")
+	if not warden and points:
+		for marker: Node3D in points.get_children():
+			drop_points.append(marker)
 	exposed_light = OmniLight3D.new()
 	exposed_light.light_color = Color("82ffe1")
 	exposed_light.light_energy = 1.15
@@ -110,7 +126,6 @@ func phase_index() -> int:
 
 func configure_difficulty(mode: int) -> void:
 	difficulty_mode = clampi(mode, Difficulty.NORMAL, Difficulty.NIGHTMARE)
-	refresh_quench_locks()
 	if not purge_valves.is_empty():
 		return
 	if warden:
@@ -162,7 +177,7 @@ func _physics_process(delta: float) -> void:
 			var cycle := attack_cycle()
 			var next: String = cycle[step % cycle.size()]
 			var camper := elevated_operator()
-			if camper and not last_attack_was_overhead and next not in ["kiln_backdraft", "rush", "rupture"]:
+			if camper and not last_attack_was_overhead and next not in ["kiln_backdraft", "rush", "rupture", "lava_surge"]:
 				begin_attack("overhead_vent", camper)
 				elevated_time[camper.get_instance_id()] = 0.0
 			else:
@@ -210,6 +225,8 @@ func begin_attack(kind: String, elevated: RiftPlayer = null) -> void:
 	window_end = 0.0
 	hit_players.clear()
 	match motion:
+		"lava_surge":
+			build_lava_surge()
 		"overhead_vent":
 			if elevated:
 				var platform_y := elevated.global_position.y - elevated.standing_capsule.height * 0.5
@@ -255,9 +272,8 @@ func begin_attack(kind: String, elevated: RiftPlayer = null) -> void:
 			var lure := target.global_position.x - rush_origin
 			if absf(lure) > 0.20:
 				facing = signf(lure)
-			rush_end = clampf(rush_origin + facing * (21.0 + 1.65 * phase_index()), arena_left, arena_right)
-			select_quench_lock()
-			show_rush_markers()
+			rush_end = rush_origin
+			select_drop_point()
 			RiftAudio.play_effect(&"titan_windup")
 
 func advance_attack(delta: float) -> void:
@@ -269,6 +285,12 @@ func advance_attack(delta: float) -> void:
 			finish_attack()
 		return
 	var pressure := phase_index()
+	if motion == "lava_surge":
+		move_in_arena(0.0, delta)
+		update_lava_surge(true)
+		if elapsed >= lava_warning_time() + LAVA_RISE_TIME + LAVA_HOLD_TIME + LAVA_DRAIN_TIME:
+			finish_attack()
+		return
 	if motion == "kiln_backdraft" and elapsed >= backdraft_warning():
 		present_purge_valves(false, true)
 	if motion in ["rush", "rupture"]:
@@ -297,6 +319,8 @@ func advance_attack(delta: float) -> void:
 	advance_flames(true)
 	var end_at := 3.40 if motion in ["pressure_dump", "rupture"] else (2.52 if motion in ["sweep", "crossfire"] else (2.26 if motion in ["firewall", "hammer", "rush"] else 1.8))
 	match motion:
+		"rush", "rupture":
+			end_at = RUSH_END_TIME + (1.4 if motion == "rupture" else .36)
 		"overhead_vent":
 			end_at = 1.90
 		"kiln_backdraft":
@@ -313,73 +337,175 @@ func finish_attack() -> void:
 func backdraft_warning() -> float:
 	return WARDEN_UNLOCK_TIME[difficulty_mode]
 
-func select_quench_lock() -> void:
-	quench_index = -1
-	var nearest := INF
-	var drill_start := rush_origin + facing * DRILL_REACH
-	var range_x := absf(rush_end - rush_origin)
-	for index in quench_locks.size():
-		var distance := (quench_locks[index].global_position.x - drill_start) * facing
-		if distance >= 0.0 and distance <= range_x and distance < nearest:
-			quench_index = index
-			nearest = distance
-	refresh_quench_locks()
+func select_drop_point() -> void:
+	var best := INF
+	for index in drop_points.size():
+		var offset := drop_points[index].global_position.x - rush_origin
+		if absf(offset) < 5.0 or absf(offset) > 25.0:
+			continue
+		var score := absf(offset) + (27.0 if signf(offset) != facing else 0.0)
+		if score < best:
+			core_index = index
+			best = score
+	if core_index >= 0:
+		facing = signf(drop_points[core_index].global_position.x - rush_origin)
+		show_falling_core()
 
-func refresh_quench_locks() -> void:
-	for index in quench_locks.size():
-		var lock := quench_locks[index]
-		var state := QuenchLock.State.READY
-		if index == quench_index:
-			state = QuenchLock.State.CLAMPED if exposed else QuenchLock.State.ARMED
-		lock.set_state(state)
+func show_falling_core() -> void:
+	if core_index < 0 or is_instance_valid(falling_core):
+		return
+	falling_core = FallingCore.new()
+	falling_core.top_level = true
+	add_child(falling_core)
+	falling_core.global_position = drop_points[core_index].global_position
+	present_core()
 
-func rush_destination() -> float:
-	if quench_index >= 0:
-		return quench_locks[quench_index].global_position.x - facing * DRILL_REACH
-	return rush_end
+func present_core() -> void:
+	if is_instance_valid(falling_core):
+		falling_core.present(elapsed, SLAM_TIME, CORE_LAND_TIME, CORE_START_HEIGHT, core_shattered)
+
+func slam_effect() -> void:
+	var at := Vector3(rush_origin, floor_height + .12, 0.0)
+	Burst.spawn(self, at, Color("ff8030"), .65)
+	RiftAudio.foundry_sound(&"boulder_roll", at)
+
+func core_landing_effect() -> void:
+	if not is_instance_valid(falling_core):
+		return
+	VFX.impact(falling_core, 2.6)
+	RiftAudio.foundry_sound(&"boulder_roll", falling_core.global_position)
+
+func shatter_core() -> void:
+	if core_index < 0 or last_shatter_step == step:
+		return
+	last_shatter_step = step
+	Burst.spawn(get_parent(), drop_points[core_index].global_position + Vector3.UP * 1.10, Color("ffc858"), 1.1)
+	RiftAudio.play_effect(&"barricade_crack")
+
+func lock_charge() -> void:
+	var lure := target.global_position.x
+	if core_index >= 0:
+		var core_x := drop_points[core_index].global_position.x
+		var side := signf(core_x - rush_origin)
+		for operator in operators():
+			if (operator.global_position.x - core_x) * side >= .68:
+				rush_hits_core = true
+				facing = side
+				rush_end = core_x - facing * DRILL_REACH
+				break
+	if not rush_hits_core:
+		facing = signf(lure - rush_origin) if absf(lure - rush_origin) > .18 else facing
+		var range_x := clampf(absf(lure - rush_origin) + .45, 1.0, 24.0)
+		if core_index >= 0:
+			var gap := (drop_points[core_index].global_position.x - rush_origin) * facing
+			if gap > 0.0:
+				range_x = minf(range_x, gap - DRILL_REACH - .25)
+		rush_end = clampf(rush_origin + facing * range_x, arena_left, arena_right)
+	show_rush_markers()
 
 func update_rush(prior: float, delta: float) -> void:
+	if prior < SLAM_TIME and elapsed >= SLAM_TIME:
+		slam_effect()
+		for body in operators():
+			if absf(body.global_position.x - rush_origin) < 4.0 and body.global_position.y < floor_height + 2.05:
+				body.take_boss_hit(23.0 * encounter_attack_scale, global_position, 1)
+	if prior < CORE_LAND_TIME and elapsed >= CORE_LAND_TIME:
+		core_landing_effect()
+		if core_index >= 0:
+			var at := drop_points[core_index].global_position
+			for body in operators():
+				if absf(body.global_position.x - at.x) < 1.25 and body.global_position.y < floor_height + 2.9:
+					body.take_boss_hit(19.0 * encounter_attack_scale, at, 1)
+	if prior < AIM_LOCK_TIME and elapsed >= AIM_LOCK_TIME:
+		lock_charge()
+	present_core()
 	var charging := elapsed >= RUSH_WINDUP and elapsed <= RUSH_END_TIME and not world_impact
 	var start_x := global_position.x
 	if charging:
 		if prior < RUSH_WINDUP:
 			RiftAudio.stop_effect(&"titan_windup")
 			RiftAudio.foundry_sound(&"fire_jet", global_position)
-		var next_x := rush_destination()
-		var speed := minf(27.0 + phase_index() * 3.1, absf(next_x - start_x) / delta)
+		var speed := minf(27.0 + phase_index() * 3.1, absf(rush_end - start_x) / delta)
 		move_in_arena(speed * facing, delta)
-		var lo := minf(start_x, global_position.x) - 0.75
-		var hi := maxf(start_x, global_position.x) + 0.75
-		lo -= 1.7 if facing < 0.0 else 0.0
-		hi += 1.7 if facing > 0.0 else 0.0
+		var lo := minf(start_x, global_position.x) - (.75 + (1.7 if facing < 0.0 else 0.0))
+		var hi := maxf(start_x, global_position.x) + (.75 + (1.7 if facing > 0.0 else 0.0))
 		for body in operators():
 			var where: Vector3 = body.global_position
 			var id: int = body.get_instance_id()
 			if not hit_players.has(id) and where.x > lo and where.x < hi and where.y < floor_height + 2.30:
 				hit_players[id] = true
 				body.take_boss_hit((33.0 + 5.0 * phase_index()) * encounter_attack_scale, global_position, 1, true)
-		if quench_index >= 0 and absf(next_x - global_position.x) < 0.12:
+		if absf(rush_end - global_position.x) < .14:
 			world_impact = true
-			open_armor()
-			refresh_quench_locks()
-			return
-		if absf(rush_end - global_position.x) < .22 or speed > 0.5 and absf(global_position.x - start_x) < .025:
+			if rush_hits_core:
+				core_shattered = true
+				present_core()
+				shatter_core()
+				open_armor()
+				return
+		elif speed > .5 and absf(global_position.x - start_x) < .025:
 			world_impact = true
-			quench_index = -1
-			refresh_quench_locks()
+		if world_impact:
 			VFX.impact(armor.drill_tip, 3.0)
 			RiftAudio.foundry_sound(&"boulder_roll", global_position)
 	else:
 		move_in_arena(0.0, delta)
 	if not world_impact and elapsed >= RUSH_END_TIME:
 		world_impact = true
-		quench_index = -1
-		refresh_quench_locks()
 	if motion == "rupture" and world_impact and zones.is_empty():
 		for i in [0, 1, 2]:
 			var lane := lerpf(rush_origin, rush_end, (float(i) + .5) / 3.0)
-			add_flame(lane, 3.1, 2.0, elapsed + .57 + float(i) * .11)
+			add_flame(lane, 3.1, 2.0, elapsed + .42 + float(i) * .11)
 	update_rush_markers()
+
+func lava_warning_time() -> float:
+	return LAVA_WARNING[difficulty_mode]
+
+func build_lava_surge() -> void:
+	var width := arena_right - arena_left + 4.8
+	tracks = FLAME.floor_mark(width, 3.6, FLAME.Style.CASTING, Color("ff5627"))
+	tracks.top_level = true
+	add_child(tracks)
+	tracks.global_position = Vector3((arena_left + arena_right) * .5, floor_height + .12, 0.0)
+	var slab := BoxMesh.new()
+	slab.size = Vector3(width, 14.0, 6.15)
+	slab.subdivide_width = 48
+	slab.subdivide_depth = 12
+	var material := ShaderMaterial.new()
+	material.shader = LavaShader
+	lava_surface = MeshInstance3D.new()
+	lava_surface.mesh = slab
+	lava_surface.material_override = material
+	lava_surface.top_level = true
+	lava_surface.hide()
+	add_child(lava_surface)
+	lava_damage_at = lava_warning_time() + .36
+
+func update_lava_surge(authority: bool) -> void:
+	if not is_instance_valid(lava_surface):
+		return
+	var age := elapsed - lava_warning_time()
+	var drain := LAVA_RISE_TIME + LAVA_HOLD_TIME
+	var progress := smoothstep(0.0, LAVA_RISE_TIME, age) * (1.0 - smoothstep(drain, drain + LAVA_DRAIN_TIME, age))
+	var height := progress * (2.85 if warden else 3.38)
+	tracks.visible = age < 0.0
+	if tracks.visible:
+		var warning := tracks.material_override as ShaderMaterial
+		warning.set_shader_parameter("progress", clampf(elapsed / lava_warning_time(), 0.0, 1.0))
+	var appeared := height > .035 and not lava_surface.visible
+	lava_surface.visible = height > .035
+	lava_surface.global_position = Vector3((arena_left + arena_right) * .5, floor_height + height - 7.0, .1)
+	lava_surface.material_override.set_shader_parameter("visible_depth", height + .32)
+	if appeared:
+		RiftAudio.foundry_sound(&"fire_jet", global_position)
+	if not authority or elapsed < lava_damage_at or height < .25:
+		return
+	lava_damage_at = elapsed + .72
+	for body in operators():
+		var at: Vector3 = body.global_position
+		var feet: float = at.y - body.standing_capsule.height * .5
+		if at.x >= arena_left - 2.4 and at.x <= arena_right + 2.4 and feet < floor_height + height:
+			body.take_boss_hit((20.0 if warden else 26.0) * encounter_attack_scale, global_position, 1)
 
 func release_pressure() -> void:
 	if not active or motion != "kiln_backdraft" or exposed or elapsed >= backdraft_warning():
@@ -404,31 +530,46 @@ func open_armor() -> void:
 func mechanic_preview_target() -> Vector3:
 	if warden and not purge_valves.is_empty():
 		return purge_valves[0].global_position + Vector3.UP * 0.46
-	if not quench_locks.is_empty():
-		return quench_locks[0].global_position + Vector3.UP * 1.32
+	if drop_points.size() > 1:
+		return drop_points[1].global_position + Vector3.UP * 5.0
 	return global_position
 
 func show_intro_target(enabled: bool) -> void:
 	if warden and not purge_valves.is_empty():
 		purge_valves[0].show_target(enabled)
-	elif not quench_locks.is_empty():
-		var lock := quench_locks[0]
-		lock.show_target(QuenchLock.State.ARMED if enabled else lock.state)
+	elif enabled and drop_points.size() > 1:
+		intro_core = FallingCore.new()
+		intro_core.top_level = true
+		add_child(intro_core)
+		intro_core.global_position = drop_points[1].global_position
+		intro_core.present(0.0, SLAM_TIME, CORE_LAND_TIME, 5.0, false)
+		intro_core.footprint.hide()
+	elif is_instance_valid(intro_core):
+		intro_core.queue_free()
+		intro_core = null
 
 func encounter_status() -> String:
 	if exposed:
 		return "CORE EXPOSED   %.1f s\nSHOOT THE BOSS NOW" % maxf(0.0, window_end - elapsed)
+	if motion == "lava_surge":
+		if elapsed < lava_warning_time():
+			return "LAVA SURGE   %.1f s\nCLIMB TO AN UPPER PLATFORM" % (lava_warning_time() - elapsed)
+		return "LAVA ON THE FLOOR\nSTAY ON THE UPPER PLATFORMS"
 	if warden:
 		if motion == "kiln_backdraft" and elapsed < backdraft_warning():
 			return "SHOOT EITHER LIT VALVE   %.1f s\nHIT IT BEFORE THE FIRE STARTS" % maxf(0.0, backdraft_warning() - elapsed)
 		if motion == "kiln_backdraft":
 			return "BACKDRAFT   /   DODGE THE FIRE\nTHE ARMOR IS STILL SEALED"
 		return "ARMOR SEALED\nWAIT FOR A PURGE VALVE TO LIGHT UP"
-	if motion in ["rush", "rupture"] and quench_index >= 0:
-		return "LOCK LINED UP   /   JUMP CLEAR\nLET THE DRILL HIT THE AMBER LOCK"
-	if motion in ["rush", "rupture"] and world_impact:
-		return "CHARGE MISSED\nSTAND PAST A QUENCH LOCK"
-	return "ARMOR SEALED\nSTAND PAST A QUENCH LOCK"
+	if motion in ["rush", "rupture"]:
+		if elapsed < CORE_LAND_TIME:
+			return "GROUND SLAM\nCLEAR THE AMBER DROP ZONE"
+		if world_impact:
+			return "CHARGE MISSED\nBAIT THE NEXT CHARGE PAST THE CORE"
+		if elapsed >= AIM_LOCK_TIME:
+			return "CHARGE LOCKED\nJUMP CLEAR" if rush_hits_core else "CHARGE LOCKED\nDODGE THE DRILL"
+		return "AMBER CORE LANDED\nMOVE TO ITS FAR SIDE"
+	return "ARMOR SEALED\nWAIT FOR THE GROUND SLAM"
 
 func fire_at(prior: float, at: float, height: float, is_drill: bool) -> void:
 	if prior >= at or elapsed < at:
@@ -485,8 +626,8 @@ func advance_flames(authority: bool) -> void:
 					body.take_boss_hit(power * encounter_attack_scale, flame.global_position, 1, true)
 
 func show_rush_markers() -> void:
-	var lo := minf(rush_origin, rush_destination()) - (2.45 if facing < 0 else 0.75)
-	var hi := maxf(rush_origin, rush_destination()) + (2.45 if facing > 0 else 0.75)
+	var lo := minf(rush_origin, rush_end) - (2.45 if facing < 0 else 0.75)
+	var hi := maxf(rush_origin, rush_end) + (2.45 if facing > 0 else 0.75)
 	tracks = FLAME.floor_mark(hi - lo, 2.35, FLAME.Style.DRILL, Color("ff632d"))
 	add_child(tracks)
 	tracks.top_level = true
@@ -499,7 +640,7 @@ func update_rush_markers() -> void:
 		tracks.visible = not exposed and elapsed < RUSH_WINDUP
 		if tracks.visible:
 			var material := tracks.material_override as ShaderMaterial
-			material.set_shader_parameter("progress", clampf(elapsed / 0.92, 0.0, 1.0))
+			material.set_shader_parameter("progress", clampf(inverse_lerp(AIM_LOCK_TIME, RUSH_WINDUP, elapsed), 0.0, 1.0))
 
 func draw_pose(delta: float) -> void:
 	var mix_weight := 1.0 - exp(-delta * 17.0)
@@ -509,25 +650,26 @@ func draw_pose(delta: float) -> void:
 	var hammer := 0.0
 	var recoil := 0.0
 	match motion:
-		"rush", "rupture":
-			windup = clampf(elapsed / 0.68, 0.0, 1.0)
-			lean = -0.21 * windup if elapsed < RUSH_WINDUP else 0.26
-			rise = -0.13 * windup
-			if elapsed > RUSH_END_TIME or world_impact:
-				windup = clampf((2.21 - elapsed) / 0.53, 0.0, 1.0)
-				lean = 0.12 * windup
-				rise *= windup
-		"hammer":
-			var gather := sin(clampf(elapsed / 0.93, 0.0, 1.0) * PI * 0.5)
-			var slam := smoothstep(0.75, 0.95, elapsed) * (1.0 - smoothstep(1.12, 1.67, elapsed))
+		"hammer", "rush", "rupture":
+			var slam_time := .95 if motion == "hammer" else SLAM_TIME
+			var gather := sin(clampf(elapsed / slam_time, 0.0, 1.0) * PI * 0.5) * (1.0 - smoothstep(slam_time, slam_time + .56, elapsed))
+			var slam := smoothstep(slam_time - .20, slam_time, elapsed) * (1.0 - smoothstep(slam_time + .15, slam_time + .72, elapsed))
 			lean = gather * -0.15 + slam * 0.47
 			rise = gather * 0.08 - slam * 0.25
 			hammer = -.66 * gather * (1.0 - slam) + .51 * slam
+			if motion != "hammer" and elapsed >= AIM_LOCK_TIME:
+				windup = clampf(inverse_lerp(AIM_LOCK_TIME, RUSH_WINDUP, elapsed), 0.0, 1.0)
+				lean = -0.21 * windup if elapsed < RUSH_WINDUP else 0.26
+				rise = -0.13 * windup
+				if world_impact:
+					windup = .12 if exposed else 0.0
+					lean = .22 if exposed else .05
+					rise = -.34 if exposed else 0.0
 		"low_volley", "drill_volley", "crossfire":
 			windup = smoothstep(0.0, 0.50, elapsed) * (1.0 - smoothstep(1.44, 1.8, elapsed))
 			recoil = sin(elapsed * 20.0) * 0.12 * windup
 			lean = recoil
-		"firewall", "sweep", "pressure_dump", "kiln_backdraft", "casting_wave", "overhead_vent":
+		"firewall", "sweep", "pressure_dump", "kiln_backdraft", "casting_wave", "overhead_vent", "lava_surge":
 			windup = smoothstep(0.0, 0.78, elapsed) * (1.0 - smoothstep(2.18, 2.65, elapsed))
 			lean = -0.12 * windup
 			rise = -0.14 * windup
@@ -544,13 +686,20 @@ func clear_attack() -> void:
 	if is_instance_valid(tracks):
 		tracks.queue_free()
 		tracks = null
+	if is_instance_valid(falling_core):
+		falling_core.queue_free()
+		falling_core = null
+	if is_instance_valid(lava_surface):
+		lava_surface.queue_free()
+		lava_surface = null
 	motion = ""
 	exposed = false
 	exposed_light.hide()
 	window_end = 0.0
 	pressure_released = false
-	quench_index = -1
-	refresh_quench_locks()
+	core_index = -1
+	rush_hits_core = false
+	core_shattered = false
 	present_purge_valves(false, false)
 	stop_core_burn()
 
@@ -632,23 +781,20 @@ func foundry_snapshot() -> Array:
 	for flame in zones:
 		emitters.append(Vector4(flame.global_position.x, flame.height, flame.width, flame.warning_time))
 		elevations.append(flame.global_position.y)
-	return [motion, step, elapsed, facing, stride, move_phase, exposed, rush_origin, rush_end, emitters, world_impact, pressure_released, elevations, window_end, quench_index]
+	return [motion, step, elapsed, facing, stride, move_phase, exposed, rush_origin, rush_end, emitters, world_impact, pressure_released, elevations, window_end, core_index, rush_hits_core, core_shattered]
 
 func apply_foundry_snapshot(state: Array) -> void:
+	var prior := elapsed if step == state[1] and motion == state[0] else 0.0
 	if motion != state[0] or step != state[1] or zones.size() != state[9].size():
 		clear_attack()
 		motion = state[0]
 		step = state[1]
-		facing = state[3]
-		rush_origin = state[7]
-		rush_end = state[8]
-		quench_index = clampi(int(state[14]), -1, quench_locks.size() - 1) if state.size() > 14 else -1
 		for index in state[9].size():
 			var emitter: Vector4 = state[9][index]
 			var platform_y: float = state[12][index] if state.size() > 12 else floor_height
 			add_flame(emitter.x, emitter.y, emitter.z, emitter.w, platform_y)
-		if motion in ["rush", "rupture"]:
-			show_rush_markers()
+		if motion == "lava_surge":
+			build_lava_surge()
 	var delta := clampf(float(state[2]) - elapsed, 0.04, 0.11)
 	elapsed = state[2]
 	facing = state[3]
@@ -657,11 +803,27 @@ func apply_foundry_snapshot(state: Array) -> void:
 	exposed = state[6]
 	exposed_light.visible = exposed
 	world_impact = state[10]
+	rush_origin = state[7]
+	rush_end = state[8]
 	pressure_released = state[11] if state.size() > 11 else false
 	window_end = state[13] if state.size() > 13 else elapsed
-	quench_index = clampi(int(state[14]), -1, quench_locks.size() - 1) if state.size() > 14 else -1
-	refresh_quench_locks()
+	core_index = clampi(int(state[14]), -1, drop_points.size() - 1) if state.size() > 14 else -1
+	rush_hits_core = state.size() > 15 and bool(state[15])
+	core_shattered = state.size() > 16 and bool(state[16])
 	present_purge_valves(not pressure_released and motion == "kiln_backdraft" and elapsed < backdraft_warning(), false)
 	draw_pose(delta)
 	advance_flames(false)
-	update_rush_markers()
+	if motion == "lava_surge":
+		update_lava_surge(false)
+	elif motion in ["rush", "rupture"]:
+		show_falling_core()
+		present_core()
+		if prior < SLAM_TIME and elapsed >= SLAM_TIME and elapsed < CORE_LAND_TIME:
+			slam_effect()
+		if prior < CORE_LAND_TIME and elapsed >= CORE_LAND_TIME and not core_shattered:
+			core_landing_effect()
+		if core_shattered:
+			shatter_core()
+		if elapsed >= AIM_LOCK_TIME and elapsed < RUSH_WINDUP and not is_instance_valid(tracks):
+			show_rush_markers()
+		update_rush_markers()

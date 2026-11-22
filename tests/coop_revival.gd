@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tests/game_test_tree.gd"
 
 class FakePeer extends Node:
 	var sent := []
@@ -188,4 +188,4 @@ func run() -> void:
 	mission.peer.free()
 	mission.queue_free()
 	await process_frame
-	quit(failures)
+	finish(failures)

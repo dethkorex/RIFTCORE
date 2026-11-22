@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tests/game_test_tree.gd"
 
 var directions: Array[Vector3] = []
 var muzzles: Array[Vector3] = []
@@ -69,11 +69,11 @@ func run() -> void:
 		failures += int(not fired_up)
 		await frames(20)
 	for sample in [
-		["move_right", 1.0, 1.0, Vector3(1.0, 1.0, 0.0)],
-		["move_right", 1.0, 0.4, Vector3(1.0, 0.4, 0.0)],
-		["move_right", 1.0, 0.14, Vector3(1.0, 0.14, 0.0)],
-		["move_right", 1.0, 0.19, Vector3(1.0, 0.19, 0.0)],
-		["move_left", 0.35, 1.0, Vector3(-0.35, 1.0, 0.0)],
+		["move_right", 1.0, 1.0, Vector3.RIGHT],
+		["move_right", 1.0, 0.4, Vector3.RIGHT],
+		["move_right", 1.0, 0.14, Vector3.RIGHT],
+		["move_left", 1.0, 0.19, Vector3.LEFT],
+		["move_left", 0.35, 1.0, Vector3.UP],
 	]:
 		actor.reset_predicted_position(spawn.global_position, Vector3.ZERO, 1.0)
 		await frames(5)
@@ -82,7 +82,7 @@ func run() -> void:
 		var before := directions.size()
 		await fire()
 		var correct: bool = directions.size() > before and directions.back().is_equal_approx(sample[3].normalized())
-		print("PASS " if correct else "FAIL ", "Upper aiming follows the exact stick ratio ", sample[3])
+		print("PASS " if correct else "FAIL ", "Mixed movement and up input picks a cardinal direction ", sample[3])
 		failures += int(not correct)
 		Input.action_release(sample[0])
 		Input.action_release("climb_up")
@@ -117,9 +117,9 @@ func run() -> void:
 			Input.action_press("move_left")
 		var before := directions.size()
 		await fire()
-		var expected := Vector3(-1, -1, 0).normalized() if sideways else Vector3.DOWN
+		var expected := Vector3.LEFT if sideways else Vector3.DOWN
 		var down_shot: bool = not actor.grounded() and directions.size() > before and directions.back().is_equal_approx(expected)
-		print("PASS " if down_shot else "FAIL ", "Free fall allows downward aim, sideways=", sideways)
+		print("PASS " if down_shot else "FAIL ", "Free fall shoots down on vertical input and stays horizontal with sideways movement, sideways=", sideways)
 		failures += int(not down_shot)
 		Input.action_release("move_left")
 		Input.action_release("climb_down")
@@ -132,7 +132,7 @@ func run() -> void:
 	var rising_level: bool = directions.back().is_equal_approx(Vector3.RIGHT)
 	print("PASS " if rising_level else "FAIL ", "Rising with Down held fires horizontally")
 	failures += int(not rising_level)
-	quit(failures)
+	finish(failures)
 
 func fire() -> void:
 	Input.action_press("shoot")

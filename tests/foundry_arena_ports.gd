@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tests/game_test_tree.gd"
 
 var failures := 0
 
@@ -82,4 +82,4 @@ func run() -> void:
 		verify(player.health < hp, "standing on the glowing grate deals damage")
 		player.health = player.max_health
 		player.clear_boss_debuff()
-	quit(failures)
+	finish(failures)

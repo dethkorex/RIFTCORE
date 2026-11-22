@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tests/game_test_tree.gd"
 var failures:=0
 func _initialize() -> void: run.call_deferred()
 func check(ok: bool,label: String) -> void:
@@ -77,4 +77,4 @@ func run() -> void:
 	await process_frame
 	await process_frame
 	print("SWIM ANIMATION RESULT failures=",failures)
-	quit(int(failures>0))
+	finish(int(failures>0))

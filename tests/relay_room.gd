@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tests/game_test_tree.gd"
 
 func _initialize() -> void:
 	run.call_deferred()
@@ -32,7 +32,7 @@ func run() -> void:
 	var party := button(game.menu, "Party")
 	failures += int(not check(is_instance_valid(party), "Social offers party management"))
 	if not party:
-		quit(failures)
+		finish(failures)
 		return
 	party.pressed.emit()
 	failures += int(not check(game.menu.page == "Party" and game.menu.relay_host.visible, "Party screen offers room controls"))
@@ -57,7 +57,7 @@ func run() -> void:
 		game.pause_menu.back_action.call()
 		failures += int(not check(paused and button(game.pause_menu, "Settings") != null, "Settings returns to Pause"))
 	paused = false
-	quit(failures)
+	finish(failures)
 
 func check(passed: bool, message: String) -> bool:
 	print("PASS " if passed else "FAIL ", message)

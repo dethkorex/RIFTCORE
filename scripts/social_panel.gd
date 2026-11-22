@@ -733,42 +733,6 @@ static func build_friend_requests(menu, columns: HBoxContainer) -> void:
 	watch(rows, directory.changed, redraw)
 	redraw.call()
 
-static func build_add(menu, columns: HBoxContainer) -> void:
-	build_directory_search(menu, columns)
-	var form: VBoxContainer = menu.card(columns)
-	UI.label(form, "ADD STEAM CONTACT", 26, UI.CYAN)
-	UI.label(form, "Steam ID, numeric friend code, or Steam profile link", 17, UI.MUTED)
-	var account := LineEdit.new()
-	account.placeholder_text = "Steam ID or link"
-	account.max_length = 160
-	form.add_child(account)
-	UI.button(form, "Paste from Clipboard", func():
-		account.text = DisplayServer.clipboard_get().strip_edges().left(account.max_length)
-		account.grab_focus()
-		account.caret_column = account.text.length()
-	, false, 35)
-	var alias := LineEdit.new()
-	alias.placeholder_text = "Name (optional)"
-	alias.max_length = 40
-	form.add_child(alias)
-	var message := UI.label(form, "", 16, UI.VIOLET)
-	var submit := func():
-		var id := RiftSocial.resolve_contact_id(account.text)
-		if id.is_empty():
-			message.text = "Enter a numeric friend code, Steam ID, or numeric Steam profile link."
-			return
-		var display := alias.text.strip_edges()
-		if not RiftSocial.save_contact(id, id if display.is_empty() else display):
-			message.text = "Could not save this contact."
-			return
-		menu.social_contact = "steam:" + id
-		menu.social_filter = 0
-		menu.show_page("Social")
-	UI.button(form, "Save Contact", submit, false, 36)
-	account.text_submitted.connect(func(_value): submit.call())
-	alias.text_submitted.connect(func(_value): submit.call())
-	UI.label(form, "Players you meet in co-op also appear under Recent.", 16, UI.MUTED)
-
 static func build_conversation(parent: VBoxContainer) -> Dictionary:
 	var pane := UI.column(parent, 5)
 	pane.size_flags_vertical = Control.SIZE_EXPAND_FILL

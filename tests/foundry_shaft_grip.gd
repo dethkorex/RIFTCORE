@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tests/game_test_tree.gd"
 
 var failures := 0
 
@@ -52,4 +52,4 @@ func run() -> void:
 			await physics_frame
 		check(player.is_on_wall() and not player.grounded(), sample[0] + " gives real airborne wall contact")
 		check((player.wall_grace > 0) == (not surface.is_in_group(&"no_wall_kick")), sample[0] + " enforces its grip during player movement")
-	quit(failures)
+	finish(failures)

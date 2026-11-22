@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tests/game_test_tree.gd"
 
 var game
 var lobby
@@ -76,13 +76,13 @@ func run() -> void:
 		game.menu.relay_join.pressed.emit()
 	if not await until(func(): return not lobby.connected_room.is_empty(),40):
 		check(false,"join test room")
-		quit(1)
+		finish(1)
 		return
 	peer=lobby.relay
 	if host: print("STRESS ROOM ",lobby.connected_room)
 	if not await until(func(): return lobby.room_size==count,70):
 		check(false,"all participants joined")
-		quit(1)
+		finish(1)
 		return
 	check(true,"joined %d-player room"%count)
 	lobby.party_chat_changed.connect(capture_chat)
@@ -94,7 +94,7 @@ func run() -> void:
 	await until(func(): return seen.size()>=count*16,10)
 	check(seen.size()==count*16,"all %d party messages received exactly once"%(count*16))
 	if failures>0:
-		quit(1)
+		finish(1)
 		return
 	for sector in ([1] if suite=="lava" else ([4] if suite=="abyssal" else ([1,2,3] if suite=="network" else range(1,11)))):
 		if not await barrier("deploy-%d"%sector): break
@@ -155,7 +155,7 @@ func run() -> void:
 	print("STRESS RESULT ",OS.get_name()," client=",client," players=",count," suite=",suite," failures=",failures," seconds=",(Time.get_ticks_msec()-start_time)/1000)
 	lobby.leave()
 	await create_timer(.3).timeout
-	quit(1 if failures else 0)
+	finish(1 if failures else 0)
 
 func capture_chat() -> void:
 	for message in lobby.party_messages:

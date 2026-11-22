@@ -1,7 +1,6 @@
 extends RefCounted
 
 const Materials := preload("res://scripts/fabrication_catalog.gd")
-const RARITIES := ["Common", "Rare", "Epic", "Legendary"]
 const MATERIAL_PRICES := {"scrap": 75, "components": 80, "circuits": 135, "cells": 105}
 const SECTOR_BUNDLE_PRICES := [125, 190, 320, 490]
 const MATERIAL_STOCK := [

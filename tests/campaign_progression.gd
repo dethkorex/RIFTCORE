@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tests/game_test_tree.gd"
 
 const Catalog := preload("res://scripts/sector_catalog.gd")
 var failures := 0
@@ -148,4 +148,4 @@ func run() -> void:
 		paused = false
 		game.queue_free()
 		await process_frame
-	quit(failures)
+	finish(failures)

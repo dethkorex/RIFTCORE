@@ -6,7 +6,6 @@ const ATTACK_FX := preload("res://scripts/attack_fx.gd")
 @export_range(3, 10) var sector_number := 3
 @export var accent := Color.CYAN
 @export var minion_scene: PackedScene
-const ZONE := preload("res://scripts/biome_zone.gd")
 const CARGO := preload("res://scripts/cargo_carrier.gd")
 const PATTERNS := {
 	3: ["ice_wall", "shards", "charge", "ice_burst"],

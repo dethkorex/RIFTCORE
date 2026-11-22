@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tests/game_test_tree.gd"
 var failures:=0
 var demonstration_done:=false
 func _initialize() -> void: run.call_deferred()
@@ -52,4 +52,4 @@ func run() -> void:
 	await process_frame
 	await process_frame
 	print("SUIT REVEAL WEAPONS RESULT failures=",failures)
-	quit(int(failures>0))
+	finish(int(failures>0))

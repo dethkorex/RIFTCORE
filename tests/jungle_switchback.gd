@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tests/game_test_tree.gd"
 
 var failures := 0
 
@@ -60,4 +60,4 @@ func run() -> void:
 		check(pod_zone.damage_volume.shape.size.x <= 1.75, "Act %d spore damage stays near the plant" % act)
 		stage.queue_free()
 		await wait_ticks(4)
-	quit(failures)
+	finish(failures)

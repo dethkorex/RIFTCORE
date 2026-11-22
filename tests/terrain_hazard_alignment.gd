@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tests/game_test_tree.gd"
 
 var failures := 0
 var elapsed := 0.0
@@ -53,4 +53,4 @@ func run() -> void:
 	await sample(press.period * .12)
 	check(not press.overlaps_body(player) and player.health == after_hit, "retracted jaw clears the operator")
 	print("TERRAIN ALIGNMENT FAILURES ", failures)
-	quit(failures)
+	finish(failures)

@@ -57,7 +57,7 @@ func run() -> void:
 			await process_frame
 			await physics_frame
 	print("CAVERN FAILURES ", failures)
-	quit(failures)
+	finish(failures)
 
 func drop_through_to(actor, source: StaticBody3D, landing: StaticBody3D) -> bool:
 	var half_width: float = source.get_node("Collider").shape.size.x * .5

@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tests/game_test_tree.gd"
 
 var failures := 0
 
@@ -41,4 +41,4 @@ func run() -> void:
 			var start := roof.global_position + Vector3(x, .9, 1.02)
 			check(cast(stage, start, start + Vector3.DOWN * 1.8).get("collider") == roof, name + " ceiling across the room")
 	check(is_equal_approx(stage.get_node("MARKERS/RoomExit").position.x - stage.get_node("MARKERS/PlayerSpawn").position.x, 333.4), "Act I keeps the original deployment-to-extraction distance")
-	quit(failures)
+	finish(failures)

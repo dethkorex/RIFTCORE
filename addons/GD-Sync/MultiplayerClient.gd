@@ -324,8 +324,8 @@ func start_multiplayer() -> void:
 ## An alternative for get_tree().quit(). Only use if you log into a GD-Sync account using [method account_login].
 ## When quitting while logged in the plugin makes some callbacks to the server to update information like
 ## your friend status.
-func quit(before_disconnect := Callable()) -> void:
-	_data_controller.quit(before_disconnect)
+func quit(before_disconnect := Callable(), after_disconnect := Callable()) -> void:
+	_data_controller.quit(before_disconnect, after_disconnect)
 
 ## Starts the GD-Sync plugin locally. This will allow for local peer-to-peer connections but will disable features
 ## such as database access and automatic host switching. Local mode also disables some optimization features

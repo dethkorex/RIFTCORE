@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tests/game_test_tree.gd"
 
 var failures := 0
 
@@ -13,7 +13,7 @@ func run() -> void:
 	var args := OS.get_cmdline_user_args()
 	if args.is_empty():
 		push_error("Pass a scratch directory for save fixtures.")
-		quit(2)
+		finish(2)
 		return
 	var manual_save = load("res://scripts/manual_save_session.gd")
 	manual_save.slot_directory = args[0].path_join("save-test-%d" % OS.get_process_id())
@@ -244,4 +244,4 @@ func run() -> void:
 	after_reset.path = account.path
 	after_reset.restore()
 	check(after_reset.unlocked_skins == account.unlocked_skins and after_reset.finish_progress == account.finish_progress, "New wardrobe unlocks and progress survive a reload")
-	quit(failures)
+	finish(failures)

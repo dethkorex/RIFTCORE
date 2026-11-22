@@ -244,7 +244,7 @@ static func boss_exchange(sector: int, act: int) -> Array:
 	return lines
 
 static func foundry_boss_hint(act: int) -> String:
-	return "Shoot a blue purge valve before the fire starts. Then hit the Warden while its armor is open." if act == 1 else "Get behind a quench lock. Jump clear on amber. When it catches the Titan's drill, hit the exposed core."
+	return "Shoot either blue purge valve before the fire starts. When the lava rises, get onto a high platform." if act == 1 else "The Titan's slam knocks an amber core loose. Stand past it to bait the charge, then jump. Shoot the Titan when the core bursts."
 
 static func jungle_boss_hint(act: int) -> String:
 	return "Trace the green tether to Briar's seed anchor. Break it to open the armor. If it grows back, follow the new tether." if act == 1 else "When poison rises, stand on a glowing drain until the mist clears. Then drop down and hit the open reactor."

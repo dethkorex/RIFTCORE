@@ -86,6 +86,8 @@ var directory: PlayerDirectory
 var recovery: PartyRecovery
 
 func _ready() -> void:
+	get_tree().set_auto_accept_quit(false)
+	get_tree().root.close_requested.connect(quit_game)
 	process_mode = PROCESS_MODE_ALWAYS
 	recovery = PartyRecovery.new()
 	recovery.name = "PartyRecovery"
@@ -157,11 +159,13 @@ func quit_game() -> void:
 	if quitting:
 		return
 	quitting = true
+	voice.stop_microphone_test()
+	voice.reset()
 	if is_instance_valid(relay) and relay.account_is_logged_in():
 		var clear_whispers: bool = not directory.whispers.session_owner.is_empty()
-		relay.quit(_finish_account_session.bind(clear_whispers) if directory.online() else Callable())
+		relay.quit(_finish_account_session.bind(clear_whispers) if directory.online() else Callable(), RiftAudio.quit_after_audio)
 	else:
-		get_tree().quit()
+		RiftAudio.quit_after_audio()
 
 func _finish_account_session(clear_whispers: bool) -> void:
 	# Back up the save before transient chat and presence cleanup can block its write.

@@ -582,6 +582,7 @@ func load_stage(packed: PackedScene = null) -> void:
 		actors.add_child(guard)
 		boss = guard
 	scale_opponent(boss)
+	BossIntro.mount_pad(boss, gate.global_position.y, Color(info.color))
 	boss.hide()
 	if host:
 		boss.died.connect(on_boss_defeated)
@@ -2118,7 +2119,8 @@ func apply_operator_state(operator: RiftPlayer, data: Array, is_local: bool) -> 
 		var pitch := (combat_flags & BUSTER_PITCH_MASK) >> BUSTER_PITCH_SHIFT
 		if pitch == 0:
 			var legacy := (combat_flags & LEGACY_BUSTER_AIM_MASK) >> LEGACY_BUSTER_AIM_SHIFT
-			pitch = 90 if legacy == 1 else (45 if legacy == 2 else 0)
+			pitch = 90 if legacy == 1 else 0
+		pitch = 90 if pitch >= 68 else 0
 		var direction := -1.0 if combat_flags & BUSTER_PITCH_DOWN else 1.0
 		operator.present_buster_pitch(deg_to_rad(pitch) * direction, data[5])
 		if not is_local and (was_aiming or pitch > 0):

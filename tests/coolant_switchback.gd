@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tests/game_test_tree.gd"
 
 var player
 var game
@@ -130,4 +130,4 @@ func run() -> void:
 		game.queue_free()
 		await process_frame
 		await physics_frame
-	quit(1 if failed else 0)
+	finish(1 if failed else 0)

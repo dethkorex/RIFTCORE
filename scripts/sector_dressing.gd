@@ -209,67 +209,6 @@ func decorate_bay(x: float, y: float, row: int) -> void:
 				var tip := at + Vector3(rng.randf_range(-0.75,0.75),rng.randf_range(0.7,2.05),0.25)
 				branch("Rift crystal", at, tip, rng.randf_range(.19,.42), .018, glow if i == row % 5 else trim, 5)
 
-func build_arena_backdrop() -> void:
-	var at := Vector3((left_edge + right_edge) * 0.5, cave_floor + 7.25, -4.10)
-	var core := Vector3(0,1.0,0)
-	match sector:
-		1:
-			plate("Smelting furnace", at, Vector3(7.9,5.5,.94), base, .40)
-			for i in 7:
-				var x := (i-3)*.87
-				plate("Furnace intake", at + Vector3(x,0,.52), Vector3(.40,3.22,.24), trim, .082)
-				plate("Banked furnace light", at + Vector3(x,0,.66), Vector3(.12,2.2,.067), glow)
-		2:
-			branch("Massive canopy root", at + Vector3(-5.0,3.2,-.2), at + Vector3(.8,-3.2,.06), .82,.42,base,10)
-			branch("Crossing canopy root", at + Vector3(5.4,2.6,-.22), at + Vector3(-1.4,-.7,.12), .65,.22,trim,10)
-			cave_formation(at + Vector3(-2.65,1.25,0))
-			cave_formation(at + Vector3(3.1,2.30,0))
-		3:
-			for offset in [-3.4,0.0,3.4]:
-				cave_formation(at + Vector3(offset,2.3 - absf(offset)*.33,0))
-			plate("Cold fusion containment", at, Vector3(3.4,4.5,.83), base, .24)
-			for i in 3:
-				plate("Heat sink fins", at + Vector3((i-1)*.82,-.22,.46), Vector3(.28,3.4,.19), trim)
-		4:
-			branch("Pressure chamber vessel", at + Vector3(-4.03,0,0), at + Vector3(4.03,0,0), 1.35,1.35,base,16)
-			for i in [-1,0,1]:
-				branch("Pressure hoops", at + Vector3(i*1.95-.094,0,0), at + Vector3(i*1.95+.094,0,0), 1.43,1.43,trim,16)
-		5:
-			for i in [-1,0,1]:
-				plate("Archive monolith", at + Vector3(i*2.1,0,0), Vector3(1.74,4.8,.71), stone,.24)
-				var sigil := plate("Inlaid triangular seal", at + Vector3(i*2.1,.48,.39),
-					Vector3(.68,.68,.06), glow,.04)
-				sigil.rotation.z = PI / 4.0
-		6:
-			plate("Hangar bay bulkhead", at, Vector3(10.2,4.62,.74), base,.25)
-			for i in [-1,1]:
-				branch("Hangar strut", at + Vector3(i*4.7,-1.88,.30), at + Vector3(i*1.38,1.8,.30), .24,.32,trim,4)
-			plate("Flight approach marker", at + Vector3(0,0,.42), Vector3(3.8,.14,.11), glow)
-		7:
-			for x in [-2.37,2.37]:
-				var vessel := at + Vector3(x,0,0)
-				branch("Bioreactor culture tank", vessel - core * 2.25, vessel + core * 2.25, .91,.91,base,18)
-				for y in [-1.56,1.56]:
-					plate("Reactor tank brace", vessel + core*y, Vector3(2.06,.23,1.88), trim,.13)
-				plate("Sample observation window", vessel + Vector3(0,.02,.83), Vector3(.57,2.54,.15), glow,.12)
-		8, 10:
-			var ring := TorusMesh.new()
-			ring.rings = 32
-			ring.ring_segments = 8
-			ring.outer_radius = 2.81
-			ring.inner_radius = 2.54
-			part("Resonance ring", ring, at, trim).rotation.x = PI * 0.5
-			for i in 7:
-				var a := TAU * i / 7.0
-				var axis := Vector3(cos(a),sin(a),0)
-				branch("Field conductor", at + axis*1.62, at + axis*2.81, .096,.18,glow,5)
-		9:
-			branch("Gantry crane crossmember", at + Vector3(-5.1,1.80,0), at + Vector3(5.1,1.80,0), .31,.31,trim,4)
-			for offset in [-3.6,2.7]:
-				var origin := at + Vector3(offset,-.1,.17)
-				branch("Crane hoist cable", origin, origin + core*2.0, .051,.068,base,6)
-				plate("Magnet hoist", origin - core*.24, Vector3(1.6,.72,.82), stone, .14)
-
 func cave_formation(origin: Vector3) -> void:
 	for i in 3:
 		var offset := Vector3((i - 1) * 0.91, rng.randf_range(-0.17, 0.21), -0.18)

@@ -38,6 +38,7 @@ var logged_in : bool = false
 var safe_quit : bool = false
 var quitting := false
 var quit_finished := false
+var quit_callback: Callable
 var document_write_busy := false
 
 var status_ping_timer : float = 0.0
@@ -74,13 +75,14 @@ func refresh_friend_status() -> void:
 	status_update_running = false
 
 func _notification(what : int) -> void:
-	if what == NOTIFICATION_WM_CLOSE_REQUEST:
-		quit()
+	if what == NOTIFICATION_WM_CLOSE_REQUEST and logged_in:
+		quit.call_deferred()
 
-func quit(before_disconnect := Callable()) -> void:
+func quit(before_disconnect := Callable(), after_disconnect := Callable()) -> void:
 	if quitting:
 		return
 	quitting = true
+	quit_callback = after_disconnect
 	get_tree().create_timer(2.0, true, false, true).timeout.connect(_finish_quit)
 	if logged_in and GDSync.is_active():
 		if before_disconnect.is_valid():
@@ -99,7 +101,10 @@ func _finish_quit() -> void:
 	connection_controller.reset_multiplayer()
 	safe_quit = true
 	save_config()
-	get_tree().quit()
+	if quit_callback.is_valid():
+		quit_callback.call()
+	else:
+		get_tree().quit()
 
 func log_in(username : String = "") -> void:
 	logged_in = true

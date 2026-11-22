@@ -45,7 +45,7 @@ const FOUNDRY_SOUNDS := {
 }
 
 func foundry_sound(cue: StringName, at: Vector3) -> void:
-	if not get_viewport().get_camera_3d() or absf(get_viewport().get_camera_3d().global_position.x - at.x) > 27.0:
+	if shutting_down or not get_viewport().get_camera_3d() or absf(get_viewport().get_camera_3d().global_position.x - at.x) > 27.0:
 		return
 	var voice := AudioStreamPlayer3D.new()
 	voice.stream = FOUNDRY_SOUNDS[cue]
@@ -67,6 +67,7 @@ var dash_fade: Tween
 const ENEMY_SHOTS := [preload("res://assets/audio/enemy_pulse.wav"),preload("res://assets/audio/enemy_heavy.wav")]
 var last_enemy_volley := {"at": Vector3.INF, "time": -100}
 var last_menu_move := -100
+var shutting_down := false
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -93,6 +94,8 @@ func play_boss_music(sector: int, act: int) -> void:
 	play_sector_score(sector, clampi(act, 1, 2))
 
 func play_sector_score(sector: int, category: int) -> void:
+	if shutting_down:
+		return
 	var tracks: Array = SCORE[clampi(sector - 1, 0, SCORE.size() - 1)]
 	var path := "%s/%s/%s.ogg" % [SCORE_ROOT, SCORE_CATEGORIES[category], tracks[category]]
 	if is_instance_valid(requested_track) and requested_track.resource_path == path:
@@ -109,7 +112,7 @@ func make_music_player() -> AudioStreamPlayer:
 	return deck
 
 func switch_music(track: AudioStream, volume: float) -> void:
-	if requested_track == track:
+	if shutting_down or requested_track == track:
 		return
 	requested_track = track
 	if music_fade and music_fade.is_valid():
@@ -146,6 +149,8 @@ func swap_music_players() -> void:
 	music_tail = previous
 
 func play_effect(cue: StringName) -> void:
+	if shutting_down:
+		return
 	if cue == &"voice_start" or cue == &"voice_level_up":
 		for extension in ["ogg", "wav", "mp3"]:
 			var path := "res://assets/audio/%s.%s" % [cue, extension]
@@ -203,6 +208,8 @@ func enemy_damage(at: Vector3) -> void:
 		play_enemy_sound(preload("res://assets/audio/enemy_damage.wav"), at, -10.5)
 
 func play_enemy_sound(stream: AudioStream, at: Vector3, gain_db: float) -> void:
+	if shutting_down:
+		return
 	var voice := AudioStreamPlayer3D.new()
 	voice.bus = &"SFX"
 	voice.stream = stream
@@ -217,3 +224,25 @@ func play_enemy_sound(stream: AudioStream, at: Vector3, gain_db: float) -> void:
 
 func stop_effect(cue: StringName) -> void:
 	voices[cue].stop()
+
+func quit_after_audio(exit_code := 0) -> void:
+	if shutting_down:
+		return
+	shutting_down = true
+	var tree := get_tree()
+	tree.paused = true
+	for fade in [music_fade, dash_fade]:
+		if fade and fade.is_valid():
+			fade.kill()
+	for type in [&"AudioStreamPlayer", &"AudioStreamPlayer2D", &"AudioStreamPlayer3D", &"VideoStreamPlayer"]:
+		for player in tree.root.find_children("*", type, true, false):
+			player.stop()
+			player.stream = null
+	requested_track = null
+	# Stopped streams are retired by the mixer. Fixed-FPS tests still use real audio time.
+	var mix_interval := maxf(AudioServer.get_output_latency(), AudioServer.get_time_to_next_mix())
+	var deadline := Time.get_ticks_msec() + ceili(clampf(mix_interval * 3.0, .09, .30) * 1000.0)
+	while Time.get_ticks_msec() < deadline:
+		await tree.process_frame
+	await tree.process_frame
+	tree.quit(exit_code)

@@ -227,20 +227,6 @@ func contacts() -> Array[Dictionary]:
 	rows.sort_custom(func(a, b): return a.priority < b.priority if a.priority != b.priority else a.name.nocasecmp_to(b.name) < 0)
 	return rows
 
-func resolve_contact_id(value: String) -> String:
-	value = value.strip_edges()
-	for prefix in ["https://steamcommunity.com/profiles/", "http://steamcommunity.com/profiles/"]:
-		if value.begins_with(prefix):
-			var profile_id := value.trim_prefix(prefix).get_slice("?", 0).get_slice("#", 0).trim_suffix("/")
-			return profile_id if valid_id(profile_id) else ""
-	if valid_id(value):
-		return value
-	if value.is_valid_int() and value.length() <= 10:
-		var account := value.to_int()
-		if account > 0 and account <= 4294967295:
-			return str(STEAM_MIN + account)
-	return ""
-
 func valid_id(value: String) -> bool:
 	return value.length() == 17 and value.is_valid_int() and value.to_int() > STEAM_MIN and value.to_int() <= STEAM_MIN + 4294967295
 
@@ -281,11 +267,3 @@ func reset_social_data() -> bool:
 	operator_id = Crypto.new().generate_random_bytes(8).hex_encode()
 	invites_changed.emit()
 	return save_social()
-
-func open_friends() -> void:
-	if OS.shell_open("steam://open/friends") != OK:
-		OS.shell_open("https://steamcommunity.com/my/friends/")
-
-func open_profile(id: String) -> void:
-	if valid_id(id):
-		OS.shell_open("https://steamcommunity.com/profiles/" + id)

@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tests/game_test_tree.gd"
 
 var failures := 0
 func _initialize() -> void:
@@ -128,4 +128,4 @@ func run() -> void:
 	print("FROZEN SECTOR TEST failures=",failures)
 	game.queue_free()
 	await process_frame
-	quit(1 if failures else 0)
+	finish(1 if failures else 0)

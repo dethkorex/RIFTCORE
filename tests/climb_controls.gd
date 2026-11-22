@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tests/game_test_tree.gd"
 
 var errors := 0
 
@@ -100,4 +100,4 @@ func run() -> void:
 	check(actor.dash_left > 0.0, "B dashes on a solid floor when standing")
 	dash.pressed = false
 	Input.parse_input_event(dash)
-	quit(errors)
+	finish(errors)

@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tests/game_test_tree.gd"
 
 var failures := 0
 
@@ -167,4 +167,4 @@ func run() -> void:
 	for voice in root.get_node("RiftAudio").find_children("*", "AudioStreamPlayer", true, false):
 		voice.stop()
 	await create_timer(0.4).timeout
-	quit(failures)
+	finish(failures)

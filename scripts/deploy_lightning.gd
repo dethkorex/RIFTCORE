@@ -3,7 +3,7 @@ extends Node3D
 const Bolt := preload("res://addons/arcflux_fx/nodes_3d/arcflux_bolt_3d.gd")
 const CYAN := Color("42dfff")
 
-func strike() -> void:
+func strike(tint := CYAN, height := 6.0) -> void:
 	var bolt := Bolt.new()
 	bolt.autoplay = false
 	bolt.width = 0.10
@@ -18,9 +18,9 @@ func strike() -> void:
 	bolt.impact_sparks = 12
 	bolt.light_range = 4.3
 	var palette := ArcfluxPalette.new()
-	palette.glow_color = CYAN
-	palette.core_color = Color("d6f7ff")
+	palette.glow_color = tint
+	palette.core_color = tint.lerp(Color.WHITE, .84)
 	bolt.palette = palette
 	add_child(bolt)
-	bolt.strike(to_global(Vector3(-0.5, 6.0, 0.06)), to_global(Vector3(0, 0.09, 0.12)))
+	bolt.strike(to_global(Vector3(-0.5, height, 0.06)), to_global(Vector3(0, 0.09, 0.12)))
 	get_tree().create_timer(bolt.total_time() + 0.10, false).timeout.connect(queue_free)

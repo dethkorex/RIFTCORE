@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tests/game_test_tree.gd"
 
 const Story := preload("res://scripts/rift_story.gd")
 const Reader := preload("res://scripts/dialogue_typewriter.gd")
@@ -88,4 +88,4 @@ func run() -> void:
 		"Skip closes the dialogue and unlocks gameplay input")
 	dialogue.queue_free()
 	await process_frame
-	quit(failures)
+	finish(failures)

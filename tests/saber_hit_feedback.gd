@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tests/game_test_tree.gd"
 
 var failures := 0
 var hits: Array[bool] = []
@@ -179,4 +179,4 @@ func run() -> void:
 	stage.queue_free()
 	for frame in 8:
 		await process_frame
-	quit(failures)
+	finish(failures)

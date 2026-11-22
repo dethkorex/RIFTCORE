@@ -7,10 +7,24 @@ const HUD := preload("res://scripts/factory_hud.gd")
 const FoundryRig := preload("res://scripts/foundry_boss_rig.gd")
 const JungleRig := preload("res://scripts/jungle_boss_rig.gd")
 const Fire := preload("res://addons/pyrolux_fx/nodes_3d/pyrolux_fire_3d.gd")
+const Pad := preload("res://assets/neon_factory/deployment_pad.tscn")
+const Beam := preload("res://scripts/deploy_lightning.gd")
+const UI := preload("res://scripts/rift_ui.gd")
+const Materialize := preload("res://assets/vfx/boss_materialize.gdshader")
+const CHARGE_TIME := 1.30
 
-const DROP_HEIGHT := 7.0
-const DROP_TIME := 0.76
-const CHARGE_TIME := 1.85
+static func mount_pad(boss: Combatant, floor_y: float, tint: Color) -> Node3D:
+	var arena := boss.get_parent()
+	var existing := arena.get_node_or_null("BossDeploymentPad") as Node3D
+	if existing:
+		return existing
+	var pad := Pad.instantiate() as Node3D
+	pad.name = "BossDeploymentPad"
+	pad.tint_override = tint
+	pad.scale = Vector3(2.2, 1.0, 1.52)
+	arena.add_child(pad)
+	pad.global_position = Vector3(boss.global_position.x, floor_y - .091, boss.global_position.z)
+	return pad
 
 func play(rig: SideCameraRig, boss: Combatant, floor_y: float, title: String, tint: Color, sector: int, act: int, readout: HUD, online := false, combat_target: Node3D = null) -> void:
 	var camera := rig.get_node("Camera3D") as Camera3D
@@ -34,26 +48,41 @@ func play(rig: SideCameraRig, boss: Combatant, floor_y: float, title: String, ti
 	var head := Vector3(landing.x, floor_y + height, landing.z)
 	var focus := head - Vector3.UP * height * 0.42
 	var wide := maxf(height * 1.55, 5.5)
-	var lift := clear_drop_height(boss, bounds, floor_y)
+	var pad := mount_pad(boss, floor_y, tint)
+	var scan := ShaderMaterial.new()
+	scan.shader = Materialize
+	scan.set_shader_parameter("tint", tint)
+	scan.set_shader_parameter("scan_y", floor_y - .16)
+	var silhouette: Dictionary[MeshInstance3D, Material] = {}
+	for mesh: MeshInstance3D in articulation.find_children("*", "MeshInstance3D", true, false):
+		silhouette[mesh] = mesh.material_override
+		mesh.material_override = scan
 	rig.set_process(false)
 	boss.collision_layer = 0
 	readout.boss_visible = false
 	readout.queue_redraw()
 
-	# Keep a single continuous shot through the fall and floor impact.
 	var approach := Vector3(-wide * 0.20, 0.72, wide)
-	boss.global_position = landing + Vector3.UP * lift
-	aim(camera, focus + Vector3.UP * lift * 0.72, approach)
-	if lift > 0.18:
-		var fall := create_tween().set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-		fall.tween_method(func(remaining: float):
-			boss.global_position = landing + Vector3.UP * remaining
-			if animate.is_valid():
-				animate.call(get_process_delta_time(), smoothstep(0.04, 0.82, remaining), 0.0, 0.0, 0.0)
-			aim(camera, focus + Vector3.UP * remaining * 0.72, approach)
-		, lift, 0.0, DROP_TIME * sqrt(lift / DROP_HEIGHT))
-		await fall.finished
-	boss.global_position = landing
+	var floor_focus := focus.lerp(pad.global_position, .41)
+	aim(camera, floor_focus, approach)
+	pad.pulse()
+	await get_tree().create_timer(.17, false).timeout
+	var beam := Beam.new()
+	add_child(beam)
+	beam.global_position = pad.global_position + Vector3.UP * .12
+	beam.strike(tint, clampf(height + 1.4, 3.2, 6.0))
+	RiftAudio.play_effect(&"deploy_zap")
+	var arrival := create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	arrival.tween_method(func(weight: float):
+		scan.set_shader_parameter("scan_y", floor_y - .16 + (height + .4) * weight)
+		if animate.is_valid():
+			animate.call(get_process_delta_time(), 0.0, 1.0 - weight, 0.0, 0.0)
+		aim(camera, floor_focus.lerp(focus, weight), approach)
+	, 0.0, 1.0, .58)
+	await arrival.finished
+	for mesh in silhouette:
+		if is_instance_valid(mesh):
+			mesh.material_override = silhouette[mesh]
 
 	var impact := Node3D.new()
 	add_child(impact)
@@ -71,19 +100,19 @@ func play(rig: SideCameraRig, boss: Combatant, floor_y: float, title: String, ti
 	, 0.0, 1.0, 0.25)
 	await recovery.finished
 
-	# The camera moves closer only after the body is planted.
 	var hero_offset := Vector3(-wide * 0.32, 0.42, wide * 0.91)
 	var opening_rotation := articulation.rotation
+	var title_card := show_title(title, tint, act, camera.get_viewport())
+	var hero_focus := focus - Vector3.RIGHT * clampf(height * .47, .85, 2.1)
 	var pose := create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	pose.tween_method(func(weight: float):
 		if armor:
 			armor.rotation.y = lerp_angle(opening_rotation.y, -0.36, weight)
 		if animate.is_valid():
 			animate.call(get_process_delta_time(), 0.0, 0.0, weight, 0.0)
-		aim(camera, focus, approach.lerp(hero_offset, weight))
-	, 0.0, 1.0, 0.65)
+		aim(camera, focus.lerp(hero_focus, weight), approach.lerp(hero_offset, weight))
+	, 0.0, 1.0, 0.52)
 	await pose.finished
-	await get_tree().create_timer(0.25, false).timeout
 
 	var charge_tint := Color("d45aff") if jungle and act == 2 else tint
 	var charge_fx := make_charge(impact, charge_tint, height, maxf(bounds.size.x, bounds.size.z))
@@ -119,6 +148,7 @@ func play(rig: SideCameraRig, boss: Combatant, floor_y: float, title: String, ti
 	RiftAudio.play_effect(&"deploy_zap")
 	RiftProjectile.suit_flash(impact, boss.global_position, charge_tint, true)
 	charge_fx.extinguish()
+	title_card.queue_free()
 	await get_tree().create_timer(0.45, false).timeout
 
 	if DisplayServer.get_name() != "headless":
@@ -154,6 +184,24 @@ func play(rig: SideCameraRig, boss: Combatant, floor_y: float, title: String, ti
 	rig.global_position = view_at
 	camera.transform = gameplay_camera
 	rig.set_process(true)
+
+func show_title(title: String, tint: Color, act: int, viewport: Viewport) -> CanvasLayer:
+	var layer := CanvasLayer.new()
+	layer.layer = 24
+	add_child(layer)
+	var card := UI.equipment_card(tint)
+	card.custom_minimum_size.x = 304
+	layer.add_child(card)
+	var block := UI.column(card, 0)
+	UI.profile_label(block, "ACT I  /  MINIBOSS" if act == 1 else "ACT II  /  SECTOR GUARDIAN", 18, tint)
+	UI.profile_label(block, title.to_upper(), 42)
+	var y := viewport.get_visible_rect().size.y * .69
+	card.position = Vector2(-34.0, y)
+	card.modulate.a = 0.0
+	var reveal := create_tween().set_parallel().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	reveal.tween_property(card, "position:x", 44.0, .31)
+	reveal.tween_property(card, "modulate:a", 1.0, .24)
+	return layer
 
 func make_charge(parent: Node3D, tint: Color, height: float, width: float) -> PyroluxFire3D:
 	var fire := Fire.new()
@@ -214,24 +262,6 @@ func play_nova_hint(hint: String) -> void:
 	add_child(guide)
 	await guide.play([[Story.GUIDE, hint]], "Continue")
 	guide.queue_free()
-
-func clear_drop_height(boss: CollisionObject3D, bounds: AABB, floor_y: float) -> float:
-	var shape := BoxShape3D.new()
-	shape.size = Vector3(maxf(bounds.size.x + 0.25, 1.4), maxf(bounds.end.y - floor_y - 0.16, 1.1),
-		maxf(bounds.size.z + 0.2, 0.9))
-	var center := bounds.get_center()
-	center.y = floor_y + 0.16 + shape.size.y * 0.5
-	var query := PhysicsShapeQueryParameters3D.new()
-	query.shape = shape
-	query.transform = Transform3D(Basis.IDENTITY, center)
-	query.collision_mask = 1
-	query.exclude = [boss.get_rid()]
-	var space := boss.get_world_3d().direct_space_state
-	if not space.intersect_shape(query, 1).is_empty():
-		return 0.0
-	query.motion = Vector3.UP * DROP_HEIGHT
-	var clearance := space.cast_motion(query)
-	return maxf(0.0, DROP_HEIGHT * clearance[0] - 0.12) if clearance.size() > 0 else 0.0
 
 func aim(camera: Camera3D, target: Vector3, offset: Vector3) -> void:
 	camera.global_position = target + offset

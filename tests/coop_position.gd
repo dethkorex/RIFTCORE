@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tests/game_test_tree.gd"
 
 class FakePeer extends Node:
 	func get_host() -> int:
@@ -124,14 +124,16 @@ func run() -> void:
 	var partner_state: Array = mission.targets[0].duplicate()
 	partner_state.append_array([0, Vector4.ZERO, Vector3.ZERO, "", 27 << mission.BUSTER_PITCH_SHIFT])
 	mission.apply_operator_state(partner, partner_state, false)
-	var pitch := deg_to_rad(27.0)
-	check(partner.buster_pose.direction_override.is_equal_approx(Vector3(-cos(pitch), sin(pitch), 0.0)), "Co-op keeps a partner's shallow left aim")
-	partner_state[24] = (27 << mission.BUSTER_PITCH_SHIFT) | mission.BUSTER_PITCH_DOWN
+	check(partner.buster_pose.direction_override.is_zero_approx(), "A shallow legacy pitch stays horizontal")
+	partner_state[24] = 90 << mission.BUSTER_PITCH_SHIFT
 	mission.apply_operator_state(partner, partner_state, false)
-	check(partner.buster_pose.direction_override.is_equal_approx(Vector3(-cos(pitch), -sin(pitch), 0.0)), "Co-op keeps a partner's downward aim")
+	check(partner.buster_pose.direction_override.is_equal_approx(Vector3.UP), "Co-op shows a partner aiming straight up")
+	partner_state[24] = (90 << mission.BUSTER_PITCH_SHIFT) | mission.BUSTER_PITCH_DOWN
+	mission.apply_operator_state(partner, partner_state, false)
+	check(partner.buster_pose.direction_override.is_equal_approx(Vector3.DOWN), "Co-op shows a partner aiming straight down")
 	partner_state[24] = 4 << mission.LEGACY_BUSTER_AIM_SHIFT
 	mission.apply_operator_state(partner, partner_state, false)
 	check(partner.buster_pose.direction_override.is_zero_approx(), "A legacy downward pose cannot aim the partner's cannon below level")
 	mission.free()
 	peer.free()
-	quit(failures)
+	finish(failures)

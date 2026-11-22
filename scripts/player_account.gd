@@ -191,9 +191,6 @@ func display_skin(slot: int) -> String:
 	var choice := String(operator_skins.get(slot, ""))
 	return choice if unlocked_skins.has(choice) else ""
 
-func select_skin(slot: int, choice: String) -> Error:
-	return select_appearance(slot, display_frame(slot), choice)
-
 func display_frame(slot: int) -> String:
 	var choice := String(operator_frames.get(slot, ""))
 	return choice if Frames.available(choice) and Frames.owned(choice, ManualSave.read_slot(slot)) else ""

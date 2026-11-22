@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tests/game_test_tree.gd"
 var failures := 0
 func _initialize() -> void:
 	run.call_deferred()
@@ -64,4 +64,4 @@ func run() -> void:
 		for frame in 4:
 			await process_frame
 	print("FROZEN COMBAT TEST failures=",failures)
-	quit(failures)
+	finish(failures)

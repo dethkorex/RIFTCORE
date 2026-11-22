@@ -1323,8 +1323,7 @@ func update_charge(delta: float) -> void:
 		return
 	charge_elapsed += delta
 	if buster_pose and fire_lock <= 0.0:
-		var next_pitch := lerpf(buster_pitch, requested_buster_pitch(), 1.0 - exp(-28.0 * delta))
-		present_buster_pitch(allowed_buster_pitch(next_pitch), facing)
+		present_buster_pitch(requested_buster_pitch(), facing)
 	present_charge(charge_elapsed, boss_debuff != 5 and energy >= charged_shot_cost())
 
 func queue_buster_shot(charged: bool, pose_held: bool, suit_shot := false) -> void:
@@ -1341,7 +1340,6 @@ func queue_buster_shot(charged: bool, pose_held: bool, suit_shot := false) -> vo
 		queued_buster_pitch = shot_pitch
 
 static func local_buster_axis() -> Vector2:
-	# Use one circular dead zone so ladder thresholds don't flatten shallow aim.
 	return Input.get_vector("move_left", "move_right", "climb_down", "climb_up", 0.18)
 
 func requested_buster_pitch() -> float:
@@ -1350,7 +1348,9 @@ func requested_buster_pitch() -> float:
 	var axis := local_buster_axis()
 	if remote_input:
 		axis = remote_buster_axis if remote_buster_axis.is_finite() else remote_axis
-	return allowed_buster_pitch(atan2(axis.y, absf(axis.x)) if not axis.is_zero_approx() else 0.0)
+	if absf(axis.y) < .45 or absf(axis.y) <= absf(axis.x):
+		return 0.0
+	return allowed_buster_pitch(signf(axis.y) * PI * .5)
 
 func allowed_buster_pitch(pitch: float) -> float:
 	if low_profile or is_instance_valid(ladder) or is_instance_valid(rocket_course) or swim_volume():
@@ -1359,7 +1359,9 @@ func allowed_buster_pitch(pitch: float) -> float:
 	return clampf(pitch, -PI * 0.5 if free_falling else 0.0, PI * 0.5)
 
 func buster_direction(pitch: float, side: float) -> Vector3:
-	return Vector3(cos(pitch) * side, sin(pitch), 0.0)
+	if is_zero_approx(pitch):
+		return Vector3.RIGHT * side
+	return Vector3.UP if pitch > 0.0 else Vector3.DOWN
 
 func present_buster_pitch(pitch: float, side: float) -> void:
 	buster_pitch = clampf(pitch, -PI * 0.5, PI * 0.5)

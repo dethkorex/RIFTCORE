@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tests/game_test_tree.gd"
 
 var failures := 0
 
@@ -57,7 +57,7 @@ func run() -> void:
 	check(game.menu.page == "Settings", "The controller opens Settings")
 	var settings = menu.find_child("RiftSettingsPanel", true, false)
 	if not is_instance_valid(settings):
-		quit(1)
+		finish(1)
 		return
 	var tab_bar: TabBar = settings.tabs.get_tab_bar()
 	for title in ["Audio", "Video", "Gameplay"]:
@@ -89,4 +89,4 @@ func run() -> void:
 	root.push_input(motion)
 	await frames(24)
 	check(focused_label() != "Enter Station" and focused_label() != "Operators", "Holding the analog stick still repeats movement")
-	quit(int(failures > 0))
+	finish(int(failures > 0))

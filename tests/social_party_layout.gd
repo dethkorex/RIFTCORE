@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tests/game_test_tree.gd"
 
 const Codes := preload("res://addons/GD-Sync/Scripts/Enums/Enums.gd")
 
@@ -112,4 +112,4 @@ func run() -> void:
 	await process_frame
 	await process_frame
 	print("SOCIAL PARTY LAYOUT RESULT failures=",failures)
-	quit(int(failures>0))
+	finish(int(failures>0))

@@ -107,7 +107,7 @@ func _ready() -> void:
 			updater.clean_install()
 		updater.free()
 		if started:
-			get_tree().quit()
+			RiftAudio.quit_after_audio()
 			return
 		preload("res://scripts/steam_artwork.gd").apply.call_deferred(install_root)
 	add_build_version()
@@ -278,7 +278,7 @@ func verify_social() -> void:
 	valid = valid and is_instance_valid(menu.relay_host)
 	if not valid:
 		print("SOCIAL SMOKE FAIL")
-		get_tree().quit(1)
+		RiftAudio.quit_after_audio(1)
 		return
 	if "--require-relay" in OS.get_cmdline_user_args():
 		valid = (valid and RiftRelay.available
@@ -297,7 +297,7 @@ func verify_social() -> void:
 		valid = valid and get_node_or_null("/root/GDSync") == null
 	RiftRelay.leave()
 	print("SOCIAL SMOKE PASS" if valid else "SOCIAL SMOKE FAIL")
-	get_tree().quit(0 if valid else 1)
+	RiftAudio.quit_after_audio(0 if valid else 1)
 
 func verify_live_relay(arguments: PackedStringArray) -> void:
 	var wipe_test := arguments.has("wipe")
@@ -316,11 +316,11 @@ func verify_live_relay(arguments: PackedStringArray) -> void:
 	var guest := arguments.size() == 2 and arguments[0] == "join" and RiftRelay.valid_code(arguments[1])
 	if (not host and not guest) or smoke_sector < 1 or smoke_sector > Catalog.SECTORS.size():
 		print("RELAY CHECK FAIL. Use host or join ROOM_CODE, with optional mission sector=N.")
-		get_tree().quit(1)
+		RiftAudio.quit_after_audio(1)
 		return
 	if not RiftRelay.available:
 		print("RELAY CHECK FAIL. ", RiftRelay.RELAY_UNAVAILABLE)
-		get_tree().quit(1)
+		RiftAudio.quit_after_audio(1)
 		return
 
 	profile.operator_name = "Leader RX" if host else "Guest RX"
@@ -900,7 +900,7 @@ func finish_relay_check(passed: bool) -> void:
 	RiftRelay.leave()
 	if checkpoint_path.begins_with("user://relay-check-") and FileAccess.file_exists(checkpoint_path):
 		DirAccess.remove_absolute(checkpoint_path)
-	get_tree().quit(0 if passed else 1)
+	RiftAudio.quit_after_audio(0 if passed else 1)
 
 func configure_input() -> void:
 	add_key_action("move_left", KEY_A)
@@ -2024,6 +2024,7 @@ func build_level() -> void:
 		boss = create_miniboss()
 		actors.add_child(boss)
 	boss.apply_boss_scaling(sector, mission_difficulty, act)
+	preload("res://scripts/boss_intro.gd").mount_pad(boss, gate.global_position.y, Color(Catalog.info(sector).color))
 	boss.hide()
 	build_hud()
 	for station in CHECKPOINT_STATIONS:

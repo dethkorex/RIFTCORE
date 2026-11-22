@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tests/game_test_tree.gd"
 
 var failures := 0
 
@@ -140,12 +140,19 @@ func run() -> void:
 			await frames(320)
 		game.queue_free()
 		await frames(3)
-	for mode in [1,2]:
-		var game = start(2,1,mode)
-		check(get_nodes_in_group(&"level_enemies").all(func(enemy): return enemy.enemy_level == (8 if mode == 1 else 16) and enemy.sector_damage_scale > 1.2), "Jungle level and damage scale with difficulty %d" % mode)
+	var normal = start(2, 1)
+	var normal_damage: float = normal.player.damage_taken_scale
+	normal.queue_free()
+	await frames(3)
+	for mode in [1, 2]:
+		var game = start(2, 1, mode)
+		var expected_level := 8 if mode == 1 else 16
+		var expected_damage := normal_damage * (1.28 if mode == 1 else 1.58)
+		check(get_nodes_in_group(&"level_enemies").all(func(enemy): return enemy.enemy_level == expected_level)
+			and is_equal_approx(game.player.damage_taken_scale, expected_damage), "Jungle level and incoming damage scale with difficulty %d" % mode)
 		game.queue_free()
 		await frames(3)
-	quit(failures)
+	finish(failures)
 
 func boss_balance() -> void:
 	for act in [1, 2]:
@@ -153,13 +160,16 @@ func boss_balance() -> void:
 		var base: float = foundry.boss.max_health
 		foundry.queue_free()
 		await frames(3)
-		var previous_health := base
+		var jungle_normal_health := 0.0
 		for difficulty in [0, 1, 2]:
 			var game = start(2, act, difficulty)
 			var boss = game.boss
 			var player = game.player
-			check(boss.max_health > previous_health * 1.50, "act %d mode %d HP scales from %.1f to %.1f" % [act, difficulty, previous_health, boss.max_health])
-			previous_health = boss.max_health
+			if difficulty == 0:
+				jungle_normal_health = boss.max_health
+				check(jungle_normal_health > base, "act %d Jungle boss has more HP than Foundry on Normal" % act)
+			var expected_hp: float = jungle_normal_health * [1.0, 1.28, 1.62][difficulty]
+			check(is_equal_approx(boss.max_health, expected_hp), "act %d mode %d boss has %.1f HP" % [act, difficulty, expected_hp])
 			boss.active = true
 			boss.target = player
 			var before: float = boss.health
@@ -183,7 +193,8 @@ func boss_balance() -> void:
 				boss.attack = 1
 				boss._release()
 			var shots := get_nodes_in_group(&"rift_projectile")
-			var expected_shot: float = (22.4 if act == 1 else 34.0) * [1.0, 1.18, 1.38][difficulty]
+			var normal_shot := 22.4 * 1.10 if act == 1 else 34.0 * 1.15
+			var expected_shot: float = normal_shot * [1.0, 1.18, 1.38][difficulty]
 			check(not shots.is_empty() and is_equal_approx(shots[0].damage, expected_shot), "act %d mode %d spawned shot does %.1f damage" % [act, difficulty, expected_shot])
 			game.queue_free()
 			await frames(3)

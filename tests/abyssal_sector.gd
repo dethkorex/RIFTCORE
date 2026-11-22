@@ -1,4 +1,4 @@
-extends SceneTree
+extends "res://tests/game_test_tree.gd"
 var failures:=0
 func _initialize() -> void: run.call_deferred()
 func check(ok: bool,caption: String) -> void:
@@ -163,7 +163,7 @@ func run() -> void:
 		await physics_frame
 		await process_frame
 	print("ABYSSAL RESULT failures=",failures)
-	quit(1 if failures else 0)
+	finish(1 if failures else 0)
 
 func jump(actor,a: Vector3,b: Vector3,edge_offset:=.55) -> bool:
 	actor.remote_held.clear()

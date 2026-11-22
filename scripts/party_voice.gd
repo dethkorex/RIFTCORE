@@ -37,7 +37,7 @@ func publish_preference() -> void:
 		lobby.relay.player_set_data(VOICE_READY, RiftSettings.voice_enabled)
 
 func available() -> bool:
-	return RiftSettings.voice_enabled and not lobby.connected_room.is_empty() and lobby.room_size > 1 and is_instance_valid(lobby.relay)
+	return not lobby.quitting and RiftSettings.voice_enabled and not lobby.connected_room.is_empty() and lobby.room_size > 1 and is_instance_valid(lobby.relay)
 
 func indicator_visible(id: int) -> bool:
 	return available() and (id == lobby.relay.get_client_id() or lobby.relay.player_get_data(id, VOICE_READY, false) == true)

@@ -194,7 +194,6 @@ var materials: Dictionary = {}
 var core_shards := 0:
 	set(value):
 		core_shards = maxi(0, value)
-const COSMETICS := {"Standard": Color("55e7ff"), "Magenta": Color("ff67ce"), "Gold": Color("ffd069")}
 var operator_name := "RX-07"
 var survival_seconds := 0.0
 var player_xp := 0
