@@ -175,7 +175,11 @@ jobs:
           $installation = Join-Path $env:LOCALAPPDATA 'RIFTCORE'
           $launcher = Join-Path $installation 'RIFTCORE.exe'
           if (!(Test-Path $launcher) -or (Test-Path (Join-Path $installation 'versions'))) { exit 1 }
-          Set-Content (Join-Path $installation 'updates.cfg') "[updates]`nrepository=`"`""
+          $config = Join-Path $installation 'updates.cfg'
+          if (!(Select-String -LiteralPath $config -SimpleMatch ('repository="' + $env:GITHUB_REPOSITORY + '"') -Quiet)) { exit 1 }
+          $manifest = Get-Content (Get-ChildItem update*.json | Select-Object -First 1).FullName -Raw | ConvertFrom-Json
+          if (!$manifest.assets.'windows-x64' -or $manifest.launcher.'windows-x64' -or (Test-Path 'RIFTCORE-Launcher-windows-x64.exe')) { exit 1 }
+          Set-Content $config "[updates]`nrepository=`"`""
           $log = Join-Path $env:RUNNER_TEMP 'installed-launcher.log'
           $launch = Start-Process -FilePath $launcher -ArgumentList @('--headless', '--quit-after', '120', '--log-file', ('"' + $log + '"')) -Wait -PassThru
           if ($launch.ExitCode -ne 0 -or !(Test-Path -LiteralPath $log) -or (Select-String -LiteralPath $log -Pattern 'SCRIPT ERROR:|Failed to load' -Quiet)) { exit 1 }
@@ -206,10 +210,11 @@ jobs:
           $target = Join-Path $base 'RIFTCORE.exe'
           $staged = Join-Path $folder.FullName 'RIFTCORE.exe'
           Copy-Item game/RIFTCORE.exe $target
-          Copy-Item RIFTCORE-Launcher-windows-x64.exe $staged
+          $launcher = Join-Path $env:LOCALAPPDATA 'RIFTCORE/RIFTCORE.exe'
+          Copy-Item $launcher $staged
           Set-Content (Join-Path $base 'updates.cfg') '[updates]`nrepository=""'.Replace('`n', [Environment]::NewLine)
           $run = Start-Process -FilePath $staged -ArgumentList @('--headless','--quit-after','600','--','--replace-launcher') -Wait -PassThru
-          if ($run.ExitCode -ne 0 -or (Get-FileHash $target).Hash -ne (Get-FileHash RIFTCORE-Launcher-windows-x64.exe).Hash) { exit 1 }
+          if ($run.ExitCode -ne 0 -or (Get-FileHash $target).Hash -ne (Get-FileHash $launcher).Hash) { exit 1 }
           for ($check = 0; $check -lt 50; $check++) {
             if (-not (Test-Path -LiteralPath "$target.previous") -and -not (Test-Path -LiteralPath $staged)) { break }
             Start-Sleep -Milliseconds 100
@@ -246,21 +251,36 @@ jobs:
         with:
           name: riftcore-playtest
           path: release-tools/artifacts
-      - name: Publish tagged preview
-        if: github.ref_type == 'tag' && endsWith(github.ref_name, '-preview')
+      - name: Publish tagged release
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
-          title="RIFTCORE ${RELEASE_TAG#v} and Launcher 0.3"
-          if [[ "$RELEASE_TAG" =~ ^v([0-9]+\.[0-9]+)\.0-preview$ ]]; then title="RIFTCORE Alpha ${BASH_REMATCH[1]} and Launcher 0.3"; fi
-          gh release create --repo "${{ github.repository }}" "$RELEASE_TAG" release-tools/artifacts/* --verify-tag --notes-file release-tools/artifacts/PATCH_NOTES.md --title "$title" --prerelease --latest=false
-      - name: Publish tagged release
-        if: github.ref_type == 'tag' && !endsWith(github.ref_name, '-preview')
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ github.ref_name }}
-        run: gh release create --repo "${{ github.repository }}" "$RELEASE_TAG" release-tools/artifacts/* --verify-tag --notes-file release-tools/artifacts/PATCH_NOTES.md --latest
+          base="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download/$RELEASE_TAG"
+          cat > release-tools/release-notes.md <<EOF
+          ## Install RIFTCORE
+
+          - **Windows** — [Download Windows Setup]($base/RIFTCORE-Windows-x64-Setup.exe) and run it. Setup installs the launcher, which downloads the game.
+          - **Linux** — [Download Linux Setup]($base/RIFTCORE-Linux-x64-Setup.run), make it executable, then run it.
+
+          EOF
+          cat release-tools/artifacts/PATCH_NOTES.md >> release-tools/release-notes.md
+          options=(--latest)
+          if [[ "$RELEASE_TAG" == *-preview ]]; then
+            title="RIFTCORE ${RELEASE_TAG#v} and Launcher 0.3"
+            if [[ "$RELEASE_TAG" =~ ^v([0-9]+\.[0-9]+)\.0-preview$ ]]; then title="RIFTCORE Alpha ${BASH_REMATCH[1]} and Launcher 0.3"; fi
+            options=(--title "$title" --prerelease --latest=false)
+          fi
+          assets=()
+          for asset in release-tools/artifacts/*; do
+            case "${asset##*/}" in
+              RIFTCORE-Windows-x64-Setup.exe) asset="$asset#Windows Setup (start here)" ;;
+              RIFTCORE-Linux-x64-Setup.run) asset="$asset#Linux Setup (start here)" ;;
+              RIFTCORE-windows-x64.zip) asset="$asset#Windows game archive (downloaded by the launcher)" ;;
+            esac
+            assets+=("$asset")
+          done
+          gh release create --repo "$GITHUB_REPOSITORY" "$RELEASE_TAG" "${assets[@]}" --verify-tag --notes-file release-tools/release-notes.md "${options[@]}"
 
       - uses: actions/download-artifact@v4
         if: github.ref_name == 'v0.5.6-preview'

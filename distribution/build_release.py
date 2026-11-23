@@ -178,12 +178,13 @@ def main() -> None:
             with embedded_release(a.tag, a.repo):
                 export(engine, ROOT, preset, version / binary, work / f"{platform}-game.log")
             export(engine, launcher, preset, payload / binary, work / f"{platform}-launcher.log")
-            launcher_asset = out / (f"RIFTCORE-Launcher-{platform}" + (".exe" if platform == "windows-x64" else ""))
-            shutil.copy2(payload / binary, launcher_asset)
-            with launcher_asset.open("rb") as handle:
-                launcher_hash = hashlib.file_digest(handle, "sha256").hexdigest()
-            manifest["launcher"][platform] = {"file": launcher_asset.name, "build": launcher_build,
-                                               "size": launcher_asset.stat().st_size, "sha256": launcher_hash}
+            if platform == "linux-x64":
+                launcher_asset = out / f"RIFTCORE-Launcher-{platform}"
+                shutil.copy2(payload / binary, launcher_asset)
+                with launcher_asset.open("rb") as handle:
+                    launcher_hash = hashlib.file_digest(handle, "sha256").hexdigest()
+                manifest["launcher"][platform] = {"file": launcher_asset.name, "build": launcher_build,
+                                                   "size": launcher_asset.stat().st_size, "sha256": launcher_hash}
             if platform == "windows-x64":
                 shutil.copy2(icon_cache, payload / "riftcore.ico")
             else:
