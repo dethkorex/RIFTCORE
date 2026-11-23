@@ -16,6 +16,7 @@ const CHUNK_BYTES := 200
 var directory
 var crypto := Crypto.new()
 var key: CryptoKey
+var key_thread := Thread.new()
 var session_owner := ""
 var session := ""
 var preparing := false
@@ -94,12 +95,27 @@ func setup() -> void:
 	# Clear abandoned packets before making the new session discoverable.
 	var cleared: int = await relay.account_delete_document(LIVE_ROOT)
 	if is_current(token) and cleared in [0, directory.Codes.ACCOUNT_DELETE_DOCUMENT_RESPONSE_CODE.DOESNT_EXIST]:
-		var candidate := crypto.generate_rsa(2048)
-		if candidate:
+		var candidate := await generate_session_key()
+		if candidate and is_current(token):
 			await announce_endpoint(candidate, token)
 			if is_current(token) and key:
 				remove_legacy_history(token)
 	preparing = false
+
+# Key generation can take many frames. Only the private Crypto instance runs
+# on the worker. Account checks and endpoint publication stay on the main thread.
+func generate_session_key() -> CryptoKey:
+	var generator := Crypto.new()
+	if key_thread.start(generator.generate_rsa.bind(2048), Thread.PRIORITY_LOW) != OK:
+		return null
+	var tree := get_tree()
+	while key_thread.is_alive():
+		await tree.process_frame
+	return key_thread.wait_to_finish() as CryptoKey if key_thread.is_started() else null
+
+func _exit_tree() -> void:
+	if key_thread.is_started():
+		key_thread.wait_to_finish()
 
 func announce_endpoint(candidate: CryptoKey, token: String) -> void:
 	preparing = true

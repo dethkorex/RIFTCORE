@@ -18,6 +18,7 @@ const PALETTES := [
 static var kits: Dictionary = {}
 var meshes: Dictionary = {}
 var ice_coating := false
+static var shadow_meshes: Dictionary[bool, BoxMesh] = {}
 
 func _ready() -> void:
 	if surface == null:
@@ -29,7 +30,20 @@ func _ready() -> void:
 	var geometry := MeshInstance3D.new()
 	geometry.name = "Sector geometry"
 	geometry.mesh = kits[key]
+	geometry.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(geometry, true)
+
+	# The structural slab casts the shadow for all its small fascia details.
+	if not shadow_meshes.has(shaft):
+		var slab := BoxMesh.new()
+		slab.size = Vector3(0.79, 4.25, 3.97) if shaft else Vector3(5.98, 0.84, 4.78)
+		shadow_meshes[shaft] = slab
+	var caster := MeshInstance3D.new()
+	caster.name = "Structural shadow"
+	caster.mesh = shadow_meshes[shaft]
+	caster.position.y = 0.0 if shaft else -0.42
+	caster.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
+	add_child(caster)
 
 func make_kit() -> ArrayMesh:
 	var colors: Array = PALETTES[sector - 1]
@@ -59,6 +73,7 @@ func make_kit() -> ArrayMesh:
 	var assembled := ArrayMesh.new()
 	for material: Material in meshes:
 		var batch: SurfaceTool = meshes[material]
+		batch.index()
 		batch.set_material(material)
 		batch.commit(assembled)
 	meshes.clear()

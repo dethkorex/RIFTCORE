@@ -26,7 +26,7 @@ func _process(delta: float) -> void:
 	refresh_left = 0.1
 	var stage := stage_source.call() as Node3D
 	if not is_instance_valid(stage):
-		map_data.clear()
+		map_data = {}
 		queue_redraw()
 		return
 	if not stage.has_meta(GEOMETRY_CACHE):
@@ -100,11 +100,15 @@ func _draw() -> void:
 	var zoom := minf(area.size.x / world.size.x, area.size.y / world.size.y)
 	var center := area.get_center() - world.get_center() * zoom
 	var lines: PackedVector2Array = map_data.lines
+	var visible_lines := PackedVector2Array()
 	for index in range(0, lines.size(), 2):
 		var a := center + lines[index] * zoom
 		var b := center + lines[index + 1] * zoom
 		if Rect2(a.min(b), (a - b).abs()).grow(1.0).intersects(area):
-			draw_line(a.clamp(area.position, area.end), b.clamp(area.position, area.end), TRACE, 1.15, true)
+			visible_lines.append(a.clamp(area.position, area.end))
+			visible_lines.append(b.clamp(area.position, area.end))
+	if not visible_lines.is_empty():
+		draw_multiline(visible_lines, TRACE, 1.15, true)
 	var exit := center + Vector2(map_data.exit) * zoom
 	if area.has_point(exit):
 		draw_line(exit - Vector2(0, 5), exit + Vector2(0, 5), UI.VIOLET, 2, true)

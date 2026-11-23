@@ -19,6 +19,9 @@ var remote: Dictionary = {}
 var busy := false
 var conflict := false
 var last_checked_hash := ""
+var polled_files := PackedInt64Array()
+var polled_at := -1
+var polled_hash := ""
 var elapsed := 6.0
 var was_online := false
 var prepared_for := ""
@@ -43,8 +46,30 @@ func _process(delta: float) -> void:
 	if not busy and (not was_online or elapsed >= 6.0):
 		was_online = true
 		elapsed = 0.0
-		if fingerprint(snapshot()) != last_checked_hash:
+		if local_poll_hash() != last_checked_hash:
 			sync()
+
+# The periodic check only needs to know if local files changed. Explicit sync,
+# conflict resolution and restore always read a fresh, complete snapshot.
+func local_poll_hash() -> String:
+	var paths := [Player.PATH, Operators.shared_path()]
+	for number in range(1, Operators.SLOT_COUNT + 1):
+		paths.append(Operators.slot_path(number))
+	var stamp := PackedInt64Array()
+	var newest := -1
+	for path: String in paths:
+		var exists := FileAccess.file_exists(path)
+		var modified := int(FileAccess.get_modified_time(path)) if exists else -1
+		stamp.append(modified)
+		stamp.append(FileAccess.get_size(path) if exists else -1)
+		newest = maxi(newest, modified)
+	var now := floori(Time.get_unix_time_from_system())
+	# Files saved twice within one filesystem timestamp can have the same size.
+	if stamp != polled_files or newest >= polled_at or now < polled_at:
+		polled_hash = fingerprint(snapshot())
+		polled_files = stamp
+		polled_at = now
+	return polled_hash
 
 func snapshot() -> Dictionary:
 	var profile := ConfigFile.new()
@@ -77,6 +102,7 @@ func remember(revision: String, data: Dictionary) -> void:
 	last_checked_hash = fingerprint(data)
 
 func reset() -> void:
+	polled_files.clear()
 	prepared_for = ""
 	remote.clear()
 	conflict = false

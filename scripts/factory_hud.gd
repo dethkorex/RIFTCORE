@@ -179,7 +179,6 @@ func _ready() -> void:
 		portrait.hud_portrait = true
 		portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		add_child(portrait)
-		portrait.set_process(false)
 		portrait.sync_operator(local_operator as RiftPlayer)
 		RiftSettings.hud_scale_changed.connect(place_portrait)
 		place_portrait()

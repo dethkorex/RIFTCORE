@@ -17,6 +17,10 @@ var trim_scene: PackedScene
 func install(level: Node3D, target: Node3D, number: int, act_number: int) -> void:
 	for light: DirectionalLight3D in level.find_children("*", "DirectionalLight3D", true, false):
 		light.directional_shadow_max_distance = minf(light.directional_shadow_max_distance, SHADOW_DISTANCE)
+		# The operator and platforms occupy a narrow depth range in the side view.
+		if light.directional_shadow_mode == DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS:
+			light.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
+			light.directional_shadow_split_1 = 0.4
 	player = target
 	sector = number
 	act = act_number

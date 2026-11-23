@@ -6,6 +6,9 @@ const Pad := preload("res://assets/hub/deploy_pad.tscn")
 var actor: RiftPlayer
 var compact := false
 var hud_portrait := false
+const PORTRAIT_INTERVAL := 1.0 / 30.0
+var portrait_view: SubViewport
+var portrait_elapsed := 0.0
 var neutral_lighting := false
 var allow_zoom := false
 var camera: Camera3D
@@ -31,6 +34,11 @@ func _ready() -> void:
 		view.msaa_3d = Viewport.MSAA_2X
 	add_child(view)
 	build_preview(view)
+	if hud_portrait:
+		portrait_view = view
+		portrait_view.render_target_update_mode = SubViewport.UPDATE_ONCE
+		if actor.animation_player:
+			actor.animation_player.callback_mode_process = AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_MANUAL
 
 func enable_controls() -> void:
 	custom_minimum_size = Vector2(116, 160) if compact else Vector2(225, 270)
@@ -122,6 +130,17 @@ func _gui_input(event: InputEvent) -> void:
 			accept_event()
 
 func _process(delta: float) -> void:
+	if hud_portrait:
+		if not is_visible_in_tree() or not is_instance_valid(portrait_view):
+			return
+		portrait_elapsed += delta
+		if portrait_elapsed >= PORTRAIT_INTERVAL:
+			var remainder := fmod(portrait_elapsed, PORTRAIT_INTERVAL)
+			if actor.animation_player:
+				actor.animation_player.advance(portrait_elapsed - remainder)
+			portrait_elapsed = remainder
+			portrait_view.render_target_update_mode = SubViewport.UPDATE_ONCE
+		return
 	if has_focus() and not is_zero_approx(rotation_axis):
 		rotate_operator(rotation_axis * 2.8 * delta)
 

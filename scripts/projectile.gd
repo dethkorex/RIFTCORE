@@ -127,21 +127,15 @@ func setup(dir: Vector3, faction: String, tint: Color = Color.CYAN, drill := fal
 
 func build_buster_projectile() -> void:
 	var scale_factor := 2.25 if is_charged else 1.0
-	var core := part(skin, cached_mesh("Orb"), plasma_paint(palette), Vector3(0, 0, .045 * scale_factor),
+	var core := part(skin, cached_mesh("Orb"), shader_paint(BUSTER_PLASMA, &"plasma", palette), Vector3(0, 0, .045 * scale_factor),
 		Vector3(.16, .16, .32) * scale_factor)
 	core.name = "PlasmaCore"
-	var wake_paint := ShaderMaterial.new()
-	wake_paint.shader = BUSTER_WAKE
-	wake_paint.set_shader_parameter("ion_color", palette)
-	var wake_mesh := QuadMesh.new()
-	wake_mesh.size = Vector2.ONE
-	buster_wake = part(skin, wake_mesh, wake_paint, Vector3.ZERO, Vector3.ONE)
+	var wake_paint := shader_paint(BUSTER_WAKE, &"ion_color", palette)
+	buster_wake = part(skin, cached_quad(1.0), wake_paint, Vector3.ZERO, Vector3.ONE)
 	buster_wake.name = "PlasmaWake"
 	buster_wake.rotation.y = -PI * .5
 	buster_wake.hide()
-	var collar_paint := ShaderMaterial.new()
-	collar_paint.shader = BUSTER_PULSE
-	collar_paint.set_shader_parameter("ion_color", palette.lerp(Color.WHITE, .24))
+	var collar_paint := shader_paint(BUSTER_PULSE, &"ion_color", palette.lerp(Color.WHITE, .24))
 	var collar := part(skin, cached_mesh("Ring"), collar_paint,
 		Vector3(0, 0, -.05 * scale_factor), Vector3.ONE * .34 * scale_factor)
 	collar.name = "PulseCollar"
@@ -162,12 +156,12 @@ func build_buster_projectile() -> void:
 	pulse.tween_property(glow, "scale", Vector3.ONE * .16, time)
 	pulse.chain().tween_callback(flash.queue_free)
 
-static func plasma_paint(tint: Color) -> ShaderMaterial:
-	var key := "buster:" + tint.to_html()
+static func shader_paint(shader: Shader, parameter: StringName, tint: Color) -> ShaderMaterial:
+	var key := shader.resource_path + ":" + tint.to_html()
 	if not paint_cache.has(key):
 		var material := ShaderMaterial.new()
-		material.shader = BUSTER_PLASMA
-		material.set_shader_parameter("plasma", tint)
+		material.shader = shader
+		material.set_shader_parameter(parameter, tint)
 		paint_cache[key] = material
 	return paint_cache[key]
 
@@ -480,12 +474,14 @@ static func drill_visual(parent: Node3D, tint: Color, factor: float) -> Node3D:
 	return rotor
 
 static func add_glow(parent: Node3D, tint: Color, diameter: float) -> MeshInstance3D:
-	var mat := ShaderMaterial.new()
-	mat.shader = HALO
-	mat.set_shader_parameter("tint", tint)
-	var quad := QuadMesh.new()
-	quad.size = Vector2.ONE * diameter
-	return part(parent, quad, mat, Vector3.ZERO, Vector3.ONE)
+	return part(parent, cached_quad(diameter), shader_paint(HALO, &"tint", tint), Vector3.ZERO, Vector3.ONE)
+
+static func cached_quad(diameter: float) -> QuadMesh:
+	if not mesh_cache.has(diameter):
+		var quad := QuadMesh.new()
+		quad.size = Vector2.ONE * diameter
+		mesh_cache[diameter] = quad
+	return mesh_cache[diameter]
 
 static func part(parent: Node3D, mesh: Mesh, material: Material, at: Vector3, dimensions: Vector3) -> MeshInstance3D:
 	var piece := MeshInstance3D.new()
